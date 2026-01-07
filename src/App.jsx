@@ -20,7 +20,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 // --- 0. تهيئة التصميم والخطوط ---
 const DesignSystemLoader = () => {
   useEffect(() => {
-    // تحميل Tailwind CSS
     if (!document.getElementById('tailwind-script')) {
       const script = document.createElement('script');
       script.id = 'tailwind-script';
@@ -39,7 +38,6 @@ const DesignSystemLoader = () => {
       };
       document.head.appendChild(script);
     }
-    // تحميل خط Cairo
     if (!document.getElementById('cairo-font')) {
       const link = document.createElement('link');
       link.id = 'cairo-font';
@@ -254,6 +252,7 @@ const ChatWidget = ({ user }) => {
   const chatEndRef = useRef(null);
   const [isContactAdminMode, setIsContactAdminMode] = useState(false);
   
+  // الاستماع للرسائل (بما في ذلك ردود الأدمن)
   useEffect(() => {
     if (!isOpen) return;
     const userId = user ? user.email : sessionId;
@@ -287,7 +286,7 @@ const ChatWidget = ({ user }) => {
              botResponse = "اكتب رسالتك للمستر وهيتم الرد عليك هنا 👇";
              setIsContactAdminMode(true);
         } else {
-             botResponse = "تم استلام رسالتك! المستر هيشوفها ويرد عليك. ✅";
+             botResponse = "تم استلام رسالتك! المستر أو الأدمن هيشوفها ويرد عليك في أقرب وقت. ✅";
              await addDoc(collection(db, 'messages'), {
                text: userMsg.text, 
                sender: user ? user.email : sessionId, 
@@ -428,7 +427,14 @@ const SecureVideoPlayer = ({ video, userName, onClose }) => {
         <button onClick={onClose} className="absolute top-4 right-4 z-50 bg-red-600 hover:bg-red-700 text-white p-2 rounded-full"><X size={20}/></button>
         <div className="aspect-video relative bg-black flex items-center justify-center group">
           <div className="watermark-video">{userName} - {video.grade}</div>
-          {video.url.includes("youtube") || video.url.includes("youtu.be") ? (
+          
+          {video.url.startsWith('data:') ? (
+              // فيديو مرفوع (Data URL)
+              <video controls className="w-full h-full object-contain">
+                  <source src={video.url} type="video/mp4" />
+                  المتصفح لا يدعم هذا الفيديو.
+              </video>
+          ) : video.url.includes("youtube") || video.url.includes("youtu.be") ? (
             <iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${video.url.split('v=')[1]?.split('&')[0] || video.url.split('/').pop()}?rel=0&modestbranding=1`} title="Video" frameBorder="0" allowFullScreen></iframe>
           ) : (
             <div className="text-center">
@@ -464,6 +470,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
   useEffect(() => {
     if (isReviewMode || isSubmitted) return;
+
     const handleVisibilityChange = () => { if (document.hidden) handleCheating(); };
     document.addEventListener("visibilitychange", handleVisibilityChange);
     document.addEventListener('contextmenu', event => event.preventDefault()); 
@@ -691,7 +698,7 @@ const AdminDashboard = ({ user }) => {
   const handleUpdateUser = async (e) => { e.preventDefault(); if(!editingUser) return; await updateDoc(doc(db, 'users', editingUser.id), { name: editingUser.name, phone: editingUser.phone, parentPhone: editingUser.parentPhone, grade: editingUser.grade }); setEditingUser(null); };
   const handleSendResetPassword = async (email) => { if(window.confirm(`إرسال رابط تغيير كلمة السر لـ ${email}؟`)) await sendPasswordResetEmail(auth, email); };
   
-  // رفع الملفات
+  // رفع الملفات (محاكاة - يحول لـ Data URL)
   const handleFileSelect = (e) => {
       const file = e.target.files[0];
       if (file) {
