@@ -20,6 +20,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 // --- 0. تهيئة التصميم والخطوط ---
 const DesignSystemLoader = () => {
   useEffect(() => {
+    // 1. تحميل Tailwind CSS
     if (!document.getElementById('tailwind-script')) {
       const script = document.createElement('script');
       script.id = 'tailwind-script';
@@ -38,6 +39,7 @@ const DesignSystemLoader = () => {
       };
       document.head.appendChild(script);
     }
+    // 2. تحميل خط Cairo
     if (!document.getElementById('cairo-font')) {
       const link = document.createElement('link');
       link.id = 'cairo-font';
@@ -252,7 +254,6 @@ const ChatWidget = ({ user }) => {
   const chatEndRef = useRef(null);
   const [isContactAdminMode, setIsContactAdminMode] = useState(false);
   
-  // الاستماع للرسائل (بما في ذلك ردود الأدمن)
   useEffect(() => {
     if (!isOpen) return;
     const userId = user ? user.email : sessionId;
@@ -429,9 +430,7 @@ const SecureVideoPlayer = ({ video, userName, onClose }) => {
           <div className="watermark-video">{userName} - {video.grade}</div>
           
           {video.url.startsWith('data:') ? (
-              // فيديو مرفوع (Data URL)
-              <video controls className="w-full h-full object-contain">
-                  <source src={video.url} type="video/mp4" />
+              <video controls className="w-full h-full object-contain" src={video.url}>
                   المتصفح لا يدعم هذا الفيديو.
               </video>
           ) : video.url.includes("youtube") || video.url.includes("youtu.be") ? (
@@ -688,6 +687,9 @@ const AdminDashboard = ({ user }) => {
     alert("تم إرسال الرد!");
   };
   
+  const handleAddContent = async (e) => { e.preventDefault(); await addDoc(collection(db, 'content'), { ...newContent, file: newContent.url, createdAt: new Date()}); alert("تم النشر!"); }; 
+  const handleDeleteContent = async (id) => { if(window.confirm("حذف هذا المحتوى؟")) await deleteDoc(doc(db, 'content', id)); };
+  
   const handleAddAnnouncement = async () => {
       if(!newAnnouncement.trim()) return;
       await addDoc(collection(db, 'announcements'), { text: newAnnouncement, createdAt: serverTimestamp() });
@@ -711,7 +713,6 @@ const AdminDashboard = ({ user }) => {
       }
   };
 
-  const handleAddContent = async (e) => { e.preventDefault(); await addDoc(collection(db, 'content'), { ...newContent, file: newContent.url, createdAt: new Date()}); alert("تم النشر!"); }; // تم تعديلها لقبول الرابط كملف
   const startLiveStream = async () => { if(!liveData.liveUrl) return alert("الرابط؟"); await addDoc(collection(db, 'live_sessions'), { ...liveData, status: 'active', createdAt: serverTimestamp() }); alert("بدا البث!"); };
   const stopLiveStream = async () => { if(window.confirm("إنهاء البث؟")) { const q = query(collection(db, 'live_sessions'), where('status', '==', 'active')); const snap = await getDocs(q); snap.forEach(async (d) => await updateDoc(doc(db, 'live_sessions', d.id), { status: 'ended' })); alert("تم الإنهاء"); } };
 
@@ -877,7 +878,7 @@ const AdminDashboard = ({ user }) => {
 
           {activeTab === 'live' && <div className="bg-white p-8 rounded-xl shadow-sm border-t-4 border-red-600"><h2 className="text-2xl font-black mb-6 flex items-center gap-2 text-red-600"><Radio size={32}/> البث المباشر</h2><div className="grid gap-4"><input className="border p-3 rounded-xl" placeholder="العنوان" value={liveData.title} onChange={e=>setLiveData({...liveData, title:e.target.value})}/><input className="border p-3 rounded-xl" placeholder="رابط البث (Zoom/YouTube/Meet)" value={liveData.liveUrl} onChange={e=>setLiveData({...liveData, liveUrl:e.target.value})}/><select className="border p-3 rounded-xl" value={liveData.grade} onChange={e=>setLiveData({...liveData, grade:e.target.value})}><GradeOptions/></select>{!isLive?<button onClick={startLiveStream} className="bg-red-600 text-white py-4 rounded-xl font-bold">بدء البث</button>:<button onClick={stopLiveStream} className="bg-slate-800 text-white py-4 rounded-xl font-bold">إنهاء البث</button>}</div></div>}
 
-          {activeTab === 'content' && <div className="bg-white p-6 rounded-xl shadow-sm"><h2 className="font-bold mb-4">إضافة محتوى</h2><form onSubmit={handleAddContent} className="grid gap-4 mb-6"><input className="border p-3 rounded" placeholder="العنوان" value={newContent.title} onChange={e=>setNewContent({...newContent, title:e.target.value})}/><input className="border p-3 rounded" placeholder="الرابط (أو اختر ملف)" value={newContent.url} onChange={e=>setNewContent({...newContent, url:e.target.value})}/><input type="file" onChange={handleFileSelect} className="border p-2 rounded text-sm"/><div className="flex gap-2"><select className="border p-3 rounded flex-1" value={newContent.type} onChange={e=>setNewContent({...newContent, type:e.target.value})}><option value="video">فيديو</option><option value="file">ملف</option></select><select className="border p-3 rounded flex-1" value={newContent.grade} onChange={e=>setNewContent({...newContent, grade:e.target.value})}><GradeOptions/></select></div><div className="flex items-center gap-2"><input type="checkbox" checked={newContent.isPublic} onChange={e=>setNewContent({...newContent, isPublic:e.target.checked})}/> <label>عام</label></div><button className="bg-amber-600 text-white p-3 rounded font-bold">نشر</button></form><div className="space-y-2">{contentList.map(c=><div key={c.id} className="flex justify-between border-b p-2"><span>{c.title}</span><span className="text-xs bg-slate-100 p-1 rounded">{c.grade}</span></div>)}</div></div>}
+          {activeTab === 'content' && <div className="bg-white p-6 rounded-xl shadow-sm"><h2 className="font-bold mb-4">إضافة محتوى</h2><form onSubmit={handleAddContent} className="grid gap-4 mb-6"><input className="border p-3 rounded" placeholder="العنوان" value={newContent.title} onChange={e=>setNewContent({...newContent, title:e.target.value})}/><input className="border p-3 rounded" placeholder="الرابط (أو اختر ملف)" value={newContent.url} onChange={e=>setNewContent({...newContent, url:e.target.value})}/><input type="file" onChange={handleFileSelect} className="border p-2 rounded text-sm"/><div className="flex gap-2"><select className="border p-3 rounded flex-1" value={newContent.type} onChange={e=>setNewContent({...newContent, type:e.target.value})}><option value="video">فيديو</option><option value="file">ملف</option></select><select className="border p-3 rounded flex-1" value={newContent.grade} onChange={e=>setNewContent({...newContent, grade:e.target.value})}><GradeOptions/></select></div><div className="flex items-center gap-2"><input type="checkbox" checked={newContent.isPublic} onChange={e=>setNewContent({...newContent, isPublic:e.target.checked})}/> <label>عام</label></div><button className="bg-amber-600 text-white p-3 rounded font-bold">نشر</button></form><div className="space-y-2">{contentList.map(c=><div key={c.id} className="flex justify-between border-b p-2"><span>{c.title}</span><div className="flex gap-2"><a href={c.url} target="_blank" className="text-blue-500">رابط</a><button onClick={() => handleDeleteContent(c.id)} className="text-red-500 hover:text-red-700"><Trash2 size={18}/></button></div></div>)}</div></div>}
 
           {activeTab === 'messages' && <div className="bg-white p-6 rounded-xl shadow-sm"><h2 className="font-bold mb-4">الرسائل</h2>{messagesList.map(m=><div key={m.id} className="border-b p-4 bg-slate-50 mb-3 rounded-lg relative"><button onClick={()=>handleDeleteMessage(m.id)} className="absolute top-2 left-2 text-red-400"><Trash2 size={16}/></button><div className="mb-2"><p className="font-bold text-amber-800">{m.senderName} <span className="text-xs text-slate-500">({m.sender})</span></p><p className="text-sm text-slate-400">{m.createdAt?.toDate?m.createdAt.toDate().toLocaleString():'الآن'}</p></div><p className="text-slate-800 bg-white p-3 rounded-lg border border-slate-200 mb-3">{m.text}</p>{m.adminReply?<div className="bg-green-50 p-3 rounded-lg border border-green-200 text-sm"><span className="font-bold text-green-700">ردك: </span>{m.adminReply}</div>:<div className="flex gap-2"><input className="flex-1 border p-2 rounded text-sm" placeholder="اكتب ردك..." value={replyTexts[m.id]||""} onChange={e=>setReplyTexts({...replyTexts,[m.id]:e.target.value})}/><button onClick={()=>handleReplyMessage(m.id)} className="bg-blue-600 text-white px-3 py-1 rounded text-sm"><Reply size={14}/></button></div>}</div>)}</div>}
 
