@@ -17,6 +17,15 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+// --- دالة مساعدة ذكية لاستخراج كود اليوتيوب من أي رابط ---
+const getYouTubeID = (url) => {
+  if (!url) return null;
+  // يدعم: watch?v=, youtu.be/, embed/, live/, shorts/
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=|live\/|shorts\/)([^#&?]*).*/;
+  const match = url.match(regExp);
+  return (match && match[2].length === 11) ? match[2] : null;
+};
+
 // --- 0. تهيئة التصميم والخطوط ---
 const DesignSystemLoader = () => {
   useEffect(() => {
@@ -377,7 +386,8 @@ const LiveSessionView = ({ session, user, onClose }) => {
     setMsgInput("");
   };
 
-  const isYouTube = (url) => url.includes("youtube") || url.includes("youtu.be");
+  const videoId = getYouTubeID(session.liveUrl);
+  const isYouTube = !!videoId;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col md:flex-row font-['Cairo']" dir="rtl">
@@ -391,8 +401,8 @@ const LiveSessionView = ({ session, user, onClose }) => {
         </div>
         <div className="flex-1 bg-black relative flex items-center justify-center">
           <div className="watermark-text">{user.displayName}</div>
-          {isYouTube(session.liveUrl) ? (
-            <iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${session.liveUrl.split('v=')[1]?.split('&')[0] || session.liveUrl.split('/').pop()}?autoplay=1&controls=1`} title="Live" frameBorder="0" allowFullScreen></iframe>
+          {isYouTube ? (
+            <iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${videoId}?autoplay=1&controls=1`} title="Live" frameBorder="0" allowFullScreen></iframe>
           ) : (
             <div className="text-center p-8 bg-slate-800 rounded-2xl max-w-md">
               <h3 className="text-2xl font-bold text-white mb-4">اجتماع خارجي</h3>
@@ -422,6 +432,8 @@ const LiveSessionView = ({ session, user, onClose }) => {
 };
 
 const SecureVideoPlayer = ({ video, userName, onClose }) => {
+  const youtubeId = getYouTubeID(video.url);
+
   return (
     <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4">
       <div className="w-full max-w-4xl bg-slate-900 rounded-xl overflow-hidden relative shadow-2xl">
@@ -433,8 +445,8 @@ const SecureVideoPlayer = ({ video, userName, onClose }) => {
               <video controls className="w-full h-full object-contain" src={video.url}>
                   المتصفح لا يدعم هذا الفيديو.
               </video>
-          ) : video.url.includes("youtube") || video.url.includes("youtu.be") ? (
-            <iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${video.url.split('v=')[1]?.split('&')[0] || video.url.split('/').pop()}?rel=0&modestbranding=1`} title="Video" frameBorder="0" allowFullScreen></iframe>
+          ) : youtubeId ? (
+            <iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${youtubeId}?rel=0&modestbranding=1`} title="Video" frameBorder="0" allowFullScreen></iframe>
           ) : (
             <div className="text-center">
               <PlayCircle size={80} className="text-amber-500 mx-auto mb-4 opacity-50" />
@@ -687,9 +699,6 @@ const AdminDashboard = ({ user }) => {
     alert("تم إرسال الرد!");
   };
   
-  const handleAddContent = async (e) => { e.preventDefault(); await addDoc(collection(db, 'content'), { ...newContent, file: newContent.url, createdAt: new Date()}); alert("تم النشر!"); }; 
-  const handleDeleteContent = async (id) => { if(window.confirm("حذف هذا المحتوى؟")) await deleteDoc(doc(db, 'content', id)); };
-  
   const handleAddAnnouncement = async () => {
       if(!newAnnouncement.trim()) return;
       await addDoc(collection(db, 'announcements'), { text: newAnnouncement, createdAt: serverTimestamp() });
@@ -712,6 +721,9 @@ const AdminDashboard = ({ user }) => {
           reader.readAsDataURL(file);
       }
   };
+
+  const handleAddContent = async (e) => { e.preventDefault(); await addDoc(collection(db, 'content'), { ...newContent, file: newContent.url, createdAt: new Date()}); alert("تم النشر!"); }; 
+  const handleDeleteContent = async (id) => { if(window.confirm("حذف هذا المحتوى؟")) await deleteDoc(doc(db, 'content', id)); };
 
   const startLiveStream = async () => { if(!liveData.liveUrl) return alert("الرابط؟"); await addDoc(collection(db, 'live_sessions'), { ...liveData, status: 'active', createdAt: serverTimestamp() }); alert("بدا البث!"); };
   const stopLiveStream = async () => { if(window.confirm("إنهاء البث؟")) { const q = query(collection(db, 'live_sessions'), where('status', '==', 'active')); const snap = await getDocs(q); snap.forEach(async (d) => await updateDoc(doc(db, 'live_sessions', d.id), { status: 'ended' })); alert("تم الإنهاء"); } };
