@@ -6,30 +6,113 @@ import {
 } from 'firebase/auth';
 import { 
   getFirestore, doc, setDoc, getDoc, getDocs, collection, addDoc, query, where, 
-  onSnapshot, updateDoc, deleteDoc, orderBy, serverTimestamp, writeBatch 
+  onSnapshot, updateDoc, deleteDoc, orderBy, serverTimestamp, writeBatch, limit 
 } from 'firebase/firestore';
 import { 
   PlayCircle, FileText, LogOut, User, GraduationCap, Quote, CheckCircle, 
   Lock, Mail, ChevronRight, Menu, X, Loader2, AlertTriangle, PlusCircle, 
   Check, Trash2, Eye, ShieldAlert, Video, UploadCloud, Phone, Edit, KeyRound,
   MessageSquare, Send, MessageCircle, Facebook, BookOpen, Feather, Radio, 
-  ExternalLink, ClipboardList, Timer, AlertOctagon, Flag, Save, HelpCircle, Reply, Unlock, Layout, Settings, Trophy, Megaphone
+  ExternalLink, ClipboardList, Timer, AlertOctagon, Flag, Save, HelpCircle, Reply, Unlock, Layout, Settings, Trophy, Megaphone, Bell, Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// --- دالة مساعدة ذكية لاستخراج كود اليوتيوب من أي رابط ---
-const getYouTubeID = (url) => {
-  if (!url) return null;
-  // يدعم: watch?v=, youtu.be/, embed/, live/, shorts/
-  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=|live\/|shorts\/)([^#&?]*).*/;
-  const match = url.match(regExp);
-  return (match && match[2].length === 11) ? match[2] : null;
+// --- 1. إعدادات Firebase ---
+const firebaseConfig = {
+  apiKey: "AIzaSyDE7PASs4dt2aD912Jerm7260142Hee4W0",
+  authDomain: "exam-f6804.firebaseapp.com",
+  projectId: "exam-f6804",
+  storageBucket: "exam-f6804.firebasestorage.app",
+  messagingSenderId: "1029912301794",
+  appId: "1:1029912301794:web:57673ad6f7331136e80ebb",
+  measurementId: "G-PCEZQ7H2EV"
 };
 
-// --- 0. تهيئة التصميم والخطوط ---
+let app, auth, db;
+try {
+  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+  auth = getAuth(app);
+  db = getFirestore(app);
+} catch (error) { console.error("Firebase Error", error); }
+
+// --- 2. الأدوات المساعدة والدوال (Helpers) ---
+
+// طلب إذن الإشعارات للمتصفح
+const requestNotificationPermission = () => {
+  if (!("Notification" in window)) return;
+  if (Notification.permission === "default") {
+    Notification.requestPermission();
+  }
+};
+
+// إرسال إشعار للنظام (System Notification)
+const sendSystemNotification = (title, body) => {
+  if (Notification.permission === "granted") {
+    try {
+        new Notification(title, {
+            body: body,
+            icon: "https://cdn-icons-png.flaticon.com/512/3449/3449750.png",
+            vibrate: [200, 100, 200]
+        });
+        // صوت تنبيه خفيف
+        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+        audio.volume = 0.2;
+        audio.play().catch(e => {}); // تجاهل الخطأ لو المتصفح منع الصوت
+    } catch(e) { console.log(e); }
+  }
+};
+
+// استخراج كود اليوتيوب من أي رابط
+const getYouTubeID = (url) => {
+    if (!url) return null;
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=|live\/|shorts\/)([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+};
+
+// طباعة النتيجة PDF (يدعم العربية)
+const handleDownloadPDF = (studentName, score, total, status) => {
+    const element = document.createElement('div');
+    const date = new Date().toLocaleDateString('ar-EG');
+    
+    element.innerHTML = `
+      <div style="direction: rtl; font-family: sans-serif; padding: 40px; border: 5px double #d97706; text-align: center; background: #fff;">
+        <h1 style="color: #d97706; font-size: 30px; margin-bottom: 10px;">منصة النحاس التعليمية</h1>
+        <h3 style="color: #555; margin-bottom: 30px;">تقرير نتيجة الطالب</h3>
+        
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 15px; margin: 20px 0; border: 1px solid #eee;">
+            <h2 style="font-size: 24px; margin: 15px 0;">الاسم: <span style="color: #000;">${studentName}</span></h2>
+            <h2 style="font-size: 24px; margin: 15px 0;">الدرجة: <span style="color: ${score >= total/2 ? 'green' : 'red'}; font-weight: bold;">${score} / ${total}</span></h2>
+            <p style="font-size: 18px; color: #777;">الحالة: ${status === 'cheated' ? '<span style="color:red">تم إلغاؤه (محاولة غش)</span>' : 'تم الانتهاء بنجاح'}</p>
+        </div>
+
+        <div style="margin-top: 50px; border-top: 1px solid #ccc; padding-top: 10px;">
+            <p style="font-size: 14px; color: #888;">تاريخ التقرير: ${date}</p>
+            <p style="font-size: 14px; color: #d97706;">إمضاء المنصة: ____________________</p>
+        </div>
+      </div>
+    `;
+    
+    // التحقق من تحميل المكتبة
+    if(window.html2pdf) {
+        const opt = { 
+            margin: 0.5, 
+            filename: `نتيجة_${studentName.replace(/\s/g, '_')}.pdf`, 
+            image: { type: 'jpeg', quality: 0.98 }, 
+            html2canvas: { scale: 2 }, 
+            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } 
+        };
+        window.html2pdf().set(opt).from(element).save();
+    } else {
+        alert("جاري تحميل نظام الطباعة... يرجى الانتظار 5 ثوانٍ والمحاولة مرة أخرى.");
+    }
+};
+
+// --- 3. المكونات الرسومية الأساسية (Design System) ---
+
 const DesignSystemLoader = () => {
   useEffect(() => {
-    // 1. تحميل Tailwind CSS
+    // تحميل Tailwind CSS
     if (!document.getElementById('tailwind-script')) {
       const script = document.createElement('script');
       script.id = 'tailwind-script';
@@ -48,13 +131,20 @@ const DesignSystemLoader = () => {
       };
       document.head.appendChild(script);
     }
-    // 2. تحميل خط Cairo
+    // تحميل خط Cairo
     if (!document.getElementById('cairo-font')) {
       const link = document.createElement('link');
       link.id = 'cairo-font';
       link.rel = 'stylesheet';
       link.href = "https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap";
       document.head.appendChild(link);
+    }
+    // تحميل مكتبة html2pdf للطباعة
+    if (!document.getElementById('html2pdf-script')) {
+        const script = document.createElement('script');
+        script.id = 'html2pdf-script';
+        script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
+        document.head.appendChild(script);
     }
   }, []);
 
@@ -69,7 +159,7 @@ const DesignSystemLoader = () => {
       .watermark-text {
         position: absolute;
         animation: floatWatermark 20s linear infinite;
-        pointer-events: none;
+        pointer-events: 9999; /* Changed to ensure it stays on top visually but doesn't block clicks if transparent */
         z-index: 9999;
         color: rgba(0, 0, 0, 0.08);
         font-weight: 900;
@@ -77,6 +167,7 @@ const DesignSystemLoader = () => {
         transform: rotate(-30deg);
         white-space: nowrap;
         text-shadow: 0 0 2px rgba(255,255,255,0.5);
+        pointer-events: none;
       }
       .watermark-video {
         position: absolute;
@@ -106,26 +197,6 @@ const DesignSystemLoader = () => {
   );
 };
 
-// --- 1. إعدادات Firebase ---
-const firebaseConfig = {
-  apiKey: "AIzaSyDE7PASs4dt2aD912Jerm7260142Hee4W0",
-  authDomain: "exam-f6804.firebaseapp.com",
-  projectId: "exam-f6804",
-  storageBucket: "exam-f6804.firebasestorage.app",
-  messagingSenderId: "1029912301794",
-  appId: "1:1029912301794:web:57673ad6f7331136e80ebb",
-  measurementId: "G-PCEZQ7H2EV"
-};
-
-let app, auth, db;
-try {
-  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-  auth = getAuth(app);
-  db = getFirestore(app);
-} catch (error) { console.error("Firebase Error", error); }
-
-// --- 2. المكونات المشتركة ---
-
 // خيارات الصفوف
 const GradeOptions = () => (
     <>
@@ -143,7 +214,10 @@ const GradeOptions = () => (
 );
 
 const getGradeLabel = (g) => {
-    const map = { '1prep': 'أولى إعدادي', '2prep': 'تانية إعدادي', '3prep': 'تالتة إعدادي', '1sec': 'أولى ثانوي', '2sec': 'تانية ثانوي', '3sec': 'تالتة ثانوي' };
+    const map = { 
+        '1prep': 'أولى إعدادي', '2prep': 'تانية إعدادي', '3prep': 'تالتة إعدادي', 
+        '1sec': 'أولى ثانوي', '2sec': 'تانية ثانوي', '3sec': 'تالتة ثانوي' 
+    };
     return map[g] || g;
 };
 
@@ -169,9 +243,9 @@ const FloatingArabicBackground = () => (
 const WisdomBox = () => {
   const [idx, setIdx] = useState(0);
   const quotes = [
-    { text: "النجاح مش صدفة، النجاح عزيمة وإصرار", source: "تحفيز" },
-    { text: "ذاكر صح، مش تذاكر كتير.. ركز يا بطل", source: "نصيحة" },
-    { text: "حلمك يستاهل تعبك، متوقفش", source: "تحفيز" },
+    { text: "النجاح مش صدفة، النجاح عزيمة وإصرار", source: "تحفيز" }, 
+    { text: "ذاكر صح، مش تذاكر كتير.. ركز يا بطل", source: "نصيحة" }, 
+    { text: "حلمك يستاهل تعبك، متوقفش", source: "تحفيز" }, 
     { text: "وَمَا نَيْلُ الْمَطَالِبِ بِالتَّمَنِّي ... وَلَكِنْ تُؤْخَذُ الدُّنْيَا غِلَابَا", source: "شعر" }
   ];
   useEffect(() => { const t = setInterval(() => setIdx(i => (i+1)%quotes.length), 6000); return () => clearInterval(t); }, []);
@@ -191,7 +265,7 @@ const Announcements = () => {
     const [announcements, setAnnouncements] = useState([]);
     useEffect(() => {
         const q = query(collection(db, 'announcements'), orderBy('createdAt', 'desc'));
-        return onSnapshot(q, snap => setAnnouncements(snap.docs.map(d => d.data())));
+        return onSnapshot(q, snap => setAnnouncements(snap.docs.map(d => ({id: d.id, ...d.data()}))));
     }, []);
 
     if(announcements.length === 0) return null;
@@ -263,6 +337,7 @@ const ChatWidget = ({ user }) => {
   const chatEndRef = useRef(null);
   const [isContactAdminMode, setIsContactAdminMode] = useState(false);
   
+  // الاستماع للرسائل (بما في ذلك ردود الأدمن)
   useEffect(() => {
     if (!isOpen) return;
     const userId = user ? user.email : sessionId;
@@ -274,7 +349,7 @@ const ChatWidget = ({ user }) => {
         setMessages(prev => {
             const combined = [...prev];
              replies.forEach(r => { if(!combined.some(m => m.id === r.id)) combined.push(r); });
-             return combined;
+             return combined.sort((a,b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
         });
       }
     });
@@ -283,7 +358,7 @@ const ChatWidget = ({ user }) => {
 
   const handleSend = async () => {
     if (!inputText.trim()) return;
-    const userMsg = { id: Date.now(), text: inputText, sender: 'user' };
+    const userMsg = { id: Date.now(), text: inputText, sender: 'user', createdAt: { seconds: Date.now() / 1000 } };
     setMessages(prev => [...prev, userMsg]);
     setInputText("");
     
@@ -317,7 +392,7 @@ const ChatWidget = ({ user }) => {
         botResponse = "ممكن تختار:\n1. تفاصيل الحجز\n2. رقم الواتس\n3. التواصل مع الادمن";
       }
 
-      if(botResponse) setMessages(prev => [...prev, { id: Date.now()+1, text: botResponse, sender: 'bot' }]);
+      if(botResponse) setMessages(prev => [...prev, { id: Date.now()+1, text: botResponse, sender: 'bot', createdAt: { seconds: Date.now() / 1000 } }]);
     }, 500);
   };
 
@@ -386,8 +461,8 @@ const LiveSessionView = ({ session, user, onClose }) => {
     setMsgInput("");
   };
 
+  const isYouTube = (url) => url.includes("youtube") || url.includes("youtu.be");
   const videoId = getYouTubeID(session.liveUrl);
-  const isYouTube = !!videoId;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col md:flex-row font-['Cairo']" dir="rtl">
@@ -432,7 +507,7 @@ const LiveSessionView = ({ session, user, onClose }) => {
 };
 
 const SecureVideoPlayer = ({ video, userName, onClose }) => {
-  const youtubeId = getYouTubeID(video.url);
+  const videoId = getYouTubeID(video.url);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4">
@@ -445,8 +520,8 @@ const SecureVideoPlayer = ({ video, userName, onClose }) => {
               <video controls className="w-full h-full object-contain" src={video.url}>
                   المتصفح لا يدعم هذا الفيديو.
               </video>
-          ) : youtubeId ? (
-            <iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${youtubeId}?rel=0&modestbranding=1`} title="Video" frameBorder="0" allowFullScreen></iframe>
+          ) : videoId ? (
+            <iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`} title="Video" frameBorder="0" allowFullScreen></iframe>
           ) : (
             <div className="text-center">
               <PlayCircle size={80} className="text-amber-500 mx-auto mb-4 opacity-50" />
@@ -542,6 +617,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                 <h2 className="text-3xl font-black mb-4">تم الانتهاء من الامتحان</h2>
                 <div className={`text-6xl font-black my-6 ${score >= flatQuestions.length / 2 ? 'text-green-600' : 'text-red-600'}`}>{score} / {flatQuestions.length}</div>
                 <div className="flex gap-4 justify-center">
+                    <button onClick={() => handleDownloadPDF(user.displayName, score, flatQuestions.length, 'completed')} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2"><Download size={18}/> تحميل النتيجة</button>
                     <button onClick={onClose} className="bg-slate-900 text-white py-3 px-8 rounded-xl font-bold">عودة للرئيسية</button>
                 </div>
             </div>
@@ -659,6 +735,9 @@ const AdminDashboard = ({ user }) => {
   const [newAnnouncement, setNewAnnouncement] = useState(""); 
   const [showLeaderboard, setShowLeaderboard] = useState(true);
   const [announcements, setAnnouncements] = useState([]);
+  
+  // Notification State
+  const [notifData, setNotifData] = useState({ text: '', grade: 'all' });
 
   // جلب البيانات
   useEffect(() => { const u = onSnapshot(query(collection(db, 'users'), where('status','==','pending')), s => setPendingUsers(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
@@ -670,7 +749,10 @@ const AdminDashboard = ({ user }) => {
   useEffect(() => { const u = onSnapshot(query(collection(db, 'exam_results'), orderBy('submittedAt', 'desc')), s => setExamResults(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(query(collection(db, 'announcements'), orderBy('createdAt', 'desc')), s => setAnnouncements(s.docs.map(d => ({id: d.id, ...d.data()})))); return u; }, []);
 
-  const handleApprove = async (id) => updateDoc(doc(db,'users',id), {status:'active'});
+  const handleApprove = async (id) => {
+    await updateDoc(doc(db,'users',id), {status:'active'});
+    sendSystemNotification("مبروك! 🎉", "تم تفعيل حسابك بنجاح.");
+  };
   const handleReject = async (id) => updateDoc(doc(db,'users',id), {status:'rejected'});
   const handleUnban = async (id) => updateDoc(doc(db,'users',id), {status:'active'});
   const handleDeleteUser = async (id) => { if(window.confirm("حذف نهائي؟")) await deleteDoc(doc(db,'users',id)); };
@@ -702,6 +784,11 @@ const AdminDashboard = ({ user }) => {
   const handleAddAnnouncement = async () => {
       if(!newAnnouncement.trim()) return;
       await addDoc(collection(db, 'announcements'), { text: newAnnouncement, createdAt: serverTimestamp() });
+      await addDoc(collection(db, 'notifications'), {
+        text: `تنبيه هام: ${newAnnouncement}`,
+        grade: 'all',
+        createdAt: serverTimestamp()
+      });
       setNewAnnouncement("");
       alert("تم نشر الإعلان");
   };
@@ -722,10 +809,30 @@ const AdminDashboard = ({ user }) => {
       }
   };
 
-  const handleAddContent = async (e) => { e.preventDefault(); await addDoc(collection(db, 'content'), { ...newContent, file: newContent.url, createdAt: new Date()}); alert("تم النشر!"); }; 
+  const handleAddContent = async (e) => { 
+      e.preventDefault(); 
+      await addDoc(collection(db, 'content'), { ...newContent, file: newContent.url, createdAt: new Date()});
+      // إرسال إشعار تلقائي
+      await addDoc(collection(db, 'notifications'), {
+        text: `تم إضافة درس جديد: ${newContent.title}`,
+        grade: newContent.grade,
+        createdAt: serverTimestamp()
+      });
+      alert("تم النشر!"); 
+  }; 
+  
   const handleDeleteContent = async (id) => { if(window.confirm("حذف هذا المحتوى؟")) await deleteDoc(doc(db, 'content', id)); };
 
-  const startLiveStream = async () => { if(!liveData.liveUrl) return alert("الرابط؟"); await addDoc(collection(db, 'live_sessions'), { ...liveData, status: 'active', createdAt: serverTimestamp() }); alert("بدا البث!"); };
+  const startLiveStream = async () => { 
+      if(!liveData.liveUrl) return alert("الرابط؟"); 
+      await addDoc(collection(db, 'live_sessions'), { ...liveData, status: 'active', createdAt: serverTimestamp() }); 
+      await addDoc(collection(db, 'notifications'), {
+        text: `🔴 بث مباشر الآن: ${liveData.title}`,
+        grade: liveData.grade,
+        createdAt: serverTimestamp()
+      });
+      alert("بدا البث!"); 
+  };
   const stopLiveStream = async () => { if(window.confirm("إنهاء البث؟")) { const q = query(collection(db, 'live_sessions'), where('status', '==', 'active')); const snap = await getDocs(q); snap.forEach(async (d) => await updateDoc(doc(db, 'live_sessions', d.id), { status: 'ended' })); alert("تم الإنهاء"); } };
 
   const handleEditExam = (exam) => {
@@ -788,6 +895,14 @@ const AdminDashboard = ({ user }) => {
     finalBlocks.forEach(block => { for (let i = block.subQuestions.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [block.subQuestions[i], block.subQuestions[j]] = [block.subQuestions[j], block.subQuestions[i]]; } });
 
     await addDoc(collection(db, 'exams'), { title: examBuilder.title, grade: examBuilder.grade, duration: examBuilder.duration, accessCode: examBuilder.accessCode, questions: finalBlocks, createdAt: serverTimestamp() });
+    
+    // إشعار بالامتحان الجديد
+    await addDoc(collection(db, 'notifications'), {
+        text: `امتحان جديد: ${examBuilder.title}`,
+        grade: examBuilder.grade,
+        createdAt: serverTimestamp()
+    });
+
     setBulkText(""); alert(`تم نشر الامتحان بنجاح!`);
   };
   
@@ -849,9 +964,12 @@ const AdminDashboard = ({ user }) => {
                </div>
                {viewingResult ? (
                    <div className="bg-slate-50 p-4 rounded-xl border">
-                       <button onClick={() => setViewingResult(null)} className="mb-4 text-sm text-slate-500 underline font-bold">العودة للقائمة</button>
+                       <div className="flex justify-between mb-4">
+                           <button onClick={() => setViewingResult(null)} className="mb-4 text-sm text-slate-500 underline font-bold">العودة للقائمة</button>
+                           <button onClick={() => handleDownloadPDF(viewingResult.studentName, viewingResult.score, viewingResult.total, viewingResult.status)} className="bg-blue-600 text-white px-4 py-1 rounded text-sm flex items-center gap-2"><Download size={16}/> تحميل PDF</button>
+                       </div>
                        <h3 className="font-bold text-lg mb-2">إجابات الطالب: {viewingResult.studentName}</h3>
-                       <div className="space-y-4 mt-4">
+                       <div className="space-y-4 mt-4" id="result-content">
                            {(() => {
                                const examData = examsList.find(e => e.id === viewingResult.examId);
                                if(!examData) return <p>بيانات الامتحان محذوفة</p>;
@@ -946,6 +1064,11 @@ const StudentDashboard = ({ user, userData }) => {
   // حالة جديدة لفتح الامتحان في وضع المراجعة للطالب
   const [reviewingExam, setReviewingExam] = useState(null);
   
+  // Notification State
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [hasNewNotif, setHasNewNotif] = useState(false);
+
   // Settings State
   const [editFormData, setEditFormData] = useState({ name: '', phone: '', parentPhone: '', grade: '' });
 
@@ -956,10 +1079,20 @@ const StudentDashboard = ({ user, userData }) => {
     const unsubExams = onSnapshot(query(collection(db, 'exams'), where('grade', '==', userData.grade)), s => setExams(s.docs.map(d=>({id:d.id,...d.data()}))));
     const unsubResults = onSnapshot(query(collection(db, 'exam_results'), where('studentId', '==', user.uid)), s => setExamResults(s.docs.map(d=>({id:d.id,...d.data()}))));
     
+    // Notifications Fetch
+    const unsubNotif = onSnapshot(query(collection(db, 'notifications'), where('grade', 'in', ['all', userData.grade]), orderBy('createdAt', 'desc'), limit(10)), s => {
+        const newNotifs = s.docs.map(d => d.data());
+        setNotifications(newNotifs);
+        if(newNotifs.length > 0) {
+             setHasNewNotif(true);
+             if(newNotifs[0].text) sendSystemNotification("تنبيه جديد 🔔", newNotifs[0].text);
+        }
+    });
+
     // Initialize edit form
     setEditFormData({ name: userData.name, phone: userData.phone, parentPhone: userData.parentPhone, grade: userData.grade });
 
-    return () => { unsubContent(); unsubLive(); unsubExams(); unsubResults(); };
+    return () => { unsubContent(); unsubLive(); unsubExams(); unsubResults(); unsubNotif(); };
   }, [userData, user]);
 
   if(liveSession) return <LiveSessionView session={liveSession} user={user} onClose={() => window.location.reload()} />;
@@ -1025,6 +1158,30 @@ const StudentDashboard = ({ user, userData }) => {
 
       <main className="flex-1 p-4 md:p-10 relative z-10 overflow-y-auto h-screen">
         <div className="md:hidden flex justify-between items-center mb-6 bg-white/80 p-4 rounded-2xl shadow-sm"><h1 className="font-bold text-lg text-slate-800">منصة النحاس</h1><button onClick={() => setMobileMenu(true)} className="p-2 bg-slate-100 rounded-lg"><Menu /></button></div>
+        
+        {/* شريط الإشعارات العلوي */}
+        <div className="flex justify-end mb-6 relative">
+            <button onClick={() => {requestNotificationPermission(); setShowNotifications(!showNotifications); setHasNewNotif(false);}} className="relative p-2 bg-white rounded-full shadow-sm hover:bg-slate-50">
+                <Bell className="text-slate-600"/>
+                {hasNewNotif && <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>}
+            </button>
+            {showNotifications && (
+                <div className="absolute top-12 left-0 w-80 bg-white rounded-xl shadow-xl border border-slate-100 p-4 z-50 max-h-96 overflow-y-auto">
+                    <h3 className="font-bold mb-3 text-sm text-slate-500">الإشعارات</h3>
+                    {notifications.length === 0 ? <p className="text-xs text-slate-400">لا توجد إشعارات جديدة</p> : (
+                        <div className="space-y-3">
+                            {notifications.map((n, i) => (
+                                <div key={i} className="text-sm bg-slate-50 p-2 rounded border-l-4 border-amber-500">
+                                    {n.text}
+                                    <div className="text-[10px] text-slate-400 mt-1">{n.createdAt?.toDate().toLocaleDateString()}</div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+
         {activeTab === 'home' && (<div className="space-y-8"><WisdomBox /><Announcements /><h2 className="text-3xl font-bold text-slate-800">منور يا {userData.name.split(' ')[0]} 👋 <span className="text-sm font-normal text-slate-500 bg-slate-200 px-2 py-1 rounded-full">{getGradeLabel(userData.grade)}</span></h2><div className="grid grid-cols-1 md:grid-cols-3 gap-6"><div className="bg-blue-600 text-white p-8 rounded-3xl shadow-lg relative overflow-hidden"><h3 className="relative z-10 text-2xl font-bold mb-2">المحاضرات</h3><p className="relative z-10 text-4xl font-black">{videos.length}</p><PlayCircle className="absolute -bottom-6 -left-6 opacity-20 w-40 h-40"/></div><div className="bg-amber-500 text-white p-8 rounded-3xl shadow-lg relative overflow-hidden"><h3 className="relative z-10 text-2xl font-bold mb-2">الملفات</h3><p className="relative z-10 text-4xl font-black">{files.length}</p><FileText className="absolute -bottom-6 -left-6 opacity-20 w-40 h-40"/></div><div className="bg-slate-800 text-white p-8 rounded-3xl shadow-lg relative overflow-hidden"><h3 className="relative z-10 text-2xl font-bold mb-2">الامتحانات</h3><p className="relative z-10 text-4xl font-black">{exams.length}</p><ClipboardList className="absolute -bottom-6 -left-6 opacity-20 w-40 h-40"/></div></div><Leaderboard /></div>)}
         {activeTab === 'videos' && <div className="grid grid-cols-1 md:grid-cols-3 gap-6">{videos.map(v => (<div key={v.id} className="bg-white rounded-xl shadow-sm border overflow-hidden cursor-pointer" onClick={() => setPlayingVideo(v)}><div className="h-40 bg-slate-800 flex items-center justify-center relative"><PlayCircle className="text-white w-12 h-12 opacity-80"/><span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded">{getGradeLabel(v.grade)}</span></div><div className="p-4"><h3 className="font-bold text-lg">{v.title}</h3></div></div>))}</div>}
         {activeTab === 'files' && <div className="bg-white rounded-xl shadow-sm border overflow-hidden">{files.map(f => (<div key={f.id} className="p-4 flex justify-between items-center border-b last:border-0 hover:bg-slate-50"><div className="flex items-center gap-4"><div className="bg-red-100 text-red-600 p-3 rounded-lg font-bold text-xs">PDF</div><div><h4 className="font-bold text-lg">{f.title}</h4><span className="text-xs text-slate-500">{getGradeLabel(f.grade)}</span></div></div><a href={f.url} target="_blank" className="bg-blue-50 text-blue-600 px-4 py-2 rounded-lg font-bold hover:bg-blue-100">تحميل</a></div>))}</div>}
@@ -1048,6 +1205,7 @@ const StudentDashboard = ({ user, userData }) => {
                         <div className="flex gap-2">
                              <button disabled className="flex-1 bg-slate-200 text-slate-500 py-3 rounded-xl font-bold cursor-not-allowed">تم الانتهاء</button>
                              <button onClick={() => setReviewingExam(e)} className="flex-1 bg-blue-100 text-blue-700 py-3 rounded-xl font-bold hover:bg-blue-200">عرض الأخطاء</button>
+                             <button onClick={() => handleDownloadPDF(user.displayName, prevResult.score, e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0), prevResult.status)} className="flex-1 bg-green-100 text-green-700 py-3 rounded-xl font-bold hover:bg-green-200 flex items-center justify-center gap-1"><Download size={16}/> شهادة</button>
                         </div>
                     ) : (
                         <button onClick={() => startExamWithCode(e)} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 flex items-center justify-center gap-2"><Lock size={16}/> ابدأ الامتحان</button>
