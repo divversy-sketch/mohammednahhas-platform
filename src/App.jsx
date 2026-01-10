@@ -64,73 +64,143 @@ const getYouTubeID = (url) => {
     return (match && match[2].length === 11) ? match[2] : null;
 };
 
-// طباعة النتيجة PDF (تصميم مزخرف واحترافي)
-const handleDownloadPDF = (studentName, score, total, status) => {
-    const percentage = Math.round((score / total) * 100);
-    const element = document.createElement('div');
+// --- دالة توليد PDF الذكية (للطلاب وللأدمن) ---
+const generatePDF = (type, data) => {
+    // data: { studentName, score, total, status, timeTaken (seconds), totalTime (minutes) }
+    
+    const percentage = Math.round((data.score / data.total) * 100);
     const date = new Date().toLocaleDateString('ar-EG');
+    const element = document.createElement('div');
     
-    // تصميم الشهادة (HTML & CSS Inline)
-    element.innerHTML = `
-      <div style="width: 800px; padding: 20px; font-family: 'Cairo', sans-serif; direction: rtl; text-align: center; background-color: #fff; color: #333;">
-        <div style="border: 10px double #d97706; padding: 40px; height: 100%; position: relative;">
+    // تحليل السرعة للأدمن
+    let speedAnalysis = "طبيعي";
+    if (data.timeTaken && data.totalTime) {
+        const totalSeconds = data.totalTime * 60;
+        if (data.timeTaken < totalSeconds * 0.4) speedAnalysis = "سريع جداً (ربما تسرع)";
+        else if (data.timeTaken > totalSeconds * 0.9) speedAnalysis = "بطيء (استغرق الوقت كاملاً)";
+    }
+    const timeSpent = data.timeTaken ? `${Math.floor(data.timeTaken / 60)} دقيقة و ${data.timeTaken % 60} ثانية` : 'غير مسجل';
+
+    // 1. تقرير الأدمن (لولي الأمر)
+    if (type === 'admin') {
+        element.innerHTML = `
+          <div style="width: 210mm; padding: 30px; font-family: 'Cairo', sans-serif; direction: rtl; background: #fff; border: 2px solid #333;">
+            <div style="text-align: center; border-bottom: 2px solid #d97706; padding-bottom: 20px; margin-bottom: 20px;">
+                <h1 style="color: #d97706; font-size: 28px; margin: 0;">منصة النحاس التعليمية</h1>
+                <p style="font-size: 16px; color: #555;">تقرير تفصيلي لولي الأمر</p>
+            </div>
             
-            <!-- Header -->
-            <div style="margin-bottom: 30px;">
-                <h1 style="color: #d97706; font-size: 40px; margin: 0; font-weight: 900;">شهادة تقدير وتفوق</h1>
-                <p style="color: #666; font-size: 16px; margin-top: 5px;">منصة النحاس التعليمية للغة العربية</p>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 16px;">
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background: #f9f9f9; width: 30%;">اسم الطالب</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">${data.studentName}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background: #f9f9f9;">تاريخ الامتحان</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;">${date}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background: #f9f9f9;">حالة الامتحان</td>
+                    <td style="padding: 10px; border: 1px solid #ddd; color: ${data.status === 'cheated' ? 'red' : 'green'}; font-weight: bold;">
+                        ${data.status === 'cheated' ? 'تم إلغاؤه (محاولة غش)' : 'تم التسليم بنجاح'}
+                    </td>
+                </tr>
+            </table>
+
+            <div style="background: #fffbeb; border: 1px solid #d97706; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+                <h3 style="color: #d97706; margin-top: 0;">تحليل الأداء:</h3>
+                <p><strong>الدرجة:</strong> ${data.score} من ${data.total}</p>
+                <p><strong>النسبة المئوية:</strong> ${percentage}%</p>
+                <p><strong>الوقت المستغرق:</strong> ${timeSpent}</p>
+                <p><strong>معدل السرعة:</strong> ${speedAnalysis}</p>
             </div>
 
-            <hr style="border: 0; border-top: 2px solid #eee; width: 60%; margin: 20px auto;" />
-
-            <!-- Body -->
-            <div style="margin: 40px 0;">
-                <p style="font-size: 22px; margin-bottom: 10px;">تتشرف إدارة المنصة بمنح الطالب / الطالبة</p>
-                <h2 style="font-size: 45px; color: #1e293b; margin: 20px 0; font-weight: 800; text-decoration: underline; text-decoration-color: #d97706;">${studentName}</h2>
-                <p style="font-size: 20px; margin-bottom: 30px;">هذه الشهادة تقديراً لاجتيازه الامتحان بنجاح باهر.</p>
-                
-                <div style="display: inline-block; background-color: #fffbeb; border: 2px solid #d97706; padding: 15px 40px; border-radius: 15px; margin-top: 10px;">
-                    <p style="font-size: 18px; margin: 0; color: #777;">النتيجة النهائية</p>
-                    <h3 style="font-size: 35px; margin: 5px 0; color: ${percentage >= 50 ? '#15803d' : '#dc2626'};">${percentage}%</h3>
-                    <p style="font-size: 14px; margin: 0; color: #555;">(الدرجة: ${score} من ${total})</p>
-                </div>
+            <div style="margin-top: 40px; text-align: left;">
+                <p style="font-size: 14px; color: #888;">إمضاء المعلم:</p>
+                <h3 style="color: #000; font-family: sans-serif;">أ / محمد النحاس</h3>
             </div>
-
-            <!-- Footer -->
-            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 60px; padding: 0 50px;">
-                <div style="text-align: right;">
-                    <p style="font-size: 14px; color: #888; margin-bottom: 5px;">تحريراً في</p>
-                    <p style="font-weight: bold; font-size: 16px;">${date}</p>
-                </div>
+          </div>
+        `;
+    } 
+    // 2. شهادة الطالب (ناجح >= 85%)
+    else if (percentage >= 85) {
+        element.innerHTML = `
+          <div style="width: 297mm; height: 210mm; padding: 0; margin: 0; font-family: 'Cairo', sans-serif; direction: rtl; text-align: center; background: #fff; position: relative;">
+            <div style="width: 100%; height: 100%; border: 15px double #daa520; padding: 40px; box-sizing: border-box; background: radial-gradient(circle, #fffff0 0%, #fff 100%);">
                 
-                <div style="text-align: left;">
-                    <p style="font-size: 14px; color: #888; margin-bottom: 10px;">معلم المادة</p>
-                    <div style="font-family: 'Reem Kufi', sans-serif; font-size: 28px; color: #d97706; font-weight: bold;">
-                        أ / محمد النحاس
+                <h1 style="color: #b45309; font-size: 48px; margin-bottom: 10px; text-shadow: 1px 1px 2px #eee;">شهـــادة تقـــدير وتفـــوق</h1>
+                <p style="font-size: 18px; color: #555;">تتشرف منصة النحاس التعليمية بمنح هذه الشهادة للطالب المتميز</p>
+                
+                <h2 style="font-size: 56px; color: #1e293b; margin: 20px 0; font-family: 'Reem Kufi', sans-serif; color: #0f172a;">${data.studentName}</h2>
+                
+                <p style="font-size: 22px; color: #444;">وذلك لتفوقه وحصوله على درجة متميزة في الاختبار.</p>
+                
+                <div style="margin: 30px auto; width: 200px; padding: 15px; border: 3px solid #daa520; border-radius: 50px; background: #fff;">
+                    <span style="display: block; font-size: 14px; color: #888;">النسبة المئوية</span>
+                    <span style="display: block; font-size: 32px; font-weight: bold; color: #b45309;">%${percentage}</span>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 60px; padding: 0 60px;">
+                    <div style="text-align: right;">
+                        <p style="font-size: 16px; color: #777;">التاريخ</p>
+                        <p style="font-weight: bold; font-size: 18px;">${date}</p>
                     </div>
-                    <div style="width: 150px; height: 2px; background-color: #d97706; margin-top: 5px;"></div>
+                    <div style="text-align: left;">
+                        <p style="font-size: 16px; color: #777;">مُعلم اللغة العربية</p>
+                        <h3 style="font-size: 32px; color: #b45309; font-family: 'Reem Kufi', sans-serif; margin: 0;">أ / محمد النحاس</h3>
+                        <div style="width: 180px; height: 3px; background: #b45309; margin-top: 5px;"></div>
+                    </div>
                 </div>
             </div>
+          </div>
+        `;
+    } 
+    // 3. تقرير الطالب (راسب < 85%)
+    else {
+        element.innerHTML = `
+          <div style="width: 210mm; height: 297mm; padding: 40px; box-sizing: border-box; font-family: 'Cairo', sans-serif; direction: rtl; text-align: center; background: #fff;">
+            <div style="border: 5px solid #ef4444; height: 100%; padding: 20px; border-radius: 20px; background: #fef2f2;">
+                <div style="font-size: 60px; margin-bottom: 10px;">⚠️</div>
+                <h1 style="color: #b91c1c; font-size: 36px; margin-bottom: 20px;">تقرير مستوى (تنبيه)</h1>
+                
+                <h2 style="font-size: 32px; color: #333; margin: 20px 0;">${data.studentName}</h2>
+                
+                <div style="background: #fff; padding: 20px; border-radius: 15px; border: 1px solid #fecaca; margin: 30px auto; width: 80%;">
+                    <p style="font-size: 18px; color: #7f1d1d;">للأسف، لم تحقق المستوى المطلوب في هذا الاختبار.</p>
+                    <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+                    <p style="font-size: 16px; color: #555;">الدرجة: <strong>${data.score}</strong> من <strong>${data.total}</strong></p>
+                    <h3 style="font-size: 40px; color: #ef4444; margin: 10px 0;">%${percentage}</h3>
+                </div>
 
-            <div style="position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; font-size: 10px; color: #aaa;">
-                تم استخراج هذه الشهادة إلكترونياً من منصة النحاس
+                <div style="text-align: center; margin-top: 40px; padding: 20px;">
+                    <h3 style="color: #333; margin-bottom: 15px;">نصيحة المعلم:</h3>
+                    <p style="font-size: 20px; color: #4b5563; line-height: 1.6;">
+                        "النجاح ليس صدفة، بل هو نتيجة اجتهاد مستمر. <br/>
+                        هذه الدرجة لا تعبر عن قدراتك الحقيقية، ولكنها جرس إنذار.<br/>
+                        شد حيلك في المرة القادمة، وراجع أخطاءك جيداً."
+                    </p>
+                </div>
+                
+                <div style="margin-top: 80px;">
+                    <p style="font-size: 14px; color: #888;">أ / محمد النحاس</p>
+                </div>
             </div>
-        </div>
-      </div>
-    `;
-    
-    // التحقق من تحميل المكتبة
+          </div>
+        `;
+    }
+
+    const opt = {
+      margin: 0,
+      filename: type === 'admin' ? `تقرير_${data.studentName}.pdf` : (percentage >= 85 ? `شهادة_${data.studentName}.pdf` : `مستوى_${data.studentName}.pdf`),
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: (type === 'student' && percentage >= 85) ? 'a4' : 'a4', orientation: (type === 'student' && percentage >= 85) ? 'landscape' : 'portrait' }
+    };
+
     if(window.html2pdf) {
-        const opt = { 
-            margin: 0.2, 
-            filename: `شهادة_${studentName.replace(/\s/g, '_')}.pdf`, 
-            image: { type: 'jpeg', quality: 0.98 }, 
-            html2canvas: { scale: 2, useCORS: true }, 
-            jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' } // landscape عشان تبقى بالعرض زي الشهادات
-        };
         window.html2pdf().set(opt).from(element).save();
     } else {
-        alert("جاري تحميل نظام الطباعة... يرجى الانتظار 5 ثوانٍ والمحاولة مرة أخرى.");
+        alert("جاري تحميل أدوات الطباعة.. انتظر قليلاً.");
     }
 };
 
@@ -568,6 +638,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const [isCheating, setIsCheating] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(isReviewMode);
   const [score, setScore] = useState(existingResult?.score || 0);
+  const [startTime] = useState(Date.now()); // لتتبع وقت البداية
 
   const flatQuestions = [];
   if (exam.questions) {
@@ -606,7 +677,18 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     if(isReviewMode || isSubmitted) return;
     setIsCheating(true); 
     setIsSubmitted(true);
-    await addDoc(collection(db, 'exam_results'), { examId: exam.id, studentId: user.uid, studentName: user.displayName, score: 0, status: 'cheated', submittedAt: serverTimestamp() });
+    const timeTaken = Math.round((Date.now() - startTime) / 1000);
+    await addDoc(collection(db, 'exam_results'), { 
+        examId: exam.id, 
+        studentId: user.uid, 
+        studentName: user.displayName, 
+        score: 0, 
+        total: flatQuestions.length,
+        status: 'cheated', 
+        timeTaken: timeTaken,
+        totalTime: exam.duration,
+        submittedAt: serverTimestamp() 
+    });
     await updateDoc(doc(db, 'users', user.uid), { status: 'banned_cheating' });
   };
 
@@ -624,10 +706,21 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     const totalQs = flatQuestions.length;
     if (!auto && Object.keys(answers).length < totalQs && !window.confirm("لم تجب على كل الأسئلة، هل أنت متأكد؟")) return;
     const finalScore = calculateScore();
+    const timeTaken = Math.round((Date.now() - startTime) / 1000);
     setScore(finalScore);
     setIsSubmitted(true);
+    
     await addDoc(collection(db, 'exam_results'), { 
-      examId: exam.id, studentId: user.uid, studentName: user.displayName, score: finalScore, total: totalQs, answers, status: 'completed', submittedAt: serverTimestamp() 
+      examId: exam.id, 
+      studentId: user.uid, 
+      studentName: user.displayName, 
+      score: finalScore, 
+      total: totalQs, 
+      answers, 
+      status: 'completed',
+      timeTaken: timeTaken,
+      totalTime: exam.duration, 
+      submittedAt: serverTimestamp() 
     });
   };
 
@@ -643,7 +736,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                 <h2 className="text-3xl font-black mb-4">تم الانتهاء من الامتحان</h2>
                 <div className={`text-6xl font-black my-6 ${score >= flatQuestions.length / 2 ? 'text-green-600' : 'text-red-600'}`}>{score} / {flatQuestions.length}</div>
                 <div className="flex gap-4 justify-center">
-                    <button onClick={() => handleDownloadPDF(user.displayName, score, flatQuestions.length, 'completed')} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2"><Download size={18}/> شهادة (PDF)</button>
+                    <button onClick={() => handleDownloadPDF(user.displayName, score, flatQuestions.length, 'completed')} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2"><Download size={18}/> تحميل النتيجة</button>
                     <button onClick={onClose} className="bg-slate-900 text-white py-3 px-8 rounded-xl font-bold">عودة للرئيسية</button>
                 </div>
             </div>
