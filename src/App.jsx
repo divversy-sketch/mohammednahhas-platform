@@ -48,17 +48,11 @@ const requestNotificationPermission = () => {
 // إرسال إشعار للنظام (System Notification)
 const sendSystemNotification = (title, body) => {
   if (Notification.permission === "granted") {
-    try {
-        new Notification(title, {
-            body: body,
-            icon: "https://cdn-icons-png.flaticon.com/512/3449/3449750.png",
-            vibrate: [200, 100, 200]
-        });
-        // صوت تنبيه خفيف
-        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-        audio.volume = 0.2;
-        audio.play().catch(e => {}); // تجاهل الخطأ لو المتصفح منع الصوت
-    } catch(e) { console.log(e); }
+    new Notification(title, {
+      body: body,
+      icon: "https://cdn-icons-png.flaticon.com/512/3449/3449750.png",
+      vibrate: [200, 100, 200]
+    });
   }
 };
 
@@ -70,25 +64,57 @@ const getYouTubeID = (url) => {
     return (match && match[2].length === 11) ? match[2] : null;
 };
 
-// طباعة النتيجة PDF (يدعم العربية)
+// طباعة النتيجة PDF (تصميم مزخرف واحترافي)
 const handleDownloadPDF = (studentName, score, total, status) => {
+    const percentage = Math.round((score / total) * 100);
     const element = document.createElement('div');
     const date = new Date().toLocaleDateString('ar-EG');
     
+    // تصميم الشهادة (HTML & CSS Inline)
     element.innerHTML = `
-      <div style="direction: rtl; font-family: sans-serif; padding: 40px; border: 5px double #d97706; text-align: center; background: #fff;">
-        <h1 style="color: #d97706; font-size: 30px; margin-bottom: 10px;">منصة النحاس التعليمية</h1>
-        <h3 style="color: #555; margin-bottom: 30px;">تقرير نتيجة الطالب</h3>
-        
-        <div style="background: #f9f9f9; padding: 30px; border-radius: 15px; margin: 20px 0; border: 1px solid #eee;">
-            <h2 style="font-size: 24px; margin: 15px 0;">الاسم: <span style="color: #000;">${studentName}</span></h2>
-            <h2 style="font-size: 24px; margin: 15px 0;">الدرجة: <span style="color: ${score >= total/2 ? 'green' : 'red'}; font-weight: bold;">${score} / ${total}</span></h2>
-            <p style="font-size: 18px; color: #777;">الحالة: ${status === 'cheated' ? '<span style="color:red">تم إلغاؤه (محاولة غش)</span>' : 'تم الانتهاء بنجاح'}</p>
-        </div>
+      <div style="width: 800px; padding: 20px; font-family: 'Cairo', sans-serif; direction: rtl; text-align: center; background-color: #fff; color: #333;">
+        <div style="border: 10px double #d97706; padding: 40px; height: 100%; position: relative;">
+            
+            <!-- Header -->
+            <div style="margin-bottom: 30px;">
+                <h1 style="color: #d97706; font-size: 40px; margin: 0; font-weight: 900;">شهادة تقدير وتفوق</h1>
+                <p style="color: #666; font-size: 16px; margin-top: 5px;">منصة النحاس التعليمية للغة العربية</p>
+            </div>
 
-        <div style="margin-top: 50px; border-top: 1px solid #ccc; padding-top: 10px;">
-            <p style="font-size: 14px; color: #888;">تاريخ التقرير: ${date}</p>
-            <p style="font-size: 14px; color: #d97706;">إمضاء المنصة: ____________________</p>
+            <hr style="border: 0; border-top: 2px solid #eee; width: 60%; margin: 20px auto;" />
+
+            <!-- Body -->
+            <div style="margin: 40px 0;">
+                <p style="font-size: 22px; margin-bottom: 10px;">تتشرف إدارة المنصة بمنح الطالب / الطالبة</p>
+                <h2 style="font-size: 45px; color: #1e293b; margin: 20px 0; font-weight: 800; text-decoration: underline; text-decoration-color: #d97706;">${studentName}</h2>
+                <p style="font-size: 20px; margin-bottom: 30px;">هذه الشهادة تقديراً لاجتيازه الامتحان بنجاح باهر.</p>
+                
+                <div style="display: inline-block; background-color: #fffbeb; border: 2px solid #d97706; padding: 15px 40px; border-radius: 15px; margin-top: 10px;">
+                    <p style="font-size: 18px; margin: 0; color: #777;">النتيجة النهائية</p>
+                    <h3 style="font-size: 35px; margin: 5px 0; color: ${percentage >= 50 ? '#15803d' : '#dc2626'};">${percentage}%</h3>
+                    <p style="font-size: 14px; margin: 0; color: #555;">(الدرجة: ${score} من ${total})</p>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 60px; padding: 0 50px;">
+                <div style="text-align: right;">
+                    <p style="font-size: 14px; color: #888; margin-bottom: 5px;">تحريراً في</p>
+                    <p style="font-weight: bold; font-size: 16px;">${date}</p>
+                </div>
+                
+                <div style="text-align: left;">
+                    <p style="font-size: 14px; color: #888; margin-bottom: 10px;">معلم المادة</p>
+                    <div style="font-family: 'Reem Kufi', sans-serif; font-size: 28px; color: #d97706; font-weight: bold;">
+                        أ / محمد النحاس
+                    </div>
+                    <div style="width: 150px; height: 2px; background-color: #d97706; margin-top: 5px;"></div>
+                </div>
+            </div>
+
+            <div style="position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; font-size: 10px; color: #aaa;">
+                تم استخراج هذه الشهادة إلكترونياً من منصة النحاس
+            </div>
         </div>
       </div>
     `;
@@ -96,11 +122,11 @@ const handleDownloadPDF = (studentName, score, total, status) => {
     // التحقق من تحميل المكتبة
     if(window.html2pdf) {
         const opt = { 
-            margin: 0.5, 
-            filename: `نتيجة_${studentName.replace(/\s/g, '_')}.pdf`, 
+            margin: 0.2, 
+            filename: `شهادة_${studentName.replace(/\s/g, '_')}.pdf`, 
             image: { type: 'jpeg', quality: 0.98 }, 
-            html2canvas: { scale: 2 }, 
-            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } 
+            html2canvas: { scale: 2, useCORS: true }, 
+            jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' } // landscape عشان تبقى بالعرض زي الشهادات
         };
         window.html2pdf().set(opt).from(element).save();
     } else {
@@ -131,12 +157,12 @@ const DesignSystemLoader = () => {
       };
       document.head.appendChild(script);
     }
-    // تحميل خط Cairo
+    // تحميل خط Cairo + Reem Kufi (للتوقيع)
     if (!document.getElementById('cairo-font')) {
       const link = document.createElement('link');
       link.id = 'cairo-font';
       link.rel = 'stylesheet';
-      link.href = "https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap";
+      link.href = "https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Reem+Kufi:wght@700&display=swap";
       document.head.appendChild(link);
     }
     // تحميل مكتبة html2pdf للطباعة
@@ -159,7 +185,7 @@ const DesignSystemLoader = () => {
       .watermark-text {
         position: absolute;
         animation: floatWatermark 20s linear infinite;
-        pointer-events: 9999; /* Changed to ensure it stays on top visually but doesn't block clicks if transparent */
+        pointer-events: 9999;
         z-index: 9999;
         color: rgba(0, 0, 0, 0.08);
         font-weight: 900;
@@ -617,7 +643,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                 <h2 className="text-3xl font-black mb-4">تم الانتهاء من الامتحان</h2>
                 <div className={`text-6xl font-black my-6 ${score >= flatQuestions.length / 2 ? 'text-green-600' : 'text-red-600'}`}>{score} / {flatQuestions.length}</div>
                 <div className="flex gap-4 justify-center">
-                    <button onClick={() => handleDownloadPDF(user.displayName, score, flatQuestions.length, 'completed')} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2"><Download size={18}/> تحميل النتيجة</button>
+                    <button onClick={() => handleDownloadPDF(user.displayName, score, flatQuestions.length, 'completed')} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2"><Download size={18}/> شهادة (PDF)</button>
                     <button onClick={onClose} className="bg-slate-900 text-white py-3 px-8 rounded-xl font-bold">عودة للرئيسية</button>
                 </div>
             </div>
@@ -639,7 +665,10 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
         {!isReviewMode ? (
             <button onClick={() => handleSubmit()} className="bg-green-600 px-6 py-2 rounded-lg font-bold">تسليم</button>
         ) : (
-            <button onClick={onClose} className="bg-slate-700 px-6 py-2 rounded-lg font-bold">إغلاق</button>
+            <div className="flex gap-2">
+                <button onClick={() => handleDownloadPDF(user.displayName, score, flatQuestions.length, 'completed')} className="bg-blue-600 px-4 py-2 rounded-lg font-bold flex items-center gap-2"><Download size={16}/> PDF</button>
+                <button onClick={onClose} className="bg-slate-700 px-6 py-2 rounded-lg font-bold">إغلاق</button>
+            </div>
         )}
       </div>
 
@@ -735,8 +764,6 @@ const AdminDashboard = ({ user }) => {
   const [newAnnouncement, setNewAnnouncement] = useState(""); 
   const [showLeaderboard, setShowLeaderboard] = useState(true);
   const [announcements, setAnnouncements] = useState([]);
-  
-  // Notification State
   const [notifData, setNotifData] = useState({ text: '', grade: 'all' });
 
   // جلب البيانات
