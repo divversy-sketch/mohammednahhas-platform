@@ -48,11 +48,17 @@ const requestNotificationPermission = () => {
 // إرسال إشعار للنظام (System Notification)
 const sendSystemNotification = (title, body) => {
   if (Notification.permission === "granted") {
-    new Notification(title, {
-      body: body,
-      icon: "https://cdn-icons-png.flaticon.com/512/3449/3449750.png",
-      vibrate: [200, 100, 200]
-    });
+    try {
+        new Notification(title, {
+            body: body,
+            icon: "https://cdn-icons-png.flaticon.com/512/3449/3449750.png",
+            vibrate: [200, 100, 200]
+        });
+        // صوت تنبيه خفيف
+        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+        audio.volume = 0.2;
+        audio.play().catch(e => {}); // تجاهل الخطأ لو المتصفح منع الصوت
+    } catch(e) { console.log(e); }
   }
 };
 
@@ -64,7 +70,7 @@ const getYouTubeID = (url) => {
     return (match && match[2].length === 11) ? match[2] : null;
 };
 
-// --- دالة توليد PDF الذكية (للطلاب وللأدمن) ---
+// طباعة النتيجة PDF (يدعم العربية)
 const generatePDF = (type, data) => {
     // data: { studentName, score, total, status, timeTaken (seconds), totalTime (minutes) }
     
@@ -336,7 +342,7 @@ const ModernLogo = () => (
 
 const FloatingArabicBackground = () => (
   <div className="fixed inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 0, background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)' }}>
-    <div className="absolute inset-0 opacity-[0.05]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d97706' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")` }} />
+    <div className="absolute inset-0 opacity-[0.05]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d97706' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")` }} />
     {['ض', 'ص', 'ث', 'ق', 'ف', 'غ', 'ع', 'ه', 'خ', 'ح', 'ج'].map((char, i) => (
       <motion.div key={i} className="absolute text-amber-600/10 font-black select-none" initial={{ x: Math.random() * 1000, y: Math.random() * 800 }} animate={{ y: [0, -50, 0], rotate: [0, 20, -20, 0], opacity: [0.1, 0.3, 0.1] }} transition={{ duration: 10 + Math.random() * 10, repeat: Infinity, ease: "easeInOut" }} style={{ fontSize: `${Math.random() * 60 + 40}px`, left: `${Math.random() * 90}%`, top: `${Math.random() * 90}%` }}>{char}</motion.div>
     ))}
@@ -742,7 +748,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                 <h2 className="text-3xl font-black mb-4">تم الانتهاء من الامتحان</h2>
                 <div className={`text-6xl font-black my-6 ${score >= flatQuestions.length / 2 ? 'text-green-600' : 'text-red-600'}`}>{score} / {flatQuestions.length}</div>
                 <div className="flex gap-4 justify-center">
-                    <button onClick={() => generatePDF('student', {studentName: user.displayName, score, total: flatQuestions.length, status: 'completed'})} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2"><Download size={18}/> الشهادة</button>
+                    <button onClick={() => generatePDF('student', {studentName: user.displayName, score, total: flatQuestions.length, status: 'completed'})} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2"><Download size={18}/> تحميل الشهادة</button>
                     <button onClick={onClose} className="bg-slate-900 text-white py-3 px-8 rounded-xl font-bold">عودة للرئيسية</button>
                 </div>
             </div>
@@ -852,7 +858,7 @@ const AdminDashboard = ({ user }) => {
   const [isLive, setIsLive] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [replyTexts, setReplyTexts] = useState({});
-  const [examBuilder, setExamBuilder] = useState({ title: '', grade: '3sec', duration: 60, questions: [], accessCode: '' });
+  const [examBuilder, setExamBuilder] = useState({ title: '', grade: '3sec', duration: 60, startTime: '', endTime: '', questions: [], accessCode: '' });
   const [bulkText, setBulkText] = useState('');
   const [examsList, setExamsList] = useState([]);
   const [examResults, setExamResults] = useState([]); 
@@ -935,6 +941,7 @@ const AdminDashboard = ({ user }) => {
   const handleAddContent = async (e) => { 
       e.preventDefault(); 
       await addDoc(collection(db, 'content'), { ...newContent, file: newContent.url, createdAt: new Date()});
+      // إرسال إشعار تلقائي
       await addDoc(collection(db, 'notifications'), {
         text: `تم إضافة درس جديد: ${newContent.title}`,
         grade: newContent.grade,
@@ -974,9 +981,8 @@ const AdminDashboard = ({ user }) => {
   };
 
   const parseExam = async () => {
-    if (!bulkText.trim()) return alert("أدخل نص الامتحان");
-    if (!examBuilder.accessCode) return alert("أدخل كود للامتحان");
-    
+    if (!bulkText.trim() || !examBuilder.startTime || !examBuilder.endTime) return alert("يرجى إدخال نص الامتحان وتحديد وقت البدء والانتهاء");
+
     const lines = bulkText.split('\n').map(l => l.trim()).filter(l => l);
     const blocks = [];
     let currentBlock = { text: '', subQuestions: [] };
@@ -1016,7 +1022,16 @@ const AdminDashboard = ({ user }) => {
     // خلط الأسئلة داخل كل مجموعة
     finalBlocks.forEach(block => { for (let i = block.subQuestions.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [block.subQuestions[i], block.subQuestions[j]] = [block.subQuestions[j], block.subQuestions[i]]; } });
 
-    await addDoc(collection(db, 'exams'), { title: examBuilder.title, grade: examBuilder.grade, duration: examBuilder.duration, accessCode: examBuilder.accessCode, questions: finalBlocks, createdAt: serverTimestamp() });
+    await addDoc(collection(db, 'exams'), { 
+        title: examBuilder.title, 
+        grade: examBuilder.grade, 
+        duration: examBuilder.duration, 
+        startTime: examBuilder.startTime, // وقت البدء
+        endTime: examBuilder.endTime,     // وقت الانتهاء
+        accessCode: examBuilder.accessCode, 
+        questions: finalBlocks, 
+        createdAt: serverTimestamp() 
+    });
     
     // إشعار بالامتحان الجديد
     await addDoc(collection(db, 'notifications'), {
@@ -1072,7 +1087,7 @@ const AdminDashboard = ({ user }) => {
 
           {activeTab === 'all_users' && <div className="bg-white p-6 rounded-xl shadow-sm"><h2 className="font-bold mb-4">قائمة الطلاب</h2>{editingUser&&<form onSubmit={handleUpdateUser} className="mb-4 bg-amber-50 p-4 rounded grid gap-2"><input className="border p-2" value={editingUser.name} onChange={e=>setEditingUser({...editingUser, name:e.target.value})}/><button className="bg-green-600 text-white px-4 py-1 rounded">حفظ</button></form>}{activeUsersList.map(u=><div key={u.id} className={`border p-4 mb-2 rounded-lg flex justify-between items-center ${u.status==='banned_cheating'?'bg-red-50 border-red-200':''}`}><div><p className="font-bold">{u.name} {u.status==='banned_cheating'&&<span className="text-red-600 text-xs">(محظور)</span>}</p><p className="text-xs text-slate-500">{u.email}</p></div><div className="flex gap-2">{u.status==='banned_cheating'?<button onClick={()=>handleUnban(u.id)} className="bg-green-100 text-green-700 px-3 py-1 rounded text-xs font-bold flex gap-1"><Unlock size={16}/>فك</button>:<button onClick={()=>setEditingUser(u)} className="bg-blue-100 text-blue-600 p-2 rounded"><Edit size={16}/></button>}<button onClick={()=>handleSendResetPassword(u.email)} className="bg-amber-100 text-amber-600 p-2 rounded"><KeyRound size={16}/></button><button onClick={()=>handleDeleteUser(u.id)} className="bg-red-100 text-red-600 p-2 rounded"><Trash2 size={16}/></button></div></div>)}</div>}
 
-          {activeTab === 'exams' && <div className="space-y-8"><div className="bg-white p-6 rounded-xl shadow-sm"><h2 className="text-xl font-bold mb-6 border-b pb-2">إنشاء امتحان</h2><div className="grid grid-cols-4 gap-4 mb-6"><input className="border p-2 rounded col-span-2" placeholder="العنوان" value={examBuilder.title} onChange={e=>setExamBuilder({...examBuilder, title:e.target.value})}/><input className="border p-2 rounded" placeholder="الكود" value={examBuilder.accessCode} onChange={e=>setExamBuilder({...examBuilder, accessCode:e.target.value})}/><input type="number" className="border p-2 rounded" placeholder="المدة" value={examBuilder.duration} onChange={e=>setExamBuilder({...examBuilder, duration:parseInt(e.target.value)})}/><select className="border p-2 rounded col-span-4" value={examBuilder.grade} onChange={e=>setExamBuilder({...examBuilder, grade:e.target.value})}><GradeOptions/></select></div><div className="bg-slate-50 p-4 rounded-xl border mb-6"><textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm" placeholder="اكتب الأسئلة هنا..." value={bulkText} onChange={e=>setBulkText(e.target.value)}/><button onClick={parseExam} className="mt-4 w-full bg-green-600 text-white py-3 rounded-xl font-bold">نشر</button></div></div><div className="bg-white p-6 rounded-xl shadow-sm"><h3 className="font-bold mb-4">الامتحانات الحالية</h3>{examsList.map(exam=><div key={exam.id} className="flex justify-between items-center border-b py-3 last:border-0"><div><p className="font-bold">{exam.title}</p><p className="text-xs text-slate-500">كود: {exam.accessCode}</p></div><div className="flex gap-2"><button onClick={()=>handleEditExam(exam)} className="text-blue-500 p-2"><Edit size={18}/></button><button onClick={()=>handleDeleteExam(exam.id)} className="text-red-500 p-2"><Trash2 size={18}/></button></div></div>)}</div></div>}
+          {activeTab === 'exams' && <div className="space-y-8"><div className="bg-white p-6 rounded-xl shadow-sm"><h2 className="text-xl font-bold mb-6 border-b pb-2">إنشاء امتحان</h2><div className="grid grid-cols-4 gap-4 mb-6"><input className="border p-2 rounded col-span-2" placeholder="العنوان" value={examBuilder.title} onChange={e=>setExamBuilder({...examBuilder, title:e.target.value})}/><input className="border p-2 rounded" placeholder="الكود" value={examBuilder.accessCode} onChange={e=>setExamBuilder({...examBuilder, accessCode:e.target.value})}/><input type="number" className="border p-2 rounded" placeholder="المدة (دقائق)" value={examBuilder.duration} onChange={e=>setExamBuilder({...examBuilder, duration:parseInt(e.target.value)})}/><select className="border p-2 rounded col-span-4" value={examBuilder.grade} onChange={e=>setExamBuilder({...examBuilder, grade:e.target.value})}><GradeOptions/></select><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت البدء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, startTime:e.target.value})}/></div><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت الانتهاء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, endTime:e.target.value})}/></div></div><div className="bg-slate-50 p-4 rounded-xl border mb-6"><textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm" placeholder="اكتب الأسئلة هنا..." value={bulkText} onChange={e=>setBulkText(e.target.value)}/><button onClick={parseExam} className="mt-4 w-full bg-green-600 text-white py-3 rounded-xl font-bold">نشر</button></div></div><div className="bg-white p-6 rounded-xl shadow-sm"><h3 className="font-bold mb-4">الامتحانات الحالية</h3>{examsList.map(exam=><div key={exam.id} className="flex justify-between items-center border-b py-3 last:border-0"><div><p className="font-bold">{exam.title}</p><p className="text-xs text-slate-500">من: {new Date(exam.startTime).toLocaleString('ar-EG')} | إلى: {new Date(exam.endTime).toLocaleString('ar-EG')}</p><p className="text-xs text-slate-400">كود: {exam.accessCode}</p></div><div className="flex gap-2"><button onClick={()=>handleEditExam(exam)} className="text-blue-500 p-2"><Edit size={18}/></button><button onClick={()=>handleDeleteExam(exam.id)} className="text-red-500 p-2"><Trash2 size={18}/></button></div></div>)}</div></div>}
 
           {activeTab === 'results' && (
              <div className="bg-white p-6 rounded-xl shadow-sm">
@@ -1183,11 +1198,15 @@ const StudentDashboard = ({ user, userData }) => {
   const [activeExam, setActiveExam] = useState(null);
   const [playingVideo, setPlayingVideo] = useState(null);
   const [examResults, setExamResults] = useState([]);
+  // حالة جديدة لفتح الامتحان في وضع المراجعة للطالب
   const [reviewingExam, setReviewingExam] = useState(null);
   
+  // Notification State
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [hasNewNotif, setHasNewNotif] = useState(false);
+
+  // Settings State
   const [editFormData, setEditFormData] = useState({ name: '', phone: '', parentPhone: '', grade: '' });
 
   useEffect(() => {
@@ -1197,6 +1216,7 @@ const StudentDashboard = ({ user, userData }) => {
     const unsubExams = onSnapshot(query(collection(db, 'exams'), where('grade', '==', userData.grade)), s => setExams(s.docs.map(d=>({id:d.id,...d.data()}))));
     const unsubResults = onSnapshot(query(collection(db, 'exam_results'), where('studentId', '==', user.uid)), s => setExamResults(s.docs.map(d=>({id:d.id,...d.data()}))));
     
+    // Notifications Fetch
     const unsubNotif = onSnapshot(query(collection(db, 'notifications'), where('grade', 'in', ['all', userData.grade]), orderBy('createdAt', 'desc'), limit(10)), s => {
         const newNotifs = s.docs.map(d => d.data());
         setNotifications(newNotifs);
@@ -1206,6 +1226,7 @@ const StudentDashboard = ({ user, userData }) => {
         }
     });
 
+    // Initialize edit form
     setEditFormData({ name: userData.name, phone: userData.phone, parentPhone: userData.parentPhone, grade: userData.grade });
 
     return () => { unsubContent(); unsubLive(); unsubExams(); unsubResults(); unsubNotif(); };
@@ -1213,13 +1234,16 @@ const StudentDashboard = ({ user, userData }) => {
 
   if(liveSession) return <LiveSessionView session={liveSession} user={user} onClose={() => window.location.reload()} />;
   
+  // تشغيل الامتحان (حل جديد)
   if (activeExam) return <ExamRunner exam={activeExam} user={user} onClose={() => setActiveExam(null)} />;
   
+  // مراجعة الامتحان (عرض النتيجة السابقة)
   if (reviewingExam) {
       const result = examResults.find(r => r.examId === reviewingExam.id);
       return <ExamRunner exam={reviewingExam} user={user} onClose={() => setReviewingExam(null)} isReviewMode={true} existingResult={result} />;
   }
 
+  // إذا كان الطالب محظوراً، نمنعه من الامتحانات فقط، وليس كامل الموقع
   const isBanned = userData?.status === 'banned_cheating';
 
   if(userData?.status === 'pending') return <div className="h-screen flex items-center justify-center bg-amber-50 text-center p-4"><div className="bg-white p-8 rounded-2xl shadow-xl"><h2 className="text-2xl font-bold mb-2">طلبك قيد المراجعة ⏳</h2><button onClick={()=>signOut(auth)} className="mt-4 text-red-500 underline">خروج</button></div></div>;
@@ -1234,6 +1258,15 @@ const StudentDashboard = ({ user, userData }) => {
         alert(`أنت امتحنت الامتحان ده قبل كده وجبت ${previousResult.score}.`);
         return;
     }
+
+    // التحقق من الوقت
+    const now = new Date();
+    const start = new Date(exam.startTime);
+    const end = new Date(exam.endTime);
+
+    if (now < start) return alert(`الامتحان لم يبدأ بعد. موعد البدء: ${start.toLocaleString('ar-EG')}`);
+    if (now > end) return alert("عفواً، انتهى وقت الامتحان.");
+
     const code = prompt("أدخل كود الامتحان:");
     if (code === exam.accessCode) {
         setActiveExam(exam);
@@ -1321,7 +1354,10 @@ const StudentDashboard = ({ user, userData }) => {
                              <button onClick={() => generatePDF('student', {studentName: user.displayName, score: prevResult.score, total: e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0), status: prevResult.status})} className="flex-1 bg-green-100 text-green-700 py-3 rounded-xl font-bold hover:bg-green-200 flex items-center justify-center gap-1"><Download size={16}/> شهادة</button>
                         </div>
                     ) : (
-                        <button onClick={() => startExamWithCode(e)} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 flex items-center justify-center gap-2"><Lock size={16}/> ابدأ الامتحان</button>
+                        <div className="space-y-2">
+                            <p className="text-xs text-slate-500">يبدأ: {new Date(e.startTime).toLocaleString('ar-EG')}</p>
+                            <button onClick={() => startExamWithCode(e)} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 flex items-center justify-center gap-2"><Lock size={16}/> ابدأ الامتحان</button>
+                        </div>
                     )}
                   </div>
                 )
