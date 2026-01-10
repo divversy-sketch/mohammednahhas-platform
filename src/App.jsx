@@ -68,6 +68,12 @@ const getYouTubeID = (url) => {
 const generatePDF = (type, data) => {
     // data: { studentName, score, total, status, timeTaken (seconds), totalTime (minutes) }
     
+    // التأكد من وجود المكتبة
+    if (!window.html2pdf) {
+        alert("جاري تحميل نظام الطباعة... يرجى الانتظار ثوانٍ والمحاولة مرة أخرى.");
+        return;
+    }
+
     const percentage = Math.round((data.score / data.total) * 100);
     const date = new Date().toLocaleDateString('ar-EG');
     const element = document.createElement('div');
@@ -189,18 +195,19 @@ const generatePDF = (type, data) => {
         `;
     }
 
-    const opt = {
-      margin: 0,
-      filename: type === 'admin' ? `تقرير_${data.studentName}.pdf` : (percentage >= 85 ? `شهادة_${data.studentName}.pdf` : `مستوى_${data.studentName}.pdf`),
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'mm', format: (type === 'student' && percentage >= 85) ? 'a4' : 'a4', orientation: (type === 'student' && percentage >= 85) ? 'landscape' : 'portrait' }
-    };
+    try {
+        const opt = {
+          margin: 0,
+          filename: type === 'admin' ? `تقرير_${data.studentName}.pdf` : (percentage >= 85 ? `شهادة_${data.studentName}.pdf` : `مستوى_${data.studentName}.pdf`),
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: 'mm', format: (type === 'student' && percentage >= 85) ? 'a4' : 'a4', orientation: (type === 'student' && percentage >= 85) ? 'landscape' : 'portrait' }
+        };
 
-    if(window.html2pdf) {
         window.html2pdf().set(opt).from(element).save();
-    } else {
-        alert("جاري تحميل أدوات الطباعة.. انتظر قليلاً.");
+    } catch (err) {
+        console.error("PDF Generation Error:", err);
+        alert("حدث خطأ أثناء إنشاء ملف PDF. يرجى المحاولة مرة أخرى.");
     }
 };
 
@@ -329,7 +336,7 @@ const ModernLogo = () => (
 
 const FloatingArabicBackground = () => (
   <div className="fixed inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 0, background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)' }}>
-    <div className="absolute inset-0 opacity-[0.05]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d97706' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")` }} />
+    <div className="absolute inset-0 opacity-[0.05]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d97706' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")` }} />
     {['ض', 'ص', 'ث', 'ق', 'ف', 'غ', 'ع', 'ه', 'خ', 'ح', 'ج'].map((char, i) => (
       <motion.div key={i} className="absolute text-amber-600/10 font-black select-none" initial={{ x: Math.random() * 1000, y: Math.random() * 800 }} animate={{ y: [0, -50, 0], rotate: [0, 20, -20, 0], opacity: [0.1, 0.3, 0.1] }} transition={{ duration: 10 + Math.random() * 10, repeat: Infinity, ease: "easeInOut" }} style={{ fontSize: `${Math.random() * 60 + 40}px`, left: `${Math.random() * 90}%`, top: `${Math.random() * 90}%` }}>{char}</motion.div>
     ))}
@@ -638,7 +645,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const [isCheating, setIsCheating] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(isReviewMode);
   const [score, setScore] = useState(existingResult?.score || 0);
-  const [startTime] = useState(Date.now()); // لتتبع وقت البداية
+  const [startTime] = useState(Date.now()); 
 
   const flatQuestions = [];
   if (exam.questions) {
@@ -653,7 +660,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
   useEffect(() => {
     if (isReviewMode || isSubmitted) return;
-
     const handleVisibilityChange = () => { if (document.hidden) handleCheating(); };
     document.addEventListener("visibilitychange", handleVisibilityChange);
     document.addEventListener('contextmenu', event => event.preventDefault()); 
@@ -736,7 +742,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                 <h2 className="text-3xl font-black mb-4">تم الانتهاء من الامتحان</h2>
                 <div className={`text-6xl font-black my-6 ${score >= flatQuestions.length / 2 ? 'text-green-600' : 'text-red-600'}`}>{score} / {flatQuestions.length}</div>
                 <div className="flex gap-4 justify-center">
-                    <button onClick={() => handleDownloadPDF(user.displayName, score, flatQuestions.length, 'completed')} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2"><Download size={18}/> تحميل النتيجة</button>
+                    <button onClick={() => generatePDF('student', {studentName: user.displayName, score, total: flatQuestions.length, status: 'completed'})} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2"><Download size={18}/> الشهادة</button>
                     <button onClick={onClose} className="bg-slate-900 text-white py-3 px-8 rounded-xl font-bold">عودة للرئيسية</button>
                 </div>
             </div>
@@ -758,10 +764,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
         {!isReviewMode ? (
             <button onClick={() => handleSubmit()} className="bg-green-600 px-6 py-2 rounded-lg font-bold">تسليم</button>
         ) : (
-            <div className="flex gap-2">
-                <button onClick={() => handleDownloadPDF(user.displayName, score, flatQuestions.length, 'completed')} className="bg-blue-600 px-4 py-2 rounded-lg font-bold flex items-center gap-2"><Download size={16}/> PDF</button>
-                <button onClick={onClose} className="bg-slate-700 px-6 py-2 rounded-lg font-bold">إغلاق</button>
-            </div>
+            <button onClick={onClose} className="bg-slate-700 px-6 py-2 rounded-lg font-bold">إغلاق</button>
         )}
       </div>
 
@@ -916,7 +919,7 @@ const AdminDashboard = ({ user }) => {
   const handleUpdateUser = async (e) => { e.preventDefault(); if(!editingUser) return; await updateDoc(doc(db, 'users', editingUser.id), { name: editingUser.name, phone: editingUser.phone, parentPhone: editingUser.parentPhone, grade: editingUser.grade }); setEditingUser(null); };
   const handleSendResetPassword = async (email) => { if(window.confirm(`إرسال رابط تغيير كلمة السر لـ ${email}؟`)) await sendPasswordResetEmail(auth, email); };
   
-  // رفع الملفات (محاكاة - يحول لـ Data URL)
+  // رفع الملفات
   const handleFileSelect = (e) => {
       const file = e.target.files[0];
       if (file) {
@@ -932,7 +935,6 @@ const AdminDashboard = ({ user }) => {
   const handleAddContent = async (e) => { 
       e.preventDefault(); 
       await addDoc(collection(db, 'content'), { ...newContent, file: newContent.url, createdAt: new Date()});
-      // إرسال إشعار تلقائي
       await addDoc(collection(db, 'notifications'), {
         text: `تم إضافة درس جديد: ${newContent.title}`,
         grade: newContent.grade,
@@ -1086,7 +1088,7 @@ const AdminDashboard = ({ user }) => {
                    <div className="bg-slate-50 p-4 rounded-xl border">
                        <div className="flex justify-between mb-4">
                            <button onClick={() => setViewingResult(null)} className="mb-4 text-sm text-slate-500 underline font-bold">العودة للقائمة</button>
-                           <button onClick={() => handleDownloadPDF(viewingResult.studentName, viewingResult.score, viewingResult.total, viewingResult.status)} className="bg-blue-600 text-white px-4 py-1 rounded text-sm flex items-center gap-2"><Download size={16}/> تحميل PDF</button>
+                           <button onClick={() => generatePDF('admin', {...viewingResult, total: viewingResult.total || 0})} className="bg-blue-600 text-white px-4 py-1 rounded text-sm flex items-center gap-2"><Download size={16}/> تحميل PDF</button>
                        </div>
                        <h3 className="font-bold text-lg mb-2">إجابات الطالب: {viewingResult.studentName}</h3>
                        <div className="space-y-4 mt-4" id="result-content">
@@ -1181,15 +1183,11 @@ const StudentDashboard = ({ user, userData }) => {
   const [activeExam, setActiveExam] = useState(null);
   const [playingVideo, setPlayingVideo] = useState(null);
   const [examResults, setExamResults] = useState([]);
-  // حالة جديدة لفتح الامتحان في وضع المراجعة للطالب
   const [reviewingExam, setReviewingExam] = useState(null);
   
-  // Notification State
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [hasNewNotif, setHasNewNotif] = useState(false);
-
-  // Settings State
   const [editFormData, setEditFormData] = useState({ name: '', phone: '', parentPhone: '', grade: '' });
 
   useEffect(() => {
@@ -1199,7 +1197,6 @@ const StudentDashboard = ({ user, userData }) => {
     const unsubExams = onSnapshot(query(collection(db, 'exams'), where('grade', '==', userData.grade)), s => setExams(s.docs.map(d=>({id:d.id,...d.data()}))));
     const unsubResults = onSnapshot(query(collection(db, 'exam_results'), where('studentId', '==', user.uid)), s => setExamResults(s.docs.map(d=>({id:d.id,...d.data()}))));
     
-    // Notifications Fetch
     const unsubNotif = onSnapshot(query(collection(db, 'notifications'), where('grade', 'in', ['all', userData.grade]), orderBy('createdAt', 'desc'), limit(10)), s => {
         const newNotifs = s.docs.map(d => d.data());
         setNotifications(newNotifs);
@@ -1209,7 +1206,6 @@ const StudentDashboard = ({ user, userData }) => {
         }
     });
 
-    // Initialize edit form
     setEditFormData({ name: userData.name, phone: userData.phone, parentPhone: userData.parentPhone, grade: userData.grade });
 
     return () => { unsubContent(); unsubLive(); unsubExams(); unsubResults(); unsubNotif(); };
@@ -1217,16 +1213,13 @@ const StudentDashboard = ({ user, userData }) => {
 
   if(liveSession) return <LiveSessionView session={liveSession} user={user} onClose={() => window.location.reload()} />;
   
-  // تشغيل الامتحان (حل جديد)
   if (activeExam) return <ExamRunner exam={activeExam} user={user} onClose={() => setActiveExam(null)} />;
   
-  // مراجعة الامتحان (عرض النتيجة السابقة)
   if (reviewingExam) {
       const result = examResults.find(r => r.examId === reviewingExam.id);
       return <ExamRunner exam={reviewingExam} user={user} onClose={() => setReviewingExam(null)} isReviewMode={true} existingResult={result} />;
   }
 
-  // إذا كان الطالب محظوراً، نمنعه من الامتحانات فقط، وليس كامل الموقع
   const isBanned = userData?.status === 'banned_cheating';
 
   if(userData?.status === 'pending') return <div className="h-screen flex items-center justify-center bg-amber-50 text-center p-4"><div className="bg-white p-8 rounded-2xl shadow-xl"><h2 className="text-2xl font-bold mb-2">طلبك قيد المراجعة ⏳</h2><button onClick={()=>signOut(auth)} className="mt-4 text-red-500 underline">خروج</button></div></div>;
@@ -1302,7 +1295,7 @@ const StudentDashboard = ({ user, userData }) => {
             )}
         </div>
 
-        {activeTab === 'home' && (<div className="space-y-8"><WisdomBox /><Announcements /><h2 className="text-3xl font-bold text-slate-800">منور يا {userData.name.split(' ')[0]} 👋 <span className="text-sm font-normal text-slate-500 bg-slate-200 px-2 py-1 rounded-full">{getGradeLabel(userData.grade)}</span></h2><div className="grid grid-cols-1 md:grid-cols-3 gap-6"><div className="bg-blue-600 text-white p-8 rounded-3xl shadow-lg relative overflow-hidden"><h3 className="relative z-10 text-2xl font-bold mb-2">المحاضرات</h3><p className="relative z-10 text-4xl font-black">{videos.length}</p><PlayCircle className="absolute -bottom-6 -left-6 opacity-20 w-40 h-40"/></div><div className="bg-amber-500 text-white p-8 rounded-3xl shadow-lg relative overflow-hidden"><h3 className="relative z-10 text-2xl font-bold mb-2">الملفات</h3><p className="relative z-10 text-4xl font-black">{files.length}</p><FileText className="absolute -bottom-6 -left-6 opacity-20 w-40 h-40"/></div><div className="bg-slate-800 text-white p-8 rounded-3xl shadow-lg relative overflow-hidden"><h3 className="relative z-10 text-2xl font-bold mb-2">الامتحانات</h3><p className="relative z-10 text-4xl font-black">{exams.length}</p><ClipboardList className="absolute -bottom-6 -left-6 opacity-20 w-40 h-40"/></div></div><Leaderboard /></div>)}
+        {activeTab === 'home' && (<div className="space-y-8"><WisdomBox /><Announcements /><h2 className="text-3xl font-bold text-slate-800">منور يا {userData.name.split(' ')[0]} 👋 <span className="text-sm font-normal text-slate-500 bg-slate-200 px-2 py-1 rounded-full">{getGradeLabel(userData.grade)}</span></h2><div className="grid grid-cols-1 md:grid-cols-3 gap-6"><div onClick={()=>setActiveTab('videos')} className="bg-blue-600 text-white p-8 rounded-3xl shadow-lg relative overflow-hidden cursor-pointer hover:scale-105 transition-transform"><h3 className="relative z-10 text-2xl font-bold mb-2">المحاضرات</h3><p className="relative z-10 text-4xl font-black">{videos.length}</p><PlayCircle className="absolute -bottom-6 -left-6 opacity-20 w-40 h-40"/></div><div onClick={()=>setActiveTab('files')} className="bg-amber-500 text-white p-8 rounded-3xl shadow-lg relative overflow-hidden cursor-pointer hover:scale-105 transition-transform"><h3 className="relative z-10 text-2xl font-bold mb-2">الملفات</h3><p className="relative z-10 text-4xl font-black">{files.length}</p><FileText className="absolute -bottom-6 -left-6 opacity-20 w-40 h-40"/></div><div onClick={()=>setActiveTab('exams')} className="bg-slate-800 text-white p-8 rounded-3xl shadow-lg relative overflow-hidden cursor-pointer hover:scale-105 transition-transform"><h3 className="relative z-10 text-2xl font-bold mb-2">الامتحانات</h3><p className="relative z-10 text-4xl font-black">{exams.length}</p><ClipboardList className="absolute -bottom-6 -left-6 opacity-20 w-40 h-40"/></div></div><Leaderboard /></div>)}
         {activeTab === 'videos' && <div className="grid grid-cols-1 md:grid-cols-3 gap-6">{videos.map(v => (<div key={v.id} className="bg-white rounded-xl shadow-sm border overflow-hidden cursor-pointer" onClick={() => setPlayingVideo(v)}><div className="h-40 bg-slate-800 flex items-center justify-center relative"><PlayCircle className="text-white w-12 h-12 opacity-80"/><span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded">{getGradeLabel(v.grade)}</span></div><div className="p-4"><h3 className="font-bold text-lg">{v.title}</h3></div></div>))}</div>}
         {activeTab === 'files' && <div className="bg-white rounded-xl shadow-sm border overflow-hidden">{files.map(f => (<div key={f.id} className="p-4 flex justify-between items-center border-b last:border-0 hover:bg-slate-50"><div className="flex items-center gap-4"><div className="bg-red-100 text-red-600 p-3 rounded-lg font-bold text-xs">PDF</div><div><h4 className="font-bold text-lg">{f.title}</h4><span className="text-xs text-slate-500">{getGradeLabel(f.grade)}</span></div></div><a href={f.url} target="_blank" className="bg-blue-50 text-blue-600 px-4 py-2 rounded-lg font-bold hover:bg-blue-100">تحميل</a></div>))}</div>}
         
@@ -1325,7 +1318,7 @@ const StudentDashboard = ({ user, userData }) => {
                         <div className="flex gap-2">
                              <button disabled className="flex-1 bg-slate-200 text-slate-500 py-3 rounded-xl font-bold cursor-not-allowed">تم الانتهاء</button>
                              <button onClick={() => setReviewingExam(e)} className="flex-1 bg-blue-100 text-blue-700 py-3 rounded-xl font-bold hover:bg-blue-200">عرض الأخطاء</button>
-                             <button onClick={() => handleDownloadPDF(user.displayName, prevResult.score, e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0), prevResult.status)} className="flex-1 bg-green-100 text-green-700 py-3 rounded-xl font-bold hover:bg-green-200 flex items-center justify-center gap-1"><Download size={16}/> شهادة</button>
+                             <button onClick={() => generatePDF('student', {studentName: user.displayName, score: prevResult.score, total: e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0), status: prevResult.status})} className="flex-1 bg-green-100 text-green-700 py-3 rounded-xl font-bold hover:bg-green-200 flex items-center justify-center gap-1"><Download size={16}/> شهادة</button>
                         </div>
                     ) : (
                         <button onClick={() => startExamWithCode(e)} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 flex items-center justify-center gap-2"><Lock size={16}/> ابدأ الامتحان</button>
