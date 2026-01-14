@@ -15,7 +15,7 @@ import {
   MessageSquare, Send, MessageCircle, Facebook, BookOpen, Feather, Radio, 
   ExternalLink, ClipboardList, Timer, AlertOctagon, Flag, Save, HelpCircle, 
   Reply, Unlock, Layout, Settings, Trophy, Megaphone, Bell, Download, XCircle, 
-  Calendar, Clock, FileWarning, Settings as GearIcon, Star
+  Calendar, Clock, FileWarning, Settings as GearIcon, Star, Bot, Power
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -49,7 +49,6 @@ try {
  * =================================================================
  */
 
-// طلب إذن الإشعارات من المتصفح
 const requestNotificationPermission = () => {
   if (!("Notification" in window)) return;
   if (Notification.permission === "default") {
@@ -59,16 +58,14 @@ const requestNotificationPermission = () => {
   }
 };
 
-// إرسال إشعار للنظام (يظهر حتى لو المتصفح في الخلفية)
 const sendSystemNotification = (title, body) => {
   if (Notification.permission === "granted") {
     try {
       new Notification(title, {
         body: body,
-        icon: "https://cdn-icons-png.flaticon.com/512/3449/3449750.png", // أيقونة جرس
+        icon: "https://cdn-icons-png.flaticon.com/512/3449/3449750.png",
         vibrate: [200, 100, 200]
       });
-      // تشغيل صوت تنبيه خفيف
       const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
       audio.volume = 0.5;
       audio.play().catch(e => {});
@@ -76,7 +73,6 @@ const sendSystemNotification = (title, body) => {
   }
 };
 
-// استخراج كود الفيديو من روابط اليوتيوب المختلفة
 const getYouTubeID = (url) => {
     if (!url) return null;
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=|live\/|shorts\/)([^#&?]*).*/;
@@ -84,111 +80,113 @@ const getYouTubeID = (url) => {
     return (match && match[2].length === 11) ? match[2] : null;
 };
 
-// توليد ملف PDF لنتيجة الطالب (تصميم منسق ومحترف)
+// --- تحديث جذري لنظام التقارير ---
 const generatePDF = (type, data) => {
-    // التأكد من تحميل المكتبة
     if (!window.html2pdf) {
         alert("جاري تحميل نظام الطباعة... يرجى الانتظار ثوانٍ والمحاولة مرة أخرى.");
         return;
     }
 
-    const percentage = Math.round((data.score / data.total) * 100);
+    const percentage = data.total > 0 ? Math.round((data.score / data.total) * 100) : 0;
     const date = new Date().toLocaleDateString('ar-EG');
     const element = document.createElement('div');
     
-    // تصميم الشهادة بناءً على النتيجة
-    if (type === 'admin') {
-         element.innerHTML = `
-          <div style="padding: 40px; font-family: 'Cairo', sans-serif; direction: rtl; border: 2px solid #333; text-align: center;">
-            <h1 style="color: #d97706;">تقرير طالب - منصة النحاس</h1>
-            <hr style="margin: 20px 0; border-top: 1px solid #ccc;"/>
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 18px;">
-                <tr><td style="padding: 15px; border: 1px solid #ccc; background: #f9f9f9; width: 30%;">اسم الطالب</td><td style="padding: 15px; border: 1px solid #ccc;">${data.studentName}</td></tr>
-                <tr><td style="padding: 15px; border: 1px solid #ccc; background: #f9f9f9;">الدرجة</td><td style="padding: 15px; border: 1px solid #ccc; font-weight: bold;">${data.score} / ${data.total} (${percentage}%)</td></tr>
-                <tr><td style="padding: 15px; border: 1px solid #ccc; background: #f9f9f9;">الحالة</td><td style="padding: 15px; border: 1px solid #ccc; color: ${data.status === 'cheated' ? 'red' : 'green'};">${data.status === 'cheated' ? 'تم إلغاؤه (غش)' : 'تم الانتهاء'}</td></tr>
-                <tr><td style="padding: 15px; border: 1px solid #ccc; background: #f9f9f9;">التاريخ</td><td style="padding: 15px; border: 1px solid #ccc;">${date}</td></tr>
+    // بناء جدول تفصيلي للإجابات
+    let answersTable = '';
+    if (data.questions && data.answers) {
+        answersTable = `
+        <div style="margin-top: 30px; page-break-before: always;">
+            <h3 style="background: #eee; padding: 10px; border-right: 5px solid #d97706;">تفاصيل الإجابات</h3>
+            <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 15px;">
+                <thead>
+                    <tr style="background-color: #f3f4f6; color: #333;">
+                        <th style="border: 1px solid #ddd; padding: 10px; width: 5%;">#</th>
+                        <th style="border: 1px solid #ddd; padding: 10px; text-align: right;">السؤال</th>
+                        <th style="border: 1px solid #ddd; padding: 10px; width: 15%;">إجابتك</th>
+                        <th style="border: 1px solid #ddd; padding: 10px; width: 15%;">الصح</th>
+                        <th style="border: 1px solid #ddd; padding: 10px; width: 10%;">الحالة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${data.questions.map((q, i) => {
+                        const studentAnsIdx = data.answers[q.id];
+                        const correctAnsIdx = q.correctIdx;
+                        const isCorrect = studentAnsIdx === correctAnsIdx;
+                        const studentAnsText = studentAnsIdx !== undefined ? q.options[studentAnsIdx] : 'لم يجب';
+                        const correctAnsText = q.options[correctAnsIdx];
+                        
+                        return `
+                        <tr style="background-color: ${isCorrect ? '#f0fdf4' : '#fef2f2'};">
+                            <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${i + 1}</td>
+                            <td style="border: 1px solid #ddd; padding: 8px;">${q.text}</td>
+                            <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">${studentAnsText}</td>
+                            <td style="border: 1px solid #ddd; padding: 8px; color: green;">${correctAnsText}</td>
+                            <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">
+                                ${isCorrect ? '<span style="color:green">✔ صحيح</span>' : '<span style="color:red">✘ خطأ</span>'}
+                            </td>
+                        </tr>
+                        `;
+                    }).join('')}
+                </tbody>
             </table>
-            <div style="margin-top: 50px; text-align: left;">
-                <p style="font-size: 16px;">يعتمد، معلم المادة</p>
-                <h3 style="font-weight: bold; margin-top: 10px;">أ / محمد النحاس</h3>
-            </div>
-          </div>`;
-    } else if (percentage >= 85) {
-        // شهادة تفوق (تصميم أسود وذهبي منسق)
-        element.innerHTML = `
-          <div style="width: 297mm; height: 210mm; padding: 20px; margin: 0; background-color: #0F0F0F; color: #D4AF37; font-family: 'Cairo', sans-serif; position: relative; text-align: center; box-sizing: border-box;">
-            <div style="border: 5px solid #D4AF37; height: 100%; padding: 20px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between;">
-                
-                <!-- رأس الشهادة -->
-                <div style="margin-top: 20px;">
-                     <div style="font-size: 80px; margin-bottom: 10px;">🏆</div>
-                     <h1 style="font-size: 50px; margin: 0; font-weight: 900; letter-spacing: 2px;">شهـــادة تـقـديــر وتـفــوق</h1>
-                     <p style="font-size: 20px; color: #fff; margin-top: 10px;">تتشرف منصة النحاس التعليمية للغة العربية بأن تمنح</p>
-                </div>
-
-                <!-- اسم الطالب -->
-                <div style="margin: 20px 0;">
-                    <h2 style="font-size: 60px; color: #fff; font-family: 'Reem Kufi', sans-serif; margin: 0; text-shadow: 0 0 10px #D4AF37;">${data.studentName}</h2>
-                    <div style="width: 300px; height: 2px; background: #D4AF37; margin: 10px auto;"></div>
-                    <p style="font-size: 22px; color: #ccc; line-height: 1.6; margin-top: 20px;">
-                        وذلك لتفوقه الباهر وحصوله على درجة متميزة في الاختبار. <br/>
-                        مع خالص تمنياتنا بدوام التوفيق والنجاح.
-                    </p>
-                </div>
-
-                <!-- الدرجة -->
-                <div>
-                     <span style="font-size: 18px; color: #fff; display: block;">التقدير العام</span>
-                     <span style="font-size: 45px; font-weight: 900;">%${percentage}</span>
-                </div>
-
-                <!-- التوقيع والتاريخ -->
-                <div style="display: flex; justify-content: space-between; align-items: flex-end; padding: 0 60px; margin-bottom: 40px;">
-                    <div style="text-align: right;">
-                        <p style="font-size: 16px; color: #aaa; margin-bottom: 5px;">تاريخ التحرير</p>
-                        <p style="font-size: 20px; color: #fff; font-weight: bold;">${date}</p>
-                    </div>
-                    <div style="text-align: left;">
-                        <p style="font-size: 16px; color: #aaa; margin-bottom: 5px;">معلم المادة</p>
-                        <h3 style="font-size: 35px; font-family: 'Reem Kufi', sans-serif; margin: 0; color: #D4AF37;">أ / محمد النحاس</h3>
-                    </div>
-                </div>
-            </div>
-          </div>
-        `;
-    } else {
-        // تقرير مستوى (تشجيع)
-        element.innerHTML = `
-          <div style="width: 297mm; height: 210mm; padding: 40px; font-family: 'Cairo', sans-serif; direction: rtl; text-align: center; background: #fff; border: 15px solid #ef4444; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center;">
-            <h1 style="color: #b91c1c; font-size: 50px; margin-bottom: 20px; font-weight: 900;">تقرير مستوى (تنبيه)</h1>
-            <h2 style="font-size: 45px; color: #333; margin: 20px 0;">الطالب / ${data.studentName}</h2>
-            
-            <div style="background: #fef2f2; padding: 30px; border-radius: 20px; border: 3px solid #fecaca; margin: 40px auto; width: 60%;">
-                <p style="font-size: 22px; color: #7f1d1d;">للأسف، لم تحقق المستوى المطلوب في هذا الاختبار.</p>
-                <hr style="border: 0; border-top: 2px solid #eee; margin: 20px 0;">
-                <p style="font-size: 18px; color: #555;">الدرجة: <strong>${data.score}</strong> من <strong>${data.total}</strong></p>
-                <h3 style="font-size: 55px; color: #ef4444; margin: 15px 0; font-weight: 900;">%${percentage}</h3>
-            </div>
-
-            <div style="text-align: center; margin-top: 40px;">
-                <p style="font-size: 26px; color: #4b5563; line-height: 1.6; font-weight: bold;">
-                    "النجاح محتاج مجهود.. شد حيلك في اللي جاي!"
-                </p>
-            </div>
-            
-            <div style="margin-top: 80px; text-align: left; padding-left: 60px;">
-                 <h3 style="font-size: 30px; color: #555;">أ / محمد النحاس</h3>
-            </div>
-          </div>
+        </div>
         `;
     }
+
+    const header = `
+      <div style="padding: 40px; font-family: 'Cairo', sans-serif; direction: rtl; color: #333;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #d97706; padding-bottom: 20px; margin-bottom: 30px;">
+            <div style="text-align: right;">
+                <h1 style="margin: 0; color: #d97706; font-size: 28px;">منصة النحاس التعليمية</h1>
+                <p style="margin: 5px 0 0; color: #666;">للغة العربية - أ/ محمد النحاس</p>
+            </div>
+            <div style="text-align: left;">
+                <p style="margin: 0; font-weight: bold;">تقرير نتيجة امتحان</p>
+                <p style="margin: 5px 0 0; color: #666;">${date}</p>
+            </div>
+        </div>
+        
+        <div style="background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+            <table style="width: 100%; font-size: 18px;">
+                <tr>
+                    <td style="padding: 10px; font-weight: bold; width: 20%;">اسم الطالب:</td>
+                    <td style="padding: 10px;">${data.studentName}</td>
+                    <td style="padding: 10px; font-weight: bold; width: 20%;">الامتحان:</td>
+                    <td style="padding: 10px;">${data.examTitle || 'اختبار عام'}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; font-weight: bold;">الدرجة:</td>
+                    <td style="padding: 10px; color: #d97706; font-weight: bold;">${data.score} / ${data.total}</td>
+                    <td style="padding: 10px; font-weight: bold;">النسبة:</td>
+                    <td style="padding: 10px;">${percentage}%</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; font-weight: bold;">الحالة:</td>
+                    <td style="padding: 10px;" colspan="3">
+                        <span style="background: ${data.status === 'cheated' ? '#fee2e2' : '#dcfce7'}; color: ${data.status === 'cheated' ? '#991b1b' : '#166534'}; padding: 5px 15px; border-radius: 20px; font-size: 14px;">
+                            ${data.status === 'cheated' ? 'تم إلغاؤه (غش)' : percentage >= 50 ? 'ناجح' : 'راسب'}
+                        </span>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        
+        ${answersTable}
+
+        <div style="margin-top: 50px; text-align: center; border-top: 1px solid #eee; padding-top: 20px;">
+             <p style="font-size: 14px; color: #999;">تم استخراج هذا التقرير آلياً من منصة النحاس التعليمية</p>
+        </div>
+      </div>
+    `;
+
+    element.innerHTML = header;
     
     const opt = { 
-        margin: 0, 
-        filename: percentage >= 85 ? `شهادة_${data.studentName}.pdf` : `تقرير_${data.studentName}.pdf`, 
+        margin: 0.5, 
+        filename: `تقرير_${data.studentName}_${date}.pdf`, 
         image: { type: 'jpeg', quality: 0.98 }, 
-        html2canvas: { scale: 2, useCORS: true }, 
-        jsPDF: { unit: 'mm', format: 'a4', orientation: type === 'admin' ? 'portrait' : 'landscape' } 
+        html2canvas: { scale: 2, useCORS: true, logging: false }, 
+        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } 
     };
     
     window.html2pdf().set(opt).from(element).save();
@@ -196,14 +194,12 @@ const generatePDF = (type, data) => {
 
 /**
  * =================================================================
- * 3. المكونات الرسومية الأساسية (Design System)
+ * 3. المكونات الرسومية الأساسية
  * =================================================================
  */
 
-// مكون تحميل التصميم والمكتبات الخارجية
 const DesignSystemLoader = () => {
   useEffect(() => {
-    // 1. تحميل Tailwind CSS
     if (!document.getElementById('tailwind-script')) {
       const script = document.createElement('script');
       script.id = 'tailwind-script';
@@ -223,7 +219,6 @@ const DesignSystemLoader = () => {
       document.head.appendChild(script);
     }
     
-    // 2. تحميل خط Cairo و Reem Kufi
     if (!document.getElementById('cairo-font')) {
       const link = document.createElement('link');
       link.id = 'cairo-font';
@@ -232,7 +227,6 @@ const DesignSystemLoader = () => {
       document.head.appendChild(link);
     }
     
-    // 3. تحميل مكتبة html2pdf
     if (!document.getElementById('html2pdf-script')) {
         const script = document.createElement('script');
         script.id = 'html2pdf-script';
@@ -248,7 +242,6 @@ const DesignSystemLoader = () => {
       ::-webkit-scrollbar-track { background: #f1f1f1; }
       ::-webkit-scrollbar-thumb { background: #d97706; border-radius: 4px; }
       .glass-panel { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.5); }
-      
       .watermark-text {
         position: absolute;
         animation: floatWatermark 20s linear infinite;
@@ -261,7 +254,6 @@ const DesignSystemLoader = () => {
         white-space: nowrap;
         text-shadow: 0 0 2px rgba(255,255,255,0.5);
       }
-      
       .watermark-video {
         position: absolute;
         animation: floatWatermark 15s linear infinite;
@@ -272,7 +264,6 @@ const DesignSystemLoader = () => {
         font-size: 1.2rem;
         text-shadow: 0 0 5px rgba(0,0,0,0.8);
       }
-
       @keyframes floatWatermark {
         0% { top: 10%; left: 10%; opacity: 0.3; }
         25% { top: 60%; left: 80%; opacity: 0.5; }
@@ -280,19 +271,11 @@ const DesignSystemLoader = () => {
         75% { top: 20%; left: 40%; opacity: 0.5; }
         100% { top: 10%; left: 10%; opacity: 0.3; }
       }
-      
-      .live-pulse { animation: pulse-red 2s infinite; }
-      @keyframes pulse-red {
-        0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-        70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
-        100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-      }
       .no-select { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
     `}</style>
   );
 };
 
-// خيارات الصفوف
 const GradeOptions = () => (
     <>
         <optgroup label="المرحلة الإعدادية">
@@ -329,9 +312,6 @@ const ModernLogo = () => (
 const FloatingArabicBackground = () => (
   <div className="fixed inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 0, background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)' }}>
     <div className="absolute inset-0 opacity-[0.05]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d97706' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")` }} />
-    {['ض', 'ص', 'ث', 'ق', 'ف', 'غ', 'ع', 'ه', 'خ', 'ح', 'ج'].map((char, i) => (
-      <motion.div key={i} className="absolute text-amber-600/10 font-black select-none" initial={{ x: Math.random() * 1000, y: Math.random() * 800 }} animate={{ y: [0, -50, 0], rotate: [0, 20, -20, 0], opacity: [0.1, 0.3, 0.1] }} transition={{ duration: 10 + Math.random() * 10, repeat: Infinity, ease: "easeInOut" }} style={{ fontSize: `${Math.random() * 60 + 40}px`, left: `${Math.random() * 90}%`, top: `${Math.random() * 90}%` }}>{char}</motion.div>
-    ))}
   </div>
 );
 
@@ -424,6 +404,7 @@ const Leaderboard = () => {
     );
 };
 
+// --- تحديث الشات ليدعم الرد الآلي الديناميكي ---
 const ChatWidget = ({ user }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([{ id: 1, text: "أهلاً بيك في منصة النحاس! 🎓\nمعاك المساعد الذكي، اسألني عن أي حاجة.", sender: 'bot' }]);
@@ -431,8 +412,18 @@ const ChatWidget = ({ user }) => {
   const [sessionId] = useState(() => Math.random().toString(36).substr(2, 9)); 
   const chatEndRef = useRef(null);
   const [isContactAdminMode, setIsContactAdminMode] = useState(false);
+  const [autoReplies, setAutoReplies] = useState([]);
+
+  // جلب قواعد الرد الآلي
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'auto_replies'), (snap) => {
+        const rules = snap.docs.map(d => d.data()).filter(r => r.isActive);
+        setAutoReplies(rules);
+    });
+    return () => unsub();
+  }, []);
   
-  // الاستماع للرسائل (بما في ذلك ردود الأدمن)
+  // الاستماع للرسائل
   useEffect(() => {
     if (!isOpen) return;
     const userId = user ? user.email : sessionId;
@@ -461,30 +452,40 @@ const ChatWidget = ({ user }) => {
       let botResponse = "";
       const lowerText = userMsg.text.toLowerCase();
 
-      if (lowerText.includes("ادمن") || lowerText.includes("مستر") || lowerText.includes("تواصل") || lowerText.includes("سؤال") || isContactAdminMode) {
-        if (!isContactAdminMode) {
-             botResponse = "اكتب رسالتك للمستر وهيتم الرد عليك هنا 👇";
-             setIsContactAdminMode(true);
-        } else {
-             botResponse = "تم استلام رسالتك! المستر أو الأدمن هيشوفها ويرد عليك في أقرب وقت. ✅";
-             await addDoc(collection(db, 'messages'), {
-               text: userMsg.text, 
-               sender: user ? user.email : sessionId, 
-               senderName: user ? user.displayName : 'زائر (' + sessionId.substr(0,4) + ')', 
-               createdAt: serverTimestamp(), 
-               read: false
-             });
-             setIsContactAdminMode(false);
-        }
+      // أولوية 1: وضع التحدث مع الأدمن
+      if (isContactAdminMode) {
+           botResponse = "تم استلام رسالتك! المستر أو الأدمن هيشوفها ويرد عليك في أقرب وقت. ✅";
+           await addDoc(collection(db, 'messages'), {
+             text: userMsg.text, 
+             sender: user ? user.email : sessionId, 
+             senderName: user ? user.displayName : 'زائر (' + sessionId.substr(0,4) + ')', 
+             createdAt: serverTimestamp(), 
+             read: false
+           });
+           setIsContactAdminMode(false);
       } 
-      else if (lowerText.includes("مواعيد") || lowerText.includes("امتى")) {
-        botResponse = "المواعيد بتنزل أسبوعياً على الجروب وصفحة الفيسبوك.";
-      }
-      else if (lowerText.includes("مكان") || lowerText.includes("عنوان")) {
-        botResponse = "تقدر تعرف أماكن السنتر من خلال التواصل واتس آب.";
-      }
+      // أولوية 2: الردود الآلية من قاعدة البيانات
       else {
-        botResponse = "ممكن تختار:\n1. تفاصيل الحجز\n2. رقم الواتس\n3. التواصل مع الادمن";
+          let matchedRule = null;
+          // البحث في القواعد النشطة
+          for (const rule of autoReplies) {
+              const keywords = rule.keywords.split(',').map(k => k.trim().toLowerCase());
+              if (keywords.some(k => lowerText.includes(k) && k.length > 0)) {
+                  matchedRule = rule;
+                  break; 
+              }
+          }
+
+          if (matchedRule) {
+              botResponse = matchedRule.response;
+          } 
+          // أولوية 3: الكلمات المحجوزة للنظام
+          else if (lowerText.includes("ادمن") || lowerText.includes("مستر") || lowerText.includes("تواصل")) {
+               botResponse = "اكتب رسالتك للمستر وهيتم الرد عليك هنا 👇";
+               setIsContactAdminMode(true);
+          } else {
+               botResponse = "ممكن تختار:\n1. تفاصيل الحجز (اسأل عن الحجز)\n2. رقم الواتس (اسأل عن الرقم)\n3. التواصل مع الادمن";
+          }
       }
 
       if(botResponse) setMessages(prev => [...prev, { id: Date.now()+1, text: botResponse, sender: 'bot', createdAt: { seconds: Date.now() / 1000 } }]);
@@ -572,7 +573,7 @@ const LiveSessionView = ({ session, user, onClose }) => {
         <div className="flex-1 bg-black relative flex items-center justify-center">
           <div className="watermark-text">{user.displayName}</div>
           {isYouTube ? (
-            <iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${videoId}?autoplay=1&controls=1`} title="Live" frameBorder="0" allowFullScreen></iframe>
+            <iframe width="100%" height="100%" src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&controls=1&rel=0&modestbranding=1`} title="Live" frameBorder="0" allowFullScreen></iframe>
           ) : (
             <div className="text-center p-8 bg-slate-800 rounded-2xl max-w-md">
               <h3 className="text-2xl font-bold text-white mb-4">اجتماع خارجي</h3>
@@ -601,7 +602,7 @@ const LiveSessionView = ({ session, user, onClose }) => {
   );
 };
 
-// --- مشغل الفيديو الجديد مع الترس والـ Pop-up ---
+// --- تحديث مشغل الفيديو لإخفاء الاقتراحات ---
 const SecureVideoPlayer = ({ video, userName, onClose }) => {
   const videoId = getYouTubeID(video.url || video.file);
   const [showSettings, setShowSettings] = useState(false);
@@ -612,6 +613,11 @@ const SecureVideoPlayer = ({ video, userName, onClose }) => {
     if(videoRef.current) videoRef.current.playbackRate = rate;
     setShowSettings(false);
   };
+
+  // تعديل الرابط لإجبار الفيديو على التكرار وعدم إظهار اقتراحات من قنوات أخرى
+  const youtubeEmbedUrl = videoId 
+    ? `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1&showinfo=0&iv_load_policy=3&loop=1&playlist=${videoId}` 
+    : '';
 
   return (
     <div className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center p-4">
@@ -635,7 +641,7 @@ const SecureVideoPlayer = ({ video, userName, onClose }) => {
           <div className="watermark-video">{userName} - {video.grade}</div>
           
           {videoId ? (
-            <iframe className="w-full h-full" src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&playsinline=1&enablejsapi=1`} title="Video" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
+            <iframe className="w-full h-full" src={youtubeEmbedUrl} title="Video" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
           ) : (
              <video ref={videoRef} controls controlsList="nodownload" className="w-full h-full object-contain" src={finalUrl}>المتصفح لا يدعم هذا الفيديو.</video>
           )}
@@ -750,7 +756,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                 <h2 className="text-3xl font-black mb-4">تم الانتهاء من الامتحان</h2>
                 <div className={`text-6xl font-black my-6 ${score >= flatQuestions.length / 2 ? 'text-green-600' : 'text-red-600'}`}>{score} / {flatQuestions.length}</div>
                 <div className="flex gap-4 justify-center">
-                    <button onClick={() => generatePDF('student', {studentName: user.displayName, score, total: flatQuestions.length, status: 'completed'})} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2"><Download size={18}/> تحميل الشهادة</button>
+                    <button onClick={() => generatePDF('student', {studentName: user.displayName, score, total: flatQuestions.length, status: 'completed', examTitle: exam.title, questions: flatQuestions, answers: answers })} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2"><Download size={18}/> تحميل التقرير الشامل</button>
                     <button onClick={onClose} className="bg-slate-900 text-white py-3 px-8 rounded-xl font-bold">عودة للرئيسية</button>
                 </div>
             </div>
@@ -868,7 +874,10 @@ const AdminDashboard = ({ user }) => {
   const [newAnnouncement, setNewAnnouncement] = useState(""); 
   const [showLeaderboard, setShowLeaderboard] = useState(true);
   const [announcements, setAnnouncements] = useState([]);
-  const [notifData, setNotifData] = useState({ text: '', grade: 'all' });
+  
+  // خاص بالرد الآلي
+  const [autoReplies, setAutoReplies] = useState([]);
+  const [newAutoReply, setNewAutoReply] = useState({ keywords: '', response: '', isActive: true });
 
   // جلب البيانات
   useEffect(() => { const u = onSnapshot(query(collection(db, 'users'), where('status','==','pending')), s => setPendingUsers(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
@@ -879,6 +888,7 @@ const AdminDashboard = ({ user }) => {
   useEffect(() => { const u = onSnapshot(query(collection(db, 'exams'), orderBy('createdAt', 'desc')), s => setExamsList(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(query(collection(db, 'exam_results'), orderBy('submittedAt', 'desc')), s => setExamResults(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(query(collection(db, 'announcements'), orderBy('createdAt', 'desc')), s => setAnnouncements(s.docs.map(d => ({id: d.id, ...d.data()})))); return u; }, []);
+  useEffect(() => { const u = onSnapshot(collection(db, 'auto_replies'), s => setAutoReplies(s.docs.map(d => ({id: d.id, ...d.data()})))); return u; }, []);
 
   const handleApprove = async (id) => {
     await updateDoc(doc(db,'users',id), {status:'active'});
@@ -952,22 +962,6 @@ const AdminDashboard = ({ user }) => {
   const startLiveStream = async () => { if(!liveData.liveUrl) return alert("الرابط؟"); await addDoc(collection(db, 'live_sessions'), { ...liveData, status: 'active', createdAt: serverTimestamp() }); await addDoc(collection(db, 'notifications'), { text: `🔴 بث مباشر الآن: ${liveData.title}`, grade: liveData.grade, createdAt: serverTimestamp() }); alert("بدا البث!"); };
   const stopLiveStream = async () => { if(window.confirm("إنهاء البث؟")) { const q = query(collection(db, 'live_sessions'), where('status', '==', 'active')); const snap = await getDocs(q); snap.forEach(async (d) => await updateDoc(doc(db, 'live_sessions', d.id), { status: 'ended' })); alert("تم الإنهاء"); } };
 
-  const handleEditExam = (exam) => {
-      setExamBuilder({ title: exam.title, grade: exam.grade, duration: exam.duration, accessCode: exam.accessCode, questions: exam.questions });
-      let text = "";
-      exam.questions.forEach(group => {
-          if(group.text) text += `بداية القطعة\n${group.text}\nنهاية القطعة\n\n`;
-          group.subQuestions.forEach(q => {
-              text += `${q.text}\n`;
-              q.options.forEach((opt, i) => { text += `${i === q.correctIdx ? '*' : ''}${opt}\n`; });
-              text += "\n";
-          });
-          if(group.text) text += "حذف القطعة\n\n";
-      });
-      setBulkText(text);
-      if(window.confirm("للتعديل سيتم حذف النسخة القديمة، موافق؟")) deleteDoc(doc(db, 'exams', exam.id));
-  };
-
   const parseExam = async () => {
     if (!bulkText.trim()) return alert("أدخل نص الامتحان");
     if (!examBuilder.accessCode) return alert("أدخل كود للامتحان");
@@ -1020,10 +1014,22 @@ const AdminDashboard = ({ user }) => {
       return flat;
   };
 
-  // التحكم في الإعدادات العامة (لوحة الشرف)
   const toggleLeaderboard = async () => {
       await setDoc(doc(db, 'settings', 'config'), { show: !showLeaderboard }, { merge: true });
       setShowLeaderboard(!showLeaderboard);
+  };
+
+  // دوال الرد الآلي
+  const handleAddAutoReply = async () => {
+      if(!newAutoReply.keywords || !newAutoReply.response) return alert("أكمل البيانات");
+      await addDoc(collection(db, 'auto_replies'), newAutoReply);
+      setNewAutoReply({ keywords: '', response: '', isActive: true });
+  };
+  const toggleAutoReply = async (id, currentStatus) => {
+      await updateDoc(doc(db, 'auto_replies', id), { isActive: !currentStatus });
+  };
+  const deleteAutoReply = async (id) => {
+      if(window.confirm("حذف هذا الرد؟")) await deleteDoc(doc(db, 'auto_replies', id));
   };
 
   return (
@@ -1035,9 +1041,9 @@ const AdminDashboard = ({ user }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white p-4 rounded-xl shadow-sm h-fit space-y-2">
-          {['users', 'all_users', 'exams', 'results', 'live', 'content', 'messages', 'settings'].map(tab => (
+          {['users', 'all_users', 'exams', 'results', 'live', 'content', 'messages', 'auto_reply', 'settings'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 ${activeTab===tab?'bg-amber-100 text-amber-700':'hover:bg-slate-50'}`}>
-              {tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'messages' ? 'الرسائل' : 'الإعدادات'}
+              {tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : 'الإعدادات'}
             </button>
           ))}
         </div>
@@ -1063,7 +1069,13 @@ const AdminDashboard = ({ user }) => {
                    <div className="bg-slate-50 p-4 rounded-xl border">
                        <div className="flex justify-between mb-4">
                            <button onClick={() => setViewingResult(null)} className="mb-4 text-sm text-slate-500 underline font-bold">العودة للقائمة</button>
-                           <button onClick={() => generatePDF('admin', {...viewingResult, total: viewingResult.total || 0})} className="bg-blue-600 text-white px-4 py-1 rounded text-sm flex items-center gap-2"><Download size={16}/> تحميل PDF</button>
+                           {(() => {
+                               const examData = examsList.find(e => e.id === viewingResult.examId);
+                               const questions = getQuestionsForExam(examData);
+                               return (
+                                   <button onClick={() => generatePDF('admin', {...viewingResult, total: viewingResult.total || 0, examTitle: examData?.title, questions: questions, answers: viewingResult.answers })} className="bg-blue-600 text-white px-4 py-1 rounded text-sm flex items-center gap-2"><Download size={16}/> تحميل التقرير الكامل</button>
+                               );
+                           })()}
                        </div>
                        <h3 className="font-bold text-lg mb-2">إجابات الطالب: {viewingResult.studentName}</h3>
                        <div className="space-y-4 mt-4">
@@ -1073,17 +1085,17 @@ const AdminDashboard = ({ user }) => {
                                const questions = getQuestionsForExam(examData);
                                return questions.map((q, idx) => (
                                    <div key={idx} className="bg-white p-4 rounded border">
-                                       <p className="font-bold mb-2">{q.text}</p>
-                                       <div className="grid grid-cols-2 gap-2 text-sm">
-                                           {q.options.map((opt, oIdx) => {
-                                               const isCorrect = oIdx === q.correctIdx;
-                                               const isSelected = viewingResult.answers[q.id] === oIdx;
-                                               let style = "bg-gray-50 text-gray-500";
-                                               if (isCorrect) style = "bg-green-100 text-green-800 border-green-500 border font-bold";
-                                               if (isSelected && !isCorrect) style = "bg-red-100 text-red-800 border-red-500 border font-bold";
-                                               return <div key={oIdx} className={`p-2 rounded ${style}`}>{opt}</div>
-                                           })}
-                                       </div>
+                                           <p className="font-bold mb-2">{q.text}</p>
+                                           <div className="grid grid-cols-2 gap-2 text-sm">
+                                               {q.options.map((opt, oIdx) => {
+                                                   const isCorrect = oIdx === q.correctIdx;
+                                                   const isSelected = viewingResult.answers[q.id] === oIdx;
+                                                   let style = "bg-gray-50 text-gray-500";
+                                                   if (isCorrect) style = "bg-green-100 text-green-800 border-green-500 border font-bold";
+                                                   if (isSelected && !isCorrect) style = "bg-red-100 text-red-800 border-red-500 border font-bold";
+                                                   return <div key={oIdx} className={`p-2 rounded ${style}`}>{opt}</div>
+                                               })}
+                                           </div>
                                    </div>
                                ));
                            })()}
@@ -1107,6 +1119,40 @@ const AdminDashboard = ({ user }) => {
           {activeTab === 'content' && <div className="bg-white p-6 rounded-xl shadow-sm"><h2 className="font-bold mb-4">إضافة محتوى</h2><form onSubmit={handleAddContent} className="grid gap-4 mb-6"><input className="border p-3 rounded" placeholder="العنوان" value={newContent.title} onChange={e=>setNewContent({...newContent, title:e.target.value})}/><input className="border p-3 rounded" placeholder="الرابط (أو اختر ملف)" value={newContent.url} onChange={e=>setNewContent({...newContent, url:e.target.value})}/><input type="file" onChange={handleFileSelect} className="border p-2 rounded text-sm"/><div className="flex gap-2"><select className="border p-3 rounded flex-1" value={newContent.type} onChange={e=>setNewContent({...newContent, type:e.target.value})}><option value="video">فيديو</option><option value="file">ملف</option></select><select className="border p-3 rounded flex-1" value={newContent.grade} onChange={e=>setNewContent({...newContent, grade:e.target.value})}><GradeOptions/></select></div><div className="flex items-center gap-2"><input type="checkbox" checked={newContent.isPublic} onChange={e=>setNewContent({...newContent, isPublic:e.target.checked})}/> <label>عام</label></div><button className="bg-amber-600 text-white p-3 rounded font-bold">نشر</button></form><div className="space-y-2">{contentList.map(c=><div key={c.id} className="flex justify-between border-b p-2"><span>{c.title}</span><div className="flex gap-2"><button onClick={() => handleDeleteContent(c.id)} className="text-red-500 hover:text-red-700"><Trash2 size={18}/></button></div></div>)}</div></div>}
 
           {activeTab === 'messages' && <div className="bg-white p-6 rounded-xl shadow-sm"><h2 className="font-bold mb-4">الرسائل</h2>{messagesList.map(m=><div key={m.id} className="border-b p-4 bg-slate-50 mb-3 rounded-lg relative"><button onClick={()=>handleDeleteMessage(m.id)} className="absolute top-2 left-2 text-red-400"><Trash2 size={16}/></button><div className="mb-2"><p className="font-bold text-amber-800">{m.senderName} <span className="text-xs text-slate-500">({m.sender})</span></p><p className="text-sm text-slate-400">{m.createdAt?.toDate?m.createdAt.toDate().toLocaleString():'الآن'}</p></div><p className="text-slate-800 bg-white p-3 rounded-lg border border-slate-200 mb-3">{m.text}</p>{m.adminReply?<div className="bg-green-50 p-3 rounded-lg border border-green-200 text-sm"><span className="font-bold text-green-700">ردك: </span>{m.adminReply}</div>:<div className="flex gap-2"><input className="flex-1 border p-2 rounded text-sm" placeholder="اكتب ردك..." value={replyTexts[m.id]||""} onChange={e=>setReplyTexts({...replyTexts,[m.id]:e.target.value})}/><button onClick={()=>handleReplyMessage(m.id)} className="bg-blue-600 text-white px-3 py-1 rounded text-sm"><Reply size={14}/></button></div>}</div>)}</div>}
+            
+          {/* تبويب الرد الآلي الجديد */}
+          {activeTab === 'auto_reply' && (
+              <div className="bg-white p-6 rounded-xl shadow-sm">
+                  <h2 className="font-bold mb-4 flex items-center gap-2"><Bot /> إعدادات الرد الآلي</h2>
+                  <div className="bg-slate-50 p-4 rounded-xl border mb-6">
+                      <h3 className="font-bold mb-2 text-sm">إضافة قاعدة جديدة</h3>
+                      <div className="grid gap-3">
+                          <input className="border p-2 rounded" placeholder="الكلمات المفتاحية (افصل بينها بفاصلة، مثال: سعر,حجز,مواعيد)" value={newAutoReply.keywords} onChange={e=>setNewAutoReply({...newAutoReply, keywords:e.target.value})} />
+                          <textarea className="border p-2 rounded h-20" placeholder="الرد الذي سيظهر للطالب..." value={newAutoReply.response} onChange={e=>setNewAutoReply({...newAutoReply, response:e.target.value})} />
+                          <button onClick={handleAddAutoReply} className="bg-amber-600 text-white py-2 rounded font-bold hover:bg-amber-700">إضافة القاعدة</button>
+                      </div>
+                  </div>
+                  
+                  <div className="space-y-3">
+                      {autoReplies.map(rule => (
+                          <div key={rule.id} className={`p-4 rounded-lg border flex justify-between items-center ${rule.isActive ? 'bg-white border-green-200' : 'bg-gray-50 border-gray-200 opacity-70'}`}>
+                              <div className="flex-1">
+                                  <p className="font-bold text-sm text-slate-600 mb-1">الكلمات: <span className="text-blue-600">{rule.keywords}</span></p>
+                                  <p className="text-slate-800">{rule.response}</p>
+                              </div>
+                              <div className="flex items-center gap-2 mr-4">
+                                  <button onClick={() => toggleAutoReply(rule.id, rule.isActive)} className={`p-2 rounded-full ${rule.isActive ? 'bg-green-100 text-green-600' : 'bg-gray-200 text-gray-500'}`} title={rule.isActive ? "تعطيل" : "تنشيط"}>
+                                      <Power size={18} />
+                                  </button>
+                                  <button onClick={() => deleteAutoReply(rule.id)} className="p-2 rounded-full bg-red-100 text-red-600 hover:bg-red-200">
+                                      <Trash2 size={18} />
+                                  </button>
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+          )}
 
           {activeTab === 'settings' && (
               <div className="bg-white p-6 rounded-xl shadow-sm space-y-6">
@@ -1296,7 +1342,7 @@ const StudentDashboard = ({ user, userData }) => {
                         <div className="flex gap-2">
                              <button disabled className="flex-1 bg-slate-200 text-slate-500 py-3 rounded-xl font-bold cursor-not-allowed">تم الانتهاء</button>
                              <button onClick={() => setReviewingExam(e)} className="flex-1 bg-blue-100 text-blue-700 py-3 rounded-xl font-bold hover:bg-blue-200">عرض الأخطاء</button>
-                             <button onClick={() => generatePDF('student', {studentName: user.displayName, score: prevResult.score, total: e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0), status: prevResult.status})} className="flex-1 bg-green-100 text-green-700 py-3 rounded-xl font-bold hover:bg-green-200 flex items-center justify-center gap-1"><Download size={16}/> شهادة</button>
+                             <button onClick={() => generatePDF('student', {studentName: user.displayName, score: prevResult.score, total: e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0), status: prevResult.status, examTitle: e.title, questions: e.questions.flatMap(q => q.subQuestions), answers: prevResult.answers })} className="flex-1 bg-green-100 text-green-700 py-3 rounded-xl font-bold hover:bg-green-200 flex items-center justify-center gap-1"><Download size={16}/> شهادة</button>
                         </div>
                     ) : (
                         <div className="space-y-2">
@@ -1346,7 +1392,7 @@ const StudentDashboard = ({ user, userData }) => {
 // --- 5. الصفحة الرئيسية العامة (Landing) ---
 const LandingPage = ({ onAuthClick }) => {
   const [publicContent, setPublicContent] = useState([]);
-  const [playingVideo, setPlayingVideo] = useState(null); // حالة لتشغيل الفيديو العام في النافذة
+  const [playingVideo, setPlayingVideo] = useState(null); 
   
   useEffect(() => { const u = onSnapshot(query(collection(db, 'content'), where('isPublic', '==', true)), s => setPublicContent(s.docs.map(d=>d.data()))); return u; }, []);
   const openFacebook = () => window.open("https://www.facebook.com/share/17aiUQWKf5/", "_blank");
