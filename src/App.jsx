@@ -1,23 +1,92 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
-  getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, 
-  signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail 
+  getAuth, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged, 
+  updateProfile, 
+  sendPasswordResetEmail 
 } from 'firebase/auth';
 import { 
-  getFirestore, doc, setDoc, getDoc, getDocs, collection, addDoc, query, where, 
-  onSnapshot, updateDoc, deleteDoc, orderBy, serverTimestamp, writeBatch, limit 
+  getFirestore, 
+  doc, 
+  setDoc, 
+  getDoc, 
+  getDocs, 
+  collection, 
+  addDoc, 
+  query, 
+  where, 
+  onSnapshot, 
+  updateDoc, 
+  deleteDoc, 
+  orderBy, 
+  serverTimestamp, 
+  writeBatch, 
+  limit 
 } from 'firebase/firestore';
 import { 
-  PlayCircle, FileText, LogOut, User, GraduationCap, Quote, CheckCircle, 
-  Lock, Mail, ChevronRight, Menu, X, Loader2, AlertTriangle, PlusCircle, 
-  Check, Trash2, Eye, ShieldAlert, Video, UploadCloud, Phone, Edit, KeyRound,
-  MessageSquare, Send, MessageCircle, Facebook, BookOpen, Feather, Radio, 
-  ExternalLink, ClipboardList, Timer, AlertOctagon, Flag, Save, HelpCircle, Reply, Unlock, Layout, Settings, Trophy, Megaphone, Bell, Download
+  PlayCircle, 
+  FileText, 
+  LogOut, 
+  User, 
+  GraduationCap, 
+  Quote, 
+  CheckCircle, 
+  Lock, 
+  Mail, 
+  ChevronRight, 
+  Menu, 
+  X, 
+  Loader2, 
+  AlertTriangle, 
+  PlusCircle, 
+  Check, 
+  Trash2, 
+  Eye, 
+  ShieldAlert, 
+  Video, 
+  UploadCloud, 
+  Phone, 
+  Edit, 
+  KeyRound,
+  MessageSquare, 
+  Send, 
+  MessageCircle, 
+  Facebook, 
+  BookOpen, 
+  Feather, 
+  Radio, 
+  ExternalLink, 
+  ClipboardList, 
+  Timer, 
+  AlertOctagon, 
+  Flag, 
+  Save, 
+  HelpCircle, 
+  Reply, 
+  Unlock, 
+  Layout, 
+  Settings, 
+  Trophy, 
+  Megaphone, 
+  Bell, 
+  Download, 
+  XCircle, 
+  Calendar, 
+  Clock, 
+  FileWarning, 
+  Settings as GearIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// --- 1. إعدادات Firebase ---
+/**
+ * =================================================================
+ * 1. إعدادات Firebase والتهيئة
+ * =================================================================
+ */
 const firebaseConfig = {
   apiKey: "AIzaSyDE7PASs4dt2aD912Jerm7260142Hee4W0",
   authDomain: "exam-f6804.firebaseapp.com",
@@ -33,36 +102,44 @@ try {
   app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
   auth = getAuth(app);
   db = getFirestore(app);
-} catch (error) { console.error("Firebase Error", error); }
+} catch (error) { 
+  console.error("Firebase Initialization Error:", error); 
+}
 
-// --- 2. الأدوات المساعدة والدوال (Helpers) ---
+/**
+ * =================================================================
+ * 2. دوال مساعدة (Utility Functions)
+ * =================================================================
+ */
 
-// طلب إذن الإشعارات للمتصفح
+// طلب إذن الإشعارات من المتصفح
 const requestNotificationPermission = () => {
   if (!("Notification" in window)) return;
   if (Notification.permission === "default") {
-    Notification.requestPermission();
+    Notification.requestPermission().then(permission => {
+      if(permission === "granted") console.log("الإشعارات مفعلة");
+    });
   }
 };
 
-// إرسال إشعار للنظام (System Notification)
+// إرسال إشعار للنظام (يظهر حتى لو المتصفح في الخلفية)
 const sendSystemNotification = (title, body) => {
   if (Notification.permission === "granted") {
     try {
-        new Notification(title, {
-            body: body,
-            icon: "https://cdn-icons-png.flaticon.com/512/3449/3449750.png",
-            vibrate: [200, 100, 200]
-        });
-        // صوت تنبيه خفيف
-        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-        audio.volume = 0.2;
-        audio.play().catch(e => {}); // تجاهل الخطأ لو المتصفح منع الصوت
-    } catch(e) { console.log(e); }
+      new Notification(title, {
+        body: body,
+        icon: "https://cdn-icons-png.flaticon.com/512/3449/3449750.png", // أيقونة جرس
+        vibrate: [200, 100, 200]
+      });
+      // تشغيل صوت تنبيه خفيف
+      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+      audio.volume = 0.5;
+      audio.play().catch(e => {});
+    } catch (e) { console.error("Notification Error:", e); }
   }
 };
 
-// استخراج كود اليوتيوب من أي رابط
+// استخراج كود الفيديو من روابط اليوتيوب المختلفة
 const getYouTubeID = (url) => {
     if (!url) return null;
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=|live\/|shorts\/)([^#&?]*).*/;
@@ -70,11 +147,9 @@ const getYouTubeID = (url) => {
     return (match && match[2].length === 11) ? match[2] : null;
 };
 
-// طباعة النتيجة PDF (يدعم العربية)
+// توليد ملف PDF لنتيجة الطالب (مزخرف واحترافي)
 const generatePDF = (type, data) => {
-    // data: { studentName, score, total, status, timeTaken (seconds), totalTime (minutes) }
-    
-    // التأكد من وجود المكتبة
+    // التأكد من تحميل المكتبة
     if (!window.html2pdf) {
         alert("جاري تحميل نظام الطباعة... يرجى الانتظار ثوانٍ والمحاولة مرة أخرى.");
         return;
@@ -84,144 +159,96 @@ const generatePDF = (type, data) => {
     const date = new Date().toLocaleDateString('ar-EG');
     const element = document.createElement('div');
     
-    // تحليل السرعة للأدمن
-    let speedAnalysis = "طبيعي";
-    if (data.timeTaken && data.totalTime) {
-        const totalSeconds = data.totalTime * 60;
-        if (data.timeTaken < totalSeconds * 0.4) speedAnalysis = "سريع جداً (ربما تسرع)";
-        else if (data.timeTaken > totalSeconds * 0.9) speedAnalysis = "بطيء (استغرق الوقت كاملاً)";
-    }
-    const timeSpent = data.timeTaken ? `${Math.floor(data.timeTaken / 60)} دقيقة و ${data.timeTaken % 60} ثانية` : 'غير مسجل';
-
-    // 1. تقرير الأدمن (لولي الأمر)
+    // تصميم الشهادة بناءً على النتيجة
     if (type === 'admin') {
+         element.innerHTML = `
+          <div style="padding: 30px; font-family: 'Cairo', sans-serif; direction: rtl; border: 2px solid #333;">
+            <h1 style="color: #d97706; text-align: center;">تقرير طالب - منصة النحاس</h1>
+            <hr/>
+            <p><strong>اسم الطالب:</strong> ${data.studentName}</p>
+            <p><strong>الدرجة:</strong> ${data.score} / ${data.total} (${percentage}%)</p>
+            <p><strong>الحالة:</strong> ${data.status === 'cheated' ? 'غش (ملغى)' : 'تم الانتهاء'}</p>
+            <p><strong>التاريخ:</strong> ${date}</p>
+            <br/><p style="text-align: left;"><strong>توقيع المعلم:</strong> أ/ محمد النحاس</p>
+          </div>`;
+    } else if (percentage >= 85) {
+        // شهادة تفوق
         element.innerHTML = `
-          <div style="width: 210mm; padding: 30px; font-family: 'Cairo', sans-serif; direction: rtl; background: #fff; border: 2px solid #333;">
-            <div style="text-align: center; border-bottom: 2px solid #d97706; padding-bottom: 20px; margin-bottom: 20px;">
-                <h1 style="color: #d97706; font-size: 28px; margin: 0;">منصة النحاس التعليمية</h1>
-                <p style="font-size: 16px; color: #555;">تقرير تفصيلي لولي الأمر</p>
-            </div>
-            
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 16px;">
-                <tr>
-                    <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background: #f9f9f9; width: 30%;">اسم الطالب</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">${data.studentName}</td>
-                </tr>
-                <tr>
-                    <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background: #f9f9f9;">تاريخ الامتحان</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">${date}</td>
-                </tr>
-                <tr>
-                    <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; background: #f9f9f9;">حالة الامتحان</td>
-                    <td style="padding: 10px; border: 1px solid #ddd; color: ${data.status === 'cheated' ? 'red' : 'green'}; font-weight: bold;">
-                        ${data.status === 'cheated' ? 'تم إلغاؤه (محاولة غش)' : 'تم التسليم بنجاح'}
-                    </td>
-                </tr>
-            </table>
-
-            <div style="background: #fffbeb; border: 1px solid #d97706; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
-                <h3 style="color: #d97706; margin-top: 0;">تحليل الأداء:</h3>
-                <p><strong>الدرجة:</strong> ${data.score} من ${data.total}</p>
-                <p><strong>النسبة المئوية:</strong> ${percentage}%</p>
-                <p><strong>الوقت المستغرق:</strong> ${timeSpent}</p>
-                <p><strong>معدل السرعة:</strong> ${speedAnalysis}</p>
-            </div>
-
-            <div style="margin-top: 40px; text-align: left;">
-                <p style="font-size: 14px; color: #888;">إمضاء المعلم:</p>
-                <h3 style="color: #000; font-family: sans-serif;">أ / محمد النحاس</h3>
-            </div>
-          </div>
-        `;
-    } 
-    // 2. شهادة الطالب (ناجح >= 85%)
-    else if (percentage >= 85) {
-        element.innerHTML = `
-          <div style="width: 297mm; height: 210mm; padding: 0; margin: 0; font-family: 'Cairo', sans-serif; direction: rtl; text-align: center; background: #fff; position: relative;">
-            <div style="width: 100%; height: 100%; border: 15px double #daa520; padding: 40px; box-sizing: border-box; background: radial-gradient(circle, #fffff0 0%, #fff 100%);">
+          <div style="width: 297mm; height: 210mm; padding: 40px; font-family: 'Cairo', sans-serif; direction: rtl; text-align: center; background: #fff; position: relative;">
+            <div style="border: 15px double #daa520; height: 100%; padding: 40px; box-sizing: border-box; background: radial-gradient(circle, #fffff0 0%, #fff 100%);">
+                <h1 style="color: #b45309; font-size: 50px; margin-bottom: 20px;">شهـــادة تقـــدير وتفـــوق</h1>
+                <p style="font-size: 20px; color: #555;">تتشرف منصة النحاس التعليمية بمنح هذه الشهادة للطالب المتميز</p>
+                <h2 style="font-size: 60px; color: #1e293b; margin: 30px 0; text-decoration: underline; text-decoration-color: #daa520;">${data.studentName}</h2>
+                <p style="font-size: 24px; color: #444;">وذلك لتفوقه وحصوله على درجة متميزة في الاختبار.</p>
                 
-                <h1 style="color: #b45309; font-size: 48px; margin-bottom: 10px; text-shadow: 1px 1px 2px #eee;">شهـــادة تقـــدير وتفـــوق</h1>
-                <p style="font-size: 18px; color: #555;">تتشرف منصة النحاس التعليمية بمنح هذه الشهادة للطالب المتميز</p>
-                
-                <h2 style="font-size: 56px; color: #1e293b; margin: 20px 0; font-family: 'Reem Kufi', sans-serif; color: #0f172a;">${data.studentName}</h2>
-                
-                <p style="font-size: 22px; color: #444;">وذلك لتفوقه وحصوله على درجة متميزة في الاختبار.</p>
-                
-                <div style="margin: 30px auto; width: 200px; padding: 15px; border: 3px solid #daa520; border-radius: 50px; background: #fff;">
-                    <span style="display: block; font-size: 14px; color: #888;">النسبة المئوية</span>
-                    <span style="display: block; font-size: 32px; font-weight: bold; color: #b45309;">%${percentage}</span>
+                <div style="margin: 40px auto; width: 250px; padding: 20px; border: 3px solid #daa520; border-radius: 50px; background: #fff;">
+                    <span style="display: block; font-size: 16px; color: #888;">النسبة المئوية</span>
+                    <span style="display: block; font-size: 40px; font-weight: bold; color: #b45309;">%${percentage}</span>
                 </div>
 
-                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 60px; padding: 0 60px;">
+                <div style="display: flex; justify-content: space-between; margin-top: 80px; padding: 0 60px;">
                     <div style="text-align: right;">
-                        <p style="font-size: 16px; color: #777;">التاريخ</p>
-                        <p style="font-weight: bold; font-size: 18px;">${date}</p>
+                        <p style="font-size: 18px; color: #777;">التاريخ</p>
+                        <p style="font-weight: bold; font-size: 20px;">${date}</p>
                     </div>
                     <div style="text-align: left;">
-                        <p style="font-size: 16px; color: #777;">مُعلم اللغة العربية</p>
-                        <h3 style="font-size: 32px; color: #b45309; font-family: 'Reem Kufi', sans-serif; margin: 0;">أ / محمد النحاس</h3>
-                        <div style="width: 180px; height: 3px; background: #b45309; margin-top: 5px;"></div>
+                        <p style="font-size: 18px; color: #777;">مُعلم اللغة العربية</p>
+                        <h3 style="font-size: 36px; color: #b45309; font-family: sans-serif;">أ / محمد النحاس</h3>
                     </div>
                 </div>
             </div>
           </div>
         `;
-    } 
-    // 3. تقرير الطالب (راسب < 85%)
-    else {
+    } else {
+        // تقرير مستوى (تشجيع)
         element.innerHTML = `
-          <div style="width: 210mm; height: 297mm; padding: 40px; box-sizing: border-box; font-family: 'Cairo', sans-serif; direction: rtl; text-align: center; background: #fff;">
-            <div style="border: 5px solid #ef4444; height: 100%; padding: 20px; border-radius: 20px; background: #fef2f2;">
-                <div style="font-size: 60px; margin-bottom: 10px;">⚠️</div>
-                <h1 style="color: #b91c1c; font-size: 36px; margin-bottom: 20px;">تقرير مستوى (تنبيه)</h1>
-                
-                <h2 style="font-size: 32px; color: #333; margin: 20px 0;">${data.studentName}</h2>
-                
-                <div style="background: #fff; padding: 20px; border-radius: 15px; border: 1px solid #fecaca; margin: 30px auto; width: 80%;">
-                    <p style="font-size: 18px; color: #7f1d1d;">للأسف، لم تحقق المستوى المطلوب في هذا الاختبار.</p>
-                    <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
-                    <p style="font-size: 16px; color: #555;">الدرجة: <strong>${data.score}</strong> من <strong>${data.total}</strong></p>
-                    <h3 style="font-size: 40px; color: #ef4444; margin: 10px 0;">%${percentage}</h3>
-                </div>
+          <div style="width: 210mm; padding: 40px; font-family: 'Cairo', sans-serif; direction: rtl; text-align: center; background: #fff; border: 5px solid #ef4444;">
+            <h1 style="color: #b91c1c; font-size: 36px; margin-bottom: 20px;">تقرير مستوى الطالب</h1>
+            <h2 style="font-size: 32px; color: #333; margin: 20px 0;">${data.studentName}</h2>
+            
+            <div style="background: #fef2f2; padding: 30px; border-radius: 15px; border: 1px solid #fecaca; margin: 30px auto; width: 80%;">
+                <p style="font-size: 18px; color: #7f1d1d;">نتيجة الاختبار:</p>
+                <h3 style="font-size: 40px; color: #ef4444; margin: 10px 0;">${data.score} / ${data.total}</h3>
+                <p style="font-size: 20px; font-weight: bold;">(%${percentage})</p>
+            </div>
 
-                <div style="text-align: center; margin-top: 40px; padding: 20px;">
-                    <h3 style="color: #333; margin-bottom: 15px;">نصيحة المعلم:</h3>
-                    <p style="font-size: 20px; color: #4b5563; line-height: 1.6;">
-                        "النجاح ليس صدفة، بل هو نتيجة اجتهاد مستمر. <br/>
-                        هذه الدرجة لا تعبر عن قدراتك الحقيقية، ولكنها جرس إنذار.<br/>
-                        شد حيلك في المرة القادمة، وراجع أخطاءك جيداً."
-                    </p>
-                </div>
-                
-                <div style="margin-top: 80px;">
-                    <p style="font-size: 14px; color: #888;">أ / محمد النحاس</p>
-                </div>
+            <div style="margin-top: 40px;">
+                <h3 style="color: #333;">نصيحة المعلم:</h3>
+                <p style="font-size: 20px; color: #4b5563; line-height: 1.6;">
+                    "المحاولة هي أول طريق النجاح. <br/>
+                    راجع أخطاءك جيداً، واستعد للامتحان القادم بقوة أكبر.<br/>
+                    نحن نثق في قدراتك."
+                </p>
+            </div>
+            
+            <div style="margin-top: 60px; text-align: left; padding-left: 40px;">
+                <p style="font-size: 14px; color: #888;">أ / محمد النحاس</p>
             </div>
           </div>
         `;
     }
-
-    try {
-        const opt = {
-          margin: 0,
-          filename: type === 'admin' ? `تقرير_${data.studentName}.pdf` : (percentage >= 85 ? `شهادة_${data.studentName}.pdf` : `مستوى_${data.studentName}.pdf`),
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true },
-          jsPDF: { unit: 'mm', format: (type === 'student' && percentage >= 85) ? 'a4' : 'a4', orientation: (type === 'student' && percentage >= 85) ? 'landscape' : 'portrait' }
-        };
-
-        window.html2pdf().set(opt).from(element).save();
-    } catch (err) {
-        console.error("PDF Generation Error:", err);
-        alert("حدث خطأ أثناء إنشاء ملف PDF. يرجى المحاولة مرة أخرى.");
-    }
+    
+    const opt = { 
+        margin: 0, 
+        filename: percentage >= 85 ? `شهادة_${data.studentName}.pdf` : `تقرير_${data.studentName}.pdf`, 
+        image: { type: 'jpeg', quality: 0.98 }, 
+        html2canvas: { scale: 2, useCORS: true }, 
+        jsPDF: { unit: 'mm', format: percentage >= 85 ? 'a4' : 'a4', orientation: percentage >= 85 ? 'landscape' : 'portrait' } 
+    };
+    
+    window.html2pdf().set(opt).from(element).save();
 };
 
-// --- 3. المكونات الرسومية الأساسية (Design System) ---
+/**
+ * =================================================================
+ * 3. المكونات الرسومية الأساسية (Design System)
+ * =================================================================
+ */
 
+// مكون تحميل التصميم والمكتبات الخارجية
 const DesignSystemLoader = () => {
   useEffect(() => {
-    // تحميل Tailwind CSS
+    // 1. تحميل Tailwind CSS
     if (!document.getElementById('tailwind-script')) {
       const script = document.createElement('script');
       script.id = 'tailwind-script';
@@ -240,7 +267,8 @@ const DesignSystemLoader = () => {
       };
       document.head.appendChild(script);
     }
-    // تحميل خط Cairo + Reem Kufi (للتوقيع)
+    
+    // 2. تحميل خط Cairo و Reem Kufi
     if (!document.getElementById('cairo-font')) {
       const link = document.createElement('link');
       link.id = 'cairo-font';
@@ -248,7 +276,8 @@ const DesignSystemLoader = () => {
       link.href = "https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Reem+Kufi:wght@700&display=swap";
       document.head.appendChild(link);
     }
-    // تحميل مكتبة html2pdf للطباعة
+    
+    // 3. تحميل مكتبة html2pdf
     if (!document.getElementById('html2pdf-script')) {
         const script = document.createElement('script');
         script.id = 'html2pdf-script';
@@ -259,7 +288,7 @@ const DesignSystemLoader = () => {
 
   return (
     <style>{`
-      body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; direction: rtl; margin: 0; padding: 0; user-select: none; }
+      body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; direction: rtl; user-select: none; }
       ::-webkit-scrollbar { width: 8px; }
       ::-webkit-scrollbar-track { background: #f1f1f1; }
       ::-webkit-scrollbar-thumb { background: #d97706; border-radius: 4px; }
@@ -268,16 +297,16 @@ const DesignSystemLoader = () => {
       .watermark-text {
         position: absolute;
         animation: floatWatermark 20s linear infinite;
-        pointer-events: 9999;
+        pointer-events: none; /* Changed to avoid blocking clicks */
         z-index: 9999;
-        color: rgba(0, 0, 0, 0.08);
+        color: rgba(0, 0, 0, 0.06);
         font-weight: 900;
         font-size: 1.5rem;
         transform: rotate(-30deg);
         white-space: nowrap;
         text-shadow: 0 0 2px rgba(255,255,255,0.5);
-        pointer-events: none;
       }
+      
       .watermark-video {
         position: absolute;
         animation: floatWatermark 15s linear infinite;
@@ -288,6 +317,7 @@ const DesignSystemLoader = () => {
         font-size: 1.2rem;
         text-shadow: 0 0 5px rgba(0,0,0,0.8);
       }
+
       @keyframes floatWatermark {
         0% { top: 10%; left: 10%; opacity: 0.3; }
         25% { top: 60%; left: 80%; opacity: 0.5; }
@@ -295,6 +325,7 @@ const DesignSystemLoader = () => {
         75% { top: 20%; left: 40%; opacity: 0.5; }
         100% { top: 10%; left: 10%; opacity: 0.3; }
       }
+      
       .live-pulse { animation: pulse-red 2s infinite; }
       @keyframes pulse-red {
         0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
@@ -306,7 +337,7 @@ const DesignSystemLoader = () => {
   );
 };
 
-// خيارات الصفوف
+// خيارات الصفوف الدراسية الموحدة
 const GradeOptions = () => (
     <>
         <optgroup label="المرحلة الإعدادية">
@@ -330,6 +361,7 @@ const getGradeLabel = (g) => {
     return map[g] || g;
 };
 
+// اللوجو المتحرك
 const ModernLogo = () => (
   <motion.svg width="80" height="80" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" whileHover={{ scale: 1.05 }} className="drop-shadow-xl cursor-pointer">
     <defs><linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#d97706" /><stop offset="100%" stopColor="#78350f" /></linearGradient></defs>
@@ -438,6 +470,7 @@ const Leaderboard = () => {
     );
 };
 
+// --- المساعد الذكي (الشات) ---
 const ChatWidget = ({ user }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([{ id: 1, text: "أهلاً بيك في منصة النحاس! 🎓\nمعاك المساعد الذكي، اسألني عن أي حاجة.", sender: 'bot' }]);
@@ -615,26 +648,50 @@ const LiveSessionView = ({ session, user, onClose }) => {
   );
 };
 
+// --- مشغل الفيديو الجديد مع الترس (Gear Icon) ---
 const SecureVideoPlayer = ({ video, userName, onClose }) => {
   const videoId = getYouTubeID(video.url);
+  const [showSettings, setShowSettings] = useState(false);
+  const videoRef = useRef(null);
+
+  const changeSpeed = (rate) => {
+    if(videoRef.current) videoRef.current.playbackRate = rate;
+    setShowSettings(false);
+  };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4">
-      <div className="w-full max-w-4xl bg-slate-900 rounded-xl overflow-hidden relative shadow-2xl">
-        <button onClick={onClose} className="absolute top-4 right-4 z-50 bg-red-600 hover:bg-red-700 text-white p-2 rounded-full"><X size={20}/></button>
-        <div className="aspect-video relative bg-black flex items-center justify-center group">
+    <div className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center p-4">
+      <div className="w-full max-w-5xl bg-black rounded-xl overflow-hidden relative shadow-2xl border border-gray-800">
+        <div className="absolute top-4 right-4 z-50 flex gap-4">
+            <div className="relative">
+                <button onClick={() => setShowSettings(!showSettings)} className="bg-black/50 hover:bg-black/80 text-white p-2 rounded-full backdrop-blur-sm transition"><GearIcon size={24}/></button>
+                {showSettings && (
+                    <div className="absolute top-12 left-0 bg-white text-black rounded-lg shadow-xl py-2 w-40 z-50 text-sm font-bold">
+                        <div className="px-4 py-2 border-b text-gray-400 text-xs">إعدادات المشاهدة</div>
+                        {[0.5, 1, 1.25, 1.5, 2].map(rate => (
+                            <button key={rate} onClick={() => changeSpeed(rate)} className="block w-full text-right px-4 py-2 hover:bg-gray-100">سرعة {rate}x</button>
+                        ))}
+                        {videoId && <div className="px-4 py-2 text-xs text-blue-600 border-t">الجودة من إعدادات اليوتيوب بالأسفل ⚙️</div>}
+                    </div>
+                )}
+            </div>
+            <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white p-2 rounded-full"><X size={24}/></button>
+        </div>
+
+        <div className="aspect-video relative flex items-center justify-center bg-black">
           <div className="watermark-video">{userName} - {video.grade}</div>
           
           {video.url.startsWith('data:') ? (
-              <video controls className="w-full h-full object-contain" src={video.url}>
+              <video ref={videoRef} controls controlsList="nodownload" className="w-full h-full object-contain" src={video.url}>
                   المتصفح لا يدعم هذا الفيديو.
               </video>
           ) : videoId ? (
-            <iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`} title="Video" frameBorder="0" allowFullScreen></iframe>
+            <iframe className="w-full h-full" src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&playsinline=1&enablejsapi=1`} title="Video" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
           ) : (
-            <div className="text-center">
+            <div className="text-center text-white">
               <PlayCircle size={80} className="text-amber-500 mx-auto mb-4 opacity-50" />
-              <a href={video.url} target="_blank" className="text-blue-400 underline mt-2 block">اضغط للمشاهدة</a>
+              <p>رابط الفيديو غير مدعوم أو خارجي.</p>
+              <a href={video.url} target="_blank" className="text-blue-400 underline mt-2 block">اضغط هنا للمشاهدة</a>
             </div>
           )}
         </div>
@@ -666,6 +723,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
   useEffect(() => {
     if (isReviewMode || isSubmitted) return;
+
     const handleVisibilityChange = () => { if (document.hidden) handleCheating(); };
     document.addEventListener("visibilitychange", handleVisibilityChange);
     document.addEventListener('contextmenu', event => event.preventDefault()); 
@@ -748,7 +806,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                 <h2 className="text-3xl font-black mb-4">تم الانتهاء من الامتحان</h2>
                 <div className={`text-6xl font-black my-6 ${score >= flatQuestions.length / 2 ? 'text-green-600' : 'text-red-600'}`}>{score} / {flatQuestions.length}</div>
                 <div className="flex gap-4 justify-center">
-                    <button onClick={() => generatePDF('student', {studentName: user.displayName, score, total: flatQuestions.length, status: 'completed'})} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2"><Download size={18}/> تحميل الشهادة</button>
+                    <button onClick={() => generatePDF('student', {studentName: user.displayName, score, total: flatQuestions.length, status: 'completed'})} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2"><Download size={18}/> تحميل النتيجة</button>
                     <button onClick={onClose} className="bg-slate-900 text-white py-3 px-8 rounded-xl font-bold">عودة للرئيسية</button>
                 </div>
             </div>
@@ -866,6 +924,8 @@ const AdminDashboard = ({ user }) => {
   const [newAnnouncement, setNewAnnouncement] = useState(""); 
   const [showLeaderboard, setShowLeaderboard] = useState(true);
   const [announcements, setAnnouncements] = useState([]);
+  
+  // Notification State
   const [notifData, setNotifData] = useState({ text: '', grade: 'all' });
 
   // جلب البيانات
@@ -925,7 +985,7 @@ const AdminDashboard = ({ user }) => {
   const handleUpdateUser = async (e) => { e.preventDefault(); if(!editingUser) return; await updateDoc(doc(db, 'users', editingUser.id), { name: editingUser.name, phone: editingUser.phone, parentPhone: editingUser.parentPhone, grade: editingUser.grade }); setEditingUser(null); };
   const handleSendResetPassword = async (email) => { if(window.confirm(`إرسال رابط تغيير كلمة السر لـ ${email}؟`)) await sendPasswordResetEmail(auth, email); };
   
-  // رفع الملفات
+  // رفع الملفات (محاكاة - يحول لـ Data URL)
   const handleFileSelect = (e) => {
       const file = e.target.files[0];
       if (file) {
@@ -981,7 +1041,9 @@ const AdminDashboard = ({ user }) => {
   };
 
   const parseExam = async () => {
-    if (!bulkText.trim() || !examBuilder.startTime || !examBuilder.endTime) return alert("يرجى إدخال نص الامتحان وتحديد وقت البدء والانتهاء");
+    if (!bulkText.trim()) return alert("أدخل نص الامتحان");
+    if (!examBuilder.accessCode) return alert("أدخل كود للامتحان");
+    if (!examBuilder.startTime || !examBuilder.endTime) return alert("يرجى تحديد وقت البدء والانتهاء");
 
     const lines = bulkText.split('\n').map(l => l.trim()).filter(l => l);
     const blocks = [];
@@ -1026,8 +1088,8 @@ const AdminDashboard = ({ user }) => {
         title: examBuilder.title, 
         grade: examBuilder.grade, 
         duration: examBuilder.duration, 
-        startTime: examBuilder.startTime, // وقت البدء
-        endTime: examBuilder.endTime,     // وقت الانتهاء
+        startTime: examBuilder.startTime,
+        endTime: examBuilder.endTime,
         accessCode: examBuilder.accessCode, 
         questions: finalBlocks, 
         createdAt: serverTimestamp() 
@@ -1294,9 +1356,9 @@ const StudentDashboard = ({ user, userData }) => {
         <div className="flex items-center gap-3 mb-10 px-2"><ModernLogo /><h1 className="text-2xl font-black text-slate-800">النحاس</h1><button onClick={() => setMobileMenu(false)} className="md:hidden mr-auto"><X /></button></div>
         <div className="space-y-2 flex-1">
           <button onClick={() => {setActiveTab('home'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='home'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><User/> الرئيسية</button>
-          <button onClick={() => {setActiveTab('videos'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='videos'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><PlayCircle/> المحاضرات</button>
-          <button onClick={() => {setActiveTab('files'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='files'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><FileText/> المذكرات</button>
-          <button onClick={() => {setActiveTab('exams'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='exams'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><ClipboardList/> الامتحانات</button>
+          <div onClick={() => setActiveTab('videos')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='videos'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><PlayCircle/> المحاضرات</div>
+          <div onClick={() => setActiveTab('files')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='files'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><FileText/> المذكرات</div>
+          <div onClick={() => setActiveTab('exams')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><ClipboardList/> الامتحانات</div>
           <button onClick={() => {setActiveTab('settings'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='settings'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><Settings/> ملفي الشخصي</button>
         </div>
         <div className="mt-auto pt-6"><button onClick={() => signOut(auth)} className="flex items-center gap-3 text-red-500 font-bold hover:bg-red-50 w-full p-4 rounded-xl transition"><LogOut/> خروج</button></div>
@@ -1329,7 +1391,7 @@ const StudentDashboard = ({ user, userData }) => {
         </div>
 
         {activeTab === 'home' && (<div className="space-y-8"><WisdomBox /><Announcements /><h2 className="text-3xl font-bold text-slate-800">منور يا {userData.name.split(' ')[0]} 👋 <span className="text-sm font-normal text-slate-500 bg-slate-200 px-2 py-1 rounded-full">{getGradeLabel(userData.grade)}</span></h2><div className="grid grid-cols-1 md:grid-cols-3 gap-6"><div onClick={()=>setActiveTab('videos')} className="bg-blue-600 text-white p-8 rounded-3xl shadow-lg relative overflow-hidden cursor-pointer hover:scale-105 transition-transform"><h3 className="relative z-10 text-2xl font-bold mb-2">المحاضرات</h3><p className="relative z-10 text-4xl font-black">{videos.length}</p><PlayCircle className="absolute -bottom-6 -left-6 opacity-20 w-40 h-40"/></div><div onClick={()=>setActiveTab('files')} className="bg-amber-500 text-white p-8 rounded-3xl shadow-lg relative overflow-hidden cursor-pointer hover:scale-105 transition-transform"><h3 className="relative z-10 text-2xl font-bold mb-2">الملفات</h3><p className="relative z-10 text-4xl font-black">{files.length}</p><FileText className="absolute -bottom-6 -left-6 opacity-20 w-40 h-40"/></div><div onClick={()=>setActiveTab('exams')} className="bg-slate-800 text-white p-8 rounded-3xl shadow-lg relative overflow-hidden cursor-pointer hover:scale-105 transition-transform"><h3 className="relative z-10 text-2xl font-bold mb-2">الامتحانات</h3><p className="relative z-10 text-4xl font-black">{exams.length}</p><ClipboardList className="absolute -bottom-6 -left-6 opacity-20 w-40 h-40"/></div></div><Leaderboard /></div>)}
-        {activeTab === 'videos' && <div className="grid grid-cols-1 md:grid-cols-3 gap-6">{videos.map(v => (<div key={v.id} className="bg-white rounded-xl shadow-sm border overflow-hidden cursor-pointer" onClick={() => setPlayingVideo(v)}><div className="h-40 bg-slate-800 flex items-center justify-center relative"><PlayCircle className="text-white w-12 h-12 opacity-80"/><span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded">{getGradeLabel(v.grade)}</span></div><div className="p-4"><h3 className="font-bold text-lg">{v.title}</h3></div></div>))}</div>}
+        {activeTab === 'videos' && <div className="grid grid-cols-1 md:grid-cols-3 gap-6">{videos.map(v => (<div key={v.id} className="bg-white rounded-xl shadow-sm border overflow-hidden cursor-pointer" onClick={() => setActiveVideo(v)}><div className="h-40 bg-slate-800 flex items-center justify-center relative"><PlayCircle className="text-white w-12 h-12 opacity-80"/><span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded">{getGradeLabel(v.grade)}</span></div><div className="p-4"><h3 className="font-bold text-lg">{v.title}</h3></div></div>))}</div>}
         {activeTab === 'files' && <div className="bg-white rounded-xl shadow-sm border overflow-hidden">{files.map(f => (<div key={f.id} className="p-4 flex justify-between items-center border-b last:border-0 hover:bg-slate-50"><div className="flex items-center gap-4"><div className="bg-red-100 text-red-600 p-3 rounded-lg font-bold text-xs">PDF</div><div><h4 className="font-bold text-lg">{f.title}</h4><span className="text-xs text-slate-500">{getGradeLabel(f.grade)}</span></div></div><a href={f.url} target="_blank" className="bg-blue-50 text-blue-600 px-4 py-2 rounded-lg font-bold hover:bg-blue-100">تحميل</a></div>))}</div>}
         
         {activeTab === 'exams' && (
