@@ -1,84 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
-  getAuth, 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  signOut, 
-  onAuthStateChanged, 
-  updateProfile, 
-  sendPasswordResetEmail 
+  getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, 
+  signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail 
 } from 'firebase/auth';
 import { 
-  getFirestore, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  getDocs, 
-  collection, 
-  addDoc, 
-  query, 
-  where, 
-  onSnapshot, 
-  updateDoc, 
-  deleteDoc, 
-  orderBy, 
-  serverTimestamp, 
-  writeBatch, 
-  limit 
+  getFirestore, doc, setDoc, getDoc, getDocs, collection, addDoc, query, where, 
+  onSnapshot, updateDoc, deleteDoc, orderBy, serverTimestamp, writeBatch, limit 
 } from 'firebase/firestore';
 import { 
-  PlayCircle, 
-  FileText, 
-  LogOut, 
-  User, 
-  GraduationCap, 
-  Quote, 
-  CheckCircle, 
-  Lock, 
-  Mail, 
-  ChevronRight, 
-  Menu, 
-  X, 
-  Loader2, 
-  AlertTriangle, 
-  PlusCircle, 
-  Check, 
-  Trash2, 
-  Eye, 
-  ShieldAlert, 
-  Video, 
-  UploadCloud, 
-  Phone, 
-  Edit, 
-  KeyRound,
-  MessageSquare, 
-  Send, 
-  MessageCircle, 
-  Facebook, 
-  BookOpen, 
-  Feather, 
-  Radio, 
-  ExternalLink, 
-  ClipboardList, 
-  Timer, 
-  AlertOctagon, 
-  Flag, 
-  Save, 
-  HelpCircle, 
-  Reply, 
-  Unlock, 
-  Layout, 
-  Settings, 
-  Trophy, 
-  Megaphone, 
-  Bell, 
-  Download, 
-  XCircle, 
-  Calendar, 
-  Clock, 
-  FileWarning, 
-  Settings as GearIcon
+  PlayCircle, FileText, LogOut, User, GraduationCap, Quote, CheckCircle, 
+  Lock, Mail, ChevronRight, Menu, X, Loader2, AlertTriangle, PlusCircle, 
+  Check, Trash2, Eye, ShieldAlert, Video, UploadCloud, Phone, Edit, KeyRound,
+  MessageSquare, Send, MessageCircle, Facebook, BookOpen, Feather, Radio, 
+  ExternalLink, ClipboardList, Timer, AlertOctagon, Flag, Save, HelpCircle, 
+  Reply, Unlock, Layout, Settings, Trophy, Megaphone, Bell, Download, XCircle, 
+  Calendar, Clock, FileWarning, Settings as GearIcon, Star
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -122,16 +59,15 @@ const requestNotificationPermission = () => {
   }
 };
 
-// إرسال إشعار للنظام (يظهر حتى لو المتصفح في الخلفية)
+// إرسال إشعار للنظام
 const sendSystemNotification = (title, body) => {
   if (Notification.permission === "granted") {
     try {
       new Notification(title, {
         body: body,
-        icon: "https://cdn-icons-png.flaticon.com/512/3449/3449750.png", // أيقونة جرس
+        icon: "https://cdn-icons-png.flaticon.com/512/3449/3449750.png",
         vibrate: [200, 100, 200]
       });
-      // تشغيل صوت تنبيه خفيف
       const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
       audio.volume = 0.5;
       audio.play().catch(e => {});
@@ -147,9 +83,8 @@ const getYouTubeID = (url) => {
     return (match && match[2].length === 11) ? match[2] : null;
 };
 
-// توليد ملف PDF لنتيجة الطالب (مزخرف واحترافي)
+// توليد ملف PDF (التصميم الأسود والذهبي الجديد)
 const generatePDF = (type, data) => {
-    // التأكد من تحميل المكتبة
     if (!window.html2pdf) {
         alert("جاري تحميل نظام الطباعة... يرجى الانتظار ثوانٍ والمحاولة مرة أخرى.");
         return;
@@ -159,70 +94,90 @@ const generatePDF = (type, data) => {
     const date = new Date().toLocaleDateString('ar-EG');
     const element = document.createElement('div');
     
-    // تصميم الشهادة بناءً على النتيجة
+    // 1. تقرير الأدمن (تفصيلي لولي الأمر)
     if (type === 'admin') {
          element.innerHTML = `
-          <div style="padding: 30px; font-family: 'Cairo', sans-serif; direction: rtl; border: 2px solid #333;">
-            <h1 style="color: #d97706; text-align: center;">تقرير طالب - منصة النحاس</h1>
-            <hr/>
-            <p><strong>اسم الطالب:</strong> ${data.studentName}</p>
-            <p><strong>الدرجة:</strong> ${data.score} / ${data.total} (${percentage}%)</p>
-            <p><strong>الحالة:</strong> ${data.status === 'cheated' ? 'غش (ملغى)' : 'تم الانتهاء'}</p>
-            <p><strong>التاريخ:</strong> ${date}</p>
-            <br/><p style="text-align: left;"><strong>توقيع المعلم:</strong> أ/ محمد النحاس</p>
-          </div>`;
-    } else if (percentage >= 85) {
-        // شهادة تفوق
-        element.innerHTML = `
-          <div style="width: 297mm; height: 210mm; padding: 40px; font-family: 'Cairo', sans-serif; direction: rtl; text-align: center; background: #fff; position: relative;">
-            <div style="border: 15px double #daa520; height: 100%; padding: 40px; box-sizing: border-box; background: radial-gradient(circle, #fffff0 0%, #fff 100%);">
-                <h1 style="color: #b45309; font-size: 50px; margin-bottom: 20px;">شهـــادة تقـــدير وتفـــوق</h1>
-                <p style="font-size: 20px; color: #555;">تتشرف منصة النحاس التعليمية بمنح هذه الشهادة للطالب المتميز</p>
-                <h2 style="font-size: 60px; color: #1e293b; margin: 30px 0; text-decoration: underline; text-decoration-color: #daa520;">${data.studentName}</h2>
-                <p style="font-size: 24px; color: #444;">وذلك لتفوقه وحصوله على درجة متميزة في الاختبار.</p>
-                
-                <div style="margin: 40px auto; width: 250px; padding: 20px; border: 3px solid #daa520; border-radius: 50px; background: #fff;">
-                    <span style="display: block; font-size: 16px; color: #888;">النسبة المئوية</span>
-                    <span style="display: block; font-size: 40px; font-weight: bold; color: #b45309;">%${percentage}</span>
-                </div>
-
-                <div style="display: flex; justify-content: space-between; margin-top: 80px; padding: 0 60px;">
-                    <div style="text-align: right;">
-                        <p style="font-size: 18px; color: #777;">التاريخ</p>
-                        <p style="font-weight: bold; font-size: 20px;">${date}</p>
-                    </div>
-                    <div style="text-align: left;">
-                        <p style="font-size: 18px; color: #777;">مُعلم اللغة العربية</p>
-                        <h3 style="font-size: 36px; color: #b45309; font-family: sans-serif;">أ / محمد النحاس</h3>
-                    </div>
-                </div>
+          <div style="padding: 40px; font-family: 'Cairo', sans-serif; direction: rtl; border: 2px solid #333; text-align: center;">
+            <h1 style="color: #d97706;">تقرير طالب - منصة النحاس</h1>
+            <hr style="margin: 20px 0; border-top: 1px solid #ccc;"/>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 18px;">
+                <tr><td style="padding: 15px; border: 1px solid #ccc; background: #f9f9f9; width: 30%;">اسم الطالب</td><td style="padding: 15px; border: 1px solid #ccc;">${data.studentName}</td></tr>
+                <tr><td style="padding: 15px; border: 1px solid #ccc; background: #f9f9f9;">الدرجة</td><td style="padding: 15px; border: 1px solid #ccc; font-weight: bold;">${data.score} / ${data.total} (${percentage}%)</td></tr>
+                <tr><td style="padding: 15px; border: 1px solid #ccc; background: #f9f9f9;">الحالة</td><td style="padding: 15px; border: 1px solid #ccc; color: ${data.status === 'cheated' ? 'red' : 'green'};">${data.status === 'cheated' ? 'تم إلغاؤه (غش)' : 'تم الانتهاء'}</td></tr>
+                <tr><td style="padding: 15px; border: 1px solid #ccc; background: #f9f9f9;">التاريخ</td><td style="padding: 15px; border: 1px solid #ccc;">${date}</td></tr>
+            </table>
+            <div style="margin-top: 50px; text-align: left;">
+                <p style="font-size: 16px;">يعتمد، معلم المادة</p>
+                <h3 style="font-weight: bold; margin-top: 10px;">أ / محمد النحاس</h3>
             </div>
+          </div>`;
+    } 
+    // 2. شهادة التفوق (أسود وذهبي - ناجح)
+    else if (percentage >= 85) {
+        element.innerHTML = `
+          <div style="width: 297mm; height: 210mm; padding: 0; margin: 0; background-color: #0F0F0F; color: #D4AF37; font-family: 'Cairo', sans-serif; position: relative; text-align: center; border: 20px solid #D4AF37; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center;">
+              <!-- زخرفة الخلفية -->
+              <div style="position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px; border: 5px solid #fff; opacity: 0.1; pointer-events: none;"></div>
+              
+              <div style="position: relative; z-index: 10;">
+                  <h1 style="font-size: 64px; margin: 0; text-shadow: 2px 2px 4px #000; letter-spacing: 2px; font-weight: 900;">شهادة تقدير وتفوق</h1>
+                  <p style="font-size: 24px; color: #fff; margin-top: 20px; letter-spacing: 1px;">تتشرف منصة النحاس التعليمية للغة العربية بأن تمنح</p>
+                  
+                  <h2 style="font-size: 72px; margin: 40px 0; color: #fff; font-family: 'Reem Kufi', sans-serif; text-shadow: 0 0 10px #D4AF37;">${data.studentName}</h2>
+                  
+                  <p style="font-size: 28px; color: #eee; line-height: 1.6; margin-bottom: 30px;">
+                      وذلك لتفوقه الباهر وحصوله على درجة متميزة في الاختبار. <br/>
+                      مع خالص تمنياتنا بدوام التوفيق والنجاح.
+                  </p>
+                  
+                  <!-- مربع الدرجة -->
+                  <div style="border: 4px solid #D4AF37; display: inline-block; padding: 15px 60px; border-radius: 50px; background: rgba(212, 175, 55, 0.1); box-shadow: 0 0 30px rgba(212, 175, 55, 0.2);">
+                      <span style="font-size: 22px; color: #fff;">التقدير العام</span><br/>
+                      <span style="font-size: 56px; font-weight: 900; text-shadow: 2px 2px 4px #000;">%${percentage}</span>
+                  </div>
+
+                  <!-- التوقيع -->
+                  <div style="margin-top: 80px; display: flex; justify-content: space-between; align-items: flex-end; padding: 0 80px;">
+                      <div style="text-align: right;">
+                          <p style="font-size: 20px; color: #aaa; margin-bottom: 5px;">تحريراً في</p>
+                          <p style="font-size: 24px; color: #fff; font-weight: bold;">${date}</p>
+                      </div>
+                      
+                      <div style="text-align: center; font-size: 80px; color: #D4AF37;">★</div>
+
+                      <div style="text-align: left;">
+                          <p style="font-size: 20px; color: #aaa; margin-bottom: 15px;">معلم المادة</p>
+                          <h3 style="font-size: 40px; font-family: 'Reem Kufi', sans-serif; margin: 0; color: #D4AF37;">أ / محمد النحاس</h3>
+                          <div style="height: 4px; width: 100%; background: #D4AF37; border-radius: 2px; margin-top: 5px;"></div>
+                      </div>
+                  </div>
+              </div>
           </div>
         `;
-    } else {
-        // تقرير مستوى (تشجيع)
+    } 
+    // 3. تقرير مستوى (راسب)
+    else {
         element.innerHTML = `
-          <div style="width: 210mm; padding: 40px; font-family: 'Cairo', sans-serif; direction: rtl; text-align: center; background: #fff; border: 5px solid #ef4444;">
-            <h1 style="color: #b91c1c; font-size: 36px; margin-bottom: 20px;">تقرير مستوى الطالب</h1>
-            <h2 style="font-size: 32px; color: #333; margin: 20px 0;">${data.studentName}</h2>
+          <div style="width: 297mm; height: 210mm; padding: 40px; font-family: 'Cairo', sans-serif; direction: rtl; text-align: center; background: #fff; border: 15px solid #ef4444; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center;">
+            <h1 style="color: #b91c1c; font-size: 56px; margin-bottom: 30px; font-weight: 900;">تقرير مستوى (تنبيه)</h1>
             
-            <div style="background: #fef2f2; padding: 30px; border-radius: 15px; border: 1px solid #fecaca; margin: 30px auto; width: 80%;">
-                <p style="font-size: 18px; color: #7f1d1d;">نتيجة الاختبار:</p>
-                <h3 style="font-size: 40px; color: #ef4444; margin: 10px 0;">${data.score} / ${data.total}</h3>
-                <p style="font-size: 20px; font-weight: bold;">(%${percentage})</p>
+            <h2 style="font-size: 48px; color: #333; margin: 20px 0;">الطالب / ${data.studentName}</h2>
+            
+            <div style="background: #fef2f2; padding: 30px; border-radius: 20px; border: 3px solid #fecaca; margin: 40px auto; width: 70%;">
+                <p style="font-size: 24px; color: #7f1d1d;">للأسف، لم تحقق المستوى المطلوب في هذا الاختبار.</p>
+                <hr style="border: 0; border-top: 2px solid #eee; margin: 20px 0;">
+                <p style="font-size: 20px; color: #555;">الدرجة: <strong>${data.score}</strong> من <strong>${data.total}</strong></p>
+                <h3 style="font-size: 60px; color: #ef4444; margin: 15px 0; font-weight: 900;">%${percentage}</h3>
             </div>
 
-            <div style="margin-top: 40px;">
-                <h3 style="color: #333;">نصيحة المعلم:</h3>
-                <p style="font-size: 20px; color: #4b5563; line-height: 1.6;">
-                    "المحاولة هي أول طريق النجاح. <br/>
-                    راجع أخطاءك جيداً، واستعد للامتحان القادم بقوة أكبر.<br/>
-                    نحن نثق في قدراتك."
+            <div style="text-align: center; margin-top: 40px;">
+                <p style="font-size: 28px; color: #4b5563; line-height: 1.6; font-weight: bold;">
+                    "النجاح محتاج مجهود.. شد حيلك في اللي جاي!"
                 </p>
             </div>
             
-            <div style="margin-top: 60px; text-align: left; padding-left: 40px;">
-                <p style="font-size: 14px; color: #888;">أ / محمد النحاس</p>
+            <div style="margin-top: 80px; text-align: left; padding-left: 60px;">
+                 <h3 style="font-size: 32px; color: #555;">أ / محمد النحاس</h3>
             </div>
           </div>
         `;
@@ -233,7 +188,7 @@ const generatePDF = (type, data) => {
         filename: percentage >= 85 ? `شهادة_${data.studentName}.pdf` : `تقرير_${data.studentName}.pdf`, 
         image: { type: 'jpeg', quality: 0.98 }, 
         html2canvas: { scale: 2, useCORS: true }, 
-        jsPDF: { unit: 'mm', format: percentage >= 85 ? 'a4' : 'a4', orientation: percentage >= 85 ? 'landscape' : 'portrait' } 
+        jsPDF: { unit: 'mm', format: 'a4', orientation: type === 'admin' ? 'portrait' : 'landscape' } 
     };
     
     window.html2pdf().set(opt).from(element).save();
@@ -297,7 +252,7 @@ const DesignSystemLoader = () => {
       .watermark-text {
         position: absolute;
         animation: floatWatermark 20s linear infinite;
-        pointer-events: none; /* Changed to avoid blocking clicks */
+        pointer-events: none;
         z-index: 9999;
         color: rgba(0, 0, 0, 0.06);
         font-weight: 900;
@@ -337,7 +292,7 @@ const DesignSystemLoader = () => {
   );
 };
 
-// خيارات الصفوف الدراسية الموحدة
+// خيارات الصفوف
 const GradeOptions = () => (
     <>
         <optgroup label="المرحلة الإعدادية">
@@ -361,7 +316,6 @@ const getGradeLabel = (g) => {
     return map[g] || g;
 };
 
-// اللوجو المتحرك
 const ModernLogo = () => (
   <motion.svg width="80" height="80" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" whileHover={{ scale: 1.05 }} className="drop-shadow-xl cursor-pointer">
     <defs><linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#d97706" /><stop offset="100%" stopColor="#78350f" /></linearGradient></defs>
@@ -470,7 +424,6 @@ const Leaderboard = () => {
     );
 };
 
-// --- المساعد الذكي (الشات) ---
 const ChatWidget = ({ user }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([{ id: 1, text: "أهلاً بيك في منصة النحاس! 🎓\nمعاك المساعد الذكي، اسألني عن أي حاجة.", sender: 'bot' }]);
@@ -479,7 +432,7 @@ const ChatWidget = ({ user }) => {
   const chatEndRef = useRef(null);
   const [isContactAdminMode, setIsContactAdminMode] = useState(false);
   
-  // الاستماع للرسائل (بما في ذلك ردود الأدمن)
+  // الاستماع للرسائل
   useEffect(() => {
     if (!isOpen) return;
     const userId = user ? user.email : sessionId;
@@ -648,11 +601,12 @@ const LiveSessionView = ({ session, user, onClose }) => {
   );
 };
 
-// --- مشغل الفيديو الجديد مع الترس (Gear Icon) ---
+// --- مشغل الفيديو الجديد مع الترس والـ Pop-up ---
 const SecureVideoPlayer = ({ video, userName, onClose }) => {
-  const videoId = getYouTubeID(video.url);
+  const videoId = getYouTubeID(video.url || video.file);
   const [showSettings, setShowSettings] = useState(false);
   const videoRef = useRef(null);
+  const finalUrl = video.url || video.file;
 
   const changeSpeed = (rate) => {
     if(videoRef.current) videoRef.current.playbackRate = rate;
@@ -667,11 +621,10 @@ const SecureVideoPlayer = ({ video, userName, onClose }) => {
                 <button onClick={() => setShowSettings(!showSettings)} className="bg-black/50 hover:bg-black/80 text-white p-2 rounded-full backdrop-blur-sm transition"><GearIcon size={24}/></button>
                 {showSettings && (
                     <div className="absolute top-12 left-0 bg-white text-black rounded-lg shadow-xl py-2 w-40 z-50 text-sm font-bold">
-                        <div className="px-4 py-2 border-b text-gray-400 text-xs">إعدادات المشاهدة</div>
+                        <div className="px-4 py-2 border-b text-gray-400 text-xs">سرعة التشغيل</div>
                         {[0.5, 1, 1.25, 1.5, 2].map(rate => (
-                            <button key={rate} onClick={() => changeSpeed(rate)} className="block w-full text-right px-4 py-2 hover:bg-gray-100">سرعة {rate}x</button>
+                            <button key={rate} onClick={() => changeSpeed(rate)} className="block w-full text-right px-4 py-2 hover:bg-gray-100">{rate}x</button>
                         ))}
-                        {videoId && <div className="px-4 py-2 text-xs text-blue-600 border-t">الجودة من إعدادات اليوتيوب بالأسفل ⚙️</div>}
                     </div>
                 )}
             </div>
@@ -681,18 +634,10 @@ const SecureVideoPlayer = ({ video, userName, onClose }) => {
         <div className="aspect-video relative flex items-center justify-center bg-black">
           <div className="watermark-video">{userName} - {video.grade}</div>
           
-          {video.url.startsWith('data:') ? (
-              <video ref={videoRef} controls controlsList="nodownload" className="w-full h-full object-contain" src={video.url}>
-                  المتصفح لا يدعم هذا الفيديو.
-              </video>
-          ) : videoId ? (
+          {videoId ? (
             <iframe className="w-full h-full" src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&playsinline=1&enablejsapi=1`} title="Video" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
           ) : (
-            <div className="text-center text-white">
-              <PlayCircle size={80} className="text-amber-500 mx-auto mb-4 opacity-50" />
-              <p>رابط الفيديو غير مدعوم أو خارجي.</p>
-              <a href={video.url} target="_blank" className="text-blue-400 underline mt-2 block">اضغط هنا للمشاهدة</a>
-            </div>
+             <video ref={videoRef} controls controlsList="nodownload" className="w-full h-full object-contain" src={finalUrl}>المتصفح لا يدعم هذا الفيديو.</video>
           )}
         </div>
       </div>
@@ -708,7 +653,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const [isCheating, setIsCheating] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(isReviewMode);
   const [score, setScore] = useState(existingResult?.score || 0);
-  const [startTime] = useState(Date.now()); 
 
   const flatQuestions = [];
   if (exam.questions) {
@@ -723,7 +667,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
   useEffect(() => {
     if (isReviewMode || isSubmitted) return;
-
     const handleVisibilityChange = () => { if (document.hidden) handleCheating(); };
     document.addEventListener("visibilitychange", handleVisibilityChange);
     document.addEventListener('contextmenu', event => event.preventDefault()); 
@@ -747,18 +690,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     if(isReviewMode || isSubmitted) return;
     setIsCheating(true); 
     setIsSubmitted(true);
-    const timeTaken = Math.round((Date.now() - startTime) / 1000);
-    await addDoc(collection(db, 'exam_results'), { 
-        examId: exam.id, 
-        studentId: user.uid, 
-        studentName: user.displayName, 
-        score: 0, 
-        total: flatQuestions.length,
-        status: 'cheated', 
-        timeTaken: timeTaken,
-        totalTime: exam.duration,
-        submittedAt: serverTimestamp() 
-    });
+    await addDoc(collection(db, 'exam_results'), { examId: exam.id, studentId: user.uid, studentName: user.displayName, score: 0, status: 'cheated', submittedAt: serverTimestamp() });
     await updateDoc(doc(db, 'users', user.uid), { status: 'banned_cheating' });
   };
 
@@ -776,21 +708,10 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     const totalQs = flatQuestions.length;
     if (!auto && Object.keys(answers).length < totalQs && !window.confirm("لم تجب على كل الأسئلة، هل أنت متأكد؟")) return;
     const finalScore = calculateScore();
-    const timeTaken = Math.round((Date.now() - startTime) / 1000);
     setScore(finalScore);
     setIsSubmitted(true);
-    
     await addDoc(collection(db, 'exam_results'), { 
-      examId: exam.id, 
-      studentId: user.uid, 
-      studentName: user.displayName, 
-      score: finalScore, 
-      total: totalQs, 
-      answers, 
-      status: 'completed',
-      timeTaken: timeTaken,
-      totalTime: exam.duration, 
-      submittedAt: serverTimestamp() 
+      examId: exam.id, studentId: user.uid, studentName: user.displayName, score: finalScore, total: totalQs, answers, status: 'completed', submittedAt: serverTimestamp() 
     });
   };
 
@@ -806,7 +727,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                 <h2 className="text-3xl font-black mb-4">تم الانتهاء من الامتحان</h2>
                 <div className={`text-6xl font-black my-6 ${score >= flatQuestions.length / 2 ? 'text-green-600' : 'text-red-600'}`}>{score} / {flatQuestions.length}</div>
                 <div className="flex gap-4 justify-center">
-                    <button onClick={() => generatePDF('student', {studentName: user.displayName, score, total: flatQuestions.length, status: 'completed'})} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2"><Download size={18}/> تحميل النتيجة</button>
+                    <button onClick={() => generatePDF('student', {studentName: user.displayName, score, total: flatQuestions.length, status: 'completed'})} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2"><Download size={18}/> الشهادة</button>
                     <button onClick={onClose} className="bg-slate-900 text-white py-3 px-8 rounded-xl font-bold">عودة للرئيسية</button>
                 </div>
             </div>
@@ -924,11 +845,8 @@ const AdminDashboard = ({ user }) => {
   const [newAnnouncement, setNewAnnouncement] = useState(""); 
   const [showLeaderboard, setShowLeaderboard] = useState(true);
   const [announcements, setAnnouncements] = useState([]);
-  
-  // Notification State
   const [notifData, setNotifData] = useState({ text: '', grade: 'all' });
 
-  // جلب البيانات
   useEffect(() => { const u = onSnapshot(query(collection(db, 'users'), where('status','==','pending')), s => setPendingUsers(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(query(collection(db, 'users'), where('status', 'in', ['active', 'banned_cheating', 'rejected'])), s => setActiveUsersList(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(query(collection(db, 'content'), orderBy('createdAt','desc')), s => setContentList(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
@@ -938,107 +856,43 @@ const AdminDashboard = ({ user }) => {
   useEffect(() => { const u = onSnapshot(query(collection(db, 'exam_results'), orderBy('submittedAt', 'desc')), s => setExamResults(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(query(collection(db, 'announcements'), orderBy('createdAt', 'desc')), s => setAnnouncements(s.docs.map(d => ({id: d.id, ...d.data()})))); return u; }, []);
 
-  const handleApprove = async (id) => {
-    await updateDoc(doc(db,'users',id), {status:'active'});
-    sendSystemNotification("مبروك! 🎉", "تم تفعيل حسابك بنجاح.");
-  };
+  const handleApprove = async (id) => { await updateDoc(doc(db,'users',id), {status:'active'}); sendSystemNotification("مبروك! 🎉", "تم تفعيل حسابك بنجاح."); };
   const handleReject = async (id) => updateDoc(doc(db,'users',id), {status:'rejected'});
   const handleUnban = async (id) => updateDoc(doc(db,'users',id), {status:'active'});
   const handleDeleteUser = async (id) => { if(window.confirm("حذف نهائي؟")) await deleteDoc(doc(db,'users',id)); };
   const handleDeleteMessage = async (id) => { if(window.confirm("حذف الرسالة؟")) await deleteDoc(doc(db,'messages',id)); };
   const handleDeleteExam = async (id) => { if(window.confirm("حذف الامتحان؟")) await deleteDoc(doc(db, 'exams', id)); };
   const handleDeleteAnnouncement = async (id) => { if(window.confirm("حذف الإعلان؟")) await deleteDoc(doc(db, 'announcements', id)); };
-  
   const handleDeleteResult = async (resultId) => { if(window.confirm("حذف النتيجة؟")) await deleteDoc(doc(db, 'exam_results', resultId)); };
-  
-  const handleDeleteAllResults = async () => {
-    if(window.confirm("تحذير خطير: سيتم حذف جميع نتائج الامتحانات لكل الطلاب. هل أنت متأكد؟")) {
-      const batch = writeBatch(db);
-      examResults.forEach(res => {
-        batch.delete(doc(db, 'exam_results', res.id));
-      });
-      await batch.commit();
-      alert("تم حذف جميع النتائج بنجاح.");
-    }
-  };
-
-  const handleReplyMessage = async (msgId) => {
-    const text = replyTexts[msgId];
-    if (!text?.trim()) return;
-    await updateDoc(doc(db, 'messages', msgId), { adminReply: text });
-    setReplyTexts(prev => ({ ...prev, [msgId]: '' }));
-    alert("تم إرسال الرد!");
-  };
-  
-  const handleAddAnnouncement = async () => {
-      if(!newAnnouncement.trim()) return;
-      await addDoc(collection(db, 'announcements'), { text: newAnnouncement, createdAt: serverTimestamp() });
-      await addDoc(collection(db, 'notifications'), {
-        text: `تنبيه هام: ${newAnnouncement}`,
-        grade: 'all',
-        createdAt: serverTimestamp()
-      });
-      setNewAnnouncement("");
-      alert("تم نشر الإعلان");
-  };
-
+  const handleDeleteAllResults = async () => { if(window.confirm("تحذير خطير: سيتم حذف جميع نتائج الامتحانات لكل الطلاب. هل أنت متأكد؟")) { const batch = writeBatch(db); examResults.forEach(res => { batch.delete(doc(db, 'exam_results', res.id)); }); await batch.commit(); alert("تم حذف جميع النتائج بنجاح."); } };
+  const handleReplyMessage = async (msgId) => { if (!replyTexts[msgId]?.trim()) return; await updateDoc(doc(db, 'messages', msgId), { adminReply: replyTexts[msgId] }); setReplyTexts(prev => ({ ...prev, [msgId]: '' })); alert("تم إرسال الرد!"); };
+  const handleAddAnnouncement = async () => { if(!newAnnouncement.trim()) return; await addDoc(collection(db, 'announcements'), { text: newAnnouncement, createdAt: serverTimestamp() }); await addDoc(collection(db, 'notifications'), { text: `تنبيه هام: ${newAnnouncement}`, grade: 'all', createdAt: serverTimestamp() }); setNewAnnouncement(""); alert("تم نشر الإعلان"); };
   const handleUpdateUser = async (e) => { e.preventDefault(); if(!editingUser) return; await updateDoc(doc(db, 'users', editingUser.id), { name: editingUser.name, phone: editingUser.phone, parentPhone: editingUser.parentPhone, grade: editingUser.grade }); setEditingUser(null); };
   const handleSendResetPassword = async (email) => { if(window.confirm(`إرسال رابط تغيير كلمة السر لـ ${email}؟`)) await sendPasswordResetEmail(auth, email); };
   
-  // رفع الملفات (محاكاة - يحول لـ Data URL)
   const handleFileSelect = (e) => {
       const file = e.target.files[0];
       if (file) {
-          if (file.size > 1000000) return alert("حجم الملف كبير جداً! (الحد الأقصى 1 ميجا حالياً بسبب قيود فايربيس المجانية). يفضل استخدام روابط درايف.");
+          if (file.size > 2000000) return alert("حجم الملف كبير جداً! (الحد الأقصى 2 ميجا).");
           const reader = new FileReader();
-          reader.onloadend = () => {
-              setNewContent({...newContent, url: reader.result});
-          };
+          reader.onloadend = () => { setNewContent({...newContent, url: reader.result}); };
           reader.readAsDataURL(file);
       }
   };
 
   const handleAddContent = async (e) => { 
       e.preventDefault(); 
-      await addDoc(collection(db, 'content'), { ...newContent, file: newContent.url, createdAt: new Date()});
-      // إرسال إشعار تلقائي
-      await addDoc(collection(db, 'notifications'), {
-        text: `تم إضافة درس جديد: ${newContent.title}`,
-        grade: newContent.grade,
-        createdAt: serverTimestamp()
-      });
+      // سواء كان رابط يوتيوب أو ملف مرفوع، سيتم تخزينه في `url` أو `file`
+      const contentData = { ...newContent, file: newContent.url, createdAt: new Date() };
+      await addDoc(collection(db, 'content'), contentData);
+      await addDoc(collection(db, 'notifications'), { text: `تم إضافة درس جديد: ${newContent.title}`, grade: newContent.grade, createdAt: serverTimestamp() });
       alert("تم النشر!"); 
   }; 
   
   const handleDeleteContent = async (id) => { if(window.confirm("حذف هذا المحتوى؟")) await deleteDoc(doc(db, 'content', id)); };
 
-  const startLiveStream = async () => { 
-      if(!liveData.liveUrl) return alert("الرابط؟"); 
-      await addDoc(collection(db, 'live_sessions'), { ...liveData, status: 'active', createdAt: serverTimestamp() }); 
-      await addDoc(collection(db, 'notifications'), {
-        text: `🔴 بث مباشر الآن: ${liveData.title}`,
-        grade: liveData.grade,
-        createdAt: serverTimestamp()
-      });
-      alert("بدا البث!"); 
-  };
+  const startLiveStream = async () => { if(!liveData.liveUrl) return alert("الرابط؟"); await addDoc(collection(db, 'live_sessions'), { ...liveData, status: 'active', createdAt: serverTimestamp() }); await addDoc(collection(db, 'notifications'), { text: `🔴 بث مباشر الآن: ${liveData.title}`, grade: liveData.grade, createdAt: serverTimestamp() }); alert("بدا البث!"); };
   const stopLiveStream = async () => { if(window.confirm("إنهاء البث؟")) { const q = query(collection(db, 'live_sessions'), where('status', '==', 'active')); const snap = await getDocs(q); snap.forEach(async (d) => await updateDoc(doc(db, 'live_sessions', d.id), { status: 'ended' })); alert("تم الإنهاء"); } };
-
-  const handleEditExam = (exam) => {
-      setExamBuilder({ title: exam.title, grade: exam.grade, duration: exam.duration, accessCode: exam.accessCode, questions: exam.questions });
-      let text = "";
-      exam.questions.forEach(group => {
-          if(group.text) text += `بداية القطعة\n${group.text}\nنهاية القطعة\n\n`;
-          group.subQuestions.forEach(q => {
-              text += `${q.text}\n`;
-              q.options.forEach((opt, i) => { text += `${i === q.correctIdx ? '*' : ''}${opt}\n`; });
-              text += "\n";
-          });
-          if(group.text) text += "حذف القطعة\n\n";
-      });
-      setBulkText(text);
-      if(window.confirm("للتعديل سيتم حذف النسخة القديمة، موافق؟")) deleteDoc(doc(db, 'exams', exam.id));
-  };
 
   const parseExam = async () => {
     if (!bulkText.trim()) return alert("أدخل نص الامتحان");
@@ -1052,10 +906,7 @@ const AdminDashboard = ({ user }) => {
     let isReadingPassage = false;
 
     lines.forEach(line => {
-      if (line === 'بداية القطعة') {
-        if (currentBlock.subQuestions.length > 0 || currentQ) { if(currentQ) currentBlock.subQuestions.push(currentQ); blocks.push(currentBlock); }
-        currentBlock = { text: '', subQuestions: [] }; currentQ = null; isReadingPassage = true; return;
-      }
+      if (line === 'بداية القطعة') { if (currentBlock.subQuestions.length > 0 || currentQ) { if(currentQ) currentBlock.subQuestions.push(currentQ); blocks.push(currentBlock); } currentBlock = { text: '', subQuestions: [] }; currentQ = null; isReadingPassage = true; return; }
       if (line === 'نهاية القطعة') { isReadingPassage = false; return; }
       if (line === 'حذف القطعة') { if(currentQ) currentBlock.subQuestions.push(currentQ); blocks.push(currentBlock); currentBlock = { text: '', subQuestions: [] }; currentQ = null; return; }
 
@@ -1079,43 +930,22 @@ const AdminDashboard = ({ user }) => {
     const finalBlocks = blocks.filter(b => b.subQuestions.length > 0);
     if (finalBlocks.length === 0) return alert("لم يتم التعرف على أسئلة.");
 
-    // خلط المجموعات
-    for (let i = finalBlocks.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [finalBlocks[i], finalBlocks[j]] = [finalBlocks[j], finalBlocks[i]]; }
-    // خلط الأسئلة داخل كل مجموعة
-    finalBlocks.forEach(block => { for (let i = block.subQuestions.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [block.subQuestions[i], block.subQuestions[j]] = [block.subQuestions[j], block.subQuestions[i]]; } });
-
     await addDoc(collection(db, 'exams'), { 
-        title: examBuilder.title, 
-        grade: examBuilder.grade, 
-        duration: examBuilder.duration, 
-        startTime: examBuilder.startTime,
-        endTime: examBuilder.endTime,
-        accessCode: examBuilder.accessCode, 
-        questions: finalBlocks, 
-        createdAt: serverTimestamp() 
+        title: examBuilder.title, grade: examBuilder.grade, duration: examBuilder.duration, 
+        startTime: examBuilder.startTime, endTime: examBuilder.endTime, accessCode: examBuilder.accessCode, 
+        questions: finalBlocks, createdAt: serverTimestamp() 
     });
     
-    // إشعار بالامتحان الجديد
-    await addDoc(collection(db, 'notifications'), {
-        text: `امتحان جديد: ${examBuilder.title}`,
-        grade: examBuilder.grade,
-        createdAt: serverTimestamp()
-    });
-
+    await addDoc(collection(db, 'notifications'), { text: `امتحان جديد: ${examBuilder.title}`, grade: examBuilder.grade, createdAt: serverTimestamp() });
     setBulkText(""); alert(`تم نشر الامتحان بنجاح!`);
   };
   
   const getQuestionsForExam = (examData) => {
       const flat = [];
-      if(examData && examData.questions) {
-          examData.questions.forEach(group => {
-              group.subQuestions.forEach(q => { flat.push({ ...q, blockText: group.text }); });
-          });
-      }
+      if(examData && examData.questions) { examData.questions.forEach(group => { group.subQuestions.forEach(q => { flat.push({ ...q, blockText: group.text }); }); }); }
       return flat;
   };
 
-  // التحكم في الإعدادات العامة (لوحة الشرف)
   const toggleLeaderboard = async () => {
       await setDoc(doc(db, 'settings', 'config'), { show: !showLeaderboard }, { merge: true });
       setShowLeaderboard(!showLeaderboard);
@@ -1132,14 +962,7 @@ const AdminDashboard = ({ user }) => {
         <div className="bg-white p-4 rounded-xl shadow-sm h-fit space-y-2">
           {['users', 'all_users', 'exams', 'results', 'live', 'content', 'messages', 'settings'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 ${activeTab===tab?'bg-amber-100 text-amber-700':'hover:bg-slate-50'}`}>
-              {tab === 'users' && <><User/> الطلبات ({pendingUsers.length})</>}
-              {tab === 'all_users' && <><User/> الطلاب ({activeUsersList.length})</>}
-              {tab === 'exams' && <><ClipboardList/> الامتحانات</>}
-              {tab === 'results' && <><Layout/> النتائج</>}
-              {tab === 'live' && <><Radio/> البث المباشر</>}
-              {tab === 'content' && <><Video/> المحتوى</>}
-              {tab === 'messages' && <><MessageCircle/> الرسائل ({messagesList.length})</>}
-              {tab === 'settings' && <><Settings/> إدارة الموقع</>}
+              {tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'messages' ? 'الرسائل' : 'الإعدادات'}
             </button>
           ))}
         </div>
@@ -1149,7 +972,7 @@ const AdminDashboard = ({ user }) => {
 
           {activeTab === 'all_users' && <div className="bg-white p-6 rounded-xl shadow-sm"><h2 className="font-bold mb-4">قائمة الطلاب</h2>{editingUser&&<form onSubmit={handleUpdateUser} className="mb-4 bg-amber-50 p-4 rounded grid gap-2"><input className="border p-2" value={editingUser.name} onChange={e=>setEditingUser({...editingUser, name:e.target.value})}/><button className="bg-green-600 text-white px-4 py-1 rounded">حفظ</button></form>}{activeUsersList.map(u=><div key={u.id} className={`border p-4 mb-2 rounded-lg flex justify-between items-center ${u.status==='banned_cheating'?'bg-red-50 border-red-200':''}`}><div><p className="font-bold">{u.name} {u.status==='banned_cheating'&&<span className="text-red-600 text-xs">(محظور)</span>}</p><p className="text-xs text-slate-500">{u.email}</p></div><div className="flex gap-2">{u.status==='banned_cheating'?<button onClick={()=>handleUnban(u.id)} className="bg-green-100 text-green-700 px-3 py-1 rounded text-xs font-bold flex gap-1"><Unlock size={16}/>فك</button>:<button onClick={()=>setEditingUser(u)} className="bg-blue-100 text-blue-600 p-2 rounded"><Edit size={16}/></button>}<button onClick={()=>handleSendResetPassword(u.email)} className="bg-amber-100 text-amber-600 p-2 rounded"><KeyRound size={16}/></button><button onClick={()=>handleDeleteUser(u.id)} className="bg-red-100 text-red-600 p-2 rounded"><Trash2 size={16}/></button></div></div>)}</div>}
 
-          {activeTab === 'exams' && <div className="space-y-8"><div className="bg-white p-6 rounded-xl shadow-sm"><h2 className="text-xl font-bold mb-6 border-b pb-2">إنشاء امتحان</h2><div className="grid grid-cols-4 gap-4 mb-6"><input className="border p-2 rounded col-span-2" placeholder="العنوان" value={examBuilder.title} onChange={e=>setExamBuilder({...examBuilder, title:e.target.value})}/><input className="border p-2 rounded" placeholder="الكود" value={examBuilder.accessCode} onChange={e=>setExamBuilder({...examBuilder, accessCode:e.target.value})}/><input type="number" className="border p-2 rounded" placeholder="المدة (دقائق)" value={examBuilder.duration} onChange={e=>setExamBuilder({...examBuilder, duration:parseInt(e.target.value)})}/><select className="border p-2 rounded col-span-4" value={examBuilder.grade} onChange={e=>setExamBuilder({...examBuilder, grade:e.target.value})}><GradeOptions/></select><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت البدء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, startTime:e.target.value})}/></div><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت الانتهاء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, endTime:e.target.value})}/></div></div><div className="bg-slate-50 p-4 rounded-xl border mb-6"><textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm" placeholder="اكتب الأسئلة هنا..." value={bulkText} onChange={e=>setBulkText(e.target.value)}/><button onClick={parseExam} className="mt-4 w-full bg-green-600 text-white py-3 rounded-xl font-bold">نشر</button></div></div><div className="bg-white p-6 rounded-xl shadow-sm"><h3 className="font-bold mb-4">الامتحانات الحالية</h3>{examsList.map(exam=><div key={exam.id} className="flex justify-between items-center border-b py-3 last:border-0"><div><p className="font-bold">{exam.title}</p><p className="text-xs text-slate-500">من: {new Date(exam.startTime).toLocaleString('ar-EG')} | إلى: {new Date(exam.endTime).toLocaleString('ar-EG')}</p><p className="text-xs text-slate-400">كود: {exam.accessCode}</p></div><div className="flex gap-2"><button onClick={()=>handleEditExam(exam)} className="text-blue-500 p-2"><Edit size={18}/></button><button onClick={()=>handleDeleteExam(exam.id)} className="text-red-500 p-2"><Trash2 size={18}/></button></div></div>)}</div></div>}
+          {activeTab === 'exams' && <div className="space-y-8"><div className="bg-white p-6 rounded-xl shadow-sm"><h2 className="text-xl font-bold mb-6 border-b pb-2">إنشاء امتحان</h2><div className="grid grid-cols-4 gap-4 mb-6"><input className="border p-2 rounded col-span-2" placeholder="العنوان" value={examBuilder.title} onChange={e=>setExamBuilder({...examBuilder, title:e.target.value})}/><input className="border p-2 rounded" placeholder="الكود" value={examBuilder.accessCode} onChange={e=>setExamBuilder({...examBuilder, accessCode:e.target.value})}/><input type="number" className="border p-2 rounded" placeholder="المدة (دقائق)" value={examBuilder.duration} onChange={e=>setExamBuilder({...examBuilder, duration:parseInt(e.target.value)})}/><select className="border p-2 rounded col-span-4" value={examBuilder.grade} onChange={e=>setExamBuilder({...examBuilder, grade:e.target.value})}><GradeOptions/></select><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت البدء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, startTime:e.target.value})}/></div><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت الانتهاء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, endTime:e.target.value})}/></div></div><div className="bg-slate-50 p-4 rounded-xl border mb-6"><textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm" placeholder="اكتب الأسئلة هنا..." value={bulkText} onChange={e=>setBulkText(e.target.value)}/><button onClick={parseExam} className="mt-4 w-full bg-green-600 text-white py-3 rounded-xl font-bold">نشر</button></div></div><div className="bg-white p-6 rounded-xl shadow-sm"><h3 className="font-bold mb-4">الامتحانات الحالية</h3>{examsList.map(exam=><div key={exam.id} className="flex justify-between items-center border-b py-3 last:border-0"><div><p className="font-bold">{exam.title}</p><p className="text-xs text-slate-500">من: {new Date(exam.startTime).toLocaleString('ar-EG')} | إلى: {new Date(exam.endTime).toLocaleString('ar-EG')}</p><p className="text-xs text-slate-400">كود: {exam.accessCode}</p></div><div className="flex gap-2"><button onClick={()=>handleDeleteExam(exam.id)} className="text-red-500 p-2"><Trash2 size={18}/></button></div></div>)}</div></div>}
 
           {activeTab === 'results' && (
              <div className="bg-white p-6 rounded-xl shadow-sm">
@@ -1168,14 +991,13 @@ const AdminDashboard = ({ user }) => {
                            <button onClick={() => generatePDF('admin', {...viewingResult, total: viewingResult.total || 0})} className="bg-blue-600 text-white px-4 py-1 rounded text-sm flex items-center gap-2"><Download size={16}/> تحميل PDF</button>
                        </div>
                        <h3 className="font-bold text-lg mb-2">إجابات الطالب: {viewingResult.studentName}</h3>
-                       <div className="space-y-4 mt-4" id="result-content">
+                       <div className="space-y-4 mt-4">
                            {(() => {
                                const examData = examsList.find(e => e.id === viewingResult.examId);
                                if(!examData) return <p>بيانات الامتحان محذوفة</p>;
                                const questions = getQuestionsForExam(examData);
                                return questions.map((q, idx) => (
                                    <div key={idx} className="bg-white p-4 rounded border">
-                                       {q.blockText && <div className="text-xs text-amber-600 mb-1">تابع للقطعة...</div>}
                                        <p className="font-bold mb-2">{q.text}</p>
                                        <div className="grid grid-cols-2 gap-2 text-sm">
                                            {q.options.map((opt, oIdx) => {
@@ -1184,7 +1006,7 @@ const AdminDashboard = ({ user }) => {
                                                let style = "bg-gray-50 text-gray-500";
                                                if (isCorrect) style = "bg-green-100 text-green-800 border-green-500 border font-bold";
                                                if (isSelected && !isCorrect) style = "bg-red-100 text-red-800 border-red-500 border font-bold";
-                                               return <div key={oIdx} className={`p-2 rounded ${style}`}>{opt} {isSelected && "(اختيار الطالب)"}</div>
+                                               return <div key={oIdx} className={`p-2 rounded ${style}`}>{opt}</div>
                                            })}
                                        </div>
                                    </div>
@@ -1207,15 +1029,13 @@ const AdminDashboard = ({ user }) => {
 
           {activeTab === 'live' && <div className="bg-white p-8 rounded-xl shadow-sm border-t-4 border-red-600"><h2 className="text-2xl font-black mb-6 flex items-center gap-2 text-red-600"><Radio size={32}/> البث المباشر</h2><div className="grid gap-4"><input className="border p-3 rounded-xl" placeholder="العنوان" value={liveData.title} onChange={e=>setLiveData({...liveData, title:e.target.value})}/><input className="border p-3 rounded-xl" placeholder="رابط البث (Zoom/YouTube/Meet)" value={liveData.liveUrl} onChange={e=>setLiveData({...liveData, liveUrl:e.target.value})}/><select className="border p-3 rounded-xl" value={liveData.grade} onChange={e=>setLiveData({...liveData, grade:e.target.value})}><GradeOptions/></select>{!isLive?<button onClick={startLiveStream} className="bg-red-600 text-white py-4 rounded-xl font-bold">بدء البث</button>:<button onClick={stopLiveStream} className="bg-slate-800 text-white py-4 rounded-xl font-bold">إنهاء البث</button>}</div></div>}
 
-          {activeTab === 'content' && <div className="bg-white p-6 rounded-xl shadow-sm"><h2 className="font-bold mb-4">إضافة محتوى</h2><form onSubmit={handleAddContent} className="grid gap-4 mb-6"><input className="border p-3 rounded" placeholder="العنوان" value={newContent.title} onChange={e=>setNewContent({...newContent, title:e.target.value})}/><input className="border p-3 rounded" placeholder="الرابط (أو اختر ملف)" value={newContent.url} onChange={e=>setNewContent({...newContent, url:e.target.value})}/><input type="file" onChange={handleFileSelect} className="border p-2 rounded text-sm"/><div className="flex gap-2"><select className="border p-3 rounded flex-1" value={newContent.type} onChange={e=>setNewContent({...newContent, type:e.target.value})}><option value="video">فيديو</option><option value="file">ملف</option></select><select className="border p-3 rounded flex-1" value={newContent.grade} onChange={e=>setNewContent({...newContent, grade:e.target.value})}><GradeOptions/></select></div><div className="flex items-center gap-2"><input type="checkbox" checked={newContent.isPublic} onChange={e=>setNewContent({...newContent, isPublic:e.target.checked})}/> <label>عام</label></div><button className="bg-amber-600 text-white p-3 rounded font-bold">نشر</button></form><div className="space-y-2">{contentList.map(c=><div key={c.id} className="flex justify-between border-b p-2"><span>{c.title}</span><div className="flex gap-2"><a href={c.url} target="_blank" className="text-blue-500">رابط</a><button onClick={() => handleDeleteContent(c.id)} className="text-red-500 hover:text-red-700"><Trash2 size={18}/></button></div></div>)}</div></div>}
+          {activeTab === 'content' && <div className="bg-white p-6 rounded-xl shadow-sm"><h2 className="font-bold mb-4">إضافة محتوى</h2><form onSubmit={handleAddContent} className="grid gap-4 mb-6"><input className="border p-3 rounded" placeholder="العنوان" value={newContent.title} onChange={e=>setNewContent({...newContent, title:e.target.value})}/><input className="border p-3 rounded" placeholder="الرابط (أو اختر ملف)" value={newContent.url} onChange={e=>setNewContent({...newContent, url:e.target.value})}/><input type="file" onChange={handleFileSelect} className="border p-2 rounded text-sm"/><div className="flex gap-2"><select className="border p-3 rounded flex-1" value={newContent.type} onChange={e=>setNewContent({...newContent, type:e.target.value})}><option value="video">فيديو</option><option value="file">ملف</option></select><select className="border p-3 rounded flex-1" value={newContent.grade} onChange={e=>setNewContent({...newContent, grade:e.target.value})}><GradeOptions/></select></div><div className="flex items-center gap-2"><input type="checkbox" checked={newContent.isPublic} onChange={e=>setNewContent({...newContent, isPublic:e.target.checked})}/> <label>عام</label></div><button className="bg-amber-600 text-white p-3 rounded font-bold">نشر</button></form><div className="space-y-2">{contentList.map(c=><div key={c.id} className="flex justify-between border-b p-2"><span>{c.title}</span><div className="flex gap-2"><button onClick={() => handleDeleteContent(c.id)} className="text-red-500 hover:text-red-700"><Trash2 size={18}/></button></div></div>)}</div></div>}
 
           {activeTab === 'messages' && <div className="bg-white p-6 rounded-xl shadow-sm"><h2 className="font-bold mb-4">الرسائل</h2>{messagesList.map(m=><div key={m.id} className="border-b p-4 bg-slate-50 mb-3 rounded-lg relative"><button onClick={()=>handleDeleteMessage(m.id)} className="absolute top-2 left-2 text-red-400"><Trash2 size={16}/></button><div className="mb-2"><p className="font-bold text-amber-800">{m.senderName} <span className="text-xs text-slate-500">({m.sender})</span></p><p className="text-sm text-slate-400">{m.createdAt?.toDate?m.createdAt.toDate().toLocaleString():'الآن'}</p></div><p className="text-slate-800 bg-white p-3 rounded-lg border border-slate-200 mb-3">{m.text}</p>{m.adminReply?<div className="bg-green-50 p-3 rounded-lg border border-green-200 text-sm"><span className="font-bold text-green-700">ردك: </span>{m.adminReply}</div>:<div className="flex gap-2"><input className="flex-1 border p-2 rounded text-sm" placeholder="اكتب ردك..." value={replyTexts[m.id]||""} onChange={e=>setReplyTexts({...replyTexts,[m.id]:e.target.value})}/><button onClick={()=>handleReplyMessage(m.id)} className="bg-blue-600 text-white px-3 py-1 rounded text-sm"><Reply size={14}/></button></div>}</div>)}</div>}
 
           {activeTab === 'settings' && (
               <div className="bg-white p-6 rounded-xl shadow-sm space-y-6">
                   <h2 className="font-bold mb-4">إدارة الموقع</h2>
-                  
-                  {/* الإعلانات */}
                   <div className="border p-4 rounded-xl">
                       <h3 className="font-bold mb-2 text-amber-600">شريط الإعلانات</h3>
                       <div className="flex gap-2 mb-2">
@@ -1231,8 +1051,6 @@ const AdminDashboard = ({ user }) => {
                           ))}
                       </div>
                   </div>
-
-                  {/* لوحة الشرف */}
                   <div className="border p-4 rounded-xl flex justify-between items-center">
                       <div>
                           <h3 className="font-bold text-blue-600">لوحة الشرف (الأوائل)</h3>
@@ -1260,15 +1078,12 @@ const StudentDashboard = ({ user, userData }) => {
   const [activeExam, setActiveExam] = useState(null);
   const [playingVideo, setPlayingVideo] = useState(null);
   const [examResults, setExamResults] = useState([]);
-  // حالة جديدة لفتح الامتحان في وضع المراجعة للطالب
   const [reviewingExam, setReviewingExam] = useState(null);
   
-  // Notification State
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [hasNewNotif, setHasNewNotif] = useState(false);
 
-  // Settings State
   const [editFormData, setEditFormData] = useState({ name: '', phone: '', parentPhone: '', grade: '' });
 
   useEffect(() => {
@@ -1278,7 +1093,6 @@ const StudentDashboard = ({ user, userData }) => {
     const unsubExams = onSnapshot(query(collection(db, 'exams'), where('grade', '==', userData.grade)), s => setExams(s.docs.map(d=>({id:d.id,...d.data()}))));
     const unsubResults = onSnapshot(query(collection(db, 'exam_results'), where('studentId', '==', user.uid)), s => setExamResults(s.docs.map(d=>({id:d.id,...d.data()}))));
     
-    // Notifications Fetch
     const unsubNotif = onSnapshot(query(collection(db, 'notifications'), where('grade', 'in', ['all', userData.grade]), orderBy('createdAt', 'desc'), limit(10)), s => {
         const newNotifs = s.docs.map(d => d.data());
         setNotifications(newNotifs);
@@ -1288,7 +1102,6 @@ const StudentDashboard = ({ user, userData }) => {
         }
     });
 
-    // Initialize edit form
     setEditFormData({ name: userData.name, phone: userData.phone, parentPhone: userData.parentPhone, grade: userData.grade });
 
     return () => { unsubContent(); unsubLive(); unsubExams(); unsubResults(); unsubNotif(); };
@@ -1296,16 +1109,13 @@ const StudentDashboard = ({ user, userData }) => {
 
   if(liveSession) return <LiveSessionView session={liveSession} user={user} onClose={() => window.location.reload()} />;
   
-  // تشغيل الامتحان (حل جديد)
   if (activeExam) return <ExamRunner exam={activeExam} user={user} onClose={() => setActiveExam(null)} />;
   
-  // مراجعة الامتحان (عرض النتيجة السابقة)
   if (reviewingExam) {
       const result = examResults.find(r => r.examId === reviewingExam.id);
       return <ExamRunner exam={reviewingExam} user={user} onClose={() => setReviewingExam(null)} isReviewMode={true} existingResult={result} />;
   }
 
-  // إذا كان الطالب محظوراً، نمنعه من الامتحانات فقط، وليس كامل الموقع
   const isBanned = userData?.status === 'banned_cheating';
 
   if(userData?.status === 'pending') return <div className="h-screen flex items-center justify-center bg-amber-50 text-center p-4"><div className="bg-white p-8 rounded-2xl shadow-xl"><h2 className="text-2xl font-bold mb-2">طلبك قيد المراجعة ⏳</h2><button onClick={()=>signOut(auth)} className="mt-4 text-red-500 underline">خروج</button></div></div>;
@@ -1321,7 +1131,6 @@ const StudentDashboard = ({ user, userData }) => {
         return;
     }
 
-    // التحقق من الوقت
     const now = new Date();
     const start = new Date(exam.startTime);
     const end = new Date(exam.endTime);
@@ -1356,9 +1165,9 @@ const StudentDashboard = ({ user, userData }) => {
         <div className="flex items-center gap-3 mb-10 px-2"><ModernLogo /><h1 className="text-2xl font-black text-slate-800">النحاس</h1><button onClick={() => setMobileMenu(false)} className="md:hidden mr-auto"><X /></button></div>
         <div className="space-y-2 flex-1">
           <button onClick={() => {setActiveTab('home'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='home'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><User/> الرئيسية</button>
-          <div onClick={() => setActiveTab('videos')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='videos'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><PlayCircle/> المحاضرات</div>
-          <div onClick={() => setActiveTab('files')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='files'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><FileText/> المذكرات</div>
-          <div onClick={() => setActiveTab('exams')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><ClipboardList/> الامتحانات</div>
+          <div onClick={() => {setActiveTab('videos'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='videos'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><PlayCircle/> المحاضرات</div>
+          <div onClick={() => {setActiveTab('files'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='files'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><FileText/> المذكرات</div>
+          <div onClick={() => {setActiveTab('exams'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><ClipboardList/> الامتحانات</div>
           <button onClick={() => {setActiveTab('settings'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='settings'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><Settings/> ملفي الشخصي</button>
         </div>
         <div className="mt-auto pt-6"><button onClick={() => signOut(auth)} className="flex items-center gap-3 text-red-500 font-bold hover:bg-red-50 w-full p-4 rounded-xl transition"><LogOut/> خروج</button></div>
@@ -1367,7 +1176,6 @@ const StudentDashboard = ({ user, userData }) => {
       <main className="flex-1 p-4 md:p-10 relative z-10 overflow-y-auto h-screen">
         <div className="md:hidden flex justify-between items-center mb-6 bg-white/80 p-4 rounded-2xl shadow-sm"><h1 className="font-bold text-lg text-slate-800">منصة النحاس</h1><button onClick={() => setMobileMenu(true)} className="p-2 bg-slate-100 rounded-lg"><Menu /></button></div>
         
-        {/* شريط الإشعارات العلوي */}
         <div className="flex justify-end mb-6 relative">
             <button onClick={() => {requestNotificationPermission(); setShowNotifications(!showNotifications); setHasNewNotif(false);}} className="relative p-2 bg-white rounded-full shadow-sm hover:bg-slate-50">
                 <Bell className="text-slate-600"/>
@@ -1391,7 +1199,7 @@ const StudentDashboard = ({ user, userData }) => {
         </div>
 
         {activeTab === 'home' && (<div className="space-y-8"><WisdomBox /><Announcements /><h2 className="text-3xl font-bold text-slate-800">منور يا {userData.name.split(' ')[0]} 👋 <span className="text-sm font-normal text-slate-500 bg-slate-200 px-2 py-1 rounded-full">{getGradeLabel(userData.grade)}</span></h2><div className="grid grid-cols-1 md:grid-cols-3 gap-6"><div onClick={()=>setActiveTab('videos')} className="bg-blue-600 text-white p-8 rounded-3xl shadow-lg relative overflow-hidden cursor-pointer hover:scale-105 transition-transform"><h3 className="relative z-10 text-2xl font-bold mb-2">المحاضرات</h3><p className="relative z-10 text-4xl font-black">{videos.length}</p><PlayCircle className="absolute -bottom-6 -left-6 opacity-20 w-40 h-40"/></div><div onClick={()=>setActiveTab('files')} className="bg-amber-500 text-white p-8 rounded-3xl shadow-lg relative overflow-hidden cursor-pointer hover:scale-105 transition-transform"><h3 className="relative z-10 text-2xl font-bold mb-2">الملفات</h3><p className="relative z-10 text-4xl font-black">{files.length}</p><FileText className="absolute -bottom-6 -left-6 opacity-20 w-40 h-40"/></div><div onClick={()=>setActiveTab('exams')} className="bg-slate-800 text-white p-8 rounded-3xl shadow-lg relative overflow-hidden cursor-pointer hover:scale-105 transition-transform"><h3 className="relative z-10 text-2xl font-bold mb-2">الامتحانات</h3><p className="relative z-10 text-4xl font-black">{exams.length}</p><ClipboardList className="absolute -bottom-6 -left-6 opacity-20 w-40 h-40"/></div></div><Leaderboard /></div>)}
-        {activeTab === 'videos' && <div className="grid grid-cols-1 md:grid-cols-3 gap-6">{videos.map(v => (<div key={v.id} className="bg-white rounded-xl shadow-sm border overflow-hidden cursor-pointer" onClick={() => setActiveVideo(v)}><div className="h-40 bg-slate-800 flex items-center justify-center relative"><PlayCircle className="text-white w-12 h-12 opacity-80"/><span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded">{getGradeLabel(v.grade)}</span></div><div className="p-4"><h3 className="font-bold text-lg">{v.title}</h3></div></div>))}</div>}
+        {activeTab === 'videos' && <div className="grid grid-cols-1 md:grid-cols-3 gap-6">{videos.map(v => (<div key={v.id} className="bg-white rounded-xl shadow-sm border overflow-hidden cursor-pointer hover:shadow-md transition" onClick={() => setPlayingVideo(v)}><div className="h-40 bg-slate-800 flex items-center justify-center relative group"><PlayCircle className="text-white w-12 h-12 opacity-80 group-hover:scale-110 transition"/><span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded">{getGradeLabel(v.grade)}</span></div><div className="p-4"><h3 className="font-bold text-lg">{v.title}</h3></div></div>))}</div>}
         {activeTab === 'files' && <div className="bg-white rounded-xl shadow-sm border overflow-hidden">{files.map(f => (<div key={f.id} className="p-4 flex justify-between items-center border-b last:border-0 hover:bg-slate-50"><div className="flex items-center gap-4"><div className="bg-red-100 text-red-600 p-3 rounded-lg font-bold text-xs">PDF</div><div><h4 className="font-bold text-lg">{f.title}</h4><span className="text-xs text-slate-500">{getGradeLabel(f.grade)}</span></div></div><a href={f.url} target="_blank" className="bg-blue-50 text-blue-600 px-4 py-2 rounded-lg font-bold hover:bg-blue-100">تحميل</a></div>))}</div>}
         
         {activeTab === 'exams' && (
@@ -1463,11 +1271,14 @@ const StudentDashboard = ({ user, userData }) => {
 // --- 5. الصفحة الرئيسية العامة (Landing) ---
 const LandingPage = ({ onAuthClick }) => {
   const [publicContent, setPublicContent] = useState([]);
+  const [playingVideo, setPlayingVideo] = useState(null); // حالة لتشغيل الفيديو العام في النافذة
+  
   useEffect(() => { const u = onSnapshot(query(collection(db, 'content'), where('isPublic', '==', true)), s => setPublicContent(s.docs.map(d=>d.data()))); return u; }, []);
   const openFacebook = () => window.open("https://www.facebook.com/share/17aiUQWKf5/", "_blank");
 
   return (
     <div className="min-h-screen font-['Cairo'] relative" dir="rtl">
+      {playingVideo && <SecureVideoPlayer video={playingVideo} userName="زائر" onClose={() => setPlayingVideo(null)} />}
       <FloatingArabicBackground />
       <ChatWidget />
       <nav className="relative z-10 flex justify-between items-center p-6 max-w-7xl mx-auto">
@@ -1491,7 +1302,11 @@ const LandingPage = ({ onAuthClick }) => {
             <h3 className="text-2xl font-bold mb-4 flex items-center gap-2 text-blue-700"><Video /> فيديوهات مجانية</h3>
             <div className="space-y-4">
               {publicContent.filter(c => c.type === 'video').length > 0 ? publicContent.filter(c => c.type === 'video').map((v, i) => (
-                 <div key={i} className="flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm"><PlayCircle className="text-amber-500"/><span className="font-bold">{v.title}</span><a href={v.url} target="_blank" className="mr-auto text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">مشاهدة</a></div>
+                 <div key={i} className="flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm cursor-pointer hover:bg-gray-50" onClick={() => setPlayingVideo(v)}>
+                    <PlayCircle className="text-amber-500"/>
+                    <span className="font-bold">{v.title}</span>
+                    <span className="mr-auto text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">مشاهدة</span>
+                 </div>
                )) : <p className="text-slate-500">مفيش فيديوهات عامة حالياً</p>}
             </div>
           </div>
