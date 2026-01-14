@@ -59,15 +59,16 @@ const requestNotificationPermission = () => {
   }
 };
 
-// إرسال إشعار للنظام
+// إرسال إشعار للنظام (يظهر حتى لو المتصفح في الخلفية)
 const sendSystemNotification = (title, body) => {
   if (Notification.permission === "granted") {
     try {
       new Notification(title, {
         body: body,
-        icon: "https://cdn-icons-png.flaticon.com/512/3449/3449750.png",
+        icon: "https://cdn-icons-png.flaticon.com/512/3449/3449750.png", // أيقونة جرس
         vibrate: [200, 100, 200]
       });
+      // تشغيل صوت تنبيه خفيف
       const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
       audio.volume = 0.5;
       audio.play().catch(e => {});
@@ -83,8 +84,9 @@ const getYouTubeID = (url) => {
     return (match && match[2].length === 11) ? match[2] : null;
 };
 
-// توليد ملف PDF (التصميم الأسود والذهبي الجديد)
+// توليد ملف PDF لنتيجة الطالب (تصميم منسق ومحترف)
 const generatePDF = (type, data) => {
+    // التأكد من تحميل المكتبة
     if (!window.html2pdf) {
         alert("جاري تحميل نظام الطباعة... يرجى الانتظار ثوانٍ والمحاولة مرة أخرى.");
         return;
@@ -94,7 +96,7 @@ const generatePDF = (type, data) => {
     const date = new Date().toLocaleDateString('ar-EG');
     const element = document.createElement('div');
     
-    // 1. تقرير الأدمن (تفصيلي لولي الأمر)
+    // تصميم الشهادة بناءً على النتيجة
     if (type === 'admin') {
          element.innerHTML = `
           <div style="padding: 40px; font-family: 'Cairo', sans-serif; direction: rtl; border: 2px solid #333; text-align: center;">
@@ -111,73 +113,71 @@ const generatePDF = (type, data) => {
                 <h3 style="font-weight: bold; margin-top: 10px;">أ / محمد النحاس</h3>
             </div>
           </div>`;
-    } 
-    // 2. شهادة التفوق (أسود وذهبي - ناجح)
-    else if (percentage >= 85) {
+    } else if (percentage >= 85) {
+        // شهادة تفوق (تصميم أسود وذهبي منسق)
         element.innerHTML = `
-          <div style="width: 297mm; height: 210mm; padding: 0; margin: 0; background-color: #0F0F0F; color: #D4AF37; font-family: 'Cairo', sans-serif; position: relative; text-align: center; border: 20px solid #D4AF37; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center;">
-              <!-- زخرفة الخلفية -->
-              <div style="position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px; border: 5px solid #fff; opacity: 0.1; pointer-events: none;"></div>
-              
-              <div style="position: relative; z-index: 10;">
-                  <h1 style="font-size: 64px; margin: 0; text-shadow: 2px 2px 4px #000; letter-spacing: 2px; font-weight: 900;">شهادة تقدير وتفوق</h1>
-                  <p style="font-size: 24px; color: #fff; margin-top: 20px; letter-spacing: 1px;">تتشرف منصة النحاس التعليمية للغة العربية بأن تمنح</p>
-                  
-                  <h2 style="font-size: 72px; margin: 40px 0; color: #fff; font-family: 'Reem Kufi', sans-serif; text-shadow: 0 0 10px #D4AF37;">${data.studentName}</h2>
-                  
-                  <p style="font-size: 28px; color: #eee; line-height: 1.6; margin-bottom: 30px;">
-                      وذلك لتفوقه الباهر وحصوله على درجة متميزة في الاختبار. <br/>
-                      مع خالص تمنياتنا بدوام التوفيق والنجاح.
-                  </p>
-                  
-                  <!-- مربع الدرجة -->
-                  <div style="border: 4px solid #D4AF37; display: inline-block; padding: 15px 60px; border-radius: 50px; background: rgba(212, 175, 55, 0.1); box-shadow: 0 0 30px rgba(212, 175, 55, 0.2);">
-                      <span style="font-size: 22px; color: #fff;">التقدير العام</span><br/>
-                      <span style="font-size: 56px; font-weight: 900; text-shadow: 2px 2px 4px #000;">%${percentage}</span>
-                  </div>
+          <div style="width: 297mm; height: 210mm; padding: 20px; margin: 0; background-color: #0F0F0F; color: #D4AF37; font-family: 'Cairo', sans-serif; position: relative; text-align: center; box-sizing: border-box;">
+            <div style="border: 5px solid #D4AF37; height: 100%; padding: 20px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between;">
+                
+                <!-- رأس الشهادة -->
+                <div style="margin-top: 20px;">
+                     <div style="font-size: 80px; margin-bottom: 10px;">🏆</div>
+                     <h1 style="font-size: 50px; margin: 0; font-weight: 900; letter-spacing: 2px;">شهـــادة تـقـديــر وتـفــوق</h1>
+                     <p style="font-size: 20px; color: #fff; margin-top: 10px;">تتشرف منصة النحاس التعليمية للغة العربية بأن تمنح</p>
+                </div>
 
-                  <!-- التوقيع -->
-                  <div style="margin-top: 80px; display: flex; justify-content: space-between; align-items: flex-end; padding: 0 80px;">
-                      <div style="text-align: right;">
-                          <p style="font-size: 20px; color: #aaa; margin-bottom: 5px;">تحريراً في</p>
-                          <p style="font-size: 24px; color: #fff; font-weight: bold;">${date}</p>
-                      </div>
-                      
-                      <div style="text-align: center; font-size: 80px; color: #D4AF37;">★</div>
+                <!-- اسم الطالب -->
+                <div style="margin: 20px 0;">
+                    <h2 style="font-size: 60px; color: #fff; font-family: 'Reem Kufi', sans-serif; margin: 0; text-shadow: 0 0 10px #D4AF37;">${data.studentName}</h2>
+                    <div style="width: 300px; height: 2px; background: #D4AF37; margin: 10px auto;"></div>
+                    <p style="font-size: 22px; color: #ccc; line-height: 1.6; margin-top: 20px;">
+                        وذلك لتفوقه الباهر وحصوله على درجة متميزة في الاختبار. <br/>
+                        مع خالص تمنياتنا بدوام التوفيق والنجاح.
+                    </p>
+                </div>
 
-                      <div style="text-align: left;">
-                          <p style="font-size: 20px; color: #aaa; margin-bottom: 15px;">معلم المادة</p>
-                          <h3 style="font-size: 40px; font-family: 'Reem Kufi', sans-serif; margin: 0; color: #D4AF37;">أ / محمد النحاس</h3>
-                          <div style="height: 4px; width: 100%; background: #D4AF37; border-radius: 2px; margin-top: 5px;"></div>
-                      </div>
-                  </div>
-              </div>
+                <!-- الدرجة -->
+                <div>
+                     <span style="font-size: 18px; color: #fff; display: block;">التقدير العام</span>
+                     <span style="font-size: 45px; font-weight: 900;">%${percentage}</span>
+                </div>
+
+                <!-- التوقيع والتاريخ -->
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; padding: 0 60px; margin-bottom: 40px;">
+                    <div style="text-align: right;">
+                        <p style="font-size: 16px; color: #aaa; margin-bottom: 5px;">تاريخ التحرير</p>
+                        <p style="font-size: 20px; color: #fff; font-weight: bold;">${date}</p>
+                    </div>
+                    <div style="text-align: left;">
+                        <p style="font-size: 16px; color: #aaa; margin-bottom: 5px;">معلم المادة</p>
+                        <h3 style="font-size: 35px; font-family: 'Reem Kufi', sans-serif; margin: 0; color: #D4AF37;">أ / محمد النحاس</h3>
+                    </div>
+                </div>
+            </div>
           </div>
         `;
-    } 
-    // 3. تقرير مستوى (راسب)
-    else {
+    } else {
+        // تقرير مستوى (تشجيع)
         element.innerHTML = `
           <div style="width: 297mm; height: 210mm; padding: 40px; font-family: 'Cairo', sans-serif; direction: rtl; text-align: center; background: #fff; border: 15px solid #ef4444; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center;">
-            <h1 style="color: #b91c1c; font-size: 56px; margin-bottom: 30px; font-weight: 900;">تقرير مستوى (تنبيه)</h1>
+            <h1 style="color: #b91c1c; font-size: 50px; margin-bottom: 20px; font-weight: 900;">تقرير مستوى (تنبيه)</h1>
+            <h2 style="font-size: 45px; color: #333; margin: 20px 0;">الطالب / ${data.studentName}</h2>
             
-            <h2 style="font-size: 48px; color: #333; margin: 20px 0;">الطالب / ${data.studentName}</h2>
-            
-            <div style="background: #fef2f2; padding: 30px; border-radius: 20px; border: 3px solid #fecaca; margin: 40px auto; width: 70%;">
-                <p style="font-size: 24px; color: #7f1d1d;">للأسف، لم تحقق المستوى المطلوب في هذا الاختبار.</p>
+            <div style="background: #fef2f2; padding: 30px; border-radius: 20px; border: 3px solid #fecaca; margin: 40px auto; width: 60%;">
+                <p style="font-size: 22px; color: #7f1d1d;">للأسف، لم تحقق المستوى المطلوب في هذا الاختبار.</p>
                 <hr style="border: 0; border-top: 2px solid #eee; margin: 20px 0;">
-                <p style="font-size: 20px; color: #555;">الدرجة: <strong>${data.score}</strong> من <strong>${data.total}</strong></p>
-                <h3 style="font-size: 60px; color: #ef4444; margin: 15px 0; font-weight: 900;">%${percentage}</h3>
+                <p style="font-size: 18px; color: #555;">الدرجة: <strong>${data.score}</strong> من <strong>${data.total}</strong></p>
+                <h3 style="font-size: 55px; color: #ef4444; margin: 15px 0; font-weight: 900;">%${percentage}</h3>
             </div>
 
             <div style="text-align: center; margin-top: 40px;">
-                <p style="font-size: 28px; color: #4b5563; line-height: 1.6; font-weight: bold;">
+                <p style="font-size: 26px; color: #4b5563; line-height: 1.6; font-weight: bold;">
                     "النجاح محتاج مجهود.. شد حيلك في اللي جاي!"
                 </p>
             </div>
             
             <div style="margin-top: 80px; text-align: left; padding-left: 60px;">
-                 <h3 style="font-size: 32px; color: #555;">أ / محمد النحاس</h3>
+                 <h3 style="font-size: 30px; color: #555;">أ / محمد النحاس</h3>
             </div>
           </div>
         `;
@@ -432,7 +432,7 @@ const ChatWidget = ({ user }) => {
   const chatEndRef = useRef(null);
   const [isContactAdminMode, setIsContactAdminMode] = useState(false);
   
-  // الاستماع للرسائل
+  // الاستماع للرسائل (بما في ذلك ردود الأدمن)
   useEffect(() => {
     if (!isOpen) return;
     const userId = user ? user.email : sessionId;
@@ -653,6 +653,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const [isCheating, setIsCheating] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(isReviewMode);
   const [score, setScore] = useState(existingResult?.score || 0);
+  const [startTime] = useState(Date.now()); 
 
   const flatQuestions = [];
   if (exam.questions) {
@@ -690,7 +691,18 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     if(isReviewMode || isSubmitted) return;
     setIsCheating(true); 
     setIsSubmitted(true);
-    await addDoc(collection(db, 'exam_results'), { examId: exam.id, studentId: user.uid, studentName: user.displayName, score: 0, status: 'cheated', submittedAt: serverTimestamp() });
+    const timeTaken = Math.round((Date.now() - startTime) / 1000);
+    await addDoc(collection(db, 'exam_results'), { 
+        examId: exam.id, 
+        studentId: user.uid, 
+        studentName: user.displayName, 
+        score: 0, 
+        total: flatQuestions.length,
+        status: 'cheated', 
+        timeTaken: timeTaken,
+        totalTime: exam.duration,
+        submittedAt: serverTimestamp() 
+    });
     await updateDoc(doc(db, 'users', user.uid), { status: 'banned_cheating' });
   };
 
@@ -708,10 +720,21 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     const totalQs = flatQuestions.length;
     if (!auto && Object.keys(answers).length < totalQs && !window.confirm("لم تجب على كل الأسئلة، هل أنت متأكد؟")) return;
     const finalScore = calculateScore();
+    const timeTaken = Math.round((Date.now() - startTime) / 1000);
     setScore(finalScore);
     setIsSubmitted(true);
+    
     await addDoc(collection(db, 'exam_results'), { 
-      examId: exam.id, studentId: user.uid, studentName: user.displayName, score: finalScore, total: totalQs, answers, status: 'completed', submittedAt: serverTimestamp() 
+      examId: exam.id, 
+      studentId: user.uid, 
+      studentName: user.displayName, 
+      score: finalScore, 
+      total: totalQs, 
+      answers, 
+      status: 'completed',
+      timeTaken: timeTaken,
+      totalTime: exam.duration, 
+      submittedAt: serverTimestamp() 
     });
   };
 
@@ -727,7 +750,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                 <h2 className="text-3xl font-black mb-4">تم الانتهاء من الامتحان</h2>
                 <div className={`text-6xl font-black my-6 ${score >= flatQuestions.length / 2 ? 'text-green-600' : 'text-red-600'}`}>{score} / {flatQuestions.length}</div>
                 <div className="flex gap-4 justify-center">
-                    <button onClick={() => generatePDF('student', {studentName: user.displayName, score, total: flatQuestions.length, status: 'completed'})} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2"><Download size={18}/> الشهادة</button>
+                    <button onClick={() => generatePDF('student', {studentName: user.displayName, score, total: flatQuestions.length, status: 'completed'})} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2"><Download size={18}/> تحميل الشهادة</button>
                     <button onClick={onClose} className="bg-slate-900 text-white py-3 px-8 rounded-xl font-bold">عودة للرئيسية</button>
                 </div>
             </div>
@@ -847,6 +870,7 @@ const AdminDashboard = ({ user }) => {
   const [announcements, setAnnouncements] = useState([]);
   const [notifData, setNotifData] = useState({ text: '', grade: 'all' });
 
+  // جلب البيانات
   useEffect(() => { const u = onSnapshot(query(collection(db, 'users'), where('status','==','pending')), s => setPendingUsers(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(query(collection(db, 'users'), where('status', 'in', ['active', 'banned_cheating', 'rejected'])), s => setActiveUsersList(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(query(collection(db, 'content'), orderBy('createdAt','desc')), s => setContentList(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
@@ -856,20 +880,54 @@ const AdminDashboard = ({ user }) => {
   useEffect(() => { const u = onSnapshot(query(collection(db, 'exam_results'), orderBy('submittedAt', 'desc')), s => setExamResults(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(query(collection(db, 'announcements'), orderBy('createdAt', 'desc')), s => setAnnouncements(s.docs.map(d => ({id: d.id, ...d.data()})))); return u; }, []);
 
-  const handleApprove = async (id) => { await updateDoc(doc(db,'users',id), {status:'active'}); sendSystemNotification("مبروك! 🎉", "تم تفعيل حسابك بنجاح."); };
+  const handleApprove = async (id) => {
+    await updateDoc(doc(db,'users',id), {status:'active'});
+    sendSystemNotification("مبروك! 🎉", "تم تفعيل حسابك بنجاح.");
+  };
   const handleReject = async (id) => updateDoc(doc(db,'users',id), {status:'rejected'});
   const handleUnban = async (id) => updateDoc(doc(db,'users',id), {status:'active'});
   const handleDeleteUser = async (id) => { if(window.confirm("حذف نهائي؟")) await deleteDoc(doc(db,'users',id)); };
   const handleDeleteMessage = async (id) => { if(window.confirm("حذف الرسالة؟")) await deleteDoc(doc(db,'messages',id)); };
   const handleDeleteExam = async (id) => { if(window.confirm("حذف الامتحان؟")) await deleteDoc(doc(db, 'exams', id)); };
   const handleDeleteAnnouncement = async (id) => { if(window.confirm("حذف الإعلان؟")) await deleteDoc(doc(db, 'announcements', id)); };
+  
   const handleDeleteResult = async (resultId) => { if(window.confirm("حذف النتيجة؟")) await deleteDoc(doc(db, 'exam_results', resultId)); };
-  const handleDeleteAllResults = async () => { if(window.confirm("تحذير خطير: سيتم حذف جميع نتائج الامتحانات لكل الطلاب. هل أنت متأكد؟")) { const batch = writeBatch(db); examResults.forEach(res => { batch.delete(doc(db, 'exam_results', res.id)); }); await batch.commit(); alert("تم حذف جميع النتائج بنجاح."); } };
-  const handleReplyMessage = async (msgId) => { if (!replyTexts[msgId]?.trim()) return; await updateDoc(doc(db, 'messages', msgId), { adminReply: replyTexts[msgId] }); setReplyTexts(prev => ({ ...prev, [msgId]: '' })); alert("تم إرسال الرد!"); };
-  const handleAddAnnouncement = async () => { if(!newAnnouncement.trim()) return; await addDoc(collection(db, 'announcements'), { text: newAnnouncement, createdAt: serverTimestamp() }); await addDoc(collection(db, 'notifications'), { text: `تنبيه هام: ${newAnnouncement}`, grade: 'all', createdAt: serverTimestamp() }); setNewAnnouncement(""); alert("تم نشر الإعلان"); };
+  
+  const handleDeleteAllResults = async () => {
+    if(window.confirm("تحذير خطير: سيتم حذف جميع نتائج الامتحانات لكل الطلاب. هل أنت متأكد؟")) {
+      const batch = writeBatch(db);
+      examResults.forEach(res => {
+        batch.delete(doc(db, 'exam_results', res.id));
+      });
+      await batch.commit();
+      alert("تم حذف جميع النتائج بنجاح.");
+    }
+  };
+
+  const handleReplyMessage = async (msgId) => {
+    const text = replyTexts[msgId];
+    if (!text?.trim()) return;
+    await updateDoc(doc(db, 'messages', msgId), { adminReply: text });
+    setReplyTexts(prev => ({ ...prev, [msgId]: '' }));
+    alert("تم إرسال الرد!");
+  };
+  
+  const handleAddAnnouncement = async () => {
+      if(!newAnnouncement.trim()) return;
+      await addDoc(collection(db, 'announcements'), { text: newAnnouncement, createdAt: serverTimestamp() });
+      await addDoc(collection(db, 'notifications'), {
+        text: `تنبيه هام: ${newAnnouncement}`,
+        grade: 'all',
+        createdAt: serverTimestamp()
+      });
+      setNewAnnouncement("");
+      alert("تم نشر الإعلان");
+  };
+
   const handleUpdateUser = async (e) => { e.preventDefault(); if(!editingUser) return; await updateDoc(doc(db, 'users', editingUser.id), { name: editingUser.name, phone: editingUser.phone, parentPhone: editingUser.parentPhone, grade: editingUser.grade }); setEditingUser(null); };
   const handleSendResetPassword = async (email) => { if(window.confirm(`إرسال رابط تغيير كلمة السر لـ ${email}؟`)) await sendPasswordResetEmail(auth, email); };
   
+  // رفع الملفات
   const handleFileSelect = (e) => {
       const file = e.target.files[0];
       if (file) {
@@ -893,6 +951,22 @@ const AdminDashboard = ({ user }) => {
 
   const startLiveStream = async () => { if(!liveData.liveUrl) return alert("الرابط؟"); await addDoc(collection(db, 'live_sessions'), { ...liveData, status: 'active', createdAt: serverTimestamp() }); await addDoc(collection(db, 'notifications'), { text: `🔴 بث مباشر الآن: ${liveData.title}`, grade: liveData.grade, createdAt: serverTimestamp() }); alert("بدا البث!"); };
   const stopLiveStream = async () => { if(window.confirm("إنهاء البث؟")) { const q = query(collection(db, 'live_sessions'), where('status', '==', 'active')); const snap = await getDocs(q); snap.forEach(async (d) => await updateDoc(doc(db, 'live_sessions', d.id), { status: 'ended' })); alert("تم الإنهاء"); } };
+
+  const handleEditExam = (exam) => {
+      setExamBuilder({ title: exam.title, grade: exam.grade, duration: exam.duration, accessCode: exam.accessCode, questions: exam.questions });
+      let text = "";
+      exam.questions.forEach(group => {
+          if(group.text) text += `بداية القطعة\n${group.text}\nنهاية القطعة\n\n`;
+          group.subQuestions.forEach(q => {
+              text += `${q.text}\n`;
+              q.options.forEach((opt, i) => { text += `${i === q.correctIdx ? '*' : ''}${opt}\n`; });
+              text += "\n";
+          });
+          if(group.text) text += "حذف القطعة\n\n";
+      });
+      setBulkText(text);
+      if(window.confirm("للتعديل سيتم حذف النسخة القديمة، موافق؟")) deleteDoc(doc(db, 'exams', exam.id));
+  };
 
   const parseExam = async () => {
     if (!bulkText.trim()) return alert("أدخل نص الامتحان");
@@ -946,6 +1020,7 @@ const AdminDashboard = ({ user }) => {
       return flat;
   };
 
+  // التحكم في الإعدادات العامة (لوحة الشرف)
   const toggleLeaderboard = async () => {
       await setDoc(doc(db, 'settings', 'config'), { show: !showLeaderboard }, { merge: true });
       setShowLeaderboard(!showLeaderboard);
@@ -1165,9 +1240,9 @@ const StudentDashboard = ({ user, userData }) => {
         <div className="flex items-center gap-3 mb-10 px-2"><ModernLogo /><h1 className="text-2xl font-black text-slate-800">النحاس</h1><button onClick={() => setMobileMenu(false)} className="md:hidden mr-auto"><X /></button></div>
         <div className="space-y-2 flex-1">
           <button onClick={() => {setActiveTab('home'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='home'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><User/> الرئيسية</button>
-          <div onClick={() => {setActiveTab('videos'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='videos'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><PlayCircle/> المحاضرات</div>
-          <div onClick={() => {setActiveTab('files'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='files'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><FileText/> المذكرات</div>
-          <div onClick={() => {setActiveTab('exams'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><ClipboardList/> الامتحانات</div>
+          <div onClick={() => setActiveTab('videos')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='videos'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><PlayCircle/> المحاضرات</div>
+          <div onClick={() => setActiveTab('files')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='files'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><FileText/> المذكرات</div>
+          <div onClick={() => setActiveTab('exams')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><ClipboardList/> الامتحانات</div>
           <button onClick={() => {setActiveTab('settings'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='settings'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><Settings/> ملفي الشخصي</button>
         </div>
         <div className="mt-auto pt-6"><button onClick={() => signOut(auth)} className="flex items-center gap-3 text-red-500 font-bold hover:bg-red-50 w-full p-4 rounded-xl transition"><LogOut/> خروج</button></div>
