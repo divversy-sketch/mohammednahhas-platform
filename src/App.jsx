@@ -15,7 +15,7 @@ import {
   MessageSquare, Send, MessageCircle, Facebook, BookOpen, Feather, Radio, 
   ExternalLink, ClipboardList, Timer, AlertOctagon, Flag, Save, HelpCircle, 
   Reply, Unlock, Layout, Settings, Trophy, Megaphone, Bell, Download, XCircle, 
-  Calendar, Clock, FileWarning, Settings as GearIcon, Star, Bot, Power
+  Calendar, Clock, FileWarning, Settings as GearIcon, Star, Bot, Power, Upload
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -80,7 +80,7 @@ const getYouTubeID = (url) => {
     return (match && match[2].length === 11) ? match[2] : null;
 };
 
-// --- تحديث جذري لنظام التقارير ---
+// --- تحديث جذري لنظام التقارير (إصلاح التنسيق والبوكس) ---
 const generatePDF = (type, data) => {
     if (!window.html2pdf) {
         alert("جاري تحميل نظام الطباعة... يرجى الانتظار ثوانٍ والمحاولة مرة أخرى.");
@@ -91,7 +91,7 @@ const generatePDF = (type, data) => {
     const date = new Date().toLocaleDateString('ar-EG');
     const element = document.createElement('div');
     
-    // بناء جدول تفصيلي للإجابات
+    // جدول الإجابات
     let answersTable = '';
     if (data.questions && data.answers) {
         answersTable = `
@@ -155,10 +155,26 @@ const generatePDF = (type, data) => {
                     <td style="padding: 10px;">${data.examTitle || 'اختبار عام'}</td>
                 </tr>
                 <tr>
-                    <td style="padding: 10px; font-weight: bold;">الدرجة:</td>
-                    <td style="padding: 10px; color: #d97706; font-weight: bold;">${data.score} / ${data.total}</td>
-                    <td style="padding: 10px; font-weight: bold;">النسبة:</td>
-                    <td style="padding: 10px;">${percentage}%</td>
+                    <td style="padding: 10px; font-weight: bold; vertical-align: middle;">الدرجة:</td>
+                    <td style="padding: 10px;">
+                        <!-- تعديل التنسيق هنا ليكون بوكس ومن اليسار لليمين -->
+                        <div style="
+                            display: inline-block;
+                            border: 3px solid #d97706;
+                            border-radius: 8px;
+                            padding: 5px 20px;
+                            font-weight: bold;
+                            color: #d97706;
+                            direction: ltr; /* إجبار الاتجاه من اليسار لليمين */
+                            font-family: sans-serif;
+                            font-size: 20px;
+                            background: #fffbeb;
+                        ">
+                            ${data.score} / ${data.total}
+                        </div>
+                    </td>
+                    <td style="padding: 10px; font-weight: bold; vertical-align: middle;">النسبة:</td>
+                    <td style="padding: 10px; font-size: 20px; font-weight: bold;">${percentage}%</td>
                 </tr>
                 <tr>
                     <td style="padding: 10px; font-weight: bold;">الحالة:</td>
@@ -404,7 +420,7 @@ const Leaderboard = () => {
     );
 };
 
-// --- تحديث الشات ليدعم الرد الآلي الديناميكي ---
+// --- الشات والرد الآلي ---
 const ChatWidget = ({ user }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([{ id: 1, text: "أهلاً بيك في منصة النحاس! 🎓\nمعاك المساعد الذكي، اسألني عن أي حاجة.", sender: 'bot' }]);
@@ -414,7 +430,6 @@ const ChatWidget = ({ user }) => {
   const [isContactAdminMode, setIsContactAdminMode] = useState(false);
   const [autoReplies, setAutoReplies] = useState([]);
 
-  // جلب قواعد الرد الآلي
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'auto_replies'), (snap) => {
         const rules = snap.docs.map(d => d.data()).filter(r => r.isActive);
@@ -423,7 +438,6 @@ const ChatWidget = ({ user }) => {
     return () => unsub();
   }, []);
   
-  // الاستماع للرسائل
   useEffect(() => {
     if (!isOpen) return;
     const userId = user ? user.email : sessionId;
@@ -452,7 +466,6 @@ const ChatWidget = ({ user }) => {
       let botResponse = "";
       const lowerText = userMsg.text.toLowerCase();
 
-      // أولوية 1: وضع التحدث مع الأدمن
       if (isContactAdminMode) {
            botResponse = "تم استلام رسالتك! المستر أو الأدمن هيشوفها ويرد عليك في أقرب وقت. ✅";
            await addDoc(collection(db, 'messages'), {
@@ -464,10 +477,8 @@ const ChatWidget = ({ user }) => {
            });
            setIsContactAdminMode(false);
       } 
-      // أولوية 2: الردود الآلية من قاعدة البيانات
       else {
           let matchedRule = null;
-          // البحث في القواعد النشطة
           for (const rule of autoReplies) {
               const keywords = rule.keywords.split(',').map(k => k.trim().toLowerCase());
               if (keywords.some(k => lowerText.includes(k) && k.length > 0)) {
@@ -479,7 +490,6 @@ const ChatWidget = ({ user }) => {
           if (matchedRule) {
               botResponse = matchedRule.response;
           } 
-          // أولوية 3: الكلمات المحجوزة للنظام
           else if (lowerText.includes("ادمن") || lowerText.includes("مستر") || lowerText.includes("تواصل")) {
                botResponse = "اكتب رسالتك للمستر وهيتم الرد عليك هنا 👇";
                setIsContactAdminMode(true);
@@ -602,7 +612,6 @@ const LiveSessionView = ({ session, user, onClose }) => {
   );
 };
 
-// --- تحديث مشغل الفيديو لإخفاء الاقتراحات ---
 const SecureVideoPlayer = ({ video, userName, onClose }) => {
   const videoId = getYouTubeID(video.url || video.file);
   const [showSettings, setShowSettings] = useState(false);
@@ -614,7 +623,6 @@ const SecureVideoPlayer = ({ video, userName, onClose }) => {
     setShowSettings(false);
   };
 
-  // تعديل الرابط لإجبار الفيديو على التكرار وعدم إظهار اقتراحات من قنوات أخرى
   const youtubeEmbedUrl = videoId 
     ? `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1&showinfo=0&iv_load_policy=3&loop=1&playlist=${videoId}` 
     : '';
@@ -879,6 +887,10 @@ const AdminDashboard = ({ user }) => {
   const [autoReplies, setAutoReplies] = useState([]);
   const [newAutoReply, setNewAutoReply] = useState({ keywords: '', response: '', isActive: true });
 
+  // حالات رفع الملف
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+
   // جلب البيانات
   useEffect(() => { const u = onSnapshot(query(collection(db, 'users'), where('status','==','pending')), s => setPendingUsers(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(query(collection(db, 'users'), where('status', 'in', ['active', 'banned_cheating', 'rejected'])), s => setActiveUsersList(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
@@ -937,15 +949,39 @@ const AdminDashboard = ({ user }) => {
   const handleUpdateUser = async (e) => { e.preventDefault(); if(!editingUser) return; await updateDoc(doc(db, 'users', editingUser.id), { name: editingUser.name, phone: editingUser.phone, parentPhone: editingUser.parentPhone, grade: editingUser.grade }); setEditingUser(null); };
   const handleSendResetPassword = async (email) => { if(window.confirm(`إرسال رابط تغيير كلمة السر لـ ${email}؟`)) await sendPasswordResetEmail(auth, email); };
   
-  // رفع الملفات
+  // تعديل وظيفة رفع الملفات مع شريط التحميل والتحقق من الحجم
   const handleFileSelect = (e) => {
       const file = e.target.files[0];
-      if (file) {
-          if (file.size > 2000000) return alert("حجم الملف كبير جداً! (الحد الأقصى 2 ميجا).");
-          const reader = new FileReader();
-          reader.onloadend = () => { setNewContent({...newContent, url: reader.result}); };
-          reader.readAsDataURL(file);
+      if (!file) return;
+
+      // Firestore document limit is 1MB. We convert to base64 which increases size by ~33%.
+      // So we limit to ~750KB-1MB max to be safe. 
+      // If user wants more, they MUST use Google Drive links.
+      if (file.size > 1048576) { // 1MB limit check
+          alert("⚠️ تنبيه: حجم الملف أكبر من 1 ميجا.\n\nقواعد البيانات لا تقبل ملفات ضخمة مباشرة. لرفع ملفات كبيرة (كتب كاملة أو فيديوهات)، يرجى رفعها على Google Drive ونسخ الرابط هنا في خانة 'الرابط'.");
+          e.target.value = null; // Reset input
+          return;
       }
+
+      setIsUploading(true);
+      const reader = new FileReader();
+
+      reader.onprogress = (event) => {
+          if (event.lengthComputable) {
+              const percent = Math.round((event.loaded / event.total) * 100);
+              setUploadProgress(percent);
+          }
+      };
+
+      reader.onloadend = () => {
+          setNewContent({...newContent, url: reader.result});
+          setIsUploading(false);
+          setUploadProgress(100);
+          // Reset progress after a short delay
+          setTimeout(() => setUploadProgress(0), 2000);
+      };
+
+      reader.readAsDataURL(file);
   };
 
   const handleAddContent = async (e) => { 
@@ -1116,7 +1152,57 @@ const AdminDashboard = ({ user }) => {
 
           {activeTab === 'live' && <div className="bg-white p-8 rounded-xl shadow-sm border-t-4 border-red-600"><h2 className="text-2xl font-black mb-6 flex items-center gap-2 text-red-600"><Radio size={32}/> البث المباشر</h2><div className="grid gap-4"><input className="border p-3 rounded-xl" placeholder="العنوان" value={liveData.title} onChange={e=>setLiveData({...liveData, title:e.target.value})}/><input className="border p-3 rounded-xl" placeholder="رابط البث (Zoom/YouTube/Meet)" value={liveData.liveUrl} onChange={e=>setLiveData({...liveData, liveUrl:e.target.value})}/><select className="border p-3 rounded-xl" value={liveData.grade} onChange={e=>setLiveData({...liveData, grade:e.target.value})}><GradeOptions/></select>{!isLive?<button onClick={startLiveStream} className="bg-red-600 text-white py-4 rounded-xl font-bold">بدء البث</button>:<button onClick={stopLiveStream} className="bg-slate-800 text-white py-4 rounded-xl font-bold">إنهاء البث</button>}</div></div>}
 
-          {activeTab === 'content' && <div className="bg-white p-6 rounded-xl shadow-sm"><h2 className="font-bold mb-4">إضافة محتوى</h2><form onSubmit={handleAddContent} className="grid gap-4 mb-6"><input className="border p-3 rounded" placeholder="العنوان" value={newContent.title} onChange={e=>setNewContent({...newContent, title:e.target.value})}/><input className="border p-3 rounded" placeholder="الرابط (أو اختر ملف)" value={newContent.url} onChange={e=>setNewContent({...newContent, url:e.target.value})}/><input type="file" onChange={handleFileSelect} className="border p-2 rounded text-sm"/><div className="flex gap-2"><select className="border p-3 rounded flex-1" value={newContent.type} onChange={e=>setNewContent({...newContent, type:e.target.value})}><option value="video">فيديو</option><option value="file">ملف</option></select><select className="border p-3 rounded flex-1" value={newContent.grade} onChange={e=>setNewContent({...newContent, grade:e.target.value})}><GradeOptions/></select></div><div className="flex items-center gap-2"><input type="checkbox" checked={newContent.isPublic} onChange={e=>setNewContent({...newContent, isPublic:e.target.checked})}/> <label>عام</label></div><button className="bg-amber-600 text-white p-3 rounded font-bold">نشر</button></form><div className="space-y-2">{contentList.map(c=><div key={c.id} className="flex justify-between border-b p-2"><span>{c.title}</span><div className="flex gap-2"><button onClick={() => handleDeleteContent(c.id)} className="text-red-500 hover:text-red-700"><Trash2 size={18}/></button></div></div>)}</div></div>}
+          {activeTab === 'content' && (
+              <div className="bg-white p-6 rounded-xl shadow-sm">
+                  <h2 className="font-bold mb-4">إضافة محتوى</h2>
+                  <form onSubmit={handleAddContent} className="grid gap-4 mb-6">
+                      <input className="border p-3 rounded" placeholder="العنوان" value={newContent.title} onChange={e=>setNewContent({...newContent, title:e.target.value})}/>
+                      <input className="border p-3 rounded" placeholder="الرابط (يفضل Google Drive للملفات الكبيرة)" value={newContent.url} onChange={e=>setNewContent({...newContent, url:e.target.value})}/>
+                      
+                      {/* منطقة رفع الملفات مع شريط التحميل */}
+                      <div className="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center hover:bg-slate-50 transition relative">
+                          <input type="file" onChange={handleFileSelect} className="absolute inset-0 opacity-0 cursor-pointer" />
+                          <div className="flex flex-col items-center gap-2 text-slate-500">
+                              <Upload size={32} />
+                              <span className="text-sm font-bold">اضغط هنا لرفع ملف (الحد الأقصى 1 ميجا)</span>
+                              <span className="text-xs text-red-400">للملفات الأكبر، استخدم رابط خارجي</span>
+                          </div>
+                          {isUploading && (
+                              <div className="absolute inset-0 bg-white/90 flex flex-col items-center justify-center rounded-xl z-10">
+                                  <span className="text-sm font-bold text-amber-600 mb-1">جاري القراءة... {uploadProgress}%</span>
+                                  <div className="w-3/4 h-2 bg-slate-200 rounded-full overflow-hidden">
+                                      <div className="h-full bg-amber-500 transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
+                                  </div>
+                              </div>
+                          )}
+                          {!isUploading && uploadProgress === 100 && (
+                              <div className="absolute inset-0 bg-white/90 flex items-center justify-center rounded-xl z-10">
+                                  <span className="text-green-600 font-bold flex items-center gap-1"><CheckCircle size={20}/> تم اختيار الملف</span>
+                              </div>
+                          )}
+                      </div>
+
+                      <div className="flex gap-2">
+                          <select className="border p-3 rounded flex-1" value={newContent.type} onChange={e=>setNewContent({...newContent, type:e.target.value})}><option value="video">فيديو</option><option value="file">ملف</option></select>
+                          <select className="border p-3 rounded flex-1" value={newContent.grade} onChange={e=>setNewContent({...newContent, grade:e.target.value})}><GradeOptions/></select>
+                      </div>
+                      <div className="flex items-center gap-2">
+                          <input type="checkbox" checked={newContent.isPublic} onChange={e=>setNewContent({...newContent, isPublic:e.target.checked})}/> <label>عام</label>
+                      </div>
+                      <button className="bg-amber-600 text-white p-3 rounded font-bold">نشر</button>
+                  </form>
+                  <div className="space-y-2">
+                      {contentList.map(c=>(
+                          <div key={c.id} className="flex justify-between border-b p-2">
+                              <span>{c.title}</span>
+                              <div className="flex gap-2">
+                                  <button onClick={() => handleDeleteContent(c.id)} className="text-red-500 hover:text-red-700"><Trash2 size={18}/></button>
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+          )}
 
           {activeTab === 'messages' && <div className="bg-white p-6 rounded-xl shadow-sm"><h2 className="font-bold mb-4">الرسائل</h2>{messagesList.map(m=><div key={m.id} className="border-b p-4 bg-slate-50 mb-3 rounded-lg relative"><button onClick={()=>handleDeleteMessage(m.id)} className="absolute top-2 left-2 text-red-400"><Trash2 size={16}/></button><div className="mb-2"><p className="font-bold text-amber-800">{m.senderName} <span className="text-xs text-slate-500">({m.sender})</span></p><p className="text-sm text-slate-400">{m.createdAt?.toDate?m.createdAt.toDate().toLocaleString():'الآن'}</p></div><p className="text-slate-800 bg-white p-3 rounded-lg border border-slate-200 mb-3">{m.text}</p>{m.adminReply?<div className="bg-green-50 p-3 rounded-lg border border-green-200 text-sm"><span className="font-bold text-green-700">ردك: </span>{m.adminReply}</div>:<div className="flex gap-2"><input className="flex-1 border p-2 rounded text-sm" placeholder="اكتب ردك..." value={replyTexts[m.id]||""} onChange={e=>setReplyTexts({...replyTexts,[m.id]:e.target.value})}/><button onClick={()=>handleReplyMessage(m.id)} className="bg-blue-600 text-white px-3 py-1 rounded text-sm"><Reply size={14}/></button></div>}</div>)}</div>}
             
