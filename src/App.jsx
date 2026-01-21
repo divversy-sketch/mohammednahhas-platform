@@ -15,7 +15,8 @@ import {
   MessageSquare, Send, MessageCircle, Facebook, BookOpen, Feather, Radio, 
   ExternalLink, ClipboardList, Timer, AlertOctagon, Flag, Save, HelpCircle, 
   Reply, Unlock, Layout, Settings, Trophy, Megaphone, Bell, Download, XCircle, 
-  Calendar, Clock, FileWarning, Settings as GearIcon, Star, Bot, Power, Upload
+  Calendar, Clock, FileWarning, Settings as GearIcon, Star, Bot, Power, Upload,
+  Users, PenTool
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -157,7 +158,6 @@ const generatePDF = (type, data) => {
                 <tr>
                     <td style="padding: 10px; font-weight: bold; vertical-align: middle;">الدرجة:</td>
                     <td style="padding: 10px;">
-                        <!-- تعديل التنسيق هنا ليكون بوكس ومن اليسار لليمين -->
                         <div style="
                             display: inline-block;
                             border: 3px solid #d97706;
@@ -165,7 +165,7 @@ const generatePDF = (type, data) => {
                             padding: 5px 20px;
                             font-weight: bold;
                             color: #d97706;
-                            direction: ltr; /* إجبار الاتجاه من اليسار لليمين */
+                            direction: ltr;
                             font-family: sans-serif;
                             font-size: 20px;
                             background: #fffbeb;
@@ -331,16 +331,30 @@ const FloatingArabicBackground = () => (
   </div>
 );
 
+// --- تحديث صندوق الحكم ليكون ديناميكياً ---
 const WisdomBox = () => {
   const [idx, setIdx] = useState(0);
-  const quotes = [
+  const [quotes, setQuotes] = useState([
     { text: "النجاح مش صدفة، النجاح عزيمة وإصرار", source: "تحفيز" }, 
     { text: "ذاكر صح، مش تذاكر كتير.. ركز يا بطل", source: "نصيحة" }, 
     { text: "حلمك يستاهل تعبك، متوقفش", source: "تحفيز" }, 
     { text: "وَمَا نَيْلُ الْمَطَالِبِ بِالتَّمَنِّي ... وَلَكِنْ تُؤْخَذُ الدُّنْيَا غِلَابَا", source: "شعر" }
-  ];
-  useEffect(() => { const t = setInterval(() => setIdx(i => (i+1)%quotes.length), 6000); return () => clearInterval(t); }, []);
+  ]);
+
+  useEffect(() => {
+      const q = query(collection(db, 'quotes'), orderBy('createdAt', 'desc'));
+      const unsub = onSnapshot(q, (snap) => {
+          if (!snap.empty) {
+              setQuotes(snap.docs.map(d => d.data()));
+          }
+      });
+      return () => unsub();
+  }, []);
+
+  useEffect(() => { const t = setInterval(() => setIdx(i => (i+1)%quotes.length), 6000); return () => clearInterval(t); }, [quotes]);
   
+  if (quotes.length === 0) return null;
+
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative bg-gradient-to-r from-amber-600 to-amber-700 text-white p-6 rounded-2xl shadow-xl mb-8 overflow-hidden z-20">
       <Quote className="absolute top-4 left-4 opacity-20 w-16 h-16" />
@@ -869,7 +883,7 @@ const AdminDashboard = ({ user }) => {
   const [activeUsersList, setActiveUsersList] = useState([]);
   const [contentList, setContentList] = useState([]);
   const [messagesList, setMessagesList] = useState([]); 
-  const [newContent, setNewContent] = useState({ title: '', url: '', type: 'video', isPublic: false, grade: '3sec' });
+  const [newContent, setNewContent] = useState({ title: '', url: '', type: 'video', isPublic: false, grade: '3sec', allowedEmails: '' });
   const [liveData, setLiveData] = useState({ title: '', liveUrl: '', grade: '3sec' });
   const [isLive, setIsLive] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -883,9 +897,11 @@ const AdminDashboard = ({ user }) => {
   const [showLeaderboard, setShowLeaderboard] = useState(true);
   const [announcements, setAnnouncements] = useState([]);
   
-  // خاص بالرد الآلي
+  // خاص بالرد الآلي والحكم
   const [autoReplies, setAutoReplies] = useState([]);
   const [newAutoReply, setNewAutoReply] = useState({ keywords: '', response: '', isActive: true });
+  const [quotesList, setQuotesList] = useState([]);
+  const [newQuote, setNewQuote] = useState({ text: '', source: '' });
 
   // حالات رفع الملف
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -901,6 +917,7 @@ const AdminDashboard = ({ user }) => {
   useEffect(() => { const u = onSnapshot(query(collection(db, 'exam_results'), orderBy('submittedAt', 'desc')), s => setExamResults(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(query(collection(db, 'announcements'), orderBy('createdAt', 'desc')), s => setAnnouncements(s.docs.map(d => ({id: d.id, ...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(collection(db, 'auto_replies'), s => setAutoReplies(s.docs.map(d => ({id: d.id, ...d.data()})))); return u; }, []);
+  useEffect(() => { const u = onSnapshot(collection(db, 'quotes'), s => setQuotesList(s.docs.map(d => ({id: d.id, ...d.data()})))); return u; }, []);
 
   const handleApprove = async (id) => {
     await updateDoc(doc(db,'users',id), {status:'active'});
@@ -949,48 +966,56 @@ const AdminDashboard = ({ user }) => {
   const handleUpdateUser = async (e) => { e.preventDefault(); if(!editingUser) return; await updateDoc(doc(db, 'users', editingUser.id), { name: editingUser.name, phone: editingUser.phone, parentPhone: editingUser.parentPhone, grade: editingUser.grade }); setEditingUser(null); };
   const handleSendResetPassword = async (email) => { if(window.confirm(`إرسال رابط تغيير كلمة السر لـ ${email}؟`)) await sendPasswordResetEmail(auth, email); };
   
-  // تعديل وظيفة رفع الملفات مع شريط التحميل والتحقق من الحجم
   const handleFileSelect = (e) => {
       const file = e.target.files[0];
       if (!file) return;
-
-      // Firestore document limit is 1MB. We convert to base64 which increases size by ~33%.
-      // So we limit to ~750KB-1MB max to be safe. 
-      // If user wants more, they MUST use Google Drive links.
-      if (file.size > 1048576) { // 1MB limit check
+      if (file.size > 1048576) { 
           alert("⚠️ تنبيه: حجم الملف أكبر من 1 ميجا.\n\nقواعد البيانات لا تقبل ملفات ضخمة مباشرة. لرفع ملفات كبيرة (كتب كاملة أو فيديوهات)، يرجى رفعها على Google Drive ونسخ الرابط هنا في خانة 'الرابط'.");
-          e.target.value = null; // Reset input
+          e.target.value = null; 
           return;
       }
-
       setIsUploading(true);
       const reader = new FileReader();
-
       reader.onprogress = (event) => {
           if (event.lengthComputable) {
               const percent = Math.round((event.loaded / event.total) * 100);
               setUploadProgress(percent);
           }
       };
-
       reader.onloadend = () => {
           setNewContent({...newContent, url: reader.result});
           setIsUploading(false);
           setUploadProgress(100);
-          // Reset progress after a short delay
           setTimeout(() => setUploadProgress(0), 2000);
       };
-
       reader.readAsDataURL(file);
   };
 
+  // تعديل وظيفة إضافة المحتوى لتشمل السماح لطلاب محددين
   const handleAddContent = async (e) => { 
       e.preventDefault(); 
-      // سواء كان رابط يوتيوب أو ملف مرفوع، سيتم تخزينه في `url` أو `file`
-      const contentData = { ...newContent, file: newContent.url, createdAt: new Date() };
+      const allowedEmailsArray = newContent.allowedEmails 
+        ? newContent.allowedEmails.split(',').map(email => email.trim()) 
+        : [];
+
+      const contentData = { 
+          ...newContent, 
+          file: newContent.url, 
+          allowedEmails: allowedEmailsArray,
+          createdAt: new Date() 
+      };
+      
       await addDoc(collection(db, 'content'), contentData);
-      await addDoc(collection(db, 'notifications'), { text: `تم إضافة درس جديد: ${newContent.title}`, grade: newContent.grade, createdAt: serverTimestamp() });
+      
+      // إذا كان عاماً للجميع، أرسل إشعار
+      if (allowedEmailsArray.length === 0) {
+          await addDoc(collection(db, 'notifications'), { text: `تم إضافة درس جديد: ${newContent.title}`, grade: newContent.grade, createdAt: serverTimestamp() });
+      } else {
+          // يمكن إضافة إشعار خاص لاحقاً إذا أردت
+      }
+      
       alert("تم النشر!"); 
+      setNewContent({ title: '', url: '', type: 'video', isPublic: false, grade: '3sec', allowedEmails: '' });
   }; 
   
   const handleDeleteContent = async (id) => { if(window.confirm("حذف هذا المحتوى؟")) await deleteDoc(doc(db, 'content', id)); };
@@ -1068,6 +1093,16 @@ const AdminDashboard = ({ user }) => {
       if(window.confirm("حذف هذا الرد؟")) await deleteDoc(doc(db, 'auto_replies', id));
   };
 
+  // دوال الحكم
+  const handleAddQuote = async () => {
+      if(!newQuote.text || !newQuote.source) return alert("أكمل البيانات");
+      await addDoc(collection(db, 'quotes'), { ...newQuote, createdAt: serverTimestamp() });
+      setNewQuote({ text: '', source: '' });
+  };
+  const deleteQuote = async (id) => {
+      if(window.confirm("حذف هذه الحكمة؟")) await deleteDoc(doc(db, 'quotes', id));
+  };
+
   return (
     <div className="min-h-screen bg-slate-100 p-6 font-['Cairo']" dir="rtl">
       <header className="flex justify-between items-center mb-8 bg-white p-4 rounded-xl shadow-sm">
@@ -1077,9 +1112,9 @@ const AdminDashboard = ({ user }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white p-4 rounded-xl shadow-sm h-fit space-y-2">
-          {['users', 'all_users', 'exams', 'results', 'live', 'content', 'messages', 'auto_reply', 'settings'].map(tab => (
+          {['users', 'all_users', 'exams', 'results', 'live', 'content', 'messages', 'auto_reply', 'quotes', 'settings'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 ${activeTab===tab?'bg-amber-100 text-amber-700':'hover:bg-slate-50'}`}>
-              {tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : 'الإعدادات'}
+              {tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : 'الإعدادات'}
             </button>
           ))}
         </div>
@@ -1159,7 +1194,7 @@ const AdminDashboard = ({ user }) => {
                       <input className="border p-3 rounded" placeholder="العنوان" value={newContent.title} onChange={e=>setNewContent({...newContent, title:e.target.value})}/>
                       <input className="border p-3 rounded" placeholder="الرابط (يفضل Google Drive للملفات الكبيرة)" value={newContent.url} onChange={e=>setNewContent({...newContent, url:e.target.value})}/>
                       
-                      {/* منطقة رفع الملفات مع شريط التحميل */}
+                      {/* منطقة رفع الملفات */}
                       <div className="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center hover:bg-slate-50 transition relative">
                           <input type="file" onChange={handleFileSelect} className="absolute inset-0 opacity-0 cursor-pointer" />
                           <div className="flex flex-col items-center gap-2 text-slate-500">
@@ -1186,15 +1221,31 @@ const AdminDashboard = ({ user }) => {
                           <select className="border p-3 rounded flex-1" value={newContent.type} onChange={e=>setNewContent({...newContent, type:e.target.value})}><option value="video">فيديو</option><option value="file">ملف</option></select>
                           <select className="border p-3 rounded flex-1" value={newContent.grade} onChange={e=>setNewContent({...newContent, grade:e.target.value})}><GradeOptions/></select>
                       </div>
+                      
+                      {/* إضافة تحديد الطلاب المسموح لهم */}
+                      <div className="border p-3 rounded-lg bg-gray-50">
+                          <label className="block text-sm font-bold text-gray-700 mb-1 flex items-center gap-2"><Lock size={14}/> تخصيص لطلاب محددين (اختياري)</label>
+                          <input 
+                            className="border p-2 rounded w-full text-sm" 
+                            placeholder="اكتب إيميلات الطلاب مفصولة بفاصلة (مثال: student1@gmail.com, student2@yahoo.com)" 
+                            value={newContent.allowedEmails} 
+                            onChange={e=>setNewContent({...newContent, allowedEmails:e.target.value})}
+                          />
+                          <p className="text-xs text-gray-500 mt-1">اتركه فارغاً لكي يظهر المحتوى لجميع طلاب الصف.</p>
+                      </div>
+
                       <div className="flex items-center gap-2">
-                          <input type="checkbox" checked={newContent.isPublic} onChange={e=>setNewContent({...newContent, isPublic:e.target.checked})}/> <label>عام</label>
+                          <input type="checkbox" checked={newContent.isPublic} onChange={e=>setNewContent({...newContent, isPublic:e.target.checked})}/> <label>عام (للصفحة الرئيسية)</label>
                       </div>
                       <button className="bg-amber-600 text-white p-3 rounded font-bold">نشر</button>
                   </form>
                   <div className="space-y-2">
                       {contentList.map(c=>(
-                          <div key={c.id} className="flex justify-between border-b p-2">
-                              <span>{c.title}</span>
+                          <div key={c.id} className="flex justify-between border-b p-2 items-center">
+                              <div>
+                                  <span className="font-bold">{c.title}</span>
+                                  {c.allowedEmails && c.allowedEmails.length > 0 && <span className="mr-2 text-xs bg-red-100 text-red-600 px-2 py-1 rounded flex items-center gap-1 inline-flex"><Lock size={10}/> خاص</span>}
+                              </div>
                               <div className="flex gap-2">
                                   <button onClick={() => handleDeleteContent(c.id)} className="text-red-500 hover:text-red-700"><Trash2 size={18}/></button>
                               </div>
@@ -1206,7 +1257,7 @@ const AdminDashboard = ({ user }) => {
 
           {activeTab === 'messages' && <div className="bg-white p-6 rounded-xl shadow-sm"><h2 className="font-bold mb-4">الرسائل</h2>{messagesList.map(m=><div key={m.id} className="border-b p-4 bg-slate-50 mb-3 rounded-lg relative"><button onClick={()=>handleDeleteMessage(m.id)} className="absolute top-2 left-2 text-red-400"><Trash2 size={16}/></button><div className="mb-2"><p className="font-bold text-amber-800">{m.senderName} <span className="text-xs text-slate-500">({m.sender})</span></p><p className="text-sm text-slate-400">{m.createdAt?.toDate?m.createdAt.toDate().toLocaleString():'الآن'}</p></div><p className="text-slate-800 bg-white p-3 rounded-lg border border-slate-200 mb-3">{m.text}</p>{m.adminReply?<div className="bg-green-50 p-3 rounded-lg border border-green-200 text-sm"><span className="font-bold text-green-700">ردك: </span>{m.adminReply}</div>:<div className="flex gap-2"><input className="flex-1 border p-2 rounded text-sm" placeholder="اكتب ردك..." value={replyTexts[m.id]||""} onChange={e=>setReplyTexts({...replyTexts,[m.id]:e.target.value})}/><button onClick={()=>handleReplyMessage(m.id)} className="bg-blue-600 text-white px-3 py-1 rounded text-sm"><Reply size={14}/></button></div>}</div>)}</div>}
             
-          {/* تبويب الرد الآلي الجديد */}
+          {/* تبويب الرد الآلي */}
           {activeTab === 'auto_reply' && (
               <div className="bg-white p-6 rounded-xl shadow-sm">
                   <h2 className="font-bold mb-4 flex items-center gap-2"><Bot /> إعدادات الرد الآلي</h2>
@@ -1234,6 +1285,35 @@ const AdminDashboard = ({ user }) => {
                                       <Trash2 size={18} />
                                   </button>
                               </div>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+          )}
+
+          {/* تبويب إدارة الحكم */}
+          {activeTab === 'quotes' && (
+              <div className="bg-white p-6 rounded-xl shadow-sm">
+                  <h2 className="font-bold mb-4 flex items-center gap-2"><PenTool /> إدارة الحكم والأقوال</h2>
+                  <div className="bg-slate-50 p-4 rounded-xl border mb-6">
+                      <h3 className="font-bold mb-2 text-sm">إضافة حكمة جديدة</h3>
+                      <div className="grid gap-3">
+                          <input className="border p-2 rounded" placeholder="نص الحكمة" value={newQuote.text} onChange={e=>setNewQuote({...newQuote, text:e.target.value})} />
+                          <input className="border p-2 rounded" placeholder="المصدر (مثال: تحفيز، شعر، حكمة)" value={newQuote.source} onChange={e=>setNewQuote({...newQuote, source:e.target.value})} />
+                          <button onClick={handleAddQuote} className="bg-amber-600 text-white py-2 rounded font-bold hover:bg-amber-700">إضافة</button>
+                      </div>
+                  </div>
+                  
+                  <div className="space-y-3">
+                      {quotesList.map(q => (
+                          <div key={q.id} className="p-3 rounded-lg border bg-white flex justify-between items-center">
+                              <div>
+                                  <p className="font-bold text-slate-800">"{q.text}"</p>
+                                  <p className="text-xs text-slate-500">- {q.source}</p>
+                              </div>
+                              <button onClick={() => deleteQuote(q.id)} className="p-2 text-red-500 hover:bg-red-50 rounded">
+                                  <Trash2 size={18} />
+                              </button>
                           </div>
                       ))}
                   </div>
@@ -1295,7 +1375,18 @@ const StudentDashboard = ({ user, userData }) => {
 
   useEffect(() => {
     if(!userData) return;
-    const unsubContent = onSnapshot(query(collection(db, 'content'), where('grade', '==', userData.grade)), s => setContent(s.docs.map(d=>({id:d.id,...d.data()}))));
+    
+    // جلب المحتوى وتصفيته حسب الصلاحيات
+    const unsubContent = onSnapshot(query(collection(db, 'content'), where('grade', '==', userData.grade)), s => {
+        const allContent = s.docs.map(d=>({id:d.id,...d.data()}));
+        // تصفية المحتوى: إما عام (بدون إيميلات) أو المستخدم موجود في القائمة
+        const visibleContent = allContent.filter(c => {
+            if (!c.allowedEmails || c.allowedEmails.length === 0) return true; // متاح للجميع
+            return c.allowedEmails.includes(user.email); // متاح لهذا المستخدم تحديداً
+        });
+        setContent(visibleContent);
+    });
+
     const unsubLive = onSnapshot(query(collection(db, 'live_sessions'), where('status', '==', 'active'), where('grade', '==', userData.grade)), s => setLiveSession(s.empty ? null : {id:s.docs[0].id, ...s.docs[0].data()}));
     const unsubExams = onSnapshot(query(collection(db, 'exams'), where('grade', '==', userData.grade)), s => setExams(s.docs.map(d=>({id:d.id,...d.data()}))));
     const unsubResults = onSnapshot(query(collection(db, 'exam_results'), where('studentId', '==', user.uid)), s => setExamResults(s.docs.map(d=>({id:d.id,...d.data()}))));
