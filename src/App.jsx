@@ -1,3 +1,4 @@
+// v4.0 - الكود المحدث (التقارير، الرد الآلي، التحكم في الحكم، صلاحيات الفيديو)
 import React, { useState, useEffect, useRef } from 'react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
