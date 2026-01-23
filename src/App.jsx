@@ -1,4 +1,3 @@
-// v4.0 - الكود المحدث (التقارير، الرد الآلي، التحكم في الحكم، صلاحيات الفيديو)
 import React, { useState, useEffect, useRef } from 'react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
@@ -17,7 +16,7 @@ import {
   ExternalLink, ClipboardList, Timer, AlertOctagon, Flag, Save, HelpCircle, 
   Reply, Unlock, Layout, Settings, Trophy, Megaphone, Bell, Download, XCircle, 
   Calendar, Clock, FileWarning, Settings as GearIcon, Star, Bot, Power, Upload,
-  Users, PenTool
+  Users, PenTool, Share2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -82,7 +81,7 @@ const getYouTubeID = (url) => {
     return (match && match[2].length === 11) ? match[2] : null;
 };
 
-// --- تحديث جذري لنظام التقارير (إصلاح التنسيق والبوكس) ---
+// --- دالة توليد التقرير PDF (النسخة المدمجة: شهادات + جداول) ---
 const generatePDF = (type, data) => {
     if (!window.html2pdf) {
         alert("جاري تحميل نظام الطباعة... يرجى الانتظار ثوانٍ والمحاولة مرة أخرى.");
@@ -93,13 +92,13 @@ const generatePDF = (type, data) => {
     const date = new Date().toLocaleDateString('ar-EG');
     const element = document.createElement('div');
     
-    // جدول الإجابات
+    // 1. إنشاء جدول الإجابات (يضاف في كل الحالات)
     let answersTable = '';
     if (data.questions && data.answers) {
         answersTable = `
-        <div style="margin-top: 30px; page-break-before: always;">
-            <h3 style="background: #eee; padding: 10px; border-right: 5px solid #d97706;">تفاصيل الإجابات</h3>
-            <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 15px;">
+        <div style="margin-top: 30px; page-break-before: always; background: white; padding: 20px; direction: rtl; font-family: 'Cairo', sans-serif;">
+            <h3 style="background: #eee; padding: 10px; border-right: 5px solid #d97706; color: #333;">تفاصيل الإجابات النموذجية</h3>
+            <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 15px; color: #333;">
                 <thead>
                     <tr style="background-color: #f3f4f6; color: #333;">
                         <th style="border: 1px solid #ddd; padding: 10px; width: 5%;">#</th>
@@ -114,8 +113,8 @@ const generatePDF = (type, data) => {
                         const studentAnsIdx = data.answers[q.id];
                         const correctAnsIdx = q.correctIdx;
                         const isCorrect = studentAnsIdx === correctAnsIdx;
-                        const studentAnsText = studentAnsIdx !== undefined ? q.options[studentAnsIdx] : 'لم يجب';
-                        const correctAnsText = q.options[correctAnsIdx];
+                        const studentAnsText = studentAnsIdx !== undefined && q.options ? q.options[studentAnsIdx] : 'لم يجب';
+                        const correctAnsText = q.options ? q.options[correctAnsIdx] : '';
                         
                         return `
                         <tr style="background-color: ${isCorrect ? '#f0fdf4' : '#fef2f2'};">
@@ -135,75 +134,103 @@ const generatePDF = (type, data) => {
         `;
     }
 
-    const header = `
-      <div style="padding: 40px; font-family: 'Cairo', sans-serif; direction: rtl; color: #333;">
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #d97706; padding-bottom: 20px; margin-bottom: 30px;">
-            <div style="text-align: right;">
-                <h1 style="margin: 0; color: #d97706; font-size: 28px;">منصة النحاس التعليمية</h1>
-                <p style="margin: 5px 0 0; color: #666;">للغة العربية - أ/ محمد النحاس</p>
-            </div>
-            <div style="text-align: left;">
-                <p style="margin: 0; font-weight: bold;">تقرير نتيجة امتحان</p>
-                <p style="margin: 5px 0 0; color: #666;">${date}</p>
-            </div>
-        </div>
-        
-        <div style="background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
-            <table style="width: 100%; font-size: 18px;">
-                <tr>
-                    <td style="padding: 10px; font-weight: bold; width: 20%;">اسم الطالب:</td>
-                    <td style="padding: 10px;">${data.studentName}</td>
-                    <td style="padding: 10px; font-weight: bold; width: 20%;">الامتحان:</td>
-                    <td style="padding: 10px;">${data.examTitle || 'اختبار عام'}</td>
-                </tr>
-                <tr>
-                    <td style="padding: 10px; font-weight: bold; vertical-align: middle;">الدرجة:</td>
-                    <td style="padding: 10px;">
-                        <div style="
-                            display: inline-block;
-                            border: 3px solid #d97706;
-                            border-radius: 8px;
-                            padding: 5px 20px;
-                            font-weight: bold;
-                            color: #d97706;
-                            direction: ltr;
-                            font-family: sans-serif;
-                            font-size: 20px;
-                            background: #fffbeb;
-                        ">
-                            ${data.score} / ${data.total}
-                        </div>
-                    </td>
-                    <td style="padding: 10px; font-weight: bold; vertical-align: middle;">النسبة:</td>
-                    <td style="padding: 10px; font-size: 20px; font-weight: bold;">${percentage}%</td>
-                </tr>
-                <tr>
-                    <td style="padding: 10px; font-weight: bold;">الحالة:</td>
-                    <td style="padding: 10px;" colspan="3">
-                        <span style="background: ${data.status === 'cheated' ? '#fee2e2' : '#dcfce7'}; color: ${data.status === 'cheated' ? '#991b1b' : '#166534'}; padding: 5px 15px; border-radius: 20px; font-size: 14px;">
-                            ${data.status === 'cheated' ? 'تم إلغاؤه (غش)' : percentage >= 50 ? 'ناجح' : 'راسب'}
-                        </span>
+    // 2. تحديد تصميم الشهادة
+    if (type === 'admin') {
+         // تصميم تقرير الأدمن (رسمي)
+         element.innerHTML = `
+          <div style="padding: 40px; font-family: 'Cairo', sans-serif; direction: rtl; border: 2px solid #333; text-align: center;">
+            <h1 style="color: #d97706;">تقرير طالب - منصة النحاس</h1>
+            <hr style="margin: 20px 0; border-top: 1px solid #ccc;"/>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 18px;">
+                <tr><td style="padding: 15px; border: 1px solid #ccc; background: #f9f9f9; width: 30%;">اسم الطالب</td><td style="padding: 15px; border: 1px solid #ccc;">${data.studentName}</td></tr>
+                <tr><td style="padding: 15px; border: 1px solid #ccc; background: #f9f9f9;">الدرجة</td>
+                    <td style="padding: 15px; border: 1px solid #ccc;">
+                        <div style="display: inline-block; border: 2px solid #d97706; padding: 5px 15px; border-radius: 5px; font-weight: bold; direction: ltr;">${data.score} / ${data.total}</div>
                     </td>
                 </tr>
+                <tr><td style="padding: 15px; border: 1px solid #ccc; background: #f9f9f9;">النسبة</td><td style="padding: 15px; border: 1px solid #ccc;">${percentage}%</td></tr>
+                <tr><td style="padding: 15px; border: 1px solid #ccc; background: #f9f9f9;">التاريخ</td><td style="padding: 15px; border: 1px solid #ccc;">${date}</td></tr>
             </table>
-        </div>
-        
-        ${answersTable}
+            ${answersTable}
+          </div>`;
+    } else if (percentage >= 85) {
+        // شهادة تفوق (تصميم أسود وذهبي فخم)
+        element.innerHTML = `
+          <div style="width: 297mm; padding: 20px; margin: 0; background-color: #0F0F0F; color: #D4AF37; font-family: 'Cairo', sans-serif; position: relative; text-align: center; box-sizing: border-box;">
+            <div style="border: 5px solid #D4AF37; padding: 40px 20px; box-sizing: border-box;">
+                <div style="font-size: 80px; margin-bottom: 10px;">🏆</div>
+                <h1 style="font-size: 50px; margin: 0; font-weight: 900; letter-spacing: 2px;">شهـــادة تـقـديــر وتـفــوق</h1>
+                <p style="font-size: 20px; color: #fff; margin-top: 10px;">تتشرف منصة النحاس التعليمية للغة العربية بأن تمنح</p>
 
-        <div style="margin-top: 50px; text-align: center; border-top: 1px solid #eee; padding-top: 20px;">
-             <p style="font-size: 14px; color: #999;">تم استخراج هذا التقرير آلياً من منصة النحاس التعليمية</p>
-        </div>
-      </div>
-    `;
+                <h2 style="font-size: 60px; color: #fff; font-family: 'Reem Kufi', sans-serif; margin: 20px 0; text-shadow: 0 0 10px #D4AF37;">${data.studentName}</h2>
+                <div style="width: 300px; height: 2px; background: #D4AF37; margin: 10px auto;"></div>
+                
+                <p style="font-size: 22px; color: #ccc; line-height: 1.6; margin-top: 20px;">
+                    وذلك لتفوقه الباهر وحصوله على درجة متميزة في الاختبار. <br/>
+                    مع خالص تمنياتنا بدوام التوفيق والنجاح.
+                </p>
 
-    element.innerHTML = header;
+                <div style="margin: 30px 0;">
+                     <span style="font-size: 18px; color: #fff; display: block; margin-bottom: 5px;">الدرجة النهائية</span>
+                     <div style="display: inline-block; border: 3px solid #D4AF37; color: #fff; padding: 10px 40px; font-size: 35px; font-weight: bold; border-radius: 10px; direction: ltr; background: rgba(212, 175, 55, 0.1);">
+                        ${data.score} / ${data.total}
+                     </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; padding: 0 60px; margin-top: 40px;">
+                    <div style="text-align: right;">
+                        <p style="font-size: 16px; color: #aaa; margin-bottom: 5px;">تاريخ التحرير</p>
+                        <p style="font-size: 20px; color: #fff; font-weight: bold;">${date}</p>
+                    </div>
+                    <div style="text-align: left;">
+                        <p style="font-size: 16px; color: #aaa; margin-bottom: 5px;">معلم المادة</p>
+                        <h3 style="font-size: 35px; font-family: 'Reem Kufi', sans-serif; margin: 0; color: #D4AF37;">أ / محمد النحاس</h3>
+                    </div>
+                </div>
+            </div>
+            ${answersTable} 
+          </div>
+        `;
+    } else {
+        // تقرير مستوى (أحمر وأبيض)
+        element.innerHTML = `
+          <div style="width: 297mm; padding: 40px; font-family: 'Cairo', sans-serif; direction: rtl; text-align: center; background: #fff; border: 15px solid #ef4444; box-sizing: border-box;">
+            <h1 style="color: #b91c1c; font-size: 50px; margin-bottom: 20px; font-weight: 900;">تقرير مستوى (تنبيه)</h1>
+            <h2 style="font-size: 45px; color: #333; margin: 20px 0;">الطالب / ${data.studentName}</h2>
+            
+            <div style="background: #fef2f2; padding: 30px; border-radius: 20px; border: 3px solid #fecaca; margin: 40px auto; width: 60%;">
+                <p style="font-size: 22px; color: #7f1d1d;">للأسف، لم تحقق المستوى المطلوب في هذا الاختبار.</p>
+                <hr style="border: 0; border-top: 2px solid #eee; margin: 20px 0;">
+                
+                <div style="margin: 15px 0;">
+                     <div style="display: inline-block; border: 3px solid #ef4444; color: #b91c1c; padding: 10px 40px; font-size: 40px; font-weight: bold; border-radius: 10px; direction: ltr; background: #fff;">
+                        ${data.score} / ${data.total}
+                     </div>
+                </div>
+                
+                <h3 style="font-size: 30px; color: #ef4444; margin: 10px 0; font-weight: 900;">%${percentage}</h3>
+            </div>
+
+            <div style="text-align: center; margin-top: 40px;">
+                <p style="font-size: 26px; color: #4b5563; line-height: 1.6; font-weight: bold;">
+                    "النجاح محتاج مجهود.. شد حيلك في اللي جاي!"
+                </p>
+            </div>
+            
+            <div style="margin-top: 60px; text-align: left; padding-left: 60px;">
+                 <h3 style="font-size: 30px; color: #555;">أ / محمد النحاس</h3>
+            </div>
+            ${answersTable}
+          </div>
+        `;
+    }
     
     const opt = { 
-        margin: 0.5, 
-        filename: `تقرير_${data.studentName}_${date}.pdf`, 
+        margin: 0, 
+        filename: percentage >= 85 ? `شهادة_${data.studentName}.pdf` : `تقرير_${data.studentName}.pdf`, 
         image: { type: 'jpeg', quality: 0.98 }, 
-        html2canvas: { scale: 2, useCORS: true, logging: false }, 
-        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } 
+        html2canvas: { scale: 2, useCORS: true }, 
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } // Landscape للشهادات العريضة
     };
     
     window.html2pdf().set(opt).from(element).save();
@@ -447,6 +474,7 @@ const ChatWidget = ({ user }) => {
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'auto_replies'), (snap) => {
+        // نأتي فقط بالردود النشطة (isActive == true)
         const rules = snap.docs.map(d => d.data()).filter(r => r.isActive);
         setAutoReplies(rules);
     });
@@ -494,6 +522,7 @@ const ChatWidget = ({ user }) => {
       } 
       else {
           let matchedRule = null;
+          // البحث في قواعد الرد الآلي
           for (const rule of autoReplies) {
               const keywords = rule.keywords.split(',').map(k => k.trim().toLowerCase());
               if (keywords.some(k => lowerText.includes(k) && k.length > 0)) {
@@ -779,7 +808,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                 <h2 className="text-3xl font-black mb-4">تم الانتهاء من الامتحان</h2>
                 <div className={`text-6xl font-black my-6 ${score >= flatQuestions.length / 2 ? 'text-green-600' : 'text-red-600'}`}>{score} / {flatQuestions.length}</div>
                 <div className="flex gap-4 justify-center">
-                    <button onClick={() => generatePDF('student', {studentName: user.displayName, score, total: flatQuestions.length, status: 'completed', examTitle: exam.title, questions: flatQuestions, answers: answers })} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2"><Download size={18}/> تحميل التقرير الشامل</button>
+                    <button onClick={() => generatePDF('student', {studentName: user.displayName, score, total: flatQuestions.length, status: 'completed', examTitle: exam.title, questions: flatQuestions, answers: answers })} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2"><Download size={18}/> تحميل الشهادة (مع الإجابات)</button>
                     <button onClick={onClose} className="bg-slate-900 text-white py-3 px-8 rounded-xl font-bold">عودة للرئيسية</button>
                 </div>
             </div>
@@ -992,7 +1021,6 @@ const AdminDashboard = ({ user }) => {
       reader.readAsDataURL(file);
   };
 
-  // تعديل وظيفة إضافة المحتوى لتشمل السماح لطلاب محددين
   const handleAddContent = async (e) => { 
       e.preventDefault(); 
       const allowedEmailsArray = newContent.allowedEmails 
@@ -1008,11 +1036,8 @@ const AdminDashboard = ({ user }) => {
       
       await addDoc(collection(db, 'content'), contentData);
       
-      // إذا كان عاماً للجميع، أرسل إشعار
       if (allowedEmailsArray.length === 0) {
           await addDoc(collection(db, 'notifications'), { text: `تم إضافة درس جديد: ${newContent.title}`, grade: newContent.grade, createdAt: serverTimestamp() });
-      } else {
-          // يمكن إضافة إشعار خاص لاحقاً إذا أردت
       }
       
       alert("تم النشر!"); 
@@ -1081,7 +1106,6 @@ const AdminDashboard = ({ user }) => {
       setShowLeaderboard(!showLeaderboard);
   };
 
-  // دوال الرد الآلي
   const handleAddAutoReply = async () => {
       if(!newAutoReply.keywords || !newAutoReply.response) return alert("أكمل البيانات");
       await addDoc(collection(db, 'auto_replies'), newAutoReply);
@@ -1094,7 +1118,6 @@ const AdminDashboard = ({ user }) => {
       if(window.confirm("حذف هذا الرد؟")) await deleteDoc(doc(db, 'auto_replies', id));
   };
 
-  // دوال الحكم
   const handleAddQuote = async () => {
       if(!newQuote.text || !newQuote.source) return alert("أكمل البيانات");
       await addDoc(collection(db, 'quotes'), { ...newQuote, createdAt: serverTimestamp() });
@@ -1324,6 +1347,32 @@ const AdminDashboard = ({ user }) => {
           {activeTab === 'settings' && (
               <div className="bg-white p-6 rounded-xl shadow-sm space-y-6">
                   <h2 className="font-bold mb-4">إدارة الموقع</h2>
+                  
+                  {/* قسم QR Code الجديد */}
+                  <div className="border p-6 rounded-xl bg-slate-900 text-white flex flex-col md:flex-row justify-between items-center gap-4 relative overflow-hidden">
+                      <div className="relative z-10">
+                          <h3 className="font-bold text-xl text-amber-400 mb-2 flex items-center gap-2">
+                              <ExternalLink size={20}/> شارك المنصة مع طلابك
+                          </h3>
+                          <p className="text-slate-300 text-sm mb-4 max-w-md">
+                              هذا هو الكود الخاص بموقعك. يمكن للطلاب مسحه بكاميرا الهاتف لفتح الموقع مباشرة وتسجيل الدخول.
+                          </p>
+                          <button onClick={() => {navigator.clipboard.writeText(window.location.origin); alert("تم نسخ الرابط!")}} className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm font-mono flex items-center gap-2 transition border border-white/20">
+                              <span className="truncate max-w-[200px]">{window.location.origin}</span>
+                              <span className="text-amber-400 font-bold">نسخ</span>
+                          </button>
+                      </div>
+                      <div className="bg-white p-2 rounded-xl shadow-2xl relative z-10 transform hover:scale-105 transition duration-300">
+                          <img 
+                              src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${window.location.origin}`} 
+                              alt="Scan to join" 
+                              className="w-40 h-40"
+                          />
+                      </div>
+                      {/* زخرفة خلفية */}
+                      <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+                  </div>
+
                   <div className="border p-4 rounded-xl">
                       <h3 className="font-bold mb-2 text-amber-600">شريط الإعلانات</h3>
                       <div className="flex gap-2 mb-2">
