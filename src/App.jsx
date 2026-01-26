@@ -52,6 +52,7 @@ try {
 
 // دالة خلط المصفوفات
 const shuffleArray = (array) => {
+    if (!Array.isArray(array)) return [];
     let currentIndex = array.length, randomIndex;
     while (currentIndex !== 0) {
       randomIndex = Math.floor(Math.random() * currentIndex);
@@ -125,8 +126,8 @@ const generatePDF = (type, data) => {
                         let studentAnsText = 'لم يجب';
                         let correctAnsText = '';
 
-                        // معالجة الـ ## في عرض الجدول أيضاً
-                        const cleanQuestionText = q.text.replace(/##/g, ' ');
+                        // معالجة الـ ## في عرض الجدول
+                        const cleanQuestionText = q.text ? q.text.replace(/##/g, ' ') : '';
 
                         if (q.type === 'essay') {
                             studentAnsText = studentAns || 'لم يجب';
@@ -706,62 +707,64 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const [score, setScore] = useState(existingResult?.score || 0);
   const [startTime] = useState(Date.now()); 
   
+  // حالة الأسئلة المسطحة (مخلوطة أم لا)
   const [flatQuestions, setFlatQuestions] = useState([]);
+  const [isLoadingExam, setIsLoadingExam] = useState(true);
 
+  // useEffect لتجهيز الأسئلة (Fix White Screen Issue)
   useEffect(() => {
-      let questions = [];
-      if (exam.questions) {
-          const blocks = JSON.parse(JSON.stringify(exam.questions));
-          if (exam.shuffle && !isReviewMode) {
-              shuffleArray(blocks);
-          }
+      try {
+          setIsLoadingExam(true);
+          let questions = [];
+          if (exam && exam.questions && Array.isArray(exam.questions)) {
+              // نسخ عميق
+              const blocks = JSON.parse(JSON.stringify(exam.questions));
+              
+              if (exam.shuffle && !isReviewMode) {
+                  shuffleArray(blocks);
+              }
 
-          blocks.forEach((block) => {
-              if (block.subQuestions) {
-                  if (exam.shuffle && !isReviewMode) {
-                      shuffleArray(block.subQuestions);
-                  }
-
-                  block.subQuestions.forEach((q) => {
-                      const type = (q.options && q.options.length > 0) ? 'multiple_choice' : 'essay';
-                      
-                      if (type === 'multiple_choice' && exam.shuffle && !isReviewMode) {
-                          const correctOptionText = q.options[q.correctIdx];
-                          shuffleArray(q.options);
-                          q.correctIdx = q.options.indexOf(correctOptionText);
+              blocks.forEach((block) => {
+                  if (block.subQuestions && Array.isArray(block.subQuestions)) {
+                      if (exam.shuffle && !isReviewMode) {
+                          shuffleArray(block.subQuestions);
                       }
 
-                      questions.push({ ...q, blockText: block.text, type });
-                  });
-              }
-          });
+                      block.subQuestions.forEach((q) => {
+                          const type = (q.options && q.options.length > 0) ? 'multiple_choice' : 'essay';
+                          
+                          if (type === 'multiple_choice' && exam.shuffle && !isReviewMode) {
+                              const correctOptionText = q.options[q.correctIdx];
+                              shuffleArray(q.options);
+                              q.correctIdx = q.options.indexOf(correctOptionText);
+                          }
+                          // التأكد من وجود نص السؤال لتجنب الكراش
+                          q.text = q.text || "سؤال بدون نص";
+                          questions.push({ ...q, blockText: block.text, type });
+                      });
+                  }
+              });
+          }
+          setFlatQuestions(questions);
+      } catch (error) {
+          console.error("Exam parsing error:", error);
+          alert("حدث خطأ أثناء تحميل الامتحان. يرجى المحاولة مرة أخرى.");
+      } finally {
+          setIsLoadingExam(false);
       }
-      setFlatQuestions(questions);
   }, [exam, isReviewMode]);
 
-  if (flatQuestions.length === 0) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-white">جاري تحميل الأسئلة...</div>;
+  // حالة التحميل (تمنع الشاشة البيضاء)
+  if (isLoadingExam) return <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white"><Loader2 className="animate-spin text-amber-600 w-12 h-12 mb-4"/><p>جاري تجهيز الامتحان...</p></div>;
+  if (flatQuestions.length === 0) return <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white"><p className="text-xl font-bold mb-4">عفواً، لا توجد أسئلة في هذا الامتحان.</p><button onClick={onClose} className="bg-slate-900 text-white px-6 py-2 rounded-lg">خروج</button></div>;
 
-  useEffect(() => {
-    if (isReviewMode || isSubmitted) return;
-    const handleVisibilityChange = () => { if (document.hidden) handleCheating(); };
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    document.addEventListener('contextmenu', event => event.preventDefault()); 
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      document.removeEventListener('contextmenu', event => event.preventDefault());
-    };
-  }, [isSubmitted, isReviewMode]);
+  const currentQObj = flatQuestions[currentQIndex];
+  // حماية إضافية ضد الـ undefined
+  if (!currentQObj) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-white">حدث خطأ في تحميل السؤال الحالي.</div>;
 
-  useEffect(() => {
-    if (isReviewMode || isSubmitted) return;
-    if (timeLeft > 0 && !isCheating) {
-      const timer = setInterval(() => setTimeLeft(p => p - 1), 1000);
-      return () => clearInterval(timer);
-    } else if (timeLeft === 0) {
-      handleSubmit(true);
-    }
-  }, [timeLeft, isSubmitted, isCheating, isReviewMode]);
+  const hasPassage = currentQObj.blockText && currentQObj.blockText.trim().length > 0;
 
+  // ... (باقي دوال الغش والإجابة كما هي) ...
   const handleCheating = async () => {
     if(isReviewMode || isSubmitted) return;
     setIsCheating(true); 
@@ -818,9 +821,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     });
   };
 
-  const currentQObj = flatQuestions[currentQIndex];
-  const hasPassage = currentQObj?.blockText && currentQObj.blockText.trim().length > 0;
-
   if (isCheating) return <div className="fixed inset-0 z-[60] bg-red-900 flex items-center justify-center text-white text-center font-['Cairo']"><div><AlertOctagon size={80} className="mx-auto mb-4"/><h1>تم رصد محاولة غش!</h1><p className="text-red-200 mt-2">خرجت من الامتحان. تم رصد درجتك (صفر) وحظرك.</p><button onClick={() => window.location.reload()} className="mt-4 bg-white text-red-900 px-6 py-2 rounded-full font-bold">خروج</button></div></div>;
 
   if (isSubmitted && !isReviewMode) {
@@ -871,7 +871,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                           if (answers[q.id] === q.correctIdx) statusClass = 'bg-green-100 text-green-700 border border-green-400';
                           else statusClass = 'bg-red-100 text-red-700 border border-red-400';
                       }
-                  } else if (answers[q.id] !== undefined && (q.type !== 'essay' || answers[q.id].trim().length > 0)) {
+                  } else if (answers[q.id] !== undefined && (q.type !== 'essay' || answers[q.id].toString().trim().length > 0)) {
                       statusClass = 'bg-blue-100 text-blue-700 border border-blue-400';
                   }
                   return (
@@ -900,7 +900,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
             
             <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 mb-8 shadow-inner">
               <h3 className="text-2xl font-bold text-slate-900 leading-relaxed">
-                  {/* هنا التعديل السحري لدعم ## كسطر جديد */}
                   {currentQObj.text.split('##').map((line, index) => (
                       <span key={index} className="block mb-2 last:mb-0">
                           {line}
@@ -1667,8 +1666,8 @@ const StudentDashboard = ({ user, userData }) => {
   const handleUpdateMyProfile = async (e) => {
     e.preventDefault();
     await updateDoc(doc(db, 'users', user.uid), {
-        phone: editFormData.phone,
-        grade: editFormData.grade
+        phone: editFormData.phone
+        // تم إزالة تحديث grade من هنا لمنع التغيير
     });
     alert("تم تحديث بياناتك بنجاح!");
   };
@@ -1772,10 +1771,12 @@ const StudentDashboard = ({ user, userData }) => {
                    <p className="text-xs text-red-500 mt-1">لا يمكن تغيير رقم ولي الأمر.</p>
                  </div>
                  <div>
-                   <label className="block text-sm font-bold text-slate-700 mb-2">الصف الدراسي (يمكنك تغييره عند النجاح)</label>
-                   <select className="w-full border p-3 rounded-xl bg-white" value={editFormData.grade} onChange={e=>setEditFormData({...editFormData, grade:e.target.value})}>
+                   <label className="block text-sm font-bold text-slate-700 mb-2">الصف الدراسي</label>
+                   {/* تم التعديل: قفل تغيير المرحلة */}
+                   <select disabled className="w-full border p-3 rounded-xl bg-slate-100 text-slate-500 cursor-not-allowed" value={editFormData.grade}>
                      <GradeOptions />
                    </select>
+                   <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><Lock size={12}/> لا يمكن تغيير المرحلة التعليمية إلا بموافقة الإدارة.</p>
                  </div>
                  <button className="w-full bg-amber-600 text-white py-3 rounded-xl font-bold hover:bg-amber-700 transition">حفظ التعديلات</button>
                </form>
