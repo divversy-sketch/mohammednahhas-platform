@@ -50,15 +50,12 @@ try {
  * =================================================================
  */
 
-// دالة خلط المصفوفات (Fisher-Yates Shuffle)
+// دالة خلط المصفوفات
 const shuffleArray = (array) => {
     let currentIndex = array.length, randomIndex;
-    // While there remain elements to shuffle.
     while (currentIndex !== 0) {
-      // Pick a remaining element.
       randomIndex = Math.floor(Math.random() * currentIndex);
       currentIndex--;
-      // And swap it with the current element.
       [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
     }
     return array;
@@ -95,7 +92,7 @@ const getYouTubeID = (url) => {
     return (match && match[2].length === 11) ? match[2] : null;
 };
 
-// --- دالة توليد التقرير PDF (محدثة لدعم المقالي) ---
+// --- دالة توليد التقرير PDF ---
 const generatePDF = (type, data) => {
     if (!window.html2pdf) {
         alert("جاري تحميل نظام الطباعة... يرجى الانتظار ثوانٍ والمحاولة مرة أخرى.");
@@ -106,7 +103,6 @@ const generatePDF = (type, data) => {
     const date = new Date().toLocaleDateString('ar-EG');
     const element = document.createElement('div');
     
-    // جدول الإجابات
     let answersTable = '';
     if (data.questions && data.answers) {
         answersTable = `
@@ -129,10 +125,13 @@ const generatePDF = (type, data) => {
                         let studentAnsText = 'لم يجب';
                         let correctAnsText = '';
 
+                        // معالجة الـ ## في عرض الجدول أيضاً
+                        const cleanQuestionText = q.text.replace(/##/g, ' ');
+
                         if (q.type === 'essay') {
                             studentAnsText = studentAns || 'لم يجب';
                             correctAnsText = 'يحتاج تصحيح يدوي';
-                            isCorrect = true; // نفترض صحة المقالي مؤقتاً في العرض أو نلونه بلون محايد
+                            isCorrect = true; 
                         } else {
                             const studentAnsIdx = studentAns;
                             const correctAnsIdx = q.correctIdx;
@@ -144,7 +143,7 @@ const generatePDF = (type, data) => {
                         return `
                         <tr style="background-color: ${q.type === 'essay' ? '#fff7ed' : (isCorrect ? '#f0fdf4' : '#fef2f2')};">
                             <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${i + 1}</td>
-                            <td style="border: 1px solid #ddd; padding: 8px;">${q.text} ${q.type === 'essay' ? '<span style="color:#d97706; font-size:10px;">(مقالي)</span>' : ''}</td>
+                            <td style="border: 1px solid #ddd; padding: 8px;">${cleanQuestionText} ${q.type === 'essay' ? '<span style="color:#d97706; font-size:10px;">(مقالي)</span>' : ''}</td>
                             <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">${studentAnsText}</td>
                             <td style="border: 1px solid #ddd; padding: 8px; color: green;">${correctAnsText}</td>
                             <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">
@@ -362,8 +361,7 @@ const WisdomBox = () => {
   const [quotes, setQuotes] = useState([
     { text: "النجاح مش صدفة، النجاح عزيمة وإصرار", source: "تحفيز" }, 
     { text: "ذاكر صح، مش تذاكر كتير.. ركز يا بطل", source: "نصيحة" }, 
-    { text: "حلمك يستاهل تعبك، متوقفش", source: "تحفيز" }, 
-    { text: "وَمَا نَيْلُ الْمَطَالِبِ بِالتَّمَنِّي ... وَلَكِنْ تُؤْخَذُ الدُّنْيَا غِلَابَا", source: "شعر" }
+    { text: "حلمك يستاهل تعبك، متوقفش", source: "تحفيز" }
   ]);
 
   useEffect(() => {
@@ -708,39 +706,28 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const [score, setScore] = useState(existingResult?.score || 0);
   const [startTime] = useState(Date.now()); 
   
-  // حالة جديدة للاسئلة (مخلوطة أم لا)
   const [flatQuestions, setFlatQuestions] = useState([]);
 
   useEffect(() => {
-      // تجهيز الأسئلة عند فتح الامتحان
       let questions = [];
       if (exam.questions) {
-          // نسخ عميق لتجنب التعديل على الأصل
           const blocks = JSON.parse(JSON.stringify(exam.questions));
-          
-          // إذا كان الخلط مفعل، نخلط البلوكات (التي تحتوي على القطع وأسئلتها)
           if (exam.shuffle && !isReviewMode) {
               shuffleArray(blocks);
           }
 
           blocks.forEach((block) => {
               if (block.subQuestions) {
-                  // إذا كان الخلط مفعل، نخلط الأسئلة الفرعية (فقط إذا لم يكن هناك نص للقطعة يفرض الترتيب، لكن عادة الترتيب داخل القطعة مهم، هنا سنخلطه حسب الطلب)
-                  // ملاحظة: عادة أسئلة القطعة مرتبة حسب ورودها في النص، لكن لو أردت خلطها:
                   if (exam.shuffle && !isReviewMode) {
                       shuffleArray(block.subQuestions);
                   }
 
                   block.subQuestions.forEach((q) => {
-                      // تحديد نوع السؤال تلقائياً إذا لم يكن محدداً
                       const type = (q.options && q.options.length > 0) ? 'multiple_choice' : 'essay';
                       
-                      // إذا كان اختيار من متعدد والخلط مفعل، نخلط الاختيارات (مع الحفاظ على الإجابة الصحيحة)
                       if (type === 'multiple_choice' && exam.shuffle && !isReviewMode) {
-                          // نحتاج نحتفظ بنص الإجابة الصحيحة قبل الخلط لأن الاندكس سيتغير
                           const correctOptionText = q.options[q.correctIdx];
                           shuffleArray(q.options);
-                          // تحديث الاندكس الجديد
                           q.correctIdx = q.options.indexOf(correctOptionText);
                       }
 
@@ -802,13 +789,11 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     let rawScore = 0;
     flatQuestions.forEach(q => { 
         if (q.type === 'multiple_choice' && answers[q.id] === q.correctIdx) rawScore++; 
-        // المقالي لا يصحح تلقائياً هنا، يمكن إضافة منطق لاحقاً
     });
     return rawScore;
   };
 
   const handleSubmit = async (auto = false) => {
-    // التحقق فقط من أسئلة الاختيار من متعدد
     const mcqs = flatQuestions.filter(q => q.type === 'multiple_choice');
     const answeredMcqs = mcqs.filter(q => answers[q.id] !== undefined);
     
@@ -824,7 +809,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
       studentId: user.uid, 
       studentName: user.displayName, 
       score: finalScore, 
-      total: mcqs.length, // الدرجة الكلية هي عدد أسئلة الاختيار (المقالي يصحح يدوياً)
+      total: mcqs.length, 
       answers, 
       status: 'completed',
       timeTaken: timeTaken,
@@ -843,7 +828,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
         <div className="fixed inset-0 z-[60] bg-slate-50 overflow-y-auto p-4 font-['Cairo']" dir="rtl">
             <div className="max-w-4xl mx-auto bg-white rounded-3xl shadow-xl p-8 mt-10 text-center">
                 <h2 className="text-3xl font-black mb-4">تم الانتهاء من الامتحان</h2>
-                {/* حساب عدد الأسئلة الاختيارية فقط للدرجة */}
                 <div className={`text-6xl font-black my-6 ${score >= flatQuestions.filter(q=>q.type!=='essay').length / 2 ? 'text-green-600' : 'text-red-600'}`}>
                     {score} / {flatQuestions.filter(q=>q.type!=='essay').length}
                 </div>
@@ -915,12 +899,18 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
             </div>
             
             <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 mb-8 shadow-inner">
-              <h3 className="text-2xl font-bold text-slate-900 leading-relaxed">{currentQObj.text}</h3>
+              <h3 className="text-2xl font-bold text-slate-900 leading-relaxed">
+                  {/* هنا التعديل السحري لدعم ## كسطر جديد */}
+                  {currentQObj.text.split('##').map((line, index) => (
+                      <span key={index} className="block mb-2 last:mb-0">
+                          {line}
+                      </span>
+                  ))}
+              </h3>
             </div>
 
             <div className="space-y-4">
               {currentQObj.type === 'essay' ? (
-                  // عرض السؤال المقالي
                   <textarea 
                     disabled={isReviewMode}
                     className={`w-full border-2 rounded-xl p-4 min-h-[150px] text-lg focus:border-amber-500 outline-none ${isReviewMode ? 'bg-gray-100' : 'bg-white'}`}
@@ -929,7 +919,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                     onChange={(e) => handleAnswer(currentQObj.id, e.target.value)}
                   />
               ) : (
-                  // عرض الاختيارات (Multiple Choice)
                   currentQObj.options.map((opt, idx) => {
                       let optionClass = 'border-slate-200 hover:bg-slate-50';
                       if (isReviewMode) {
@@ -1187,14 +1176,8 @@ const AdminDashboard = ({ user }) => {
       if (isReadingPassage) { 
           currentBlock.text += line + '\n'; 
       } else {
-        // التحقق هل السطر هو "اختيار" أم "سؤال جديد"
-        // السطر يعتبر اختيار إذا بدأ بنجمة أو إذا كان هناك سؤال مفتوح ولديه أقل من 4 خيارات (افتراضياً)
-        // لكن لدعم المقالي، سنفترض أن أي سطر يبدأ بـ * هو إجابة، وأي سطر عادي هو سؤال جديد إذا لم يكن هناك سؤال مفتوح
         
         const isOption = line.startsWith('*') || (currentQ && currentQ.options.length < 4 && !line.includes('?')); 
-        // ملاحظة: المنطق هنا يحتاج دقة. لنجعله: إذا بدأ ب * فهو جواب. إذا لم يبدأ ب * وكان لدينا سؤال، نعتبره خياراً إذا لم ينته بعلامة استفهام؟ لا، هذا معقد.
-        // لنبسط: السطر الجديد دائماً سؤال، إلا إذا بدأ ب * أو كان يتبع سؤالاً ونريد اعتباره خياراً.
-        // الطريقة الأفضل حسب تعليماتك: *(أ) كذا.
         
         if (line.startsWith('*')) {
              if (!currentQ) return; // تجاهل خيار بدون سؤال
@@ -1205,7 +1188,6 @@ const AdminDashboard = ({ user }) => {
              currentQ.options.push(optText);
         } else if (currentQ && currentQ.options.length > 0 && currentQ.options.length < 4 && !line.includes('?')) {
              // حالة خاصة: خيارات لا تبدأ بنجمة (اختيارات خاطئة)
-             // هذا السطر اختياري، لكن بما أنك ستضع * قبل الإجابة، فالأسطر الأخرى هي خيارات خاطئة
              currentQ.options.push(line);
         } else {
              // سؤال جديد
