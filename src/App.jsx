@@ -706,16 +706,15 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
   if (flatQuestions.length === 0) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-white">عفواً، لا توجد أسئلة.<button onClick={onClose} className="ml-4 bg-gray-200 px-4 py-2 rounded">خروج</button></div>;
 
-useEffect(() => {
+ useEffect(() => {
     if (isReviewMode || isSubmitted) return;
 
-    // وظيفة تسجل الطالب كغاش فوراً في قاعدة البيانات
+    // وظيفة العقاب عند التحديث أو الخروج
     const penalizeStudent = async () => {
-      const q = query(
-        collection(db, 'exam_results'), 
+      const q = query(collection(db, 'exam_results'), 
         where('examId', '==', exam.id), 
-        where('studentId', '==', user.uid),
-        where('status', '==', 'in_progress'),
+        where('studentId', '==', user.uid), 
+        where('status', '==', 'in_progress'), 
         limit(1)
       );
       const snap = await getDocs(q);
@@ -727,28 +726,49 @@ useEffect(() => {
       }
     };
 
-    // منع التحديث وإغلاق الصفحة
+    // 1. منع تحديث الصفحة أو إغلاقها
     const handleBeforeUnload = (e) => {
-      penalizeStudent(); // تنفيذ العقوبة فوراً
+      penalizeStudent(); // تسجيل غش فوراً
       e.preventDefault();
-      e.returnValue = 'سيتم إلغاء امتحانك واعتبارك غاشاً إذا خرجت!'; 
+      e.returnValue = ''; 
     };
 
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    
-    // منع أزرار التحديث (F5, Ctrl+R)
+    // 2. منع أزرار التحديث (F5, Ctrl+R)
     const handleKeyDown = (e) => {
       if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && e.key === 'r')) {
         e.preventDefault();
-        alert("تنبيه: محاولة تحديث الصفحة تعرضك للحظر الفوري!");
       }
     };
 
+    // 3. كشف لقطة الشاشة وإظهار شاشة بيضاء
+    const handleKeyUp = (e) => {
+      if (e.key === 'PrintScreen' || e.key === 'Snapshot') {
+        const whiteOverlay = document.createElement('div');
+        whiteOverlay.id = 'protection-overlay';
+        whiteOverlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:white;z-index:999999;display:flex;align-items:center;justify-content:center;';
+        whiteOverlay.innerHTML = '<h1 style="font-family:Cairo;color:red;text-align:center;">تصوير الشاشة ممنوع!<br>تم إبلاغ الإدارة.</h1>';
+        document.body.appendChild(whiteOverlay);
+        setTimeout(() => {
+          const el = document.getElementById('protection-overlay');
+          if(el) document.body.removeChild(el);
+        }, 3000);
+      }
+    };
+
+    // 4. الغش عند تبديل النوافذ (Tab Switching)
+    const handleVisibility = () => { if (document.hidden) penalizeStudent(); };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
     window.addEventListener("keydown", handleKeyDown);
-    
+    window.addEventListener("keyup", handleKeyUp);
+    document.addEventListener("visibilitychange", handleVisibility);
+    document.addEventListener('contextmenu', e => e.preventDefault()); // منع كليك يمين
+
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
       window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [isSubmitted, isReviewMode]);
 
@@ -1469,54 +1489,36 @@ const StudentDashboard = ({ user, userData }) => {
   const videos = content.filter(c => c.type === 'video');
   const files = content.filter(c => c.type === 'file');
 
-const startExamWithCode = async (exam) => {
-    // 1. التحقق إذا كان هناك نتيجة سابقة (تم الحل أو بدأ ولم يكمل)
+ const startExamWithCode = async (exam) => {
+    // 1. التحقق من وجود محاولة سابقة (سواء انتهت أو لا تزال جارية)
     const previousResult = examResults.find(r => r.examId === exam.id);
     if (previousResult) {
-        alert(`عفواً، لا يمكنك دخول الامتحان مرتين. (تم تسجيل محاولة سابقة)`);
+        alert("عفواً، تم تسجيل محاولة دخول لهذا الامتحان مسبقاً. لا يسمح بالدخول المتكرر.");
         return;
     }
 
     const now = new Date();
-    const start = new Date(exam.startTime);
-    const end = new Date(exam.endTime);
-
-    if (now < start) return alert(`الامتحان لم يبدأ بعد.`);
-    if (now > end) return alert("انتهى وقت الامتحان.");
+    if (now < new Date(exam.startTime)) return alert(`الامتحان لم يبدأ بعد.`);
+    if (now > new Date(exam.endTime)) return alert("عفواً، انتهى وقت الامتحان.");
 
     const code = prompt("أدخل كود الامتحان:");
     if (code === exam.accessCode) {
-        // 2. تسجيل "بدء الامتحان" فوراً في قاعدة البيانات لمنع الدخول من جهاز آخر أو التحديث
+        // 2. تسجيل "بدء المحاولة" فوراً في قاعدة البيانات لمنع إعادة الدخول عند التحديث
         await addDoc(collection(db, 'exam_results'), { 
           examId: exam.id, 
           studentId: user.uid, 
           studentName: user.displayName, 
           score: 0, 
           total: exam.questions.reduce((acc,g)=>acc+g.subQuestions.length,0),
-          status: 'in_progress', // حالة "قيد التقدم"
+          status: 'in_progress', // حالة قيد التنفيذ
           submittedAt: serverTimestamp() 
         });
-        
         setActiveExam(exam);
     } else {
         alert("كود خاطئ!");
     }
   };
 
-    const now = new Date();
-    const start = new Date(exam.startTime);
-    const end = new Date(exam.endTime);
-
-    if (now < start) return alert(`الامتحان لم يبدأ بعد. موعد البدء: ${start.toLocaleString('ar-EG')}`);
-    if (now > end) return alert("عفواً، انتهى وقت الامتحان.");
-
-    const code = prompt("أدخل كود الامتحان:");
-    if (code === exam.accessCode) {
-        setActiveExam(exam);
-    } else {
-        alert("كود خاطئ!");
-    }
-  };
 
   const handleUpdateMyProfile = async (e) => {
     e.preventDefault();
