@@ -721,19 +721,17 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     setIsCheating(true); 
     setIsSubmitted(true);
     const timeTaken = Math.round((Date.now() - startTime) / 1000);
-    
-    // تعديل: تحديث الوثيقة الموجودة بدلاً من إنشاء واحدة جديدة
-    if (exam.attemptId) {
-        await updateDoc(doc(db, 'exam_results', exam.attemptId), { 
-            score: 0, 
-            total: flatQuestions.length,
-            status: 'cheated', 
-            timeTaken: timeTaken,
-            totalTime: exam.duration,
-            submittedAt: serverTimestamp() 
-        });
-    }
-    
+    await addDoc(collection(db, 'exam_results'), { 
+        examId: exam.id, 
+        studentId: user.uid, 
+        studentName: user.displayName, 
+        score: 0, 
+        total: flatQuestions.length,
+        status: 'cheated', 
+        timeTaken: timeTaken,
+        totalTime: exam.duration,
+        submittedAt: serverTimestamp() 
+    });
     await updateDoc(doc(db, 'users', user.uid), { status: 'banned_cheating' });
   };
 
@@ -750,38 +748,23 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const handleSubmit = async (auto = false) => {
     const totalQs = flatQuestions.length;
     if (!auto && Object.keys(answers).length < totalQs && !window.confirm("لم تجب على كل الأسئلة، هل أنت متأكد؟")) return;
-    
     const finalScore = calculateScore();
     const timeTaken = Math.round((Date.now() - startTime) / 1000);
     setScore(finalScore);
     setIsSubmitted(true);
     
-    // تعديل: تحديث الوثيقة التي تم إنشاؤها عند بدء الامتحان
-    if (exam.attemptId) {
-        await updateDoc(doc(db, 'exam_results', exam.attemptId), { 
-            score: finalScore, 
-            total: totalQs, 
-            answers, 
-            status: 'completed',
-            timeTaken: timeTaken,
-            totalTime: exam.duration, 
-            submittedAt: serverTimestamp() 
-        });
-    } else {
-        // Fallback for logic consistency (لو مفيش ID لأي سبب)
-         await addDoc(collection(db, 'exam_results'), { 
-          examId: exam.id, 
-          studentId: user.uid, 
-          studentName: user.displayName, 
-          score: finalScore, 
-          total: totalQs, 
-          answers, 
-          status: 'completed',
-          timeTaken: timeTaken,
-          totalTime: exam.duration, 
-          submittedAt: serverTimestamp() 
-        });
-    }
+    await addDoc(collection(db, 'exam_results'), { 
+      examId: exam.id, 
+      studentId: user.uid, 
+      studentName: user.displayName, 
+      score: finalScore, 
+      total: totalQs, 
+      answers, 
+      status: 'completed',
+      timeTaken: timeTaken,
+      totalTime: exam.duration, 
+      submittedAt: serverTimestamp() 
+    });
   };
 
   const currentQObj = flatQuestions[currentQIndex];
@@ -858,8 +841,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
             </div>
             
             <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 mb-8 shadow-inner">
-              {/* التعديل هنا: إضافة whitespace-pre-line لإظهار الأسطر الجديدة */}
-              <h3 className="text-2xl font-bold text-slate-900 leading-relaxed whitespace-pre-line">{currentQObj.text}</h3>
+              <h3 className="text-2xl font-bold text-slate-900 leading-relaxed">{currentQObj.text}</h3>
             </div>
 
             <div className="space-y-4">
@@ -876,7 +858,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                     <div key={idx} onClick={() => handleAnswer(currentQObj.id, idx)} className={`p-5 rounded-xl border-2 cursor-pointer transition flex items-center gap-4 text-lg font-medium ${optionClass}`}>
                       <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${answers[currentQObj.id] === idx || (isReviewMode && idx === currentQObj.correctIdx) ? 'border-transparent bg-current' : 'border-slate-300'}`}>
                       </div>
-                      <span className="whitespace-pre-line">{opt}</span>
+                      <span>{opt}</span>
                       {isReviewMode && idx === currentQObj.correctIdx && <CheckCircle className="text-green-600 mr-auto"/>}
                       {isReviewMode && answers[currentQObj.id] === idx && idx !== currentQObj.correctIdx && <XCircle className="text-red-600 mr-auto"/>}
                     </div>
@@ -1441,17 +1423,10 @@ const StudentDashboard = ({ user, userData }) => {
   const videos = content.filter(c => c.type === 'video');
   const files = content.filter(c => c.type === 'file');
 
-  const startExamWithCode = (exam) => {const startExamWithCode = async (exam) => {
-    // 1. التحقق: هل يوجد أي سجل سابق (سواء ناجح، راسب، غش، أو حتى مجرد بدأ ولم يكمل)
+  const startExamWithCode = (exam) => {
     const previousResult = examResults.find(r => r.examId === exam.id);
-    
     if (previousResult) {
-        // رسالة مختلفة حسب الحالة
-        if (previousResult.status === 'started') {
-            alert("لقد قمت بفتح هذا الامتحان سابقاً ولم تكمله. لا يمكن إعادة الدخول (نظام الفرصة الواحدة).");
-        } else {
-            alert(`أنت امتحنت الامتحان ده قبل كده وجبت ${previousResult.score}.`);
-        }
+        alert(`أنت امتحنت الامتحان ده قبل كده وجبت ${previousResult.score}.`);
         return;
     }
 
@@ -1464,30 +1439,10 @@ const StudentDashboard = ({ user, userData }) => {
 
     const code = prompt("أدخل كود الامتحان:");
     if (code === exam.accessCode) {
-        // 2. تسجيل "بداية الامتحان" في قاعدة البيانات فوراً
-        try {
-            const attemptRef = await addDoc(collection(db, 'exam_results'), { 
-                examId: exam.id, 
-                studentId: user.uid, 
-                studentName: user.displayName, 
-                score: 0, 
-                total: 0,
-                status: 'started', // حالة جديدة تعني أنه بدأ
-                answers: {},
-                startedAt: serverTimestamp() 
-            });
-
-            // نمرر الـ ID بتاع المحاولة عشان نعدل عليه لما يخلص مش نعمل واحد جديد
-            setActiveExam({ ...exam, attemptId: attemptRef.id });
-
-        } catch (error) {
-            console.error(error);
-            alert("حدث خطأ أثناء بدء الامتحان، تأكد من الاتصال بالإنترنت.");
-        }
+        setActiveExam(exam);
     } else {
         alert("كود خاطئ!");
     }
-  };
   };
 
   const handleUpdateMyProfile = async (e) => {
