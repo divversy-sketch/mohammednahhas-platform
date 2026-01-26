@@ -706,41 +706,51 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
   if (flatQuestions.length === 0) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-white">عفواً، لا توجد أسئلة.<button onClick={onClose} className="ml-4 bg-gray-200 px-4 py-2 rounded">خروج</button></div>;
 
-  useEffect(() => {
-  if (isReviewMode || isSubmitted) return;
+useEffect(() => {
+    if (isReviewMode || isSubmitted) return;
 
-  // 1. منع تحديث الصفحة أو إغلاق التبويب
-  const handleBeforeUnload = (e) => {
-    e.preventDefault();
-    e.returnValue = ''; // سيظهر رسالة تأكيد للمتصفح
-  };
+    // وظيفة تسجل الطالب كغاش فوراً في قاعدة البيانات
+    const penalizeStudent = async () => {
+      const q = query(
+        collection(db, 'exam_results'), 
+        where('examId', '==', exam.id), 
+        where('studentId', '==', user.uid),
+        where('status', '==', 'in_progress'),
+        limit(1)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        await updateDoc(doc(db, 'exam_results', snap.docs[0].id), { 
+          status: 'cheated', 
+          score: 0 
+        });
+      }
+    };
 
-  // 2. منع اختصارات التحديث (F5, Ctrl+R)
-  const handleKeyDown = (e) => {
-    if (
-      e.key === 'F5' || 
-      (e.ctrlKey && e.key === 'r') || 
-      (e.metaKey && e.key === 'r')
-    ) {
+    // منع التحديث وإغلاق الصفحة
+    const handleBeforeUnload = (e) => {
+      penalizeStudent(); // تنفيذ العقوبة فوراً
       e.preventDefault();
-    }
-  };
+      e.returnValue = 'سيتم إلغاء امتحانك واعتبارك غاشاً إذا خرجت!'; 
+    };
 
-  // 3. رصد محاولة الغش عند الخروج من الصفحة
-  const handleVisibilityChange = () => { 
-    if (document.hidden) handleCheating(); 
-  };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    
+    // منع أزرار التحديث (F5, Ctrl+R)
+    const handleKeyDown = (e) => {
+      if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && e.key === 'r')) {
+        e.preventDefault();
+        alert("تنبيه: محاولة تحديث الصفحة تعرضك للحظر الفوري!");
+      }
+    };
 
-  window.addEventListener("beforeunload", handleBeforeUnload);
-  window.addEventListener("keydown", handleKeyDown);
-  document.addEventListener("visibilitychange", handleVisibilityChange);
-  
-  return () => {
-    window.removeEventListener("beforeunload", handleBeforeUnload);
-    window.removeEventListener("keydown", handleKeyDown);
-    document.removeEventListener("visibilitychange", handleVisibilityChange);
-  };
-}, [isSubmitted, isReviewMode]);
+    window.addEventListener("keydown", handleKeyDown);
+    
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isSubmitted, isReviewMode]);
 
   useEffect(() => {
     if (isReviewMode || isSubmitted) return;
@@ -1459,12 +1469,39 @@ const StudentDashboard = ({ user, userData }) => {
   const videos = content.filter(c => c.type === 'video');
   const files = content.filter(c => c.type === 'file');
 
-  const startExamWithCode = (exam) => {
+const startExamWithCode = async (exam) => {
+    // 1. التحقق إذا كان هناك نتيجة سابقة (تم الحل أو بدأ ولم يكمل)
     const previousResult = examResults.find(r => r.examId === exam.id);
     if (previousResult) {
-        alert(`أنت امتحنت الامتحان ده قبل كده وجبت ${previousResult.score}.`);
+        alert(`عفواً، لا يمكنك دخول الامتحان مرتين. (تم تسجيل محاولة سابقة)`);
         return;
     }
+
+    const now = new Date();
+    const start = new Date(exam.startTime);
+    const end = new Date(exam.endTime);
+
+    if (now < start) return alert(`الامتحان لم يبدأ بعد.`);
+    if (now > end) return alert("انتهى وقت الامتحان.");
+
+    const code = prompt("أدخل كود الامتحان:");
+    if (code === exam.accessCode) {
+        // 2. تسجيل "بدء الامتحان" فوراً في قاعدة البيانات لمنع الدخول من جهاز آخر أو التحديث
+        await addDoc(collection(db, 'exam_results'), { 
+          examId: exam.id, 
+          studentId: user.uid, 
+          studentName: user.displayName, 
+          score: 0, 
+          total: exam.questions.reduce((acc,g)=>acc+g.subQuestions.length,0),
+          status: 'in_progress', // حالة "قيد التقدم"
+          submittedAt: serverTimestamp() 
+        });
+        
+        setActiveExam(exam);
+    } else {
+        alert("كود خاطئ!");
+    }
+  };
 
     const now = new Date();
     const start = new Date(exam.startTime);
