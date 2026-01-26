@@ -271,6 +271,17 @@ const DesignSystemLoader = () => {
         white-space: nowrap;
         text-shadow: 0 0 2px rgba(255,255,255,0.5);
       }
+	  /* منع تحديد النصوص في الموقع كله بقوة */
+      * {
+        -webkit-user-select: none !important;
+        -moz-user-select: none !important;
+        -ms-user-select: none !important;
+        user-select: none !important;
+      }
+      /* إخفاء المحتوى تماماً عند محاولة الطباعة */
+      @media print {
+        body { display: none !important; }
+      }
       .watermark-video {
         position: absolute;
         animation: floatWatermark 15s linear infinite;
@@ -696,15 +707,40 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   if (flatQuestions.length === 0) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-white">عفواً، لا توجد أسئلة.<button onClick={onClose} className="ml-4 bg-gray-200 px-4 py-2 rounded">خروج</button></div>;
 
   useEffect(() => {
-    if (isReviewMode || isSubmitted) return;
-    const handleVisibilityChange = () => { if (document.hidden) handleCheating(); };
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    document.addEventListener('contextmenu', event => event.preventDefault()); 
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      document.removeEventListener('contextmenu', event => event.preventDefault());
-    };
-  }, [isSubmitted, isReviewMode]);
+  if (isReviewMode || isSubmitted) return;
+
+  // 1. منع تحديث الصفحة أو إغلاق التبويب
+  const handleBeforeUnload = (e) => {
+    e.preventDefault();
+    e.returnValue = ''; // سيظهر رسالة تأكيد للمتصفح
+  };
+
+  // 2. منع اختصارات التحديث (F5, Ctrl+R)
+  const handleKeyDown = (e) => {
+    if (
+      e.key === 'F5' || 
+      (e.ctrlKey && e.key === 'r') || 
+      (e.metaKey && e.key === 'r')
+    ) {
+      e.preventDefault();
+    }
+  };
+
+  // 3. رصد محاولة الغش عند الخروج من الصفحة
+  const handleVisibilityChange = () => { 
+    if (document.hidden) handleCheating(); 
+  };
+
+  window.addEventListener("beforeunload", handleBeforeUnload);
+  window.addEventListener("keydown", handleKeyDown);
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+  
+  return () => {
+    window.removeEventListener("beforeunload", handleBeforeUnload);
+    window.removeEventListener("keydown", handleKeyDown);
+    document.removeEventListener("visibilitychange", handleVisibilityChange);
+  };
+}, [isSubmitted, isReviewMode]);
 
   useEffect(() => {
     if (isReviewMode || isSubmitted) return;
