@@ -16,7 +16,7 @@ import {
   ExternalLink, ClipboardList, Timer, AlertOctagon, Flag, Save, HelpCircle, 
   Reply, Unlock, Layout, Settings, Trophy, Megaphone, Bell, Download, XCircle, 
   Calendar, Clock, FileWarning, Settings as GearIcon, Star, Bot, Power, Upload,
-  Users, PenTool, Share2
+  Users, PenTool, Share2, Shuffle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -50,6 +50,20 @@ try {
  * =================================================================
  */
 
+// دالة خلط المصفوفات (Fisher-Yates Shuffle)
+const shuffleArray = (array) => {
+    let currentIndex = array.length, randomIndex;
+    // While there remain elements to shuffle.
+    while (currentIndex !== 0) {
+      // Pick a remaining element.
+      randomIndex = Math.floor(Math.random() * currentIndex);
+      currentIndex--;
+      // And swap it with the current element.
+      [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+    }
+    return array;
+};
+
 const requestNotificationPermission = () => {
   if (!("Notification" in window)) return;
   if (Notification.permission === "default") {
@@ -81,7 +95,7 @@ const getYouTubeID = (url) => {
     return (match && match[2].length === 11) ? match[2] : null;
 };
 
-// --- دالة توليد التقرير PDF (النسخة المدمجة: شهادات + جداول) ---
+// --- دالة توليد التقرير PDF (محدثة لدعم المقالي) ---
 const generatePDF = (type, data) => {
     if (!window.html2pdf) {
         alert("جاري تحميل نظام الطباعة... يرجى الانتظار ثوانٍ والمحاولة مرة أخرى.");
@@ -92,7 +106,7 @@ const generatePDF = (type, data) => {
     const date = new Date().toLocaleDateString('ar-EG');
     const element = document.createElement('div');
     
-    // 1. إنشاء جدول الإجابات (يضاف في كل الحالات)
+    // جدول الإجابات
     let answersTable = '';
     if (data.questions && data.answers) {
         answersTable = `
@@ -103,27 +117,38 @@ const generatePDF = (type, data) => {
                     <tr style="background-color: #f3f4f6; color: #333;">
                         <th style="border: 1px solid #ddd; padding: 10px; width: 5%;">#</th>
                         <th style="border: 1px solid #ddd; padding: 10px; text-align: right;">السؤال</th>
-                        <th style="border: 1px solid #ddd; padding: 10px; width: 15%;">إجابتك</th>
+                        <th style="border: 1px solid #ddd; padding: 10px; width: 25%;">إجابتك</th>
                         <th style="border: 1px solid #ddd; padding: 10px; width: 15%;">الصح</th>
                         <th style="border: 1px solid #ddd; padding: 10px; width: 10%;">الحالة</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${data.questions.map((q, i) => {
-                        const studentAnsIdx = data.answers[q.id];
-                        const correctAnsIdx = q.correctIdx;
-                        const isCorrect = studentAnsIdx === correctAnsIdx;
-                        const studentAnsText = studentAnsIdx !== undefined && q.options ? q.options[studentAnsIdx] : 'لم يجب';
-                        const correctAnsText = q.options ? q.options[correctAnsIdx] : '';
+                        const studentAns = data.answers[q.id];
+                        let isCorrect = false;
+                        let studentAnsText = 'لم يجب';
+                        let correctAnsText = '';
+
+                        if (q.type === 'essay') {
+                            studentAnsText = studentAns || 'لم يجب';
+                            correctAnsText = 'يحتاج تصحيح يدوي';
+                            isCorrect = true; // نفترض صحة المقالي مؤقتاً في العرض أو نلونه بلون محايد
+                        } else {
+                            const studentAnsIdx = studentAns;
+                            const correctAnsIdx = q.correctIdx;
+                            isCorrect = studentAnsIdx === correctAnsIdx;
+                            studentAnsText = studentAnsIdx !== undefined && q.options ? q.options[studentAnsIdx] : 'لم يجب';
+                            correctAnsText = q.options ? q.options[correctAnsIdx] : '';
+                        }
                         
                         return `
-                        <tr style="background-color: ${isCorrect ? '#f0fdf4' : '#fef2f2'};">
+                        <tr style="background-color: ${q.type === 'essay' ? '#fff7ed' : (isCorrect ? '#f0fdf4' : '#fef2f2')};">
                             <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${i + 1}</td>
-                            <td style="border: 1px solid #ddd; padding: 8px;">${q.text}</td>
+                            <td style="border: 1px solid #ddd; padding: 8px;">${q.text} ${q.type === 'essay' ? '<span style="color:#d97706; font-size:10px;">(مقالي)</span>' : ''}</td>
                             <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">${studentAnsText}</td>
                             <td style="border: 1px solid #ddd; padding: 8px; color: green;">${correctAnsText}</td>
                             <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">
-                                ${isCorrect ? '<span style="color:green">✔ صحيح</span>' : '<span style="color:red">✘ خطأ</span>'}
+                                ${q.type === 'essay' ? '<span style="color:#d97706">---</span>' : (isCorrect ? '<span style="color:green">✔ صحيح</span>' : '<span style="color:red">✘ خطأ</span>')}
                             </td>
                         </tr>
                         `;
@@ -134,103 +159,75 @@ const generatePDF = (type, data) => {
         `;
     }
 
-    // 2. تحديد تصميم الشهادة
-    if (type === 'admin') {
-         // تصميم تقرير الأدمن (رسمي)
-         element.innerHTML = `
-          <div style="padding: 40px; font-family: 'Cairo', sans-serif; direction: rtl; border: 2px solid #333; text-align: center;">
-            <h1 style="color: #d97706;">تقرير طالب - منصة النحاس</h1>
-            <hr style="margin: 20px 0; border-top: 1px solid #ccc;"/>
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 18px;">
-                <tr><td style="padding: 15px; border: 1px solid #ccc; background: #f9f9f9; width: 30%;">اسم الطالب</td><td style="padding: 15px; border: 1px solid #ccc;">${data.studentName}</td></tr>
-                <tr><td style="padding: 15px; border: 1px solid #ccc; background: #f9f9f9;">الدرجة</td>
-                    <td style="padding: 15px; border: 1px solid #ccc;">
-                        <div style="display: inline-block; border: 2px solid #d97706; padding: 5px 15px; border-radius: 5px; font-weight: bold; direction: ltr;">${data.score} / ${data.total}</div>
+    const header = `
+      <div style="padding: 40px; font-family: 'Cairo', sans-serif; direction: rtl; color: #333;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #d97706; padding-bottom: 20px; margin-bottom: 30px;">
+            <div style="text-align: right;">
+                <h1 style="margin: 0; color: #d97706; font-size: 28px;">منصة النحاس التعليمية</h1>
+                <p style="margin: 5px 0 0; color: #666;">للغة العربية - أ/ محمد النحاس</p>
+            </div>
+            <div style="text-align: left;">
+                <p style="margin: 0; font-weight: bold;">تقرير نتيجة امتحان</p>
+                <p style="margin: 5px 0 0; color: #666;">${date}</p>
+            </div>
+        </div>
+        
+        <div style="background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+            <table style="width: 100%; font-size: 18px;">
+                <tr>
+                    <td style="padding: 10px; font-weight: bold; width: 20%;">اسم الطالب:</td>
+                    <td style="padding: 10px;">${data.studentName}</td>
+                    <td style="padding: 10px; font-weight: bold; width: 20%;">الامتحان:</td>
+                    <td style="padding: 10px;">${data.examTitle || 'اختبار عام'}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; font-weight: bold; vertical-align: middle;">الدرجة (اختياري):</td>
+                    <td style="padding: 10px;">
+                        <div style="
+                            display: inline-block;
+                            border: 3px solid #d97706;
+                            border-radius: 8px;
+                            padding: 5px 20px;
+                            font-weight: bold;
+                            color: #d97706;
+                            direction: ltr;
+                            font-family: sans-serif;
+                            font-size: 20px;
+                            background: #fffbeb;
+                        ">
+                            ${data.score} / ${data.total}
+                        </div>
+                    </td>
+                    <td style="padding: 10px; font-weight: bold; vertical-align: middle;">النسبة:</td>
+                    <td style="padding: 10px; font-size: 20px; font-weight: bold;">${percentage}%</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; font-weight: bold;">الحالة:</td>
+                    <td style="padding: 10px;" colspan="3">
+                        <span style="background: ${data.status === 'cheated' ? '#fee2e2' : '#dcfce7'}; color: ${data.status === 'cheated' ? '#991b1b' : '#166534'}; padding: 5px 15px; border-radius: 20px; font-size: 14px;">
+                            ${data.status === 'cheated' ? 'تم إلغاؤه (غش)' : percentage >= 50 ? 'ناجح' : 'راسب'}
+                        </span>
                     </td>
                 </tr>
-                <tr><td style="padding: 15px; border: 1px solid #ccc; background: #f9f9f9;">النسبة</td><td style="padding: 15px; border: 1px solid #ccc;">${percentage}%</td></tr>
-                <tr><td style="padding: 15px; border: 1px solid #ccc; background: #f9f9f9;">التاريخ</td><td style="padding: 15px; border: 1px solid #ccc;">${date}</td></tr>
             </table>
-            ${answersTable}
-          </div>`;
-    } else if (percentage >= 85) {
-        // شهادة تفوق (تصميم أسود وذهبي فخم)
-        element.innerHTML = `
-          <div style="width: 297mm; padding: 20px; margin: 0; background-color: #0F0F0F; color: #D4AF37; font-family: 'Cairo', sans-serif; position: relative; text-align: center; box-sizing: border-box;">
-            <div style="border: 5px solid #D4AF37; padding: 40px 20px; box-sizing: border-box;">
-                <div style="font-size: 80px; margin-bottom: 10px;">🏆</div>
-                <h1 style="font-size: 50px; margin: 0; font-weight: 900; letter-spacing: 2px;">شهـــادة تـقـديــر وتـفــوق</h1>
-                <p style="font-size: 20px; color: #fff; margin-top: 10px;">تتشرف منصة النحاس التعليمية للغة العربية بأن تمنح</p>
+        </div>
+        
+        ${answersTable}
 
-                <h2 style="font-size: 60px; color: #fff; font-family: 'Reem Kufi', sans-serif; margin: 20px 0; text-shadow: 0 0 10px #D4AF37;">${data.studentName}</h2>
-                <div style="width: 300px; height: 2px; background: #D4AF37; margin: 10px auto;"></div>
-                
-                <p style="font-size: 22px; color: #ccc; line-height: 1.6; margin-top: 20px;">
-                    وذلك لتفوقه الباهر وحصوله على درجة متميزة في الاختبار. <br/>
-                    مع خالص تمنياتنا بدوام التوفيق والنجاح.
-                </p>
+        <div style="margin-top: 50px; text-align: center; border-top: 1px solid #eee; padding-top: 20px;">
+             <p style="font-size: 14px; color: #999;">تم استخراج هذا التقرير آلياً من منصة النحاس التعليمية</p>
+        </div>
+      </div>
+    `;
 
-                <div style="margin: 30px 0;">
-                     <span style="font-size: 18px; color: #fff; display: block; margin-bottom: 5px;">الدرجة النهائية</span>
-                     <div style="display: inline-block; border: 3px solid #D4AF37; color: #fff; padding: 10px 40px; font-size: 35px; font-weight: bold; border-radius: 10px; direction: ltr; background: rgba(212, 175, 55, 0.1);">
-                        ${data.score} / ${data.total}
-                     </div>
-                </div>
-
-                <div style="display: flex; justify-content: space-between; align-items: flex-end; padding: 0 60px; margin-top: 40px;">
-                    <div style="text-align: right;">
-                        <p style="font-size: 16px; color: #aaa; margin-bottom: 5px;">تاريخ التحرير</p>
-                        <p style="font-size: 20px; color: #fff; font-weight: bold;">${date}</p>
-                    </div>
-                    <div style="text-align: left;">
-                        <p style="font-size: 16px; color: #aaa; margin-bottom: 5px;">معلم المادة</p>
-                        <h3 style="font-size: 35px; font-family: 'Reem Kufi', sans-serif; margin: 0; color: #D4AF37;">أ / محمد النحاس</h3>
-                    </div>
-                </div>
-            </div>
-            ${answersTable} 
-          </div>
-        `;
-    } else {
-        // تقرير مستوى (أحمر وأبيض)
-        element.innerHTML = `
-          <div style="width: 297mm; padding: 40px; font-family: 'Cairo', sans-serif; direction: rtl; text-align: center; background: #fff; border: 15px solid #ef4444; box-sizing: border-box;">
-            <h1 style="color: #b91c1c; font-size: 50px; margin-bottom: 20px; font-weight: 900;">تقرير مستوى (تنبيه)</h1>
-            <h2 style="font-size: 45px; color: #333; margin: 20px 0;">الطالب / ${data.studentName}</h2>
-            
-            <div style="background: #fef2f2; padding: 30px; border-radius: 20px; border: 3px solid #fecaca; margin: 40px auto; width: 60%;">
-                <p style="font-size: 22px; color: #7f1d1d;">للأسف، لم تحقق المستوى المطلوب في هذا الاختبار.</p>
-                <hr style="border: 0; border-top: 2px solid #eee; margin: 20px 0;">
-                
-                <div style="margin: 15px 0;">
-                     <div style="display: inline-block; border: 3px solid #ef4444; color: #b91c1c; padding: 10px 40px; font-size: 40px; font-weight: bold; border-radius: 10px; direction: ltr; background: #fff;">
-                        ${data.score} / ${data.total}
-                     </div>
-                </div>
-                
-                <h3 style="font-size: 30px; color: #ef4444; margin: 10px 0; font-weight: 900;">%${percentage}</h3>
-            </div>
-
-            <div style="text-align: center; margin-top: 40px;">
-                <p style="font-size: 26px; color: #4b5563; line-height: 1.6; font-weight: bold;">
-                    "النجاح محتاج مجهود.. شد حيلك في اللي جاي!"
-                </p>
-            </div>
-            
-            <div style="margin-top: 60px; text-align: left; padding-left: 60px;">
-                 <h3 style="font-size: 30px; color: #555;">أ / محمد النحاس</h3>
-            </div>
-            ${answersTable}
-          </div>
-        `;
-    }
+    element.innerHTML = header;
     
     const opt = { 
-        margin: 0, 
-        filename: percentage >= 85 ? `شهادة_${data.studentName}.pdf` : `تقرير_${data.studentName}.pdf`, 
+        margin: 0.5, 
+        filename: `تقرير_${data.studentName}_${date}.pdf`, 
         image: { type: 'jpeg', quality: 0.98 }, 
-        html2canvas: { scale: 2, useCORS: true }, 
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } // Landscape للشهادات العريضة
+        html2canvas: { scale: 2, useCORS: true, logging: false }, 
+        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } 
     };
     
     window.html2pdf().set(opt).from(element).save();
@@ -474,7 +471,6 @@ const ChatWidget = ({ user }) => {
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'auto_replies'), (snap) => {
-        // نأتي فقط بالردود النشطة (isActive == true)
         const rules = snap.docs.map(d => d.data()).filter(r => r.isActive);
         setAutoReplies(rules);
     });
@@ -522,7 +518,6 @@ const ChatWidget = ({ user }) => {
       } 
       else {
           let matchedRule = null;
-          // البحث في قواعد الرد الآلي
           for (const rule of autoReplies) {
               const keywords = rule.keywords.split(',').map(k => k.trim().toLowerCase());
               if (keywords.some(k => lowerText.includes(k) && k.length > 0)) {
@@ -712,17 +707,52 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const [isSubmitted, setIsSubmitted] = useState(isReviewMode);
   const [score, setScore] = useState(existingResult?.score || 0);
   const [startTime] = useState(Date.now()); 
+  
+  // حالة جديدة للاسئلة (مخلوطة أم لا)
+  const [flatQuestions, setFlatQuestions] = useState([]);
 
-  const flatQuestions = [];
-  if (exam.questions) {
-    exam.questions.forEach((block) => {
-      block.subQuestions.forEach((q) => {
-        flatQuestions.push({ ...q, blockText: block.text });
-      });
-    });
-  }
+  useEffect(() => {
+      // تجهيز الأسئلة عند فتح الامتحان
+      let questions = [];
+      if (exam.questions) {
+          // نسخ عميق لتجنب التعديل على الأصل
+          const blocks = JSON.parse(JSON.stringify(exam.questions));
+          
+          // إذا كان الخلط مفعل، نخلط البلوكات (التي تحتوي على القطع وأسئلتها)
+          if (exam.shuffle && !isReviewMode) {
+              shuffleArray(blocks);
+          }
 
-  if (flatQuestions.length === 0) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-white">عفواً، لا توجد أسئلة.<button onClick={onClose} className="ml-4 bg-gray-200 px-4 py-2 rounded">خروج</button></div>;
+          blocks.forEach((block) => {
+              if (block.subQuestions) {
+                  // إذا كان الخلط مفعل، نخلط الأسئلة الفرعية (فقط إذا لم يكن هناك نص للقطعة يفرض الترتيب، لكن عادة الترتيب داخل القطعة مهم، هنا سنخلطه حسب الطلب)
+                  // ملاحظة: عادة أسئلة القطعة مرتبة حسب ورودها في النص، لكن لو أردت خلطها:
+                  if (exam.shuffle && !isReviewMode) {
+                      shuffleArray(block.subQuestions);
+                  }
+
+                  block.subQuestions.forEach((q) => {
+                      // تحديد نوع السؤال تلقائياً إذا لم يكن محدداً
+                      const type = (q.options && q.options.length > 0) ? 'multiple_choice' : 'essay';
+                      
+                      // إذا كان اختيار من متعدد والخلط مفعل، نخلط الاختيارات (مع الحفاظ على الإجابة الصحيحة)
+                      if (type === 'multiple_choice' && exam.shuffle && !isReviewMode) {
+                          // نحتاج نحتفظ بنص الإجابة الصحيحة قبل الخلط لأن الاندكس سيتغير
+                          const correctOptionText = q.options[q.correctIdx];
+                          shuffleArray(q.options);
+                          // تحديث الاندكس الجديد
+                          q.correctIdx = q.options.indexOf(correctOptionText);
+                      }
+
+                      questions.push({ ...q, blockText: block.text, type });
+                  });
+              }
+          });
+      }
+      setFlatQuestions(questions);
+  }, [exam, isReviewMode]);
+
+  if (flatQuestions.length === 0) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-white">جاري تحميل الأسئلة...</div>;
 
   useEffect(() => {
     if (isReviewMode || isSubmitted) return;
@@ -764,19 +794,26 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     await updateDoc(doc(db, 'users', user.uid), { status: 'banned_cheating' });
   };
 
-  const handleAnswer = (qId, optionIdx) => { 
-    if(!isReviewMode && !isSubmitted) setAnswers({ ...answers, [qId]: optionIdx }); 
+  const handleAnswer = (qId, val) => { 
+    if(!isReviewMode && !isSubmitted) setAnswers({ ...answers, [qId]: val }); 
   };
   
   const calculateScore = () => {
     let rawScore = 0;
-    flatQuestions.forEach(q => { if (answers[q.id] === q.correctIdx) rawScore++; });
+    flatQuestions.forEach(q => { 
+        if (q.type === 'multiple_choice' && answers[q.id] === q.correctIdx) rawScore++; 
+        // المقالي لا يصحح تلقائياً هنا، يمكن إضافة منطق لاحقاً
+    });
     return rawScore;
   };
 
   const handleSubmit = async (auto = false) => {
-    const totalQs = flatQuestions.length;
-    if (!auto && Object.keys(answers).length < totalQs && !window.confirm("لم تجب على كل الأسئلة، هل أنت متأكد؟")) return;
+    // التحقق فقط من أسئلة الاختيار من متعدد
+    const mcqs = flatQuestions.filter(q => q.type === 'multiple_choice');
+    const answeredMcqs = mcqs.filter(q => answers[q.id] !== undefined);
+    
+    if (!auto && answeredMcqs.length < mcqs.length && !window.confirm("لم تجب على كل الأسئلة الاختيارية، هل أنت متأكد؟")) return;
+    
     const finalScore = calculateScore();
     const timeTaken = Math.round((Date.now() - startTime) / 1000);
     setScore(finalScore);
@@ -787,7 +824,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
       studentId: user.uid, 
       studentName: user.displayName, 
       score: finalScore, 
-      total: totalQs, 
+      total: mcqs.length, // الدرجة الكلية هي عدد أسئلة الاختيار (المقالي يصحح يدوياً)
       answers, 
       status: 'completed',
       timeTaken: timeTaken,
@@ -806,9 +843,13 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
         <div className="fixed inset-0 z-[60] bg-slate-50 overflow-y-auto p-4 font-['Cairo']" dir="rtl">
             <div className="max-w-4xl mx-auto bg-white rounded-3xl shadow-xl p-8 mt-10 text-center">
                 <h2 className="text-3xl font-black mb-4">تم الانتهاء من الامتحان</h2>
-                <div className={`text-6xl font-black my-6 ${score >= flatQuestions.length / 2 ? 'text-green-600' : 'text-red-600'}`}>{score} / {flatQuestions.length}</div>
+                {/* حساب عدد الأسئلة الاختيارية فقط للدرجة */}
+                <div className={`text-6xl font-black my-6 ${score >= flatQuestions.filter(q=>q.type!=='essay').length / 2 ? 'text-green-600' : 'text-red-600'}`}>
+                    {score} / {flatQuestions.filter(q=>q.type!=='essay').length}
+                </div>
+                <p className="text-slate-500 mb-6">سيتم مراجعة الأسئلة المقالية (إن وجدت) من قبل المعلم.</p>
                 <div className="flex gap-4 justify-center">
-                    <button onClick={() => generatePDF('student', {studentName: user.displayName, score, total: flatQuestions.length, status: 'completed', examTitle: exam.title, questions: flatQuestions, answers: answers })} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2"><Download size={18}/> تحميل الشهادة (مع الإجابات)</button>
+                    <button onClick={() => generatePDF('student', {studentName: user.displayName, score, total: flatQuestions.filter(q=>q.type!=='essay').length, status: 'completed', examTitle: exam.title, questions: flatQuestions, answers: answers })} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2"><Download size={18}/> تحميل الشهادة</button>
                     <button onClick={onClose} className="bg-slate-900 text-white py-3 px-8 rounded-xl font-bold">عودة للرئيسية</button>
                 </div>
             </div>
@@ -840,9 +881,13 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
               {flatQuestions.map((q, idx) => {
                   let statusClass = 'bg-slate-100 text-slate-600';
                   if (isReviewMode) {
-                      if (answers[q.id] === q.correctIdx) statusClass = 'bg-green-100 text-green-700 border border-green-400';
-                      else statusClass = 'bg-red-100 text-red-700 border border-red-400';
-                  } else if (answers[q.id] !== undefined) {
+                      if (q.type === 'essay') {
+                          statusClass = 'bg-amber-100 text-amber-700 border border-amber-400';
+                      } else {
+                          if (answers[q.id] === q.correctIdx) statusClass = 'bg-green-100 text-green-700 border border-green-400';
+                          else statusClass = 'bg-red-100 text-red-700 border border-red-400';
+                      }
+                  } else if (answers[q.id] !== undefined && (q.type !== 'essay' || answers[q.id].trim().length > 0)) {
                       statusClass = 'bg-blue-100 text-blue-700 border border-blue-400';
                   }
                   return (
@@ -865,7 +910,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
           
           <div className={`${hasPassage ? 'flex-1' : 'w-full max-w-4xl mx-auto'} bg-white p-8 overflow-y-auto flex flex-col shadow-sm m-4 rounded-3xl h-fit max-h-[95%] border border-slate-200`}>
             <div className="flex justify-between items-start mb-8">
-              <span className="bg-slate-100 text-slate-600 px-4 py-1 rounded-full text-sm font-bold">سؤال {currentQIndex + 1}</span>
+              <span className="bg-slate-100 text-slate-600 px-4 py-1 rounded-full text-sm font-bold">سؤال {currentQIndex + 1} {currentQObj.type === 'essay' && '(مقالي)'}</span>
               {!isReviewMode && <button onClick={() => { setFlagged({...flagged, [currentQObj.id]: !flagged[currentQObj.id]}) }} className={`flex items-center gap-2 px-4 py-1 rounded-full text-sm font-bold transition ${flagged[currentQObj.id] ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}><Flag size={16} /> مراجعة لاحقاً</button>}
             </div>
             
@@ -874,25 +919,37 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
             </div>
 
             <div className="space-y-4">
-              {currentQObj.options.map((opt, idx) => {
-                  let optionClass = 'border-slate-200 hover:bg-slate-50';
-                  if (isReviewMode) {
-                      if (idx === currentQObj.correctIdx) optionClass = 'border-green-500 bg-green-50 text-green-900'; 
-                      else if (answers[currentQObj.id] === idx) optionClass = 'border-red-500 bg-red-50 text-red-900'; 
-                  } else {
-                      if (answers[currentQObj.id] === idx) optionClass = 'border-amber-500 bg-amber-50 text-amber-900 shadow-sm';
-                  }
+              {currentQObj.type === 'essay' ? (
+                  // عرض السؤال المقالي
+                  <textarea 
+                    disabled={isReviewMode}
+                    className={`w-full border-2 rounded-xl p-4 min-h-[150px] text-lg focus:border-amber-500 outline-none ${isReviewMode ? 'bg-gray-100' : 'bg-white'}`}
+                    placeholder="اكتب إجابتك هنا..."
+                    value={answers[currentQObj.id] || ''}
+                    onChange={(e) => handleAnswer(currentQObj.id, e.target.value)}
+                  />
+              ) : (
+                  // عرض الاختيارات (Multiple Choice)
+                  currentQObj.options.map((opt, idx) => {
+                      let optionClass = 'border-slate-200 hover:bg-slate-50';
+                      if (isReviewMode) {
+                          if (idx === currentQObj.correctIdx) optionClass = 'border-green-500 bg-green-50 text-green-900'; 
+                          else if (answers[currentQObj.id] === idx) optionClass = 'border-red-500 bg-red-50 text-red-900'; 
+                      } else {
+                          if (answers[currentQObj.id] === idx) optionClass = 'border-amber-500 bg-amber-50 text-amber-900 shadow-sm';
+                      }
 
-                  return (
-                    <div key={idx} onClick={() => handleAnswer(currentQObj.id, idx)} className={`p-5 rounded-xl border-2 cursor-pointer transition flex items-center gap-4 text-lg font-medium ${optionClass}`}>
-                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${answers[currentQObj.id] === idx || (isReviewMode && idx === currentQObj.correctIdx) ? 'border-transparent bg-current' : 'border-slate-300'}`}>
-                      </div>
-                      <span>{opt}</span>
-                      {isReviewMode && idx === currentQObj.correctIdx && <CheckCircle className="text-green-600 mr-auto"/>}
-                      {isReviewMode && answers[currentQObj.id] === idx && idx !== currentQObj.correctIdx && <XCircle className="text-red-600 mr-auto"/>}
-                    </div>
-                  )
-              })}
+                      return (
+                        <div key={idx} onClick={() => handleAnswer(currentQObj.id, idx)} className={`p-5 rounded-xl border-2 cursor-pointer transition flex items-center gap-4 text-lg font-medium ${optionClass}`}>
+                          <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${answers[currentQObj.id] === idx || (isReviewMode && idx === currentQObj.correctIdx) ? 'border-transparent bg-current' : 'border-slate-300'}`}>
+                          </div>
+                          <span>{opt}</span>
+                          {isReviewMode && idx === currentQObj.correctIdx && <CheckCircle className="text-green-600 mr-auto"/>}
+                          {isReviewMode && answers[currentQObj.id] === idx && idx !== currentQObj.correctIdx && <XCircle className="text-red-600 mr-auto"/>}
+                        </div>
+                      )
+                  })
+              )}
             </div>
 
             <div className="mt-12 flex justify-between">
@@ -918,7 +975,7 @@ const AdminDashboard = ({ user }) => {
   const [isLive, setIsLive] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [replyTexts, setReplyTexts] = useState({});
-  const [examBuilder, setExamBuilder] = useState({ title: '', grade: '3sec', duration: 60, startTime: '', endTime: '', questions: [], accessCode: '' });
+  const [examBuilder, setExamBuilder] = useState({ title: '', grade: '3sec', duration: 60, startTime: '', endTime: '', questions: [], accessCode: '', shuffle: false });
   const [bulkText, setBulkText] = useState('');
   const [examsList, setExamsList] = useState([]);
   const [examResults, setExamResults] = useState([]); 
@@ -957,7 +1014,11 @@ const AdminDashboard = ({ user }) => {
   const handleUnban = async (id) => updateDoc(doc(db,'users',id), {status:'active'});
   const handleDeleteUser = async (id) => { if(window.confirm("حذف نهائي؟")) await deleteDoc(doc(db,'users',id)); };
   const handleDeleteMessage = async (id) => { if(window.confirm("حذف الرسالة؟")) await deleteDoc(doc(db,'messages',id)); };
-  const handleDeleteExam = async (id) => { if(window.confirm("حذف الامتحان؟")) await deleteDoc(doc(db, 'exams', id)); };
+  
+  // تعديل: حذف الامتحان
+  const handleDeleteExam = async (id) => { 
+      if(window.confirm("حذف الامتحان؟")) await deleteDoc(doc(db, 'exams', id)); 
+  };
   const handleDeleteAnnouncement = async (id) => { if(window.confirm("حذف الإعلان؟")) await deleteDoc(doc(db, 'announcements', id)); };
   
   const handleDeleteResult = async (resultId) => { if(window.confirm("حذف النتيجة؟")) await deleteDoc(doc(db, 'exam_results', resultId)); };
@@ -1049,6 +1110,47 @@ const AdminDashboard = ({ user }) => {
   const startLiveStream = async () => { if(!liveData.liveUrl) return alert("الرابط؟"); await addDoc(collection(db, 'live_sessions'), { ...liveData, status: 'active', createdAt: serverTimestamp() }); await addDoc(collection(db, 'notifications'), { text: `🔴 بث مباشر الآن: ${liveData.title}`, grade: liveData.grade, createdAt: serverTimestamp() }); alert("بدا البث!"); };
   const stopLiveStream = async () => { if(window.confirm("إنهاء البث؟")) { const q = query(collection(db, 'live_sessions'), where('status', '==', 'active')); const snap = await getDocs(q); snap.forEach(async (d) => await updateDoc(doc(db, 'live_sessions', d.id), { status: 'ended' })); alert("تم الإنهاء"); } };
 
+  // --- دالة تعديل الامتحان (استرجاع البيانات) ---
+  const handleEditExam = (exam) => {
+      setExamBuilder({ 
+          title: exam.title, 
+          grade: exam.grade, 
+          duration: exam.duration, 
+          accessCode: exam.accessCode, 
+          questions: exam.questions,
+          startTime: exam.startTime,
+          endTime: exam.endTime,
+          shuffle: exam.shuffle || false // استرجاع حالة الخلط
+      });
+      
+      // تحويل هيكل الأسئلة (JSON) إلى نص (Text) ليتمكن الأدمن من تعديله
+      let text = "";
+      exam.questions.forEach(group => {
+          if(group.text && group.text.trim()) {
+              text += `بداية القطعة\n${group.text}\nنهاية القطعة\n\n`;
+          }
+          group.subQuestions.forEach(q => {
+              text += `${q.text}\n`;
+              if (q.options && q.options.length > 0) {
+                  // سؤال اختياري
+                  q.options.forEach((opt, i) => { 
+                      // إضافة النجمة للاختيار الصحيح
+                      const prefix = i === q.correctIdx ? '*' : '';
+                      text += `${prefix}${opt}\n`; 
+                  });
+              } else {
+                  // سؤال مقالي (بدون خيارات) - نتركه كما هو، النظام سيفهمه
+              }
+              text += "\n";
+          });
+          if(group.text && group.text.trim()) text += "حذف القطعة\n\n";
+      });
+      setBulkText(text);
+      if(window.confirm("للتعديل سيتم حذف النسخة القديمة وإنشاء جديدة، موافق؟")) {
+          deleteDoc(doc(db, 'exams', exam.id));
+      }
+  };
+
   const parseExam = async () => {
     if (!bulkText.trim()) return alert("أدخل نص الامتحان");
     if (!examBuilder.accessCode) return alert("أدخل كود للامتحان");
@@ -1061,24 +1163,59 @@ const AdminDashboard = ({ user }) => {
     let isReadingPassage = false;
 
     lines.forEach(line => {
-      if (line === 'بداية القطعة') { if (currentBlock.subQuestions.length > 0 || currentQ) { if(currentQ) currentBlock.subQuestions.push(currentQ); blocks.push(currentBlock); } currentBlock = { text: '', subQuestions: [] }; currentQ = null; isReadingPassage = true; return; }
+      if (line === 'بداية القطعة') { 
+          // حفظ ما سبق
+          if (currentBlock.subQuestions.length > 0 || currentQ) { 
+              if(currentQ) currentBlock.subQuestions.push(currentQ); 
+              blocks.push(currentBlock); 
+          } 
+          // بدء بلوك جديد
+          currentBlock = { text: '', subQuestions: [] }; 
+          currentQ = null; 
+          isReadingPassage = true; 
+          return; 
+      }
       if (line === 'نهاية القطعة') { isReadingPassage = false; return; }
-      if (line === 'حذف القطعة') { if(currentQ) currentBlock.subQuestions.push(currentQ); blocks.push(currentBlock); currentBlock = { text: '', subQuestions: [] }; currentQ = null; return; }
+      if (line === 'حذف القطعة') { 
+          if(currentQ) currentBlock.subQuestions.push(currentQ); 
+          blocks.push(currentBlock); 
+          currentBlock = { text: '', subQuestions: [] }; 
+          currentQ = null; 
+          return; 
+      }
 
-      if (isReadingPassage) { currentBlock.text += line + '\n'; } 
-      else {
-        if (line.startsWith('*') || (currentQ && currentQ.options.length < 4)) {
-          if (!currentQ) return; 
-          const isCorrect = line.startsWith('*');
-          const optText = isCorrect ? line.substring(1).trim() : line;
-          if (isCorrect) currentQ.correctIdx = currentQ.options.length;
-          currentQ.options.push(optText);
+      if (isReadingPassage) { 
+          currentBlock.text += line + '\n'; 
+      } else {
+        // التحقق هل السطر هو "اختيار" أم "سؤال جديد"
+        // السطر يعتبر اختيار إذا بدأ بنجمة أو إذا كان هناك سؤال مفتوح ولديه أقل من 4 خيارات (افتراضياً)
+        // لكن لدعم المقالي، سنفترض أن أي سطر يبدأ بـ * هو إجابة، وأي سطر عادي هو سؤال جديد إذا لم يكن هناك سؤال مفتوح
+        
+        const isOption = line.startsWith('*') || (currentQ && currentQ.options.length < 4 && !line.includes('?')); 
+        // ملاحظة: المنطق هنا يحتاج دقة. لنجعله: إذا بدأ ب * فهو جواب. إذا لم يبدأ ب * وكان لدينا سؤال، نعتبره خياراً إذا لم ينته بعلامة استفهام؟ لا، هذا معقد.
+        // لنبسط: السطر الجديد دائماً سؤال، إلا إذا بدأ ب * أو كان يتبع سؤالاً ونريد اعتباره خياراً.
+        // الطريقة الأفضل حسب تعليماتك: *(أ) كذا.
+        
+        if (line.startsWith('*')) {
+             if (!currentQ) return; // تجاهل خيار بدون سؤال
+             const isCorrect = true;
+             // حذف النجمة من البداية
+             const optText = line.substring(1).trim();
+             if (isCorrect) currentQ.correctIdx = currentQ.options.length;
+             currentQ.options.push(optText);
+        } else if (currentQ && currentQ.options.length > 0 && currentQ.options.length < 4 && !line.includes('?')) {
+             // حالة خاصة: خيارات لا تبدأ بنجمة (اختيارات خاطئة)
+             // هذا السطر اختياري، لكن بما أنك ستضع * قبل الإجابة، فالأسطر الأخرى هي خيارات خاطئة
+             currentQ.options.push(line);
         } else {
-          if (currentQ) currentBlock.subQuestions.push(currentQ);
-          currentQ = { id: Date.now() + Math.random(), text: line, options: [], correctIdx: 0 };
+             // سؤال جديد
+             if (currentQ) currentBlock.subQuestions.push(currentQ);
+             // إنشاء سؤال جديد (مبدئياً هو مقالي حتى يثبت العكس بوجود خيارات)
+             currentQ = { id: Date.now() + Math.random(), text: line, options: [], correctIdx: 0 };
         }
       }
     });
+    // إضافة آخر سؤال
     if (currentQ) currentBlock.subQuestions.push(currentQ);
     blocks.push(currentBlock);
 
@@ -1088,7 +1225,8 @@ const AdminDashboard = ({ user }) => {
     await addDoc(collection(db, 'exams'), { 
         title: examBuilder.title, grade: examBuilder.grade, duration: examBuilder.duration, 
         startTime: examBuilder.startTime, endTime: examBuilder.endTime, accessCode: examBuilder.accessCode, 
-        questions: finalBlocks, createdAt: serverTimestamp() 
+        questions: finalBlocks, createdAt: serverTimestamp(),
+        shuffle: examBuilder.shuffle // حفظ إعداد الخلط
     });
     
     await addDoc(collection(db, 'notifications'), { text: `امتحان جديد: ${examBuilder.title}`, grade: examBuilder.grade, createdAt: serverTimestamp() });
@@ -1106,6 +1244,7 @@ const AdminDashboard = ({ user }) => {
       setShowLeaderboard(!showLeaderboard);
   };
 
+  // دوال الرد الآلي
   const handleAddAutoReply = async () => {
       if(!newAutoReply.keywords || !newAutoReply.response) return alert("أكمل البيانات");
       await addDoc(collection(db, 'auto_replies'), newAutoReply);
@@ -1118,6 +1257,7 @@ const AdminDashboard = ({ user }) => {
       if(window.confirm("حذف هذا الرد؟")) await deleteDoc(doc(db, 'auto_replies', id));
   };
 
+  // دوال الحكم
   const handleAddQuote = async () => {
       if(!newQuote.text || !newQuote.source) return alert("أكمل البيانات");
       await addDoc(collection(db, 'quotes'), { ...newQuote, createdAt: serverTimestamp() });
@@ -1148,7 +1288,48 @@ const AdminDashboard = ({ user }) => {
 
           {activeTab === 'all_users' && <div className="bg-white p-6 rounded-xl shadow-sm"><h2 className="font-bold mb-4">قائمة الطلاب</h2>{editingUser&&<form onSubmit={handleUpdateUser} className="mb-4 bg-amber-50 p-4 rounded grid gap-2"><input className="border p-2" value={editingUser.name} onChange={e=>setEditingUser({...editingUser, name:e.target.value})}/><button className="bg-green-600 text-white px-4 py-1 rounded">حفظ</button></form>}{activeUsersList.map(u=><div key={u.id} className={`border p-4 mb-2 rounded-lg flex justify-between items-center ${u.status==='banned_cheating'?'bg-red-50 border-red-200':''}`}><div><p className="font-bold">{u.name} {u.status==='banned_cheating'&&<span className="text-red-600 text-xs">(محظور)</span>}</p><p className="text-xs text-slate-500">{u.email}</p></div><div className="flex gap-2">{u.status==='banned_cheating'?<button onClick={()=>handleUnban(u.id)} className="bg-green-100 text-green-700 px-3 py-1 rounded text-xs font-bold flex gap-1"><Unlock size={16}/>فك</button>:<button onClick={()=>setEditingUser(u)} className="bg-blue-100 text-blue-600 p-2 rounded"><Edit size={16}/></button>}<button onClick={()=>handleSendResetPassword(u.email)} className="bg-amber-100 text-amber-600 p-2 rounded"><KeyRound size={16}/></button><button onClick={()=>handleDeleteUser(u.id)} className="bg-red-100 text-red-600 p-2 rounded"><Trash2 size={16}/></button></div></div>)}</div>}
 
-          {activeTab === 'exams' && <div className="space-y-8"><div className="bg-white p-6 rounded-xl shadow-sm"><h2 className="text-xl font-bold mb-6 border-b pb-2">إنشاء امتحان</h2><div className="grid grid-cols-4 gap-4 mb-6"><input className="border p-2 rounded col-span-2" placeholder="العنوان" value={examBuilder.title} onChange={e=>setExamBuilder({...examBuilder, title:e.target.value})}/><input className="border p-2 rounded" placeholder="الكود" value={examBuilder.accessCode} onChange={e=>setExamBuilder({...examBuilder, accessCode:e.target.value})}/><input type="number" className="border p-2 rounded" placeholder="المدة (دقائق)" value={examBuilder.duration} onChange={e=>setExamBuilder({...examBuilder, duration:parseInt(e.target.value)})}/><select className="border p-2 rounded col-span-4" value={examBuilder.grade} onChange={e=>setExamBuilder({...examBuilder, grade:e.target.value})}><GradeOptions/></select><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت البدء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, startTime:e.target.value})}/></div><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت الانتهاء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, endTime:e.target.value})}/></div></div><div className="bg-slate-50 p-4 rounded-xl border mb-6"><textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm" placeholder="اكتب الأسئلة هنا..." value={bulkText} onChange={e=>setBulkText(e.target.value)}/><button onClick={parseExam} className="mt-4 w-full bg-green-600 text-white py-3 rounded-xl font-bold">نشر</button></div></div><div className="bg-white p-6 rounded-xl shadow-sm"><h3 className="font-bold mb-4">الامتحانات الحالية</h3>{examsList.map(exam=><div key={exam.id} className="flex justify-between items-center border-b py-3 last:border-0"><div><p className="font-bold">{exam.title}</p><p className="text-xs text-slate-500">من: {new Date(exam.startTime).toLocaleString('ar-EG')} | إلى: {new Date(exam.endTime).toLocaleString('ar-EG')}</p><p className="text-xs text-slate-400">كود: {exam.accessCode}</p></div><div className="flex gap-2"><button onClick={()=>handleDeleteExam(exam.id)} className="text-red-500 p-2"><Trash2 size={18}/></button></div></div>)}</div></div>}
+          {activeTab === 'exams' && <div className="space-y-8">
+              <div className="bg-white p-6 rounded-xl shadow-sm">
+                  <h2 className="text-xl font-bold mb-6 border-b pb-2">إنشاء امتحان</h2>
+                  <div className="grid grid-cols-4 gap-4 mb-6">
+                      <input className="border p-2 rounded col-span-2" placeholder="العنوان" value={examBuilder.title} onChange={e=>setExamBuilder({...examBuilder, title:e.target.value})}/>
+                      <input className="border p-2 rounded" placeholder="الكود" value={examBuilder.accessCode} onChange={e=>setExamBuilder({...examBuilder, accessCode:e.target.value})}/>
+                      <input type="number" className="border p-2 rounded" placeholder="المدة (دقائق)" value={examBuilder.duration} onChange={e=>setExamBuilder({...examBuilder, duration:parseInt(e.target.value)})}/>
+                      <select className="border p-2 rounded col-span-4" value={examBuilder.grade} onChange={e=>setExamBuilder({...examBuilder, grade:e.target.value})}><GradeOptions/></select>
+                      <div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت البدء</label><input type="datetime-local" className="border p-2 rounded w-full" value={examBuilder.startTime} onChange={e=>setExamBuilder({...examBuilder, startTime:e.target.value})}/></div>
+                      <div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت الانتهاء</label><input type="datetime-local" className="border p-2 rounded w-full" value={examBuilder.endTime} onChange={e=>setExamBuilder({...examBuilder, endTime:e.target.value})}/></div>
+                      <div className="col-span-4 flex items-center gap-2 bg-blue-50 p-3 rounded-lg">
+                          <input type="checkbox" id="shuffleCheck" checked={examBuilder.shuffle} onChange={e=>setExamBuilder({...examBuilder, shuffle:e.target.checked})} className="w-5 h-5"/>
+                          <label htmlFor="shuffleCheck" className="font-bold text-blue-800 flex items-center gap-2"><Shuffle size={18}/> تفعيل خلط الأسئلة (Shuffle)</label>
+                      </div>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-xl border mb-6">
+                      <textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm" placeholder={`اكتب الأسئلة هنا..
+مثال للمقالي: "عرف ما يلي" (بدون خيارات تحته)
+مثال للاختياري:
+ما عاصمة مصر؟
+*القاهرة
+الاسكندرية`} value={bulkText} onChange={e=>setBulkText(e.target.value)}/>
+                      <button onClick={parseExam} className="mt-4 w-full bg-green-600 text-white py-3 rounded-xl font-bold">نشر / حفظ التعديل</button>
+                  </div>
+              </div>
+              <div className="bg-white p-6 rounded-xl shadow-sm">
+                  <h3 className="font-bold mb-4">الامتحانات الحالية</h3>
+                  {examsList.map(exam=>(
+                      <div key={exam.id} className="flex justify-between items-center border-b py-3 last:border-0">
+                          <div>
+                              <p className="font-bold">{exam.title}</p>
+                              <p className="text-xs text-slate-500">من: {new Date(exam.startTime).toLocaleString('ar-EG')} | إلى: {new Date(exam.endTime).toLocaleString('ar-EG')}</p>
+                              <p className="text-xs text-slate-400">كود: {exam.accessCode}</p>
+                          </div>
+                          <div className="flex gap-2">
+                              <button onClick={()=>handleEditExam(exam)} className="text-blue-500 bg-blue-50 p-2 rounded hover:bg-blue-100" title="تعديل"><Edit size={18}/></button>
+                              <button onClick={()=>handleDeleteExam(exam.id)} className="text-red-500 bg-red-50 p-2 rounded hover:bg-red-100" title="حذف"><Trash2 size={18}/></button>
+                          </div>
+                      </div>
+                  ))}
+              </div>
+          </div>}
 
           {activeTab === 'results' && (
              <div className="bg-white p-6 rounded-xl shadow-sm">
@@ -1180,17 +1361,24 @@ const AdminDashboard = ({ user }) => {
                                const questions = getQuestionsForExam(examData);
                                return questions.map((q, idx) => (
                                    <div key={idx} className="bg-white p-4 rounded border">
-                                           <p className="font-bold mb-2">{q.text}</p>
-                                           <div className="grid grid-cols-2 gap-2 text-sm">
-                                               {q.options.map((opt, oIdx) => {
-                                                   const isCorrect = oIdx === q.correctIdx;
-                                                   const isSelected = viewingResult.answers[q.id] === oIdx;
-                                                   let style = "bg-gray-50 text-gray-500";
-                                                   if (isCorrect) style = "bg-green-100 text-green-800 border-green-500 border font-bold";
-                                                   if (isSelected && !isCorrect) style = "bg-red-100 text-red-800 border-red-500 border font-bold";
-                                                   return <div key={oIdx} className={`p-2 rounded ${style}`}>{opt}</div>
-                                               })}
-                                           </div>
+                                           <p className="font-bold mb-2">{q.text} {q.options.length===0 && '(مقالي)'}</p>
+                                           {q.options.length > 0 ? (
+                                              <div className="grid grid-cols-2 gap-2 text-sm">
+                                                  {q.options.map((opt, oIdx) => {
+                                                      const isCorrect = oIdx === q.correctIdx;
+                                                      const isSelected = viewingResult.answers[q.id] === oIdx;
+                                                      let style = "bg-gray-50 text-gray-500";
+                                                      if (isCorrect) style = "bg-green-100 text-green-800 border-green-500 border font-bold";
+                                                      if (isSelected && !isCorrect) style = "bg-red-100 text-red-800 border-red-500 border font-bold";
+                                                      return <div key={oIdx} className={`p-2 rounded ${style}`}>{opt}</div>
+                                                  })}
+                                              </div>
+                                           ) : (
+                                              <div className="bg-amber-50 p-3 rounded text-amber-900 border border-amber-200">
+                                                  <span className="font-bold block mb-1">إجابة الطالب:</span>
+                                                  {viewingResult.answers[q.id] || "لم يجب"}
+                                              </div>
+                                           )}
                                    </div>
                                ));
                            })()}
