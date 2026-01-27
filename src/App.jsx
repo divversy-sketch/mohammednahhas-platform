@@ -686,7 +686,6 @@ const SecureVideoPlayer = ({ video, userName, onClose }) => {
 };
 
 const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult = null }) => {
-  // --- 1. هنا مجموعة الـ useState الموجودة أصلاً عندك ---
   const [currentQIndex, setCurrentQIndex] = useState(0);
   const [answers, setAnswers] = useState(existingResult?.answers || {});
   const [flagged, setFlagged] = useState({});
@@ -695,10 +694,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const [isSubmitted, setIsSubmitted] = useState(isReviewMode);
   const [score, setScore] = useState(existingResult?.score || 0);
   const [startTime] = useState(Date.now()); 
-
-  // ************************************************************
-  // 2. هنا تضع السطر الجديد (هذا هو المكان السليم والمحدد)
-  // ************************************************************
   const isSubmittingRef = useRef(false); 
 
   const flatQuestions = [];
