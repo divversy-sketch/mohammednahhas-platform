@@ -358,7 +358,7 @@ const DynamicWatermark = ({ text, type = 'exam' }) => {
                     className={`watermark-unit float-watermark ${type === 'video' ? 'video-layer-watermark' : 'exam-layer-watermark'}`}
                     style={{ 
                         top: item.top, 
-                        left: item.left,
+                        left: item.left, 
                         animationDelay: item.delay
                     }}
                 >
@@ -433,7 +433,7 @@ const WisdomBox = () => {
     { text: "اللغة العربية هي لغة الفكر، فتعلمها بقلبك قبل عقلك.", source: "كلمة الأستاذ" }, 
     { text: "إنما النجاح صبر ساعة، فاستعن بالله ولا تعجز.", source: "نصيحة اليوم" }, 
     { text: "ذاكر لتفهم، ونافس لتتميز، وكن فخوراً بنفسك دائماً.", source: "رسالة تحفيزية" }, 
-    { text: "أَنَا البَحرُ في أَحشائِهِ الدُرُّ كامِنٌ.. فَهَل سَأَلوا الغَوّاصَ عَن صَدَفاتي", source: "حافظ إبراهيم" },
+    { text: "أَنَا البَحرُ في أَحشائِهِ الدُرُّ كامِنٌ.. فَهَل سَأَلوا الغَوّاصَ عَن صَدَفاتي", source: "حافظ إبراهيم" },
     { text: "من سلك طريقاً يلتمس فيه علماً، سهل الله له به طريقاً إلى الجنة.", source: "حديث شريف" }
   ]);
 
@@ -1336,7 +1336,9 @@ const AdminDashboard = ({ user }) => {
     await addDoc(collection(db, 'exams'), { ...examBuilder, questions: blocks, createdAt: serverTimestamp() });
     setBulkText(""); alert("تم النشر");
   };
-const startLiveStream = async () => {
+
+  // 1. دوال البث المباشر
+  const startLiveStream = async () => {
     if (!liveData.liveUrl || !liveData.title) return alert("يرجى ملء رابط البث والعنوان!");
     try {
       await addDoc(collection(db, 'live_sessions'), { ...liveData, status: 'active', createdAt: serverTimestamp() });
@@ -1402,6 +1404,7 @@ const startLiveStream = async () => {
   const handleDeleteContent = async (id) => {
       if(window.confirm("هل أنت متأكد من حذف هذا المحتوى؟")) await deleteDoc(doc(db, 'content', id));
   };
+
   return (
     <div className="min-h-screen bg-slate-100 p-4 md:p-8 font-['Cairo']" dir="rtl">
       <header className="flex flex-col md:flex-row justify-between items-center mb-10 bg-white p-8 rounded-[3rem] shadow-sm border border-slate-50 gap-6">
@@ -1707,8 +1710,8 @@ const startLiveStream = async () => {
                                   <div>
                                       <p className="font-black text-slate-800 text-xl">{c.title}</p>
                                       <div className="flex gap-3 mt-1">
-                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{getGradeLabel(c.grade)}</span>
-                                        {c.allowedEmails && c.allowedEmails.length > 0 && <span className="text-[9px] bg-slate-900 text-amber-500 px-2 rounded-full font-black uppercase tracking-tighter flex items-center gap-1"><Lock size={8}/> Private Access</span>}
+                                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{getGradeLabel(c.grade)}</span>
+                                          {c.allowedEmails && c.allowedEmails.length > 0 && <span className="text-[9px] bg-slate-900 text-amber-500 px-2 rounded-full font-black uppercase tracking-tighter flex items-center gap-1"><Lock size={8}/> Private Access</span>}
                                       </div>
                                   </div>
                               </div>
