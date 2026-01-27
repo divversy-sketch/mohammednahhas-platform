@@ -1336,7 +1336,72 @@ const AdminDashboard = ({ user }) => {
     await addDoc(collection(db, 'exams'), { ...examBuilder, questions: blocks, createdAt: serverTimestamp() });
     setBulkText(""); alert("تم النشر");
   };
+const startLiveStream = async () => {
+    if (!liveData.liveUrl || !liveData.title) return alert("يرجى ملء رابط البث والعنوان!");
+    try {
+      await addDoc(collection(db, 'live_sessions'), { ...liveData, status: 'active', createdAt: serverTimestamp() });
+      await addDoc(collection(db, 'notifications'), { text: `بث مباشر الآن: ${liveData.title}`, grade: liveData.grade, createdAt: serverTimestamp() });
+      setIsLive(true);
+      alert("تم بدء البث وإشعار الطلاب بنجاح! 🔴");
+    } catch (e) { console.error(e); alert("حدث خطأ أثناء بدء البث"); }
+  };
 
+  const stopLiveStream = async () => {
+    try {
+      const q = query(collection(db, 'live_sessions'), where('status', '==', 'active'));
+      const snap = await getDocs(q);
+      snap.forEach(async (d) => await updateDoc(doc(db, 'live_sessions', d.id), { status: 'ended' }));
+      setIsLive(false);
+      alert("تم إيقاف البث المباشر ⬛");
+    } catch (e) { console.error(e); }
+  };
+
+  // 2. دوال الرد الآلي
+  const handleAddAutoReply = async () => {
+      if(!newAutoReply.keywords || !newAutoReply.response) return alert("اكتب الكلمات الدالة والرد!");
+      await addDoc(collection(db, 'auto_replies'), { ...newAutoReply, isActive: true });
+      setNewAutoReply({ keywords: '', response: '', isActive: true });
+      alert("تم حفظ قاعدة الرد الآلي ✅");
+  };
+
+  const toggleAutoReply = async (id, currentStatus) => {
+      await updateDoc(doc(db, 'auto_replies', id), { isActive: !currentStatus });
+  };
+
+  const deleteAutoReply = async (id) => {
+      if(window.confirm("هل أنت متأكد من حذف هذا الرد التلقائي؟")) await deleteDoc(doc(db, 'auto_replies', id));
+  };
+
+  // 3. دوال الحكم والأقوال
+  const handleAddQuote = async () => {
+    if(!newQuote.text || !newQuote.source) return alert("اكتب نص الحكمة والمصدر!");
+    await addDoc(collection(db, 'quotes'), { ...newQuote, createdAt: serverTimestamp() });
+    setNewQuote({ text: '', source: '' });
+    alert("تم نشر الحكمة الجديدة 📢");
+  };
+
+  const deleteQuote = async (id) => {
+     if(window.confirm("حذف هذه الحكمة؟")) await deleteDoc(doc(db, 'quotes', id));
+  };
+
+  // 4. دوال الإعدادات (لوحة الشرف)
+  const toggleLeaderboard = async () => {
+     const newStatus = !showLeaderboard;
+     setShowLeaderboard(newStatus);
+     // حفظ الإعداد في قاعدة البيانات لكي يراه الطلاب
+     await setDoc(doc(db, 'settings', 'config'), { show: newStatus }, { merge: true });
+  };
+
+  const handleSendResetPassword = async (email) => {
+     try {
+        await sendPasswordResetEmail(auth, email);
+        alert("تم إرسال رابط إعادة تعيين كلمة المرور للطالب.");
+     } catch (err) { alert("حدث خطأ، تأكد من صحة البريد."); }
+  };
+  
+  const handleDeleteContent = async (id) => {
+      if(window.confirm("هل أنت متأكد من حذف هذا المحتوى؟")) await deleteDoc(doc(db, 'content', id));
+  };
   return (
     <div className="min-h-screen bg-slate-100 p-4 md:p-8 font-['Cairo']" dir="rtl">
       <header className="flex flex-col md:flex-row justify-between items-center mb-10 bg-white p-8 rounded-[3rem] shadow-sm border border-slate-50 gap-6">
@@ -1845,6 +1910,17 @@ const StudentDashboard = ({ user, userData }) => {
     };
   }, [userData, user.email, user.uid]);
 
+  // <<< تم نقل كود الحماية هنا بعد انتهاء جميع الـ Hooks >>>
+  if (!userData) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-slate-50 font-['Cairo']">
+        <Loader2 className="animate-spin text-amber-600 w-16 h-16 mb-4" />
+        <p className="text-slate-500 font-black text-xl animate-pulse">جاري جلب بيانات الطالب...</p>
+        <button onClick={() => window.location.reload()} className="mt-8 text-sm text-blue-500 underline font-bold">اضغط هنا لو طولت</button>
+      </div>
+    );
+  }
+  
   // واجهة البث المباشر
   if(liveSession) return (
       <div className="fixed inset-0 z-[150] bg-slate-900 flex flex-col md:flex-row font-['Cairo'] no-select overflow-hidden">
