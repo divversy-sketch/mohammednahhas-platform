@@ -708,14 +708,12 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   if (flatQuestions.length === 0) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-white">عفواً، لا توجد أسئلة.<button onClick={onClose} className="ml-4 bg-gray-200 px-4 py-2 rounded">خروج</button></div>;
 
 // 1. دالة الحظر المحدثة
-const handleCheating = async (reason = "تبديل نافذة") => {
-    // السطر القادم هو الأهم: لو العلم (isSubmittingRef) مرفوع، لا تفعل شيئاً واخرج فوراً
-    if (isSubmittingRef.current === true) return; 
-
-    if(isReviewMode || isSubmitted || isCheating) return;
-	
+const handleCheating = async (reason = "محاولة غش") => {
+    // هذا السطر يمنع الشاشة البيضاء إذا كان الطالب يسلم أو في وضع المراجعة
+    if (isReviewMode || isSubmitted || isSubmittingRef.current) return;
+    
+    setIsScreenLocked(true); // تفعيل الشاشة البيضاء
     setIsCheating(true); 
-    setIsSubmitted(true);
     const timeTaken = Math.round((Date.now() - startTime) / 1000);
     if (exam.attemptId) {
         await updateDoc(doc(db, 'exam_results', exam.attemptId), { 
@@ -1519,17 +1517,16 @@ const StudentDashboard = ({ user, userData }) => {
 const startExamWithCode = async (exam) => {
     // 1. التحقق من وجود نتيجة سابقة
     const previousResult = examResults.find(r => r.examId === exam.id);
-    
     if (previousResult) {
         if (previousResult.status === 'started') {
-            alert("لقد بدأت هذا الامتحان ولم تكمله. لا يمكن الدخول مرة أخرى.");
+            alert("لقد بدأت هذا الامتحان سابقاً ولم تكمله. لا يمكن الدخول مرة أخرى.");
         } else {
-            alert(`لقد امتحنت هذا الامتحان سابقاً وحصلت على ${previousResult.score}.`);
+            alert(`أنت امتحنت الامتحان ده قبل كده وجبت ${previousResult.score}.`);
         }
         return;
     }
 
-    // 2. التحقق من مواعيد الامتحان
+    // 2. التحقق من مواعيد الامتحان (هذا الجزء كان يسبب الشاشة البيضاء لأنه كان خارج الدالة)
     const now = new Date();
     const start = new Date(exam.startTime);
     const end = new Date(exam.endTime);
@@ -1552,14 +1549,11 @@ const startExamWithCode = async (exam) => {
                 startedAt: serverTimestamp() 
             });
 
-            // تعطيل الحماية مؤقتاً عند الانتقال
-            isSubmittingRef.current = true;
+            // نمرر الـ ID الجديد للمحاولة
             setActiveExam({ ...exam, attemptId: attemptRef.id });
-            // إعادة الحماية بعد أجزاء من الثانية
-            setTimeout(() => { isSubmittingRef.current = false; }, 500);
 
         } catch (error) {
-            console.error(error);
+            console.error("Error starting exam:", error);
             alert("حدث خطأ أثناء بدء الامتحان، تأكد من الاتصال بالإنترنت.");
         }
     } else {
