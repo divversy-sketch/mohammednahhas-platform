@@ -258,42 +258,35 @@ const DesignSystemLoader = () => {
       ::-webkit-scrollbar-track { background: #f1f1f1; }
       ::-webkit-scrollbar-thumb { background: #d97706; border-radius: 4px; }
       .glass-panel { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.5); }
-
-/* 1. العلامة المائية للامتحانات (خلفية فاتحة غالباً) */
-.watermark-text {
-    position: fixed;
-    pointer-events: none;
-    z-index: 9999;
-    color: rgba(0, 0, 0, 0.04); /* شفافة جداً سوداء */
-    font-weight: 900;
-    font-size: 1.3rem;
-    white-space: nowrap;
-    user-select: none;
-    transform: rotate(-30deg);
-}
-
-/* 2. العلامة المائية للفيديو (خلفية غامقة غالباً) */
-.watermark-video {
-    position: absolute;
-    pointer-events: none;
-    z-index: 50;
-    color: rgba(255, 255, 255, 0.2); /* بيضاء شفافة */
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.5); /* ظل لضمان الرؤية */
-    font-weight: 900;
-    font-size: 1.1rem;
-    white-space: nowrap;
-    user-select: none;
-}
-
-/* 3. محرك الحركة الموحد والسلس */
-@keyframes floatWatermark {
-    0%   { transform: translate(0, 0) rotate(-30deg); }
-    25%  { transform: translate(10vw, 20vh) rotate(-30deg); }
-    50%  { transform: translate(-5vw, 40vh) rotate(-30deg); }
-    75%  { transform: translate(15vw, 10vh) rotate(-30deg); }
-    100% { transform: translate(0, 0) rotate(-30deg); }
-}
-
+      .watermark-text {
+        position: absolute;
+        animation: floatWatermark 20s linear infinite;
+        pointer-events: none;
+        z-index: 9999;
+        color: rgba(0, 0, 0, 0.06);
+        font-weight: 900;
+        font-size: 1.5rem;
+        transform: rotate(-30deg);
+        white-space: nowrap;
+        text-shadow: 0 0 2px rgba(255,255,255,0.5);
+      }
+      .watermark-video {
+        position: absolute;
+        animation: floatWatermark 15s linear infinite;
+        pointer-events: none;
+        z-index: 50;
+        color: rgba(255, 255, 255, 0.3);
+        font-weight: 900;
+        font-size: 1.2rem;
+        text-shadow: 0 0 5px rgba(0,0,0,0.8);
+      }
+      @keyframes floatWatermark {
+        0% { top: 10%; left: 10%; opacity: 0.3; }
+        25% { top: 60%; left: 80%; opacity: 0.5; }
+        50% { top: 80%; left: 20%; opacity: 0.3; }
+        75% { top: 20%; left: 40%; opacity: 0.5; }
+        100% { top: 10%; left: 10%; opacity: 0.3; }
+      }
       .no-select { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
     `}</style>
   );
@@ -634,166 +627,187 @@ const LiveSessionView = ({ session, user, onClose }) => {
 };
 
 const SecureVideoPlayer = ({ video, userName, onClose }) => {
-  const videoId = getYouTubeID(video.url || video.file);
-  const [showSettings, setShowSettings] = useState(false);
-  const videoRef = useRef(null);
-  const finalUrl = video.url || video.file;
+  const videoId = getYouTubeID(video.url || video.file);
+  const [showSettings, setShowSettings] = useState(false);
+  const videoRef = useRef(null);
+  const finalUrl = video.url || video.file;
 
-  const changeSpeed = (rate) => {
-    if(videoRef.current) videoRef.current.playbackRate = rate;
-    setShowSettings(false);
-  };
+  const changeSpeed = (rate) => {
+    if(videoRef.current) videoRef.current.playbackRate = rate;
+    setShowSettings(false);
+  };
 
-  const youtubeEmbedUrl = videoId 
-    ? `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1&showinfo=0&iv_load_policy=3&loop=1&playlist=${videoId}` 
-    : '';
+  const youtubeEmbedUrl = videoId 
+    ? `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1&showinfo=0&iv_load_policy=3&loop=1&playlist=${videoId}` 
+    : '';
 
-  return (
-    <div className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center p-4">
-      <div className="w-full max-w-5xl bg-black rounded-xl overflow-hidden relative shadow-2xl border border-gray-800">
-        
-        {/* أزرار التحكم */}
-        <div className="absolute top-4 right-4 z-50 flex gap-4">
-            <button onClick={() => setShowSettings(!showSettings)} className="bg-black/50 text-white p-2 rounded-full backdrop-blur-sm"><GearIcon size={24}/></button>
-            <button onClick={onClose} className="bg-red-600 text-white p-2 rounded-full"><X size={24}/></button>
-        </div>
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center p-4">
+      <div className="w-full max-w-5xl bg-black rounded-xl overflow-hidden relative shadow-2xl border border-gray-800">
+        <div className="absolute top-4 right-4 z-50 flex gap-4">
+            <div className="relative">
+                <button onClick={() => setShowSettings(!showSettings)} className="bg-black/50 hover:bg-black/80 text-white p-2 rounded-full backdrop-blur-sm transition"><GearIcon size={24}/></button>
+                {showSettings && (
+                    <div className="absolute top-12 left-0 bg-white text-black rounded-lg shadow-xl py-2 w-40 z-50 text-sm font-bold">
+                        <div className="px-4 py-2 border-b text-gray-400 text-xs">سرعة التشغيل</div>
+                        {[0.5, 1, 1.25, 1.5, 2].map(rate => (
+                            <button key={rate} onClick={() => changeSpeed(rate)} className="block w-full text-right px-4 py-2 hover:bg-gray-100">{rate}x</button>
+                        ))}
+                    </div>
+                )}
+            </div>
+            <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white p-2 rounded-full"><X size={24}/></button>
+        </div>
 
-        <div className="aspect-video relative flex items-center justify-center bg-black overflow-hidden">
-          {/* مشغل الفيديو */}
-          {videoId ? (
-            <iframe className="w-full h-full" src={youtubeEmbedUrl} frameBorder="0" allowFullScreen shadow-xl></iframe>
-          ) : (
-            <video ref={videoRef} controls controlsList="nodownload" className="w-full h-full object-contain" src={finalUrl}></video>
-          )}
-
-          {/* العلامة المائية الموحدة */}
-          <div className="absolute inset-0 pointer-events-none z-50">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="watermark-video" style={{ 
-                  top: `${(i * 30) + 15}%`, 
-                  left: i === 0 ? '10%' : i === 1 ? '40%' : '70%',
-                  animation: `floatWatermark ${14 + (i * 3)}s linear infinite`,
-                  animationDelay: `${i * -2}s`
-              }}>
-                {userName} - {video.grade}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+        <div className="aspect-video relative flex items-center justify-center bg-black">
+          <div className="watermark-video">{userName} - {video.grade}</div>
+          
+          {videoId ? (
+            <iframe className="w-full h-full" src={youtubeEmbedUrl} title="Video" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
+          ) : (
+             <video ref={videoRef} controls controlsList="nodownload" className="w-full h-full object-contain" src={finalUrl}>المتصفح لا يدعم هذا الفيديو.</video>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 };
 
 const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult = null }) => {
-const [currentQIndex, setCurrentQIndex] = useState(0);
-  const [answers, setAnswers] = useState(existingResult?.answers || {});
-  const [flagged, setFlagged] = useState({});
-  const [timeLeft, setTimeLeft] = useState(exam.duration * 60);
-  const [isCheating, setIsCheating] = useState(false);
-  const [isSubmitted, setIsSubmitted] = useState(isReviewMode);
-  const [score, setScore] = useState(existingResult?.score || 0);
-  const [startTime] = useState(Date.now()); 
-  const [isScreenLocked, setIsScreenLocked] = useState(false); 
-  const isSubmittingRef = useRef(false);
+  const [currentQIndex, setCurrentQIndex] = useState(0);
+  const [answers, setAnswers] = useState(existingResult?.answers || {});
+  const [flagged, setFlagged] = useState({});
+  const [timeLeft, setTimeLeft] = useState(exam.duration * 60);
+  const [isCheating, setIsCheating] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(isReviewMode);
+  const [score, setScore] = useState(existingResult?.score || 0);
+  const [startTime] = useState(Date.now()); 
 
-// 1. دالة اختيار الإجابة
-  const handleAnswer = (questionId, optionIdx) => {
-    if (isSubmitted || isReviewMode || isCheating) return;
-    setAnswers(prev => ({ ...prev, [questionId]: optionIdx }));
-  };
+  const flatQuestions = [];
+  if (exam.questions) {
+    exam.questions.forEach((block) => {
+      block.subQuestions.forEach((q) => {
+        flatQuestions.push({ ...q, blockText: block.text });
+      });
+    });
+  }
 
-  // 2. دالة الحظر (إصلاح نظام رصد الغش)
-  const handleCheating = async (reason = "محاولة غش") => {
-    if (isReviewMode || isSubmitted || isCheating || isSubmittingRef.current) return;
-    
+  if (flatQuestions.length === 0) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-white">عفواً، لا توجد أسئلة.<button onClick={onClose} className="ml-4 bg-gray-200 px-4 py-2 rounded">خروج</button></div>;
+
+// 1. دالة الحظر المحدثة
+const handleCheating = async (reason = "محاولة غش") => {
+    if(isReviewMode || isSubmitted || isCheating) return;
     setIsCheating(true); 
     setIsSubmitted(true);
     const timeTaken = Math.round((Date.now() - startTime) / 1000);
-    
     if (exam.attemptId) {
         await updateDoc(doc(db, 'exam_results', exam.attemptId), { 
             score: 0, status: 'cheated', cheatReason: reason, timeTaken: timeTaken, submittedAt: serverTimestamp() 
         });
     }
     await updateDoc(doc(db, 'users', user.uid), { status: 'banned_cheating' });
-  };
+};
 
-// 1. دالة التسليم الوحيدة والسليمة
-  const handleSubmit = async (auto = false) => {
-    isSubmittingRef.current = true; // تفعيل صمام الأمان
-    const totalQs = flatQuestions.length;
-
-    if (!auto && Object.keys(answers).length < totalQs && !window.confirm("لم تجب على كل الأسئلة، هل أنت متأكد؟")) {
-        isSubmittingRef.current = false;
-        return;
-    }
-    
-    // حساب الدرجة يدوياً بداخل الدالة
-    let rawScore = 0;
-    flatQuestions.forEach(q => {
-        if (answers[q.id] === q.correctIdx) rawScore++;
-    });
-
-    const timeTaken = Math.round((Date.now() - startTime) / 1000);
-    setScore(rawScore);
-    setIsSubmitted(true);
-    
-    if (exam.attemptId) {
-        await updateDoc(doc(db, 'exam_results', exam.attemptId), { 
-            score: rawScore, 
-            total: totalQs, 
-            answers: answers, 
-            status: 'completed', 
-            timeTaken: timeTaken, 
-            submittedAt: serverTimestamp() 
-        });
-    }
-  };
-
-  // 2. مراقب الكيبورد
-  const handleKeyDown = (e) => {
-    if (e.key === 'PrintScreen' || (e.ctrlKey && (e.key === 'p' || e.key === 'c' || e.key === 'u')) || e.key === 'F12') {
+// 2. دالة منع أزرار لوحة المفاتيح
+const handleKeyDown = (e) => {
+    if (
+        e.key === 'F12' || 
+        (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C')) || 
+        (e.ctrlKey && e.key === 'U') ||
+        e.key === 'PrintScreen'
+    ) {
         e.preventDefault();
-        setIsScreenLocked(true); 
-        handleCheating("محاولة تصوير أو نسخ");
+        handleCheating("استخدام اختصارات لوحة المفاتيح الممنوعة");
     }
-  };
+};
 
-    useEffect(() => {
+useEffect(() => {
+    // إذا كان الطالب في وضع المراجعة أو سلم الامتحان بالفعل، لا تفعل الحماية
     if (isReviewMode || isSubmitted) return;
 
-    // دوال الحماية
-    const handleVisibilityChange = () => { if (document.hidden) handleCheating("الخروج من التبويب"); };
-    const handleBlur = () => handleCheating("تبديل النافذة");
-    const handleForbiddenAction = (e) => { e.preventDefault(); setIsScreenLocked(true); handleCheating("نسخ أو طباعة"); };
+    // 1. دالة مراقبة التنقل بين التبويبات (للكمبيوتر)
+    const handleVisibilityChange = () => { 
+        if (document.hidden) handleCheating("الخروج من التبويب"); 
+    };
 
-    // ربط المستمعات
-    document.addEventListener("copy", handleForbiddenAction);
-    window.addEventListener("beforeprint", handleForbiddenAction);
+    // 2. دالة مراقبة الخروج من التطبيق أو الهاتف (سحب الإشعارات أو تبديل التطبيقات)
+    const handleBlur = () => {
+        handleCheating("الخروج من التطبيق أو تبديل النافذة");
+    };
+
+    // 3. دالة منع التحديث (Refresh) أو إغلاق الصفحة
+    const handleBeforeUnload = (e) => {
+        handleCheating("محاولة تحديث أو إغلاق الصفحة"); 
+        e.preventDefault();
+        e.returnValue = ''; 
+    };
+
+    // --- تفعيل جميع المستمعات (Listeners) عند بدء الامتحان ---
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("blur", handleBlur);
-    window.addEventListener("keydown", handleKeyDown);
-    document.addEventListener('contextmenu', e => e.preventDefault());
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("keydown", handleKeyDown); // مراقب أزرار لوحة المفاتيح
+    document.addEventListener('contextmenu', event => event.preventDefault()); // منع الزر الأيمن
 
-    // عداد الوقت
-    const timer = setInterval(() => {
-        setTimeLeft(p => {
-            if (p <= 1) { clearInterval(timer); handleSubmit(true); return 0; }
-            return p - 1;
-        });
-    }, 1000);
-
+    // --- تنظيف المستمعات (Cleanup) عند إغلاق المكون أو انتهاء الامتحان ---
     return () => {
-        clearInterval(timer);
-        document.removeEventListener("copy", handleForbiddenAction);
-        window.removeEventListener("beforeprint", handleForbiddenAction);
         document.removeEventListener("visibilitychange", handleVisibilityChange);
         window.removeEventListener("blur", handleBlur);
+        window.removeEventListener("beforeunload", handleBeforeUnload);
         window.removeEventListener("keydown", handleKeyDown);
-        document.removeEventListener('contextmenu', e => e.preventDefault());
+        document.removeEventListener('contextmenu', event => event.preventDefault());
     };
-  }, [isSubmitted, isReviewMode, isCheating]);
+}, [isSubmitted, isReviewMode, isCheating]);
+
+  useEffect(() => {
+    if (isReviewMode || isSubmitted) return;
+    if (timeLeft > 0 && !isCheating) {
+      const timer = setInterval(() => setTimeLeft(p => p - 1), 1000);
+      return () => clearInterval(timer);
+    } else if (timeLeft === 0) {
+      handleSubmit(true);
+    }
+  }, [timeLeft, isSubmitted, isCheating, isReviewMode]);
+
+  const handleSubmit = async (auto = false) => {
+    const totalQs = flatQuestions.length;
+    if (!auto && Object.keys(answers).length < totalQs && !window.confirm("لم تجب على كل الأسئلة، هل أنت متأكد؟")) return;
+    
+    const finalScore = calculateScore();
+    const timeTaken = Math.round((Date.now() - startTime) / 1000);
+    setScore(finalScore);
+    setIsSubmitted(true);
+    
+    // تعديل: تحديث الوثيقة التي تم إنشاؤها عند بدء الامتحان
+    if (exam.attemptId) {
+        await updateDoc(doc(db, 'exam_results', exam.attemptId), { 
+            score: finalScore, 
+            total: totalQs, 
+            answers, 
+            status: 'completed',
+            timeTaken: timeTaken,
+            totalTime: exam.duration, 
+            submittedAt: serverTimestamp() 
+        });
+    } else {
+        // Fallback for logic consistency (لو مفيش ID لأي سبب)
+         await addDoc(collection(db, 'exam_results'), { 
+          examId: exam.id, 
+          studentId: user.uid, 
+          studentName: user.displayName, 
+          score: finalScore, 
+          total: totalQs, 
+          answers, 
+          status: 'completed',
+          timeTaken: timeTaken,
+          totalTime: exam.duration, 
+          submittedAt: serverTimestamp() 
+        });
+    }
+  };
+
+  const currentQObj = flatQuestions[currentQIndex];
+  const hasPassage = currentQObj?.blockText && currentQObj.blockText.trim().length > 0;
 
   if (isCheating) return <div className="fixed inset-0 z-[60] bg-red-900 flex items-center justify-center text-white text-center font-['Cairo']"><div><AlertOctagon size={80} className="mx-auto mb-4"/><h1>تم رصد محاولة غش!</h1><p className="text-red-200 mt-2">خرجت من الامتحان. تم رصد درجتك (صفر) وحظرك.</p><button onClick={() => window.location.reload()} className="mt-4 bg-white text-red-900 px-6 py-2 rounded-full font-bold">خروج</button></div></div>;
 
@@ -814,34 +828,9 @@ const [currentQIndex, setCurrentQIndex] = useState(0);
   
   return (
     <div className="fixed inset-0 z-50 bg-slate-100 flex flex-col font-['Cairo'] no-select" dir="rtl">
-{isScreenLocked && (
-        <div className="fixed inset-0 z-[10001] bg-white flex items-center justify-center text-center p-8">
-          <div className="max-w-md">
-            <XCircle size={80} className="text-red-600 mx-auto mb-6 animate-pulse" />
-            <h1 className="text-3xl font-black text-slate-900 mb-4">تم قفل الشاشة</h1>
-            <p className="text-xl text-slate-600">بسبب محاولة النسخ أو التصوير. تم حظر حسابك نهائياً.</p>
-            <button onClick={() => window.location.reload()} className="mt-8 bg-slate-900 text-white px-10 py-3 rounded-2xl font-bold">خروج</button>
-          </div>
-        </div>
-      )}
-{!isReviewMode && (
-  <div className="fixed inset-0 pointer-events-none overflow-hidden z-[9999]">
-    {[...Array(6)].map((_, i) => (
-      <div 
-        key={i} 
-        className="watermark-text" 
-        style={{ 
-          top: `${(i * 15) + 5}%`, 
-          left: i % 2 === 0 ? '10%' : '60%',
-          animation: `floatWatermark ${18 + (i * 2)}s linear infinite`,
-          animationDelay: `${i * -3}s` 
-        }}
-      >
-        {user.displayName} - {user.email}
-      </div>
-    ))}
-  </div>
-)}
+      {!isReviewMode && (
+        <div className="fixed inset-0 pointer-events-none flex items-center justify-center overflow-hidden z-[9999]">{[...Array(6)].map((_, i) => (<div key={i} className="watermark-text" style={{ top: `${Math.random()*100}%`, left: `${Math.random()*100}%` }}>{user.displayName} - {user.email}</div>))}</div>
+      )}
       
       <div className="bg-slate-900 text-white p-4 flex justify-between items-center shadow-md relative z-50">
         <div className="flex items-center gap-4">
@@ -1475,29 +1464,52 @@ const StudentDashboard = ({ user, userData }) => {
   const files = content.filter(c => c.type === 'file');
 
 const startExamWithCode = async (exam) => {
-    const previousResult = examResults.find(r => r.examId === exam.id);
-    if (previousResult) {
-        alert(previousResult.status === 'started' ? "بدأت هذا الامتحان ولم تكمله." : `امتحنت قبل كده وجبت ${previousResult.score}`);
-        return;
-    }
-    const now = new Date();
-    if (now < new Date(exam.startTime)) return alert("الامتحان لم يبدأ بعد.");
-    if (now > new Date(exam.endTime)) return alert("عفواً، انتهى وقت الامتحان.");
-    const code = prompt("أدخل كود الامتحان:");
-    if (code === exam.accessCode) {
-        try {
-            const attemptRef = await addDoc(collection(db, 'exam_results'), { 
-                examId: exam.id, studentId: user.uid, studentName: user.displayName, 
-                score: 0, total: 0, status: 'started', answers: {}, startedAt: serverTimestamp() 
-            });
-            setActiveExam({ ...exam, attemptId: attemptRef.id });
-        } catch (error) {
-            alert("حدث خطأ في الاتصال بالإنترنت.");
-        }
-    } else {
-        alert("كود خاطئ!");
-    }
-};
+    // 1. التحقق: هل يوجد أي سجل سابق (سواء ناجح، راسب، غش، أو حتى مجرد بدأ ولم يكمل)
+    const previousResult = examResults.find(r => r.examId === exam.id);
+    
+    if (previousResult) {
+        // رسالة مختلفة حسب الحالة
+        if (previousResult.status === 'started') {
+            alert("لقد قمت بفتح هذا الامتحان سابقاً ولم تكمله. لا يمكن إعادة الدخول (نظام الفرصة الواحدة).");
+        } else {
+            alert(`أنت امتحنت الامتحان ده قبل كده وجبت ${previousResult.score}.`);
+        }
+        return;
+    }
+
+    const now = new Date();
+    const start = new Date(exam.startTime);
+    const end = new Date(exam.endTime);
+
+    if (now < start) return alert(`الامتحان لم يبدأ بعد. موعد البدء: ${start.toLocaleString('ar-EG')}`);
+    if (now > end) return alert("عفواً، انتهى وقت الامتحان.");
+
+    const code = prompt("أدخل كود الامتحان:");
+    if (code === exam.accessCode) {
+        // 2. تسجيل "بداية الامتحان" في قاعدة البيانات فوراً
+        try {
+            const attemptRef = await addDoc(collection(db, 'exam_results'), { 
+                examId: exam.id, 
+                studentId: user.uid, 
+                studentName: user.displayName, 
+                score: 0, 
+                total: 0,
+                status: 'started', // حالة جديدة تعني أنه بدأ
+                answers: {},
+                startedAt: serverTimestamp() 
+            });
+
+            // نمرر الـ ID بتاع المحاولة عشان نعدل عليه لما يخلص مش نعمل واحد جديد
+            setActiveExam({ ...exam, attemptId: attemptRef.id });
+
+        } catch (error) {
+            console.error(error);
+            alert("حدث خطأ أثناء بدء الامتحان، تأكد من الاتصال بالإنترنت.");
+        }
+    } else {
+        alert("كود خاطئ!");
+    }
+  };
 
   const handleUpdateMyProfile = async (e) => {
     e.preventDefault();
