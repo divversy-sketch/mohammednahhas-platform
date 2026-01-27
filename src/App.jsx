@@ -686,24 +686,27 @@ const SecureVideoPlayer = ({ video, userName, onClose }) => {
 };
 
 const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult = null }) => {
-  const [currentQIndex, setCurrentQIndex] = useState(0);
-  const [answers, setAnswers] = useState(existingResult?.answers || {});
-  const [flagged, setFlagged] = useState({});
-  const [timeLeft, setTimeLeft] = useState(exam.duration * 60);
-  const [isCheating, setIsCheating] = useState(false);
-  const [isSubmitted, setIsSubmitted] = useState(isReviewMode);
-  const [score, setScore] = useState(existingResult?.score || 0);
-  const [startTime] = useState(Date.now()); 
+  const [currentQIndex, setCurrentQIndex] = useState(0);
+  const [answers, setAnswers] = useState(existingResult?.answers || {});
+  const [flagged, setFlagged] = useState({});
+  const [timeLeft, setTimeLeft] = useState(exam.duration * 60);
+  const [isCheating, setIsCheating] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(isReviewMode);
+  const [score, setScore] = useState(existingResult?.score || 0);
+  const [startTime] = useState(Date.now()); 
+  
+  // --- السطور القادمة هي التي كانت ناقصة وتسبب الشاشة البيضاء ---
+  const [isScreenLocked, setIsScreenLocked] = useState(false); 
   const isSubmittingRef = useRef(false); 
 
-  const flatQuestions = [];
-  if (exam.questions) {
-    exam.questions.forEach((block) => {
-      block.subQuestions.forEach((q) => {
-        flatQuestions.push({ ...q, blockText: block.text });
-      });
-    });
-  }
+  const flatQuestions = [];
+  if (exam.questions) {
+    exam.questions.forEach((block) => {
+      block.subQuestions.forEach((q) => {
+        flatQuestions.push({ ...q, blockText: block.text });
+      });
+    });
+  }
 
   if (flatQuestions.length === 0) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-white">عفواً، لا توجد أسئلة.<button onClick={onClose} className="ml-4 bg-gray-200 px-4 py-2 rounded">خروج</button></div>;
 
