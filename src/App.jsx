@@ -693,6 +693,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const [isCheating, setIsCheating] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(isReviewMode);
   const [score, setScore] = useState(existingResult?.score || 0);
+  const [isScreenLocked, setIsScreenLocked] = useState(false);
   const [startTime] = useState(Date.now()); 
 
   const flatQuestions = [];
@@ -734,40 +735,35 @@ const handleKeyDown = (e) => {
 };
 
 useEffect(() => {
-    // إذا كان الطالب في وضع المراجعة أو سلم الامتحان بالفعل، لا تفعل الحماية
     if (isReviewMode || isSubmitted) return;
 
-    // 1. دالة مراقبة التنقل بين التبويبات (للكمبيوتر)
-    const handleVisibilityChange = () => { 
-        if (document.hidden) handleCheating("الخروج من التبويب"); 
-    };
+    const handleVisibilityChange = () => { if (document.hidden) handleCheating("الخروج من التبويب"); };
+    const handleBlur = () => handleCheating("الخروج من التطبيق");
+    const handleBeforeUnload = (e) => { handleCheating("تحديث الصفحة"); e.preventDefault(); e.returnValue = ''; };
 
-    // 2. دالة مراقبة الخروج من التطبيق أو الهاتف (سحب الإشعارات أو تبديل التطبيقات)
-    const handleBlur = () => {
-        handleCheating("الخروج من التطبيق أو تبديل النافذة");
-    };
-
-    // 3. دالة منع التحديث (Refresh) أو إغلاق الصفحة
-    const handleBeforeUnload = (e) => {
-        handleCheating("محاولة تحديث أو إغلاق الصفحة"); 
+    // --- الفخ الجديد (النسخ والطباعة) ---
+    const handleForbiddenAction = (e) => {
         e.preventDefault();
-        e.returnValue = ''; 
+        setIsScreenLocked(true); // قفل الشاشة فوراً
+        handleCheating("محاولة نسخ أو طباعة المحتوى");
     };
 
-    // --- تفعيل جميع المستمعات (Listeners) عند بدء الامتحان ---
+    document.addEventListener("copy", handleForbiddenAction);
+    window.addEventListener("beforeprint", handleForbiddenAction);
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("blur", handleBlur);
     window.addEventListener("beforeunload", handleBeforeUnload);
-    window.addEventListener("keydown", handleKeyDown); // مراقب أزرار لوحة المفاتيح
-    document.addEventListener('contextmenu', event => event.preventDefault()); // منع الزر الأيمن
+    window.addEventListener("keydown", handleKeyDown);
+    document.addEventListener('contextmenu', e => e.preventDefault());
 
-    // --- تنظيف المستمعات (Cleanup) عند إغلاق المكون أو انتهاء الامتحان ---
     return () => {
+        document.removeEventListener("copy", handleForbiddenAction);
+        window.removeEventListener("beforeprint", handleForbiddenAction);
         document.removeEventListener("visibilitychange", handleVisibilityChange);
         window.removeEventListener("blur", handleBlur);
         window.removeEventListener("beforeunload", handleBeforeUnload);
         window.removeEventListener("keydown", handleKeyDown);
-        document.removeEventListener('contextmenu', event => event.preventDefault());
+        document.removeEventListener('contextmenu', e => e.preventDefault());
     };
 }, [isSubmitted, isReviewMode, isCheating]);
 
@@ -840,6 +836,28 @@ useEffect(() => {
   
   return (
     <div className="fixed inset-0 z-50 bg-slate-100 flex flex-col font-['Cairo'] no-select" dir="rtl">
+{/* --- بداية فخ الشاشة البيضاء --- */}
+      {isScreenLocked && (
+        <div className="fixed inset-0 z-[10001] bg-white flex items-center justify-center text-center p-8 font-['Cairo']">
+          <div className="max-w-md">
+            <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <XCircle size={60} className="text-red-600 animate-pulse" />
+            </div>
+            <h1 className="text-4xl font-black text-slate-900 mb-4">تم قفل الاختبار</h1>
+            <p className="text-xl text-slate-600 leading-relaxed">
+              لقد حاولت القيام بعملية ممنوعة (تصوير، نسخ، أو طباعة). 
+              بناءً على سياسة المنصة، تم قفل الشاشة <span className="text-red-600 font-bold">وحظر حسابك نهائياً</span>.
+            </p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="mt-8 bg-slate-900 text-white px-10 py-3 rounded-2xl font-bold hover:bg-slate-800 transition-colors shadow-lg"
+            >
+              خروج من المنصة
+            </button>
+          </div>
+        </div>
+      )}
+      {/* --- نهاية فخ الشاشة البيضاء --- */}
 {!isReviewMode && (
   <div className="fixed inset-0 pointer-events-none overflow-hidden z-[9999]">
     {[...Array(6)].map((_, i) => (
