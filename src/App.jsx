@@ -1517,31 +1517,50 @@ const StudentDashboard = ({ user, userData }) => {
   const files = content.filter(c => c.type === 'file');
 
 const startExamWithCode = async (exam) => {
+    // 1. التحقق من وجود نتيجة سابقة
     const previousResult = examResults.find(r => r.examId === exam.id);
     
     if (previousResult) {
         if (previousResult.status === 'started') {
-            alert("لقد قمت بفتح هذا الامتحان سابقاً ولم تكمله. لا يمكن إعادة الدخول (نظام الفرصة الواحدة).");
+            alert("لقد بدأت هذا الامتحان ولم تكمله. لا يمكن الدخول مرة أخرى.");
         } else {
-            alert(`أنت امتحنت الامتحان ده قبل كده وجبت ${previousResult.score}.`);
+            alert(`لقد امتحنت هذا الامتحان سابقاً وحصلت على ${previousResult.score}.`);
         }
         return;
     }
 
+    // 2. التحقق من مواعيد الامتحان
     const now = new Date();
-    if (now < new Date(exam.startTime)) return alert("الامتحان لم يبدأ بعد.");
-    if (now > new Date(exam.endTime)) return alert("عفواً، انتهى وقت الامتحان.");
+    const start = new Date(exam.startTime);
+    const end = new Date(exam.endTime);
 
+    if (now < start) return alert(`الامتحان لم يبدأ بعد. موعد البدء: ${start.toLocaleString('ar-EG')}`);
+    if (now > end) return alert("عفواً، انتهى وقت الامتحان.");
+
+    // 3. طلب الكود وبدء الامتحان
     const code = prompt("أدخل كود الامتحان:");
     if (code === exam.accessCode) {
         try {
             const attemptRef = await addDoc(collection(db, 'exam_results'), { 
-                examId: exam.id, studentId: user.uid, studentName: user.displayName, 
-                score: 0, total: 0, status: 'started', answers: {}, startedAt: serverTimestamp() 
+                examId: exam.id, 
+                studentId: user.uid, 
+                studentName: user.displayName, 
+                score: 0, 
+                total: 0,
+                status: 'started',
+                answers: {},
+                startedAt: serverTimestamp() 
             });
+
+            // تعطيل الحماية مؤقتاً عند الانتقال
+            isSubmittingRef.current = true;
             setActiveExam({ ...exam, attemptId: attemptRef.id });
+            // إعادة الحماية بعد أجزاء من الثانية
+            setTimeout(() => { isSubmittingRef.current = false; }, 500);
+
         } catch (error) {
-            alert("حدث خطأ في الاتصال بالإنترنت.");
+            console.error(error);
+            alert("حدث خطأ أثناء بدء الامتحان، تأكد من الاتصال بالإنترنت.");
         }
     } else {
         alert("كود خاطئ!");
