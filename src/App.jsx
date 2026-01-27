@@ -258,24 +258,35 @@ const DesignSystemLoader = () => {
       ::-webkit-scrollbar-track { background: #f1f1f1; }
       ::-webkit-scrollbar-thumb { background: #d97706; border-radius: 4px; }
       .glass-panel { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.5); }
-.watermark-text, .watermark-video {
-  position: absolute;
-  pointer-events: none;
-  z-index: 9999;
-  color: rgba(0, 0, 0, 0.08); /* شفافية خفيفة */
-  font-weight: 900;
-  white-space: nowrap;
-  animation: floatWatermark 20s linear infinite; /* تشغيل الحركة */
-}
-
-/* أضف هذا الجزء في نهاية الـ style */
-@keyframes floatWatermark {
-  0% { top: 5%; left: 5%; transform: rotate(-20deg); }
-  25% { top: 70%; left: 60%; transform: rotate(10deg); }
-  50% { top: 30%; left: 80%; transform: rotate(-15deg); }
-  75% { top: 80%; left: 10%; transform: rotate(20deg); }
-  100% { top: 5%; left: 5%; transform: rotate(-20deg); }
-}
+      .watermark-text {
+        position: absolute;
+        animation: floatWatermark 20s linear infinite;
+        pointer-events: none;
+        z-index: 9999;
+        color: rgba(0, 0, 0, 0.06);
+        font-weight: 900;
+        font-size: 1.5rem;
+        transform: rotate(-30deg);
+        white-space: nowrap;
+        text-shadow: 0 0 2px rgba(255,255,255,0.5);
+      }
+      .watermark-video {
+        position: absolute;
+        animation: floatWatermark 15s linear infinite;
+        pointer-events: none;
+        z-index: 50;
+        color: rgba(255, 255, 255, 0.3);
+        font-weight: 900;
+        font-size: 1.2rem;
+        text-shadow: 0 0 5px rgba(0,0,0,0.8);
+      }
+      @keyframes floatWatermark {
+        0% { top: 10%; left: 10%; opacity: 0.3; }
+        25% { top: 60%; left: 80%; opacity: 0.5; }
+        50% { top: 80%; left: 20%; opacity: 0.3; }
+        75% { top: 20%; left: 40%; opacity: 0.5; }
+        100% { top: 10%; left: 10%; opacity: 0.3; }
+      }
       .no-select { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
     `}</style>
   );
@@ -671,7 +682,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const [isSubmitted, setIsSubmitted] = useState(isReviewMode);
   const [score, setScore] = useState(existingResult?.score || 0);
   const [startTime] = useState(Date.now()); 
-  const isFinalizing = useRef(false);
 
   const flatQuestions = [];
   if (exam.questions) {
@@ -686,7 +696,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
 // 1. دالة الحظر المحدثة
 const handleCheating = async (reason = "محاولة غش") => {
-    if(isReviewMode || isSubmitted || isCheating || isFinalizing.current) return; 
+    if(isReviewMode || isSubmitted || isCheating) return;
     setIsCheating(true); 
     setIsSubmitted(true);
     const timeTaken = Math.round((Date.now() - startTime) / 1000);
@@ -760,7 +770,6 @@ useEffect(() => {
   }, [timeLeft, isSubmitted, isCheating, isReviewMode]);
 
   const handleSubmit = async (auto = false) => {
-    isFinalizing.current = true;
     const totalQs = flatQuestions.length;
     if (!auto && Object.keys(answers).length < totalQs && !window.confirm("لم تجب على كل الأسئلة، هل أنت متأكد؟")) return;
     
