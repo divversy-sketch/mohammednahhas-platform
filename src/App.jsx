@@ -686,6 +686,7 @@ const SecureVideoPlayer = ({ video, userName, onClose }) => {
 };
 
 const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult = null }) => {
+  // --- 1. هنا مجموعة الـ useState الموجودة أصلاً عندك ---
   const [currentQIndex, setCurrentQIndex] = useState(0);
   const [answers, setAnswers] = useState(existingResult?.answers || {});
   const [flagged, setFlagged] = useState({});
@@ -693,9 +694,12 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const [isCheating, setIsCheating] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(isReviewMode);
   const [score, setScore] = useState(existingResult?.score || 0);
-  const [isScreenLocked, setIsScreenLocked] = useState(false);
-  const [startTime] = useState(Date.now()); 
-  const isSubmittingRef = useRef(false);
+  const [startTime] = useState(Date.now()); 
+
+  // ************************************************************
+  // 2. هنا تضع السطر الجديد (هذا هو المكان السليم والمحدد)
+  // ************************************************************
+  const isSubmittingRef = useRef(false); 
 
   const flatQuestions = [];
   if (exam.questions) {
@@ -709,9 +713,12 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   if (flatQuestions.length === 0) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-white">عفواً، لا توجد أسئلة.<button onClick={onClose} className="ml-4 bg-gray-200 px-4 py-2 rounded">خروج</button></div>;
 
 // 1. دالة الحظر المحدثة
-const handleCheating = async (reason = "محاولة غش") => {
-    if (isSubmittingRef.current) return;
+const handleCheating = async (reason = "تبديل نافذة") => {
+    // السطر القادم هو الأهم: لو العلم (isSubmittingRef) مرفوع، لا تفعل شيئاً واخرج فوراً
+    if (isSubmittingRef.current === true) return; 
+
     if(isReviewMode || isSubmitted || isCheating) return;
+	
     setIsCheating(true); 
     setIsSubmitted(true);
     const timeTaken = Math.round((Date.now() - startTime) / 1000);
