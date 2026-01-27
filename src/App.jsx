@@ -695,6 +695,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const [score, setScore] = useState(existingResult?.score || 0);
   const [isScreenLocked, setIsScreenLocked] = useState(false);
   const [startTime] = useState(Date.now()); 
+  const isSubmittingRef = useRef(false);
 
   const flatQuestions = [];
   if (exam.questions) {
@@ -709,6 +710,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
 // 1. دالة الحظر المحدثة
 const handleCheating = async (reason = "محاولة غش") => {
+    if (isSubmittingRef.current) return;
     if(isReviewMode || isSubmitted || isCheating) return;
     setIsCheating(true); 
     setIsSubmitted(true);
@@ -778,8 +780,12 @@ useEffect(() => {
   }, [timeLeft, isSubmitted, isCheating, isReviewMode]);
 
   const handleSubmit = async (auto = false) => {
-    const totalQs = flatQuestions.length;
-    if (!auto && Object.keys(answers).length < totalQs && !window.confirm("لم تجب على كل الأسئلة، هل أنت متأكد؟")) return;
+    isSubmittingRef.current = true;
+    const totalQs = flatQuestions.length;
+    if (!auto && Object.keys(answers).length < totalQs && !window.confirm("لم تجب على كل الأسئلة، هل أنت متأكد؟")) {
+        isSubmittingRef.current = false; // السطر المضاف لو تراجع الطالب
+        return;
+    }
     
     const finalScore = calculateScore();
     const timeTaken = Math.round((Date.now() - startTime) / 1000);
