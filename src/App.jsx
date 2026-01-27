@@ -23,7 +23,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 /**
  * =================================================================
- * 1. تهيئة نظام Firebase (الإعدادات الأصلية)
+ * 1. تهيئة نظام Firebase
  * =================================================================
  */
 const firebaseConfig = {
@@ -47,11 +47,10 @@ try {
 
 /**
  * =================================================================
- * 2. دوال النظام المساعدة (Utility Functions)
+ * 2. دوال النظام المساعدة
  * =================================================================
  */
 
-// طلب الإذن للإشعارات المتصفح
 const requestNotificationPermission = () => {
   if (!("Notification" in window)) return;
   if (Notification.permission === "default") {
@@ -61,7 +60,6 @@ const requestNotificationPermission = () => {
   }
 };
 
-// إرسال إشعار نظام حقيقي للطالب
 const sendSystemNotification = (title, body) => {
   if (Notification.permission === "granted") {
     try {
@@ -77,7 +75,6 @@ const sendSystemNotification = (title, body) => {
   }
 };
 
-// استخراج معرف اليوتيوب من أي رابط
 const getYouTubeID = (url) => {
     if (!url) return null;
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=|live\/|shorts\/)([^#&?]*).*/;
@@ -87,7 +84,7 @@ const getYouTubeID = (url) => {
 
 /**
  * =================================================================
- * 3. نظام توليد التقارير الذكي (PDF Engine)
+ * 3. نظام توليد التقارير (PDF)
  * =================================================================
  */
 const generatePDF = (type, data) => {
@@ -216,7 +213,7 @@ const generatePDF = (type, data) => {
 
 /**
  * =================================================================
- * 4. نظام التصميم والأنميشن (Premium UI System)
+ * 4. نظام التصميم والأنميشن
  * =================================================================
  */
 
@@ -285,7 +282,6 @@ const DesignSystemLoader = () => {
       .glass-morphism { background: rgba(255, 255, 255, 0.75); backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.5); }
       .gradient-border { border: 2px solid; border-image: linear-gradient(to right, #d97706, #78350f) 1; }
       
-      /* نظام العلامة المائية الشفافة المتحركة (تم التحسين لمنع الرمش عند التحديث) */
       .watermark-container-root {
         position: absolute;
         inset: 0;
@@ -338,9 +334,7 @@ const DesignSystemLoader = () => {
   );
 };
 
-// مكون العلامة المائية المتقدم (المتحرك والشفاف)
 const DynamicWatermark = ({ text, type = 'exam' }) => {
-    // استخدام useMemo لضمان عدم إعادة حساب الإحداثيات عند الريندير
     const items = useMemo(() => [
         { id: 'w1', top: '10%', left: '5%', delay: '0s' },
         { id: 'w2', top: '50%', left: '75%', delay: '-5s' },
@@ -371,7 +365,7 @@ const DynamicWatermark = ({ text, type = 'exam' }) => {
 
 /**
  * =================================================================
- * 5. المكونات البصرية الأساسية (Modern Logo & Branding)
+ * 5. المكونات البصرية الأساسية
  * =================================================================
  */
 
@@ -426,7 +420,6 @@ const ModernLogo = () => (
   </motion.svg>
 );
 
-// مكون الحكم والأقوال المتحرك
 const WisdomBox = () => {
   const [idx, setIdx] = useState(0);
   const [quotes, setQuotes] = useState([
@@ -485,94 +478,9 @@ const WisdomBox = () => {
   );
 };
 
-// لوحة الشرف للأوائل
-const Leaderboard = () => {
-    const [topStudents, setTopStudents] = useState([]);
-    const [config, setConfig] = useState({ show: true });
-
-    useEffect(() => {
-        const unsubConfig = onSnapshot(doc(db, 'settings', 'config'), (snap) => {
-            if(snap.exists()) setConfig(snap.data());
-        });
-        const unsub = onSnapshot(query(collection(db, 'exam_results')), (snap) => {
-            const scores = {};
-            snap.docs.forEach(doc => {
-                const data = doc.data();
-                if(data.score && data.status !== 'cheated') {
-                    if(!scores[data.studentName]) scores[data.studentName] = 0;
-                    scores[data.studentName] += parseInt(data.score);
-                }
-            });
-            const sorted = Object.entries(scores)
-                .map(([name, score]) => ({ name, score }))
-                .sort((a, b) => b.score - a.score)
-                .slice(0, 5); 
-            setTopStudents(sorted);
-        });
-        return () => { unsub(); unsubConfig(); };
-    }, []);
-
-    if(!config.show) return null;
-
-    return (
-        <motion.div 
-            initial={{ opacity: 0, y: 50 }} 
-            animate={{ opacity: 1, y: 0 }} 
-            className="bg-white p-10 rounded-[4rem] shadow-[0_30px_100px_rgba(0,0,0,0.04)] border border-slate-50 mb-14"
-        >
-            <div className="flex items-center justify-between mb-12">
-                <div className="flex items-center gap-5">
-                    <div className="p-4 bg-amber-100 text-amber-600 rounded-[2rem] shadow-inner rotate-12 hover:rotate-0 transition-transform"><Trophy size={40}/></div>
-                    <div>
-                        <h3 className="text-3xl font-black text-slate-800 tracking-tighter">لوحة شرف الأوائل</h3>
-                        <p className="text-xs text-slate-400 font-black uppercase tracking-widest mt-1">Hall of Fame - Top Performers</p>
-                    </div>
-                </div>
-                <div className="hidden md:flex gap-2">
-                    {[1,2,3].map(i => <div key={i} className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" style={{ animationDelay: `${i*0.2}s` }}></div>)}
-                </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-5">
-                {topStudents.length === 0 ? (
-                    <div className="text-center py-16 bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-200">
-                        <Star className="mx-auto text-slate-200 w-16 h-16 mb-4 animate-pulse" />
-                        <p className="text-slate-400 font-black text-lg uppercase tracking-widest">التنافس لم يبدأ بعد!</p>
-                    </div>
-                ) : topStudents.map((s, i) => (
-                    <motion.div 
-                        whileHover={{ scale: 1.01, x: -10 }}
-                        key={i} 
-                        className={`flex justify-between items-center p-6 rounded-[2.5rem] border-2 transition-all group ${
-                            i === 0 ? 'bg-amber-50 border-amber-200 shadow-lg shadow-amber-100' : 'bg-white border-slate-100 shadow-sm'
-                        }`}
-                    >
-                        <div className="flex items-center gap-6">
-                            <div className={`w-14 h-14 rounded-[1.2rem] flex items-center justify-center font-black text-2xl transition-all ${
-                                i === 0 ? 'bg-amber-600 text-white shadow-xl shadow-amber-300 -rotate-6 group-hover:rotate-0' : 
-                                i === 1 ? 'bg-slate-300 text-white' : 
-                                i === 2 ? 'bg-orange-400 text-white' : 'bg-slate-100 text-slate-400'
-                            }`}>
-                                {i + 1}
-                            </div>
-                            <div>
-                                <span className="font-black text-slate-800 text-xl block mb-1 group-hover:text-amber-700 transition-colors">{s.name}</span>
-                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Verified Student Account</span>
-                            </div>
-                        </div>
-                        <div className="bg-slate-900 px-8 py-3 rounded-2xl shadow-xl shadow-slate-200">
-                            <span className="text-amber-500 font-black text-2xl">{s.score}</span>
-                            <span className="text-white text-xs font-black mr-2 uppercase">Pts</span>
-                        </div>
-                    </motion.div>
-                ))}
-            </div>
-        </motion.div>
-    );
-};
-
 /**
  * =================================================================
- * 6. نظام المحادثة المتطور (Smart AI Chat Widget)
+ * 6. نظام المحادثة المتطور
  * =================================================================
  */
 
@@ -583,15 +491,6 @@ const ChatWidget = ({ user }) => {
   const [sessionId] = useState(() => Math.random().toString(36).substr(2, 9)); 
   const chatEndRef = useRef(null);
   const [isContactAdminMode, setIsContactAdminMode] = useState(false);
-  const [autoReplies, setAutoReplies] = useState([]);
-
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'auto_replies'), (snap) => {
-        const rules = snap.docs.map(d => d.data()).filter(r => r.isActive);
-        setAutoReplies(rules);
-    });
-    return () => unsub();
-  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -635,19 +534,7 @@ const ChatWidget = ({ user }) => {
            setIsContactAdminMode(false);
       } 
       else {
-          let matchedRule = null;
-          for (const rule of autoReplies) {
-              const keywords = rule.keywords.split(',').map(k => k.trim().toLowerCase());
-              if (keywords.some(k => lowerText.includes(k) && k.length > 0)) {
-                  matchedRule = rule;
-                  break; 
-              }
-          }
-
-          if (matchedRule) {
-              botResponse = matchedRule.response;
-          } 
-          else if (lowerText.includes("ادمن") || lowerText.includes("مستر") || lowerText.includes("تواصل") || lowerText.includes("سؤال")) {
+          if (lowerText.includes("ادمن") || lowerText.includes("مستر") || lowerText.includes("تواصل") || lowerText.includes("سؤال")) {
                botResponse = "تفضل بكتابة رسالتك للأستاذ محمد النحاس وسأقوم بنقلها له فوراً: 👇";
                setIsContactAdminMode(true);
           } else {
@@ -784,7 +671,6 @@ const SecureVideoPlayer = ({ video, userName, onClose }) => {
       className="fixed inset-0 z-[150] bg-slate-950/98 flex items-center justify-center p-4 md:p-8 backdrop-blur-2xl"
     >
       <div className="w-full max-w-7xl bg-black rounded-[3rem] overflow-hidden relative shadow-[0_0_80px_rgba(0,0,0,0.9)] border border-slate-800 perspective">
-        {/* شريط التحكم العلوي */}
         <div className="absolute top-8 right-8 z-[160] flex gap-4">
             <div className="relative">
                 <button 
@@ -823,10 +709,7 @@ const SecureVideoPlayer = ({ video, userName, onClose }) => {
             </button>
         </div>
 
-        {/* حاوية الفيديو الرئيسية */}
         <div className="aspect-video relative flex items-center justify-center bg-black overflow-hidden group">
-          
-          {/* العلامة المائية المدمجة فوق الفيديو */}
           <DynamicWatermark text={`${userName} - منصة النحاس`} type="video" />
           
           {videoId ? (
@@ -852,7 +735,6 @@ const SecureVideoPlayer = ({ video, userName, onClose }) => {
              </video>
           )}
 
-          {/* تراكب معلومات الفيديو */}
           <div className="absolute bottom-0 left-0 right-0 p-10 bg-gradient-to-t from-black/90 via-black/40 to-transparent z-20 pointer-events-none opacity-0 group-hover:opacity-100 transition-all duration-500 translate-y-10 group-hover:translate-y-0">
               <div className="flex items-center gap-4 mb-2">
                   <div className="p-2 bg-amber-600 rounded-lg text-white"><PlayCircle size={20}/></div>
@@ -868,7 +750,7 @@ const SecureVideoPlayer = ({ video, userName, onClose }) => {
 
 /**
  * =================================================================
- * 8. نظام الامتحانات الذكي (Professional Exam Runner)
+ * 8. نظام الامتحانات الذكي
  * =================================================================
  */
 
@@ -894,7 +776,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     return flat;
   }, [exam.questions]);
 
-  // دالة الحظر التلقائي (الغش)
+  // تعديل 1: إزالة حساسية حدث Blur لمنع الغش الكاذب
   const handleCheating = useCallback(async (reason = "محاولة غش") => {
     if(isReviewMode || isSubmitted || isCheating) return;
     setIsCheating(true); 
@@ -908,7 +790,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     await updateDoc(doc(db, 'users', user.uid), { status: 'banned_cheating' });
   }, [exam.attemptId, isCheating, isReviewMode, isSubmitted, startTime, user.uid]);
 
-  // مراقبة اختصارات لوحة المفاتيح
   const handleKeyDown = useCallback((e) => {
     if (
         e.key === 'F12' || 
@@ -921,16 +802,16 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     }
   }, [handleCheating]);
 
-  // تفعيل كافة أنظمة الحماية
   useEffect(() => {
     if (isReviewMode || isSubmitted) return;
 
+    // تم الاكتفاء فقط بحدث تغيير التبويب لمنع الظلم
     const handleVisibilityChange = () => { 
         if (document.hidden) handleCheating("مغادرة تبويب الامتحان"); 
     };
-    const handleBlur = () => {
-        handleCheating("تغيير النافذة النشطة أو سحب الإشعارات");
-    };
+    
+    // تم إلغاء حدث Blur لأنه حساس جداً
+
     const handleBeforeUnload = (e) => {
         handleCheating("محاولة إعادة تحميل الصفحة (Refresh)"); 
         e.preventDefault();
@@ -938,21 +819,18 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("blur", handleBlur);
     window.addEventListener("beforeunload", handleBeforeUnload);
     window.addEventListener("keydown", handleKeyDown);
     document.addEventListener('contextmenu', e => e.preventDefault());
 
     return () => {
         document.removeEventListener("visibilitychange", handleVisibilityChange);
-        window.removeEventListener("blur", handleBlur);
         window.removeEventListener("beforeunload", handleBeforeUnload);
         window.removeEventListener("keydown", handleKeyDown);
         document.removeEventListener('contextmenu', e => e.preventDefault());
     };
   }, [isSubmitted, isReviewMode, handleCheating, handleKeyDown]);
 
-  // عداد الوقت التنازلي
   useEffect(() => {
     if (isReviewMode || isSubmitted) return;
     if (timeLeft > 0 && !isCheating) {
@@ -973,8 +851,8 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
   const handleSubmit = async (auto = false) => {
     if (isSubmitted && !auto) return;
+    // تم إزالة window.confirm لمنع حدوث Blur خاطئ
     const totalQs = flatQuestions.length;
-    if (!auto && Object.keys(answers).length < totalQs && !window.confirm("لا تزال هناك أسئلة بدون إجابة، هل أنت متأكد من تسليم الامتحان الآن؟")) return;
     
     const finalScore = calculateScore();
     const timeTaken = Math.round((Date.now() - startTime) / 1000);
@@ -994,15 +872,16 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     }
   };
 
+  // تعديل 2: إصلاح مشكلة تحديد الإجابة
   const handleAnswer = (qId, idx) => {
       if (isReviewMode || isSubmitted) return;
+      // التأكد من تحديث الحالة بشكل صحيح
       setAnswers(prev => ({ ...prev, [qId]: idx }));
   };
 
   const currentQObj = flatQuestions[currentQIndex];
   const hasPassage = currentQObj?.blockText && currentQObj.blockText.trim().length > 0;
 
-  // شاشة الحظر
   if (isCheating) return (
     <div className="fixed inset-0 z-[200] bg-red-950 flex items-center justify-center text-white text-center p-8">
         <motion.div initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
@@ -1014,7 +893,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     </div>
   );
 
-  // شاشة النتيجة النهائية
   if (isSubmitted && !isReviewMode) {
      return (
         <div className="fixed inset-0 z-[180] bg-slate-50 overflow-y-auto p-6 md:p-14 font-['Cairo']">
@@ -1054,10 +932,8 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   return (
     <div className="fixed inset-0 z-[180] bg-slate-100 flex flex-col font-['Cairo'] no-select overflow-hidden" dir="rtl">
       
-      {/* طبقة العلامة المائية الشفافة المتحركة للوقاية من التصوير */}
       {!isReviewMode && <DynamicWatermark text={`${user.displayName} - ${user.email}`} type="exam" />}
       
-      {/* شريط الامتحان العلوي */}
       <div className="bg-slate-900 text-white p-6 flex justify-between items-center shadow-2xl relative z-[190] border-b border-white/5">
         <div className="flex items-center gap-6">
             <div className="p-3 bg-amber-500 rounded-2xl text-slate-900 shadow-xl rotate-3"><ClipboardList size={26}/></div>
@@ -1091,7 +967,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
       <div className="flex-1 flex overflow-hidden relative z-[185]">
         
-        {/* شريط التنقل الجانبي بين الأسئلة */}
         <div className="w-24 md:w-32 bg-white border-l border-slate-200 flex flex-col p-4 overflow-y-auto scrollbar-hide">
           <div className="grid grid-cols-1 gap-4">
               {flatQuestions.map((q, idx) => {
@@ -1116,10 +991,8 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
           </div>
         </div>
 
-        {/* منطقة المحتوى: القطعة + السؤال */}
         <div className={`flex-1 flex flex-col ${hasPassage ? 'md:flex-row' : 'items-center'} h-full overflow-hidden bg-slate-100/50 w-full`}>
           
-          {/* عرض القطعة النصية إن وجدت */}
           {hasPassage && (
             <div className="flex-1 w-full bg-amber-50/40 p-10 md:p-16 overflow-y-auto border-l border-amber-100 shadow-inner">
               <div className="max-w-4xl mx-auto">
@@ -1134,7 +1007,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
             </div>
           )}
           
-          {/* عرض السؤال والخيارات */}
           <div className={`${hasPassage ? 'flex-1' : 'w-full max-w-5xl mx-auto'} bg-white p-10 md:p-16 overflow-y-auto flex flex-col shadow-2xl m-6 rounded-[4rem] h-fit max-h-[96%] border border-slate-100 relative modern-shadow`}>
             <div className="flex justify-between items-start mb-12">
               <div className="bg-slate-900 text-amber-500 px-8 py-3 rounded-2xl text-sm font-black tracking-[4px] uppercase shadow-xl shadow-slate-200">
@@ -1166,12 +1038,12 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                       if (answers[currentQObj.id] === idx) optionClass = 'border-amber-600 bg-amber-600/5 text-amber-950 shadow-2xl shadow-amber-200 ring-4 ring-amber-600/20 scale-[1.02]';
                   }
 
+                  // تم تبسيط عنصر الاختيار لضمان عمله بسلاسة وحل مشكلة عدم التحديد
                   return (
-                    <motion.div 
-                      whileTap={{ scale: 0.98 }}
+                    <div 
                       key={idx} 
                       onClick={() => handleAnswer(currentQObj.id, idx)} 
-                      className={`p-7 rounded-[2rem] border-2 cursor-pointer transition-all flex items-center gap-6 text-2xl font-bold ${optionClass}`}
+                      className={`p-7 rounded-[2rem] border-2 cursor-pointer transition-all flex items-center gap-6 text-2xl font-bold ${optionClass} select-none`}
                     >
                       <div className={`w-10 h-10 rounded-[1.2rem] border-2 flex items-center justify-center shrink-0 transition-all duration-300 ${
                           answers[currentQObj.id] === idx || (isReviewMode && idx === currentQObj.correctIdx) 
@@ -1183,7 +1055,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                       <span className="whitespace-pre-line leading-relaxed flex-1">{opt}</span>
                       {isReviewMode && idx === currentQObj.correctIdx && <Award className="text-green-600 mr-auto animate-bounce-gentle"/>}
                       {isReviewMode && answers[currentQObj.id] === idx && idx !== currentQObj.correctIdx && <XCircle className="text-red-600 mr-auto animate-shake"/>}
-                    </motion.div>
+                    </div>
                   )
               })}
             </div>
@@ -1211,12 +1083,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   );
 };
 
-/**
- * =================================================================
- * 9. لوحة تحكم الإدارة (Admin Dashboard) - النسخة الكاملة
- * =================================================================
- */
-
 const AdminDashboard = ({ user }) => {
   const [activeTab, setActiveTab] = useState('users'); 
   const [pendingUsers, setPendingUsers] = useState([]);
@@ -1234,11 +1100,8 @@ const AdminDashboard = ({ user }) => {
   const [examResults, setExamResults] = useState([]); 
   const [viewingResult, setViewingResult] = useState(null); 
   const [newAnnouncement, setNewAnnouncement] = useState(""); 
-  const [showLeaderboard, setShowLeaderboard] = useState(true);
   const [announcements, setAnnouncements] = useState([]);
   
-  const [autoReplies, setAutoReplies] = useState([]);
-  const [newAutoReply, setNewAutoReply] = useState({ keywords: '', response: '', isActive: true });
   const [quotesList, setQuotesList] = useState([]);
   const [newQuote, setNewQuote] = useState({ text: '', source: '' });
 
@@ -1254,11 +1117,10 @@ const AdminDashboard = ({ user }) => {
     const unsubExams = onSnapshot(query(collection(db, 'exams'), orderBy('createdAt', 'desc')), s => setExamsList(s.docs.map(d=>({id:d.id,...d.data()}))));
     const unsubResults = onSnapshot(query(collection(db, 'exam_results'), orderBy('submittedAt', 'desc')), s => setExamResults(s.docs.map(d=>({id:d.id,...d.data()}))));
     const unsubAnnounce = onSnapshot(query(collection(db, 'announcements'), orderBy('createdAt', 'desc')), s => setAnnouncements(s.docs.map(d => ({id: d.id, ...d.data()}))));
-    const unsubAuto = onSnapshot(collection(db, 'auto_replies'), s => setAutoReplies(s.docs.map(d => ({id: d.id, ...d.data()}))));
     const unsubQuotes = onSnapshot(collection(db, 'quotes'), s => setQuotesList(s.docs.map(d => ({id: d.id, ...d.data()}))));
 
     return () => {
-        unsubUsers(); unsubActive(); unsubContent(); unsubMsgs(); unsubLive(); unsubExams(); unsubResults(); unsubAnnounce(); unsubAuto(); unsubQuotes();
+        unsubUsers(); unsubActive(); unsubContent(); unsubMsgs(); unsubLive(); unsubExams(); unsubResults(); unsubAnnounce(); unsubQuotes();
     };
   }, []);
 
@@ -1337,7 +1199,6 @@ const AdminDashboard = ({ user }) => {
     setBulkText(""); alert("تم النشر");
   };
 
-  // 1. دوال البث المباشر
   const startLiveStream = async () => {
     if (!liveData.liveUrl || !liveData.title) return alert("يرجى ملء رابط البث والعنوان!");
     try {
@@ -1358,23 +1219,6 @@ const AdminDashboard = ({ user }) => {
     } catch (e) { console.error(e); }
   };
 
-  // 2. دوال الرد الآلي
-  const handleAddAutoReply = async () => {
-      if(!newAutoReply.keywords || !newAutoReply.response) return alert("اكتب الكلمات الدالة والرد!");
-      await addDoc(collection(db, 'auto_replies'), { ...newAutoReply, isActive: true });
-      setNewAutoReply({ keywords: '', response: '', isActive: true });
-      alert("تم حفظ قاعدة الرد الآلي ✅");
-  };
-
-  const toggleAutoReply = async (id, currentStatus) => {
-      await updateDoc(doc(db, 'auto_replies', id), { isActive: !currentStatus });
-  };
-
-  const deleteAutoReply = async (id) => {
-      if(window.confirm("هل أنت متأكد من حذف هذا الرد التلقائي؟")) await deleteDoc(doc(db, 'auto_replies', id));
-  };
-
-  // 3. دوال الحكم والأقوال
   const handleAddQuote = async () => {
     if(!newQuote.text || !newQuote.source) return alert("اكتب نص الحكمة والمصدر!");
     await addDoc(collection(db, 'quotes'), { ...newQuote, createdAt: serverTimestamp() });
@@ -1384,14 +1228,6 @@ const AdminDashboard = ({ user }) => {
 
   const deleteQuote = async (id) => {
      if(window.confirm("حذف هذه الحكمة؟")) await deleteDoc(doc(db, 'quotes', id));
-  };
-
-  // 4. دوال الإعدادات (لوحة الشرف)
-  const toggleLeaderboard = async () => {
-     const newStatus = !showLeaderboard;
-     setShowLeaderboard(newStatus);
-     // حفظ الإعداد في قاعدة البيانات لكي يراه الطلاب
-     await setDoc(doc(db, 'settings', 'config'), { show: newStatus }, { merge: true });
   };
 
   const handleSendResetPassword = async (email) => {
@@ -1425,7 +1261,6 @@ const AdminDashboard = ({ user }) => {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-6 gap-8">
-        {/* القائمة الجانبية للأدمن */}
         <div className="lg:col-span-1 space-y-3">
           {[
             { id: 'users', label: 'الطلبات', icon: <Users size={20}/> },
@@ -1435,7 +1270,6 @@ const AdminDashboard = ({ user }) => {
             { id: 'live', label: 'البث', icon: <Radio size={20}/> },
             { id: 'content', label: 'المحتوى', icon: <Layers size={20}/> },
             { id: 'messages', label: 'الرسائل', icon: <MessageSquare size={20}/> },
-            { id: 'auto_reply', label: 'الرد الآلي', icon: <Bot size={20}/> },
             { id: 'quotes', label: 'الحكم', icon: <PenTool size={20}/> },
             { id: 'settings', label: 'الإعدادات', icon: <GearIcon size={20}/> }
           ].map(tab => (
@@ -1453,7 +1287,6 @@ const AdminDashboard = ({ user }) => {
           ))}
         </div>
 
-        {/* منطقة المحتوى للأدمن */}
         <div className="lg:col-span-5 bg-white p-10 rounded-[4rem] shadow-[0_40px_100px_rgba(0,0,0,0.03)] border border-slate-50 min-h-[80vh]">
           
           {activeTab === 'users' && (
@@ -1561,7 +1394,7 @@ const AdminDashboard = ({ user }) => {
                   </div>
               </div>
           )}
-
+          
           {activeTab === 'results' && (
               <div>
                   <div className="flex justify-between items-center mb-10">
@@ -1585,33 +1418,6 @@ const AdminDashboard = ({ user }) => {
                               </div>
                               <div className="flex gap-3">
                                   <button onClick={()=>handleDeleteResult(res.id)} className="px-8 py-3 bg-red-50 text-red-600 rounded-2xl font-black text-xs hover:bg-red-600 hover:text-white transition-all active:scale-95 border border-red-100">حذف وإعادة</button>
-                              </div>
-                          </div>
-                      ))}
-                  </div>
-              </div>
-          )}
-
-          {activeTab === 'auto_reply' && (
-              <div className="space-y-10">
-                  <div className="bg-slate-50 p-10 rounded-[3rem] border-2 border-slate-100">
-                      <h3 className="font-black text-xl mb-8 flex items-center gap-3"><Bot className="text-amber-600"/> برمجة الرد الآلي الذكي</h3>
-                      <div className="grid gap-6">
-                          <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase mr-2">كلمات البحث (افصل بينها بفاصلة)</label><input className="w-full border-2 border-slate-200 p-4 rounded-2xl focus:border-amber-500 outline-none transition-all" placeholder="مثال: سعر، حجز، سنتر، ميعاد" value={newAutoReply.keywords} onChange={e=>setNewAutoReply({...newAutoReply, keywords:e.target.value})}/></div>
-                          <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase mr-2">محتوى الرد التلقائي</label><textarea className="w-full border-2 border-slate-200 p-4 rounded-2xl h-32 focus:border-amber-500 outline-none transition-all" placeholder="اكتب الرد الذي سيظهر للطالب..." value={newAutoReply.response} onChange={e=>setNewAutoReply({...newAutoReply, response:e.target.value})}/></div>
-                          <button onClick={handleAddAutoReply} className="w-full bg-amber-600 text-white py-5 rounded-2xl font-black text-xl shadow-2xl shadow-amber-200 hover:bg-amber-700 transition-all active:scale-95">حفظ القاعدة البرمجية</button>
-                      </div>
-                  </div>
-                  <div className="space-y-4">
-                      {autoReplies.map(rule => (
-                          <div key={rule.id} className={`p-8 rounded-[2.5rem] border-2 flex justify-between items-center transition-all ${rule.isActive ? 'bg-white border-green-100 shadow-md shadow-green-50' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
-                              <div className="flex-1">
-                                  <div className="flex items-center gap-3 mb-2"><div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div><p className="font-black text-slate-800 uppercase text-xs tracking-[2px]">Keywords: {rule.keywords}</p></div>
-                                  <p className="text-slate-600 font-bold text-lg leading-relaxed">{rule.response}</p>
-                              </div>
-                              <div className="flex gap-3 ml-6">
-                                  <button onClick={()=>toggleAutoReply(rule.id, rule.isActive)} className={`p-4 rounded-2xl transition-all active:scale-90 ${rule.isActive ? 'text-green-600 bg-green-50 hover:bg-green-600 hover:text-white' : 'text-slate-400 bg-slate-100'}`}><Power size={24}/></button>
-                                  <button onClick={()=>deleteAutoReply(rule.id)} className="p-4 text-red-500 bg-red-50 rounded-2xl hover:bg-red-600 hover:text-white transition-all active:scale-90"><Trash2 size={24}/></button>
                               </div>
                           </div>
                       ))}
@@ -1813,17 +1619,6 @@ const AdminDashboard = ({ user }) => {
                       </div>
                   </div>
 
-                  <div className="bg-white p-10 rounded-[4rem] border-2 border-slate-100 flex flex-col md:flex-row justify-between items-center gap-8 group hover:border-blue-100 transition-colors shadow-sm">
-                      <div className="text-right">
-                          <h3 className="text-2xl font-black text-slate-800 mb-2 flex items-center gap-3"><Trophy className="text-blue-600"/> لوحة الشرف (Leaderboard)</h3>
-                          <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">إظهار أو إخفاء قائمة الطلاب الأوائل في الصفحة الرئيسية للطلاب.</p>
-                      </div>
-                      <button onClick={toggleLeaderboard} className={`relative inline-flex h-14 w-32 items-center rounded-full transition-all duration-500 shadow-xl ${showLeaderboard ? 'bg-green-600' : 'bg-slate-300'}`}>
-                          <span className={`inline-block h-10 w-10 transform rounded-full bg-white transition-all duration-500 shadow-lg ${showLeaderboard ? '-translate-x-2' : '-translate-x-20'}`} />
-                          <span className={`absolute font-black text-[10px] uppercase text-white ${showLeaderboard ? 'right-4' : 'left-4'}`}>{showLeaderboard ? 'ON' : 'OFF'}</span>
-                      </button>
-                  </div>
-
                   <div className="bg-slate-900 p-12 rounded-[4rem] text-center shadow-2xl relative overflow-hidden group">
                         <div className="absolute inset-0 bg-gradient-to-br from-amber-600/10 to-transparent"></div>
                         <Activity size={60} className="mx-auto text-amber-500 mb-6 group-hover:scale-110 transition-transform duration-700"/>
@@ -1923,7 +1718,7 @@ const StudentDashboard = ({ user, userData }) => {
       </div>
     );
   }
-  
+
   // واجهة البث المباشر
   if(liveSession) return (
       <div className="fixed inset-0 z-[150] bg-slate-900 flex flex-col md:flex-row font-['Cairo'] no-select overflow-hidden">
@@ -2028,7 +1823,7 @@ const StudentDashboard = ({ user, userData }) => {
     <div className="min-h-screen flex bg-slate-50 relative font-['Cairo'] overflow-hidden" dir="rtl">
       
       {/* مشغل الفيديو المنفصل */}
-      {playingVideo && <SecureVideoPlayer video={playingVideo} userName={userData.name} onClose={() => setPlayingVideo(null)} />}
+      {playingVideo && <SecureVideoPlayer video={playingVideo} userName={userData?.name || "طالب"} onClose={() => setPlayingVideo(null)} />}
       
       <FloatingArabicBackground />
       <ChatWidget user={user} />
@@ -2081,9 +1876,9 @@ const StudentDashboard = ({ user, userData }) => {
         {/* هيدر الترحيب والإشعارات */}
         <div className="flex justify-between items-center mb-14 relative z-[110]">
             <div className="hidden md:block">
-                <h2 className="text-5xl font-black text-slate-850 tracking-tighter mb-2">منور يا {userData.name.split(' ')[0]} 👋</h2>
+                <h2 className="text-5xl font-black text-slate-850 tracking-tighter mb-2">منور يا {userData?.name ? userData.name.split(' ')[0] : 'طالب'} 👋</h2>
                 <div className="flex items-center gap-4">
-                    <span className="bg-amber-100 text-amber-700 px-5 py-1 rounded-full text-xs font-black tracking-widest uppercase shadow-sm">{getGradeLabel(userData.grade)}</span>
+                    <span className="bg-amber-100 text-amber-700 px-5 py-1 rounded-full text-xs font-black tracking-widest uppercase shadow-sm">{getGradeLabel(userData?.grade)}</span>
                     <span className="w-2 h-2 bg-slate-300 rounded-full"></span>
                     <p className="text-slate-400 font-bold uppercase text-[10px] tracking-[4px]">Verified Active Learner Account</p>
                 </div>
@@ -2101,7 +1896,7 @@ const StudentDashboard = ({ user, userData }) => {
                     <motion.div 
                         initial={{ opacity: 0, y: 30, scale: 0.95 }} 
                         animate={{ opacity: 1, y: 0, scale: 1 }} 
-                        exit={{ opacity: 0, y: 30, scale: 0.95 }}
+                        exit={{ opacity: 0, y: 30, scale: 0.95 }} 
                         className="absolute top-20 left-0 w-[24rem] bg-white/95 backdrop-blur-3xl rounded-[3rem] shadow-2xl border border-slate-50 p-8 z-[120] modern-shadow"
                     >
                         <div className="flex justify-between items-center mb-8">
@@ -2157,8 +1952,6 @@ const StudentDashboard = ({ user, userData }) => {
                         </motion.div>
                     ))}
                 </div>
-                
-                <Leaderboard />
             </motion.div>
         )}
 
