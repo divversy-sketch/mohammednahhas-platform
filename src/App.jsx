@@ -686,7 +686,7 @@ const SecureVideoPlayer = ({ video, userName, onClose }) => {
 };
 
 const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult = null }) => {
-  const [currentQIndex, setCurrentQIndex] = useState(0);
+const [currentQIndex, setCurrentQIndex] = useState(0);
   const [answers, setAnswers] = useState(existingResult?.answers || {});
   const [flagged, setFlagged] = useState({});
   const [timeLeft, setTimeLeft] = useState(exam.duration * 60);
@@ -694,137 +694,106 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const [isSubmitted, setIsSubmitted] = useState(isReviewMode);
   const [score, setScore] = useState(existingResult?.score || 0);
   const [startTime] = useState(Date.now()); 
-  
-  // --- السطور القادمة هي التي كانت ناقصة وتسبب الشاشة البيضاء ---
   const [isScreenLocked, setIsScreenLocked] = useState(false); 
-  const isSubmittingRef = useRef(false); 
+  const isSubmittingRef = useRef(false);
 
-  const flatQuestions = [];
-  if (exam.questions) {
-    exam.questions.forEach((block) => {
-      block.subQuestions.forEach((q) => {
-        flatQuestions.push({ ...q, blockText: block.text });
-      });
-    });
-  }
+// 1. دالة اختيار الإجابة
+  const handleAnswer = (questionId, optionIdx) => {
+    if (isSubmitted || isReviewMode || isCheating) return;
+    setAnswers(prev => ({ ...prev, [questionId]: optionIdx }));
+  };
 
-  if (flatQuestions.length === 0) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-white">عفواً، لا توجد أسئلة.<button onClick={onClose} className="ml-4 bg-gray-200 px-4 py-2 rounded">خروج</button></div>;
-
-// 1. دالة الحظر المحدثة
-const handleCheating = async (reason = "محاولة غش") => {
-    // هذا السطر يمنع الشاشة البيضاء إذا كان الطالب يسلم أو في وضع المراجعة
-    if (isReviewMode || isSubmitted || isSubmittingRef.current) return;
+  // 2. دالة الحظر (إصلاح نظام رصد الغش)
+  const handleCheating = async (reason = "محاولة غش") => {
+    if (isReviewMode || isSubmitted || isCheating || isSubmittingRef.current) return;
     
-    setIsScreenLocked(true); // تفعيل الشاشة البيضاء
     setIsCheating(true); 
+    setIsSubmitted(true);
     const timeTaken = Math.round((Date.now() - startTime) / 1000);
+    
     if (exam.attemptId) {
         await updateDoc(doc(db, 'exam_results', exam.attemptId), { 
             score: 0, status: 'cheated', cheatReason: reason, timeTaken: timeTaken, submittedAt: serverTimestamp() 
         });
     }
     await updateDoc(doc(db, 'users', user.uid), { status: 'banned_cheating' });
-};
+  };
 
-// 2. دالة منع أزرار لوحة المفاتيح
-const handleKeyDown = (e) => {
-    if (
-        e.key === 'F12' || 
-        (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C')) || 
-        (e.ctrlKey && e.key === 'U') ||
-        e.key === 'PrintScreen'
-    ) {
-        e.preventDefault();
-        handleCheating("استخدام اختصارات لوحة المفاتيح الممنوعة");
+// 1. دالة التسليم الوحيدة والسليمة
+  const handleSubmit = async (auto = false) => {
+    isSubmittingRef.current = true; // تفعيل صمام الأمان
+    const totalQs = flatQuestions.length;
+
+    if (!auto && Object.keys(answers).length < totalQs && !window.confirm("لم تجب على كل الأسئلة، هل أنت متأكد؟")) {
+        isSubmittingRef.current = false;
+        return;
     }
-};
+    
+    // حساب الدرجة يدوياً بداخل الدالة
+    let rawScore = 0;
+    flatQuestions.forEach(q => {
+        if (answers[q.id] === q.correctIdx) rawScore++;
+    });
 
-useEffect(() => {
+    const timeTaken = Math.round((Date.now() - startTime) / 1000);
+    setScore(rawScore);
+    setIsSubmitted(true);
+    
+    if (exam.attemptId) {
+        await updateDoc(doc(db, 'exam_results', exam.attemptId), { 
+            score: rawScore, 
+            total: totalQs, 
+            answers: answers, 
+            status: 'completed', 
+            timeTaken: timeTaken, 
+            submittedAt: serverTimestamp() 
+        });
+    }
+  };
+
+  // 2. مراقب الكيبورد
+  const handleKeyDown = (e) => {
+    if (e.key === 'PrintScreen' || (e.ctrlKey && (e.key === 'p' || e.key === 'c' || e.key === 'u')) || e.key === 'F12') {
+        e.preventDefault();
+        setIsScreenLocked(true); 
+        handleCheating("محاولة تصوير أو نسخ");
+    }
+  };
+
+    useEffect(() => {
     if (isReviewMode || isSubmitted) return;
 
+    // دوال الحماية
     const handleVisibilityChange = () => { if (document.hidden) handleCheating("الخروج من التبويب"); };
-    const handleBlur = () => handleCheating("الخروج من التطبيق");
-    const handleBeforeUnload = (e) => { handleCheating("تحديث الصفحة"); e.preventDefault(); e.returnValue = ''; };
+    const handleBlur = () => handleCheating("تبديل النافذة");
+    const handleForbiddenAction = (e) => { e.preventDefault(); setIsScreenLocked(true); handleCheating("نسخ أو طباعة"); };
 
-    // --- الفخ الجديد (النسخ والطباعة) ---
-    const handleForbiddenAction = (e) => {
-        e.preventDefault();
-        setIsScreenLocked(true); // قفل الشاشة فوراً
-        handleCheating("محاولة نسخ أو طباعة المحتوى");
-    };
-
+    // ربط المستمعات
     document.addEventListener("copy", handleForbiddenAction);
     window.addEventListener("beforeprint", handleForbiddenAction);
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("blur", handleBlur);
-    window.addEventListener("beforeunload", handleBeforeUnload);
     window.addEventListener("keydown", handleKeyDown);
     document.addEventListener('contextmenu', e => e.preventDefault());
 
+    // عداد الوقت
+    const timer = setInterval(() => {
+        setTimeLeft(p => {
+            if (p <= 1) { clearInterval(timer); handleSubmit(true); return 0; }
+            return p - 1;
+        });
+    }, 1000);
+
     return () => {
+        clearInterval(timer);
         document.removeEventListener("copy", handleForbiddenAction);
         window.removeEventListener("beforeprint", handleForbiddenAction);
         document.removeEventListener("visibilitychange", handleVisibilityChange);
         window.removeEventListener("blur", handleBlur);
-        window.removeEventListener("beforeunload", handleBeforeUnload);
         window.removeEventListener("keydown", handleKeyDown);
         document.removeEventListener('contextmenu', e => e.preventDefault());
     };
-}, [isSubmitted, isReviewMode, isCheating]);
-
-  useEffect(() => {
-    if (isReviewMode || isSubmitted) return;
-    if (timeLeft > 0 && !isCheating) {
-      const timer = setInterval(() => setTimeLeft(p => p - 1), 1000);
-      return () => clearInterval(timer);
-    } else if (timeLeft === 0) {
-      handleSubmit(true);
-    }
-  }, [timeLeft, isSubmitted, isCheating, isReviewMode]);
-
-  const handleSubmit = async (auto = false) => {
-    isSubmittingRef.current = true;
-    const totalQs = flatQuestions.length;
-    if (!auto && Object.keys(answers).length < totalQs && !window.confirm("لم تجب على كل الأسئلة، هل أنت متأكد؟")) {
-        isSubmittingRef.current = false; // السطر المضاف لو تراجع الطالب
-        return;
-    }
-    
-    const finalScore = calculateScore();
-    const timeTaken = Math.round((Date.now() - startTime) / 1000);
-    setScore(finalScore);
-    setIsSubmitted(true);
-    
-    // تعديل: تحديث الوثيقة التي تم إنشاؤها عند بدء الامتحان
-    if (exam.attemptId) {
-        await updateDoc(doc(db, 'exam_results', exam.attemptId), { 
-            score: finalScore, 
-            total: totalQs, 
-            answers, 
-            status: 'completed',
-            timeTaken: timeTaken,
-            totalTime: exam.duration, 
-            submittedAt: serverTimestamp() 
-        });
-    } else {
-        // Fallback for logic consistency (لو مفيش ID لأي سبب)
-         await addDoc(collection(db, 'exam_results'), { 
-          examId: exam.id, 
-          studentId: user.uid, 
-          studentName: user.displayName, 
-          score: finalScore, 
-          total: totalQs, 
-          answers, 
-          status: 'completed',
-          timeTaken: timeTaken,
-          totalTime: exam.duration, 
-          submittedAt: serverTimestamp() 
-        });
-    }
-  };
-
-  const currentQObj = flatQuestions[currentQIndex];
-  const hasPassage = currentQObj?.blockText && currentQObj.blockText.trim().length > 0;
+  }, [isSubmitted, isReviewMode, isCheating]);
 
   if (isCheating) return <div className="fixed inset-0 z-[60] bg-red-900 flex items-center justify-center text-white text-center font-['Cairo']"><div><AlertOctagon size={80} className="mx-auto mb-4"/><h1>تم رصد محاولة غش!</h1><p className="text-red-200 mt-2">خرجت من الامتحان. تم رصد درجتك (صفر) وحظرك.</p><button onClick={() => window.location.reload()} className="mt-4 bg-white text-red-900 px-6 py-2 rounded-full font-bold">خروج</button></div></div>;
 
@@ -845,28 +814,16 @@ useEffect(() => {
   
   return (
     <div className="fixed inset-0 z-50 bg-slate-100 flex flex-col font-['Cairo'] no-select" dir="rtl">
-{/* --- بداية فخ الشاشة البيضاء --- */}
-      {isScreenLocked && (
-        <div className="fixed inset-0 z-[10001] bg-white flex items-center justify-center text-center p-8 font-['Cairo']">
+{isScreenLocked && (
+        <div className="fixed inset-0 z-[10001] bg-white flex items-center justify-center text-center p-8">
           <div className="max-w-md">
-            <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <XCircle size={60} className="text-red-600 animate-pulse" />
-            </div>
-            <h1 className="text-4xl font-black text-slate-900 mb-4">تم قفل الاختبار</h1>
-            <p className="text-xl text-slate-600 leading-relaxed">
-              لقد حاولت القيام بعملية ممنوعة (تصوير، نسخ، أو طباعة). 
-              بناءً على سياسة المنصة، تم قفل الشاشة <span className="text-red-600 font-bold">وحظر حسابك نهائياً</span>.
-            </p>
-            <button 
-              onClick={() => window.location.reload()} 
-              className="mt-8 bg-slate-900 text-white px-10 py-3 rounded-2xl font-bold hover:bg-slate-800 transition-colors shadow-lg"
-            >
-              خروج من المنصة
-            </button>
+            <XCircle size={80} className="text-red-600 mx-auto mb-6 animate-pulse" />
+            <h1 className="text-3xl font-black text-slate-900 mb-4">تم قفل الشاشة</h1>
+            <p className="text-xl text-slate-600">بسبب محاولة النسخ أو التصوير. تم حظر حسابك نهائياً.</p>
+            <button onClick={() => window.location.reload()} className="mt-8 bg-slate-900 text-white px-10 py-3 rounded-2xl font-bold">خروج</button>
           </div>
         </div>
       )}
-      {/* --- نهاية فخ الشاشة البيضاء --- */}
 {!isReviewMode && (
   <div className="fixed inset-0 pointer-events-none overflow-hidden z-[9999]">
     {[...Array(6)].map((_, i) => (
@@ -1518,46 +1475,24 @@ const StudentDashboard = ({ user, userData }) => {
   const files = content.filter(c => c.type === 'file');
 
 const startExamWithCode = async (exam) => {
-    // 1. التحقق من وجود نتيجة سابقة
     const previousResult = examResults.find(r => r.examId === exam.id);
     if (previousResult) {
-        if (previousResult.status === 'started') {
-            alert("لقد بدأت هذا الامتحان سابقاً ولم تكمله. لا يمكن الدخول مرة أخرى.");
-        } else {
-            alert(`أنت امتحنت الامتحان ده قبل كده وجبت ${previousResult.score}.`);
-        }
+        alert(previousResult.status === 'started' ? "بدأت هذا الامتحان ولم تكمله." : `امتحنت قبل كده وجبت ${previousResult.score}`);
         return;
     }
-
-    // 2. التحقق من مواعيد الامتحان (هذا الجزء كان يسبب الشاشة البيضاء لأنه كان خارج الدالة)
     const now = new Date();
-    const start = new Date(exam.startTime);
-    const end = new Date(exam.endTime);
-
-    if (now < start) return alert(`الامتحان لم يبدأ بعد. موعد البدء: ${start.toLocaleString('ar-EG')}`);
-    if (now > end) return alert("عفواً، انتهى وقت الامتحان.");
-
-    // 3. طلب الكود وبدء الامتحان
+    if (now < new Date(exam.startTime)) return alert("الامتحان لم يبدأ بعد.");
+    if (now > new Date(exam.endTime)) return alert("عفواً، انتهى وقت الامتحان.");
     const code = prompt("أدخل كود الامتحان:");
     if (code === exam.accessCode) {
         try {
             const attemptRef = await addDoc(collection(db, 'exam_results'), { 
-                examId: exam.id, 
-                studentId: user.uid, 
-                studentName: user.displayName, 
-                score: 0, 
-                total: 0,
-                status: 'started',
-                answers: {},
-                startedAt: serverTimestamp() 
+                examId: exam.id, studentId: user.uid, studentName: user.displayName, 
+                score: 0, total: 0, status: 'started', answers: {}, startedAt: serverTimestamp() 
             });
-
-            // نمرر الـ ID الجديد للمحاولة
             setActiveExam({ ...exam, attemptId: attemptRef.id });
-
         } catch (error) {
-            console.error("Error starting exam:", error);
-            alert("حدث خطأ أثناء بدء الامتحان، تأكد من الاتصال بالإنترنت.");
+            alert("حدث خطأ في الاتصال بالإنترنت.");
         }
     } else {
         alert("كود خاطئ!");
