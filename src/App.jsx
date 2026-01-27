@@ -258,35 +258,42 @@ const DesignSystemLoader = () => {
       ::-webkit-scrollbar-track { background: #f1f1f1; }
       ::-webkit-scrollbar-thumb { background: #d97706; border-radius: 4px; }
       .glass-panel { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.5); }
-      .watermark-text {
-        position: absolute;
-        animation: floatWatermark 20s linear infinite;
-        pointer-events: none;
-        z-index: 9999;
-        color: rgba(0, 0, 0, 0.06);
-        font-weight: 900;
-        font-size: 1.5rem;
-        transform: rotate(-30deg);
-        white-space: nowrap;
-        text-shadow: 0 0 2px rgba(255,255,255,0.5);
-      }
-      .watermark-video {
-        position: absolute;
-        animation: floatWatermark 15s linear infinite;
-        pointer-events: none;
-        z-index: 50;
-        color: rgba(255, 255, 255, 0.3);
-        font-weight: 900;
-        font-size: 1.2rem;
-        text-shadow: 0 0 5px rgba(0,0,0,0.8);
-      }
-      @keyframes floatWatermark {
-        0% { top: 10%; left: 10%; opacity: 0.3; }
-        25% { top: 60%; left: 80%; opacity: 0.5; }
-        50% { top: 80%; left: 20%; opacity: 0.3; }
-        75% { top: 20%; left: 40%; opacity: 0.5; }
-        100% { top: 10%; left: 10%; opacity: 0.3; }
-      }
+
+/* 1. العلامة المائية للامتحانات (خلفية فاتحة غالباً) */
+.watermark-text {
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    color: rgba(0, 0, 0, 0.04); /* شفافة جداً سوداء */
+    font-weight: 900;
+    font-size: 1.3rem;
+    white-space: nowrap;
+    user-select: none;
+    transform: rotate(-30deg);
+}
+
+/* 2. العلامة المائية للفيديو (خلفية غامقة غالباً) */
+.watermark-video {
+    position: absolute;
+    pointer-events: none;
+    z-index: 50;
+    color: rgba(255, 255, 255, 0.2); /* بيضاء شفافة */
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.5); /* ظل لضمان الرؤية */
+    font-weight: 900;
+    font-size: 1.1rem;
+    white-space: nowrap;
+    user-select: none;
+}
+
+/* 3. محرك الحركة الموحد والسلس */
+@keyframes floatWatermark {
+    0%   { transform: translate(0, 0) rotate(-30deg); }
+    25%  { transform: translate(10vw, 20vh) rotate(-30deg); }
+    50%  { transform: translate(-5vw, 40vh) rotate(-30deg); }
+    75%  { transform: translate(15vw, 10vh) rotate(-30deg); }
+    100% { transform: translate(0, 0) rotate(-30deg); }
+}
+
       .no-select { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
     `}</style>
   );
@@ -627,50 +634,55 @@ const LiveSessionView = ({ session, user, onClose }) => {
 };
 
 const SecureVideoPlayer = ({ video, userName, onClose }) => {
-  const videoId = getYouTubeID(video.url || video.file);
-  const [showSettings, setShowSettings] = useState(false);
-  const videoRef = useRef(null);
-  const finalUrl = video.url || video.file;
+  const videoId = getYouTubeID(video.url || video.file);
+  const [showSettings, setShowSettings] = useState(false);
+  const videoRef = useRef(null);
+  const finalUrl = video.url || video.file;
 
-  const changeSpeed = (rate) => {
-    if(videoRef.current) videoRef.current.playbackRate = rate;
-    setShowSettings(false);
-  };
+  const changeSpeed = (rate) => {
+    if(videoRef.current) videoRef.current.playbackRate = rate;
+    setShowSettings(false);
+  };
 
-  const youtubeEmbedUrl = videoId 
-    ? `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1&showinfo=0&iv_load_policy=3&loop=1&playlist=${videoId}` 
-    : '';
+  const youtubeEmbedUrl = videoId 
+    ? `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1&showinfo=0&iv_load_policy=3&loop=1&playlist=${videoId}` 
+    : '';
 
-  return (
-    <div className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center p-4">
-      <div className="w-full max-w-5xl bg-black rounded-xl overflow-hidden relative shadow-2xl border border-gray-800">
-        <div className="absolute top-4 right-4 z-50 flex gap-4">
-            <div className="relative">
-                <button onClick={() => setShowSettings(!showSettings)} className="bg-black/50 hover:bg-black/80 text-white p-2 rounded-full backdrop-blur-sm transition"><GearIcon size={24}/></button>
-                {showSettings && (
-                    <div className="absolute top-12 left-0 bg-white text-black rounded-lg shadow-xl py-2 w-40 z-50 text-sm font-bold">
-                        <div className="px-4 py-2 border-b text-gray-400 text-xs">سرعة التشغيل</div>
-                        {[0.5, 1, 1.25, 1.5, 2].map(rate => (
-                            <button key={rate} onClick={() => changeSpeed(rate)} className="block w-full text-right px-4 py-2 hover:bg-gray-100">{rate}x</button>
-                        ))}
-                    </div>
-                )}
-            </div>
-            <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white p-2 rounded-full"><X size={24}/></button>
-        </div>
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center p-4">
+      <div className="w-full max-w-5xl bg-black rounded-xl overflow-hidden relative shadow-2xl border border-gray-800">
+        
+        {/* أزرار التحكم */}
+        <div className="absolute top-4 right-4 z-50 flex gap-4">
+            <button onClick={() => setShowSettings(!showSettings)} className="bg-black/50 text-white p-2 rounded-full backdrop-blur-sm"><GearIcon size={24}/></button>
+            <button onClick={onClose} className="bg-red-600 text-white p-2 rounded-full"><X size={24}/></button>
+        </div>
 
-        <div className="aspect-video relative flex items-center justify-center bg-black">
-          <div className="watermark-video">{userName} - {video.grade}</div>
-          
-          {videoId ? (
-            <iframe className="w-full h-full" src={youtubeEmbedUrl} title="Video" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
-          ) : (
-             <video ref={videoRef} controls controlsList="nodownload" className="w-full h-full object-contain" src={finalUrl}>المتصفح لا يدعم هذا الفيديو.</video>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+        <div className="aspect-video relative flex items-center justify-center bg-black overflow-hidden">
+          {/* مشغل الفيديو */}
+          {videoId ? (
+            <iframe className="w-full h-full" src={youtubeEmbedUrl} frameBorder="0" allowFullScreen shadow-xl></iframe>
+          ) : (
+            <video ref={videoRef} controls controlsList="nodownload" className="w-full h-full object-contain" src={finalUrl}></video>
+          )}
+
+          {/* العلامة المائية الموحدة */}
+          <div className="absolute inset-0 pointer-events-none z-50">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="watermark-video" style={{ 
+                  top: `${(i * 30) + 15}%`, 
+                  left: i === 0 ? '10%' : i === 1 ? '40%' : '70%',
+                  animation: `floatWatermark ${14 + (i * 3)}s linear infinite`,
+                  animationDelay: `${i * -2}s`
+              }}>
+                {userName} - {video.grade}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult = null }) => {
@@ -828,9 +840,24 @@ useEffect(() => {
   
   return (
     <div className="fixed inset-0 z-50 bg-slate-100 flex flex-col font-['Cairo'] no-select" dir="rtl">
-      {!isReviewMode && (
-        <div className="fixed inset-0 pointer-events-none flex items-center justify-center overflow-hidden z-[9999]">{[...Array(6)].map((_, i) => (<div key={i} className="watermark-text" style={{ top: `${Math.random()*100}%`, left: `${Math.random()*100}%` }}>{user.displayName} - {user.email}</div>))}</div>
-      )}
+{!isReviewMode && (
+  <div className="fixed inset-0 pointer-events-none overflow-hidden z-[9999]">
+    {[...Array(6)].map((_, i) => (
+      <div 
+        key={i} 
+        className="watermark-text" 
+        style={{ 
+          top: `${(i * 15) + 5}%`, 
+          left: i % 2 === 0 ? '10%' : '60%',
+          animation: `floatWatermark ${18 + (i * 2)}s linear infinite`,
+          animationDelay: `${i * -3}s` 
+        }}
+      >
+        {user.displayName} - {user.email}
+      </div>
+    ))}
+  </div>
+)}
       
       <div className="bg-slate-900 text-white p-4 flex justify-between items-center shadow-md relative z-50">
         <div className="flex items-center gap-4">
@@ -1464,52 +1491,36 @@ const StudentDashboard = ({ user, userData }) => {
   const files = content.filter(c => c.type === 'file');
 
 const startExamWithCode = async (exam) => {
-    // 1. التحقق: هل يوجد أي سجل سابق (سواء ناجح، راسب، غش، أو حتى مجرد بدأ ولم يكمل)
-    const previousResult = examResults.find(r => r.examId === exam.id);
-    
-    if (previousResult) {
-        // رسالة مختلفة حسب الحالة
-        if (previousResult.status === 'started') {
-            alert("لقد قمت بفتح هذا الامتحان سابقاً ولم تكمله. لا يمكن إعادة الدخول (نظام الفرصة الواحدة).");
-        } else {
-            alert(`أنت امتحنت الامتحان ده قبل كده وجبت ${previousResult.score}.`);
-        }
-        return;
-    }
+    const previousResult = examResults.find(r => r.examId === exam.id);
+    
+    if (previousResult) {
+        if (previousResult.status === 'started') {
+            alert("لقد قمت بفتح هذا الامتحان سابقاً ولم تكمله. لا يمكن إعادة الدخول (نظام الفرصة الواحدة).");
+        } else {
+            alert(`أنت امتحنت الامتحان ده قبل كده وجبت ${previousResult.score}.`);
+        }
+        return;
+    }
 
-    const now = new Date();
-    const start = new Date(exam.startTime);
-    const end = new Date(exam.endTime);
+    const now = new Date();
+    if (now < new Date(exam.startTime)) return alert("الامتحان لم يبدأ بعد.");
+    if (now > new Date(exam.endTime)) return alert("عفواً، انتهى وقت الامتحان.");
 
-    if (now < start) return alert(`الامتحان لم يبدأ بعد. موعد البدء: ${start.toLocaleString('ar-EG')}`);
-    if (now > end) return alert("عفواً، انتهى وقت الامتحان.");
-
-    const code = prompt("أدخل كود الامتحان:");
-    if (code === exam.accessCode) {
-        // 2. تسجيل "بداية الامتحان" في قاعدة البيانات فوراً
-        try {
-            const attemptRef = await addDoc(collection(db, 'exam_results'), { 
-                examId: exam.id, 
-                studentId: user.uid, 
-                studentName: user.displayName, 
-                score: 0, 
-                total: 0,
-                status: 'started', // حالة جديدة تعني أنه بدأ
-                answers: {},
-                startedAt: serverTimestamp() 
-            });
-
-            // نمرر الـ ID بتاع المحاولة عشان نعدل عليه لما يخلص مش نعمل واحد جديد
-            setActiveExam({ ...exam, attemptId: attemptRef.id });
-
-        } catch (error) {
-            console.error(error);
-            alert("حدث خطأ أثناء بدء الامتحان، تأكد من الاتصال بالإنترنت.");
-        }
-    } else {
-        alert("كود خاطئ!");
-    }
-  };
+    const code = prompt("أدخل كود الامتحان:");
+    if (code === exam.accessCode) {
+        try {
+            const attemptRef = await addDoc(collection(db, 'exam_results'), { 
+                examId: exam.id, studentId: user.uid, studentName: user.displayName, 
+                score: 0, total: 0, status: 'started', answers: {}, startedAt: serverTimestamp() 
+            });
+            setActiveExam({ ...exam, attemptId: attemptRef.id });
+        } catch (error) {
+            alert("حدث خطأ في الاتصال بالإنترنت.");
+        }
+    } else {
+        alert("كود خاطئ!");
+    }
+};
 
   const handleUpdateMyProfile = async (e) => {
     e.preventDefault();
