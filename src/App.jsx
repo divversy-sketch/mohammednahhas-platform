@@ -276,7 +276,7 @@ const DesignSystemLoader = () => {
         animation: floatWatermark 10s linear infinite alternate;
         pointer-events: none;
         z-index: 50;
-        color: rgba(0, 0, 0, 0.1); /* خففت اللون قليلا لعدم إزعاج الرؤية في الhtml */
+        color: rgba(0, 0, 0, 0.1); 
         font-weight: 900;
         font-size: 1.5rem;
         text-shadow: 0 0 5px rgba(255,255,255,0.5);
@@ -838,7 +838,10 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   
   const calculateScore = () => {
     let rawScore = 0;
-    flatQuestions.forEach(q => { if (answers[q.id] === q.correctIdx) rawScore++; });
+    flatQuestions.forEach(q => { 
+        // Strict equality check, ensuring both are treated as numbers/indices
+        if (answers[q.id] === q.correctIdx) rawScore++; 
+    });
     return rawScore;
   };
 
@@ -849,10 +852,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const handleSubmit = async (auto = false) => {
     setShowSubmitConfirm(false);
     const totalQs = flatQuestions.length;
-    // Auto submit ignores empty answers
-    if (!auto && Object.keys(answers).length < totalQs) {
-        // Just a gentle notification, not blocking via window.confirm to avoid focus loss
-    }
     
     const finalScore = calculateScore();
     const timeTaken = Math.round((Date.now() - startTime) / 1000);
@@ -1154,6 +1153,7 @@ const AdminDashboard = ({ user }) => {
   const startLiveStream = async () => { if(!liveData.liveUrl) return alert("الرابط؟"); await addDoc(collection(db, 'live_sessions'), { ...liveData, status: 'active', createdAt: serverTimestamp() }); await addDoc(collection(db, 'notifications'), { text: `🔴 بث مباشر الآن: ${liveData.title}`, grade: liveData.grade, createdAt: serverTimestamp() }); alert("بدا البث!"); };
   const stopLiveStream = async () => { if(window.confirm("إنهاء البث؟")) { const q = query(collection(db, 'live_sessions'), where('status', '==', 'active')); const snap = await getDocs(q); snap.forEach(async (d) => await updateDoc(doc(db, 'live_sessions', d.id), { status: 'ended' })); alert("تم الإنهاء"); } };
 
+  // --- التعديل الأساسي هنا لحل مشكلة الإجابات الصفرية ---
   const parseExam = async () => {
     if (!bulkText.trim()) return alert("أدخل نص الامتحان");
     if (!examBuilder.accessCode) return alert("أدخل كود للامتحان");
@@ -1166,24 +1166,52 @@ const AdminDashboard = ({ user }) => {
     let isReadingPassage = false;
 
     lines.forEach(line => {
-      if (line === 'بداية القطعة') { if (currentBlock.subQuestions.length > 0 || currentQ) { if(currentQ) currentBlock.subQuestions.push(currentQ); blocks.push(currentBlock); } currentBlock = { text: '', subQuestions: [] }; currentQ = null; isReadingPassage = true; return; }
+      // منطق التعامل مع القطع النصية
+      if (line === 'بداية القطعة') { 
+          if (currentBlock.subQuestions.length > 0 || currentQ) { 
+              if(currentQ) currentBlock.subQuestions.push(currentQ); 
+              blocks.push(currentBlock); 
+          } 
+          currentBlock = { text: '', subQuestions: [] }; 
+          currentQ = null; 
+          isReadingPassage = true; 
+          return; 
+      }
       if (line === 'نهاية القطعة') { isReadingPassage = false; return; }
-      if (line === 'حذف القطعة') { if(currentQ) currentBlock.subQuestions.push(currentQ); blocks.push(currentBlock); currentBlock = { text: '', subQuestions: [] }; currentQ = null; return; }
+      if (line === 'حذف القطعة') { 
+          if(currentQ) currentBlock.subQuestions.push(currentQ); 
+          blocks.push(currentBlock); 
+          currentBlock = { text: '', subQuestions: [] }; 
+          currentQ = null; 
+          return; 
+      }
 
-      if (isReadingPassage) { currentBlock.text += line + '\n'; } 
+      if (isReadingPassage) { 
+          currentBlock.text += line + '\n'; 
+      } 
       else {
-        if (line.startsWith('*') || (currentQ && currentQ.options.length < 4)) {
-          if (!currentQ) return; 
-          const isCorrect = line.startsWith('*');
-          const optText = isCorrect ? line.substring(1).trim() : line;
-          if (isCorrect) currentQ.correctIdx = currentQ.options.length;
-          currentQ.options.push(optText);
+        // --- الإصلاح: تحسين اكتشاف النجمة والأسئلة ---
+        const cleanedLine = line.trim();
+        const isCorrect = cleanedLine.startsWith('*');
+        const optText = isCorrect ? cleanedLine.substring(1).trim() : cleanedLine;
+
+        // إذا كان لدينا سؤال حالي ولم يكتمل بـ 4 اختيارات، نعتبر السطر الحالي اختياراً
+        if (currentQ && currentQ.options.length < 4) {
+            if (isCorrect) {
+                // تسجيل رقم الاختيار الحالي كإجابة صحيحة
+                currentQ.correctIdx = currentQ.options.length;
+            }
+            currentQ.options.push(optText);
         } else {
-          if (currentQ) currentBlock.subQuestions.push(currentQ);
-          currentQ = { id: Date.now() + Math.random(), text: line, options: [], correctIdx: 0 };
+            // إذا اكتمل السؤال السابق أو لا يوجد سؤال، نعتبر السطر سؤالاً جديداً
+            if (currentQ) currentBlock.subQuestions.push(currentQ);
+            
+            // إنشاء سؤال جديد مع تعيين افتراضي للإجابة (0) تحسباً للنسيان، ولكن سيتم تحديثه إذا وجدنا نجمة
+            currentQ = { id: Date.now() + Math.random(), text: optText, options: [], correctIdx: 0 };
         }
       }
     });
+    
     if (currentQ) currentBlock.subQuestions.push(currentQ);
     blocks.push(currentBlock);
 
@@ -1255,7 +1283,7 @@ const AdminDashboard = ({ user }) => {
 
           {activeTab === 'all_users' && <div className="bg-white p-6 rounded-xl shadow-sm"><h2 className="font-bold mb-4">قائمة الطلاب</h2>{editingUser&&<form onSubmit={handleUpdateUser} className="mb-4 bg-amber-50 p-4 rounded grid gap-2"><input className="border p-2" value={editingUser.name} onChange={e=>setEditingUser({...editingUser, name:e.target.value})}/><button className="bg-green-600 text-white px-4 py-1 rounded">حفظ</button></form>}{activeUsersList.map(u=><div key={u.id} className={`border p-4 mb-2 rounded-lg flex justify-between items-center ${u.status==='banned_cheating'?'bg-red-50 border-red-200':''}`}><div><p className="font-bold">{u.name} {u.status==='banned_cheating'&&<span className="text-red-600 text-xs">(محظور)</span>}</p><p className="text-xs text-slate-500">{u.email}</p></div><div className="flex gap-2">{u.status==='banned_cheating'?<button onClick={()=>handleUnban(u.id)} className="bg-green-100 text-green-700 px-3 py-1 rounded text-xs font-bold flex gap-1"><Unlock size={16}/>فك</button>:<button onClick={()=>setEditingUser(u)} className="bg-blue-100 text-blue-600 p-2 rounded"><Edit size={16}/></button>}<button onClick={()=>handleSendResetPassword(u.email)} className="bg-amber-100 text-amber-600 p-2 rounded"><KeyRound size={16}/></button><button onClick={()=>handleDeleteUser(u.id)} className="bg-red-100 text-red-600 p-2 rounded"><Trash2 size={16}/></button></div></div>)}</div>}
 
-          {activeTab === 'exams' && <div className="space-y-8"><div className="bg-white p-6 rounded-xl shadow-sm"><h2 className="text-xl font-bold mb-6 border-b pb-2">إنشاء امتحان</h2><div className="grid grid-cols-4 gap-4 mb-6"><input className="border p-2 rounded col-span-2" placeholder="العنوان" value={examBuilder.title} onChange={e=>setExamBuilder({...examBuilder, title:e.target.value})}/><input className="border p-2 rounded" placeholder="الكود" value={examBuilder.accessCode} onChange={e=>setExamBuilder({...examBuilder, accessCode:e.target.value})}/><input type="number" className="border p-2 rounded" placeholder="المدة (دقائق)" value={examBuilder.duration} onChange={e=>setExamBuilder({...examBuilder, duration:parseInt(e.target.value)})}/><select className="border p-2 rounded col-span-4" value={examBuilder.grade} onChange={e=>setExamBuilder({...examBuilder, grade:e.target.value})}><GradeOptions/></select><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت البدء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, startTime:e.target.value})}/></div><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت الانتهاء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, endTime:e.target.value})}/></div></div><div className="bg-slate-50 p-4 rounded-xl border mb-6"><textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm" placeholder="اكتب الأسئلة هنا..." value={bulkText} onChange={e=>setBulkText(e.target.value)}/><button onClick={parseExam} className="mt-4 w-full bg-green-600 text-white py-3 rounded-xl font-bold">نشر</button></div></div><div className="bg-white p-6 rounded-xl shadow-sm"><h3 className="font-bold mb-4">الامتحانات الحالية</h3>{examsList.map(exam=><div key={exam.id} className="flex justify-between items-center border-b py-3 last:border-0"><div><p className="font-bold">{exam.title}</p><p className="text-xs text-slate-500">من: {new Date(exam.startTime).toLocaleString('ar-EG')} | إلى: {new Date(exam.endTime).toLocaleString('ar-EG')}</p><p className="text-xs text-slate-400">كود: {exam.accessCode}</p></div><div className="flex gap-2"><button onClick={()=>handleDeleteExam(exam.id)} className="text-red-500 p-2"><Trash2 size={18}/></button></div></div>)}</div></div>}
+          {activeTab === 'exams' && <div className="space-y-8"><div className="bg-white p-6 rounded-xl shadow-sm"><h2 className="text-xl font-bold mb-6 border-b pb-2">إنشاء امتحان</h2><div className="grid grid-cols-4 gap-4 mb-6"><input className="border p-2 rounded col-span-2" placeholder="العنوان" value={examBuilder.title} onChange={e=>setExamBuilder({...examBuilder, title:e.target.value})}/><input className="border p-2 rounded" placeholder="الكود" value={examBuilder.accessCode} onChange={e=>setExamBuilder({...examBuilder, accessCode:e.target.value})}/><input type="number" className="border p-2 rounded" placeholder="المدة (دقائق)" value={examBuilder.duration} onChange={e=>setExamBuilder({...examBuilder, duration:parseInt(e.target.value)})}/><select className="border p-2 rounded col-span-4" value={examBuilder.grade} onChange={e=>setExamBuilder({...examBuilder, grade:e.target.value})}><GradeOptions/></select><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت البدء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, startTime:e.target.value})}/></div><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت الانتهاء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, endTime:e.target.value})}/></div></div><div className="bg-slate-50 p-4 rounded-xl border mb-6"><textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm" placeholder="اكتب الأسئلة هنا... (ضع علامة * قبل الإجابة الصحيحة)" value={bulkText} onChange={e=>setBulkText(e.target.value)}/><button onClick={parseExam} className="mt-4 w-full bg-green-600 text-white py-3 rounded-xl font-bold">نشر</button></div></div><div className="bg-white p-6 rounded-xl shadow-sm"><h3 className="font-bold mb-4">الامتحانات الحالية</h3>{examsList.map(exam=><div key={exam.id} className="flex justify-between items-center border-b py-3 last:border-0"><div><p className="font-bold">{exam.title}</p><p className="text-xs text-slate-500">من: {new Date(exam.startTime).toLocaleString('ar-EG')} | إلى: {new Date(exam.endTime).toLocaleString('ar-EG')}</p><p className="text-xs text-slate-400">كود: {exam.accessCode}</p></div><div className="flex gap-2"><button onClick={()=>handleDeleteExam(exam.id)} className="text-red-500 p-2"><Trash2 size={18}/></button></div></div>)}</div></div>}
 
           {activeTab === 'results' && (
              <div className="bg-white p-6 rounded-xl shadow-sm">
