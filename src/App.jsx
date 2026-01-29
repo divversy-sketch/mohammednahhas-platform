@@ -276,10 +276,11 @@ const DesignSystemLoader = () => {
         animation: floatWatermark 10s linear infinite alternate;
         pointer-events: none;
         z-index: 50;
-        color: rgba(255, 255, 255, 0.4);
+        color: rgba(0, 0, 0, 0.1); /* خففت اللون قليلا لعدم إزعاج الرؤية في الhtml */
         font-weight: 900;
-        font-size: 1.2rem;
-        text-shadow: 0 0 5px rgba(0,0,0,0.8);
+        font-size: 1.5rem;
+        text-shadow: 0 0 5px rgba(255,255,255,0.5);
+        white-space: nowrap;
       }
       
       @keyframes floatWatermark {
@@ -675,15 +676,25 @@ const SecureVideoPlayer = ({ video, userName, onClose }) => {
   );
 };
 
-const InteractiveViewer = ({ content, onClose }) => {
+const InteractiveViewer = ({ content, user, onClose }) => {
     return (
         <div className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center p-4">
             <div className="w-full h-full max-w-7xl bg-white rounded-xl overflow-hidden relative shadow-2xl border border-gray-800 flex flex-col">
                 <div className="bg-slate-900 p-3 flex justify-between items-center text-white border-b border-gray-700">
-                   <h3 className="font-bold flex items-center gap-2"><Code /> {content.title}</h3>
+                   <div className="flex items-center gap-4">
+                       <h3 className="font-bold flex items-center gap-2"><Code /> {content.title}</h3>
+                       {/* عرض اسم الموقع والمعلم في الشريط العلوي */}
+                       <span className="hidden md:block text-xs bg-amber-600 px-3 py-1 rounded-full text-white font-bold">منصة النحاس - أ/ محمد النحاس</span>
+                   </div>
                    <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white px-4 py-1 rounded font-bold transition">خروج</button>
                 </div>
                 <div className="flex-1 bg-white relative">
+                   {/* العلامة المائية باسم الطالب */}
+                   {user && (
+                       <div className="watermark-video" style={{ pointerEvents: 'none' }}>
+                           {user.name} - {user.grade}
+                       </div>
+                   )}
                    <iframe 
                      src={content.url} 
                      className="w-full h-full border-0" 
@@ -1545,7 +1556,7 @@ const StudentDashboard = ({ user, userData }) => {
   return (
     <div className="min-h-screen flex bg-slate-50 relative font-['Cairo']" dir="rtl">
       {playingVideo && <SecureVideoPlayer video={playingVideo} userName={userData.name} onClose={() => setPlayingVideo(null)} />}
-      {playingHtml && <InteractiveViewer content={playingHtml} onClose={() => setPlayingHtml(null)} />}
+      {playingHtml && <InteractiveViewer content={playingHtml} user={userData} onClose={() => setPlayingHtml(null)} />}
       
       <FloatingArabicBackground />
       <ChatWidget user={user} />
@@ -1687,7 +1698,7 @@ const LandingPage = ({ onAuthClick }) => {
   return (
     <div className="min-h-screen font-['Cairo'] relative" dir="rtl">
       {playingVideo && <SecureVideoPlayer video={playingVideo} userName="زائر" onClose={() => setPlayingVideo(null)} />}
-      {playingHtml && <InteractiveViewer content={playingHtml} onClose={() => setPlayingHtml(null)} />}
+      {playingHtml && <InteractiveViewer content={playingHtml} user={null} onClose={() => setPlayingHtml(null)} />}
       <FloatingArabicBackground />
       <ChatWidget />
       <nav className="relative z-10 flex justify-between items-center p-6 max-w-7xl mx-auto">
