@@ -677,10 +677,42 @@ const SecureVideoPlayer = ({ video, userName, onClose }) => {
 };
 
 const InteractiveViewer = ({ content, user, onClose }) => {
+    // منع القائمة المنبثقة (Right Click)
+    const handleContextMenu = (e) => e.preventDefault();
+    
+    // محاولة تحجيم زر Print Screen (تنبيه)
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'PrintScreen') {
+                alert('غير مسموح بأخذ لقطات شاشة! المحتوى محمي.');
+                // محاولة إفراغ الحافظة (لا تعمل في كل المتصفحات لأسباب أمنية لكنها محاولة إضافية)
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText('Screenshots are disabled');
+                }
+            }
+        };
+        
+        // تعطيل النسخ واللصق والقص
+        const handleCopy = (e) => { e.preventDefault(); alert("النسخ غير مسموح!"); };
+        
+        window.addEventListener('keydown', handleKeyDown);
+        document.addEventListener('copy', handleCopy);
+        document.addEventListener('cut', handleCopy);
+        
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            document.removeEventListener('copy', handleCopy);
+            document.removeEventListener('cut', handleCopy);
+        };
+    }, []);
+
     return (
-        <div className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center p-4">
+        <div 
+            className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center p-4 select-none" 
+            onContextMenu={handleContextMenu}
+        >
             <div className="w-full h-full max-w-7xl bg-white rounded-xl overflow-hidden relative shadow-2xl border border-gray-800 flex flex-col">
-                <div className="bg-slate-900 p-3 flex justify-between items-center text-white border-b border-gray-700">
+                <div className="bg-slate-900 p-3 flex justify-between items-center text-white border-b border-gray-700 select-none">
                    <div className="flex items-center gap-4">
                        <h3 className="font-bold flex items-center gap-2"><Code /> {content.title}</h3>
                        {/* عرض اسم الموقع والمعلم في الشريط العلوي */}
@@ -688,18 +720,24 @@ const InteractiveViewer = ({ content, user, onClose }) => {
                    </div>
                    <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white px-4 py-1 rounded font-bold transition">خروج</button>
                 </div>
-                <div className="flex-1 bg-white relative">
-                   {/* العلامة المائية باسم الطالب */}
+                <div className="flex-1 bg-white relative overflow-hidden">
+                   {/* العلامة المائية الشاملة داخل المحتوى (تتحرك) */}
                    {user && (
-                       <div className="watermark-video" style={{ pointerEvents: 'none' }}>
-                           {user.name} - {user.grade}
+                       <div className="watermark-video" style={{ pointerEvents: 'none', zIndex: 9999 }}>
+                           {user.name} - {user.grade} — منصة النحاس — أ/ محمد النحاس
                        </div>
                    )}
+                   
+                   {/* طبقة شفافة لمنع التحديد المباشر في بعض الحالات، مع السماح بالتفاعل */}
+                   <div className="absolute inset-0 z-[9998] pointer-events-none select-none"></div>
+
                    <iframe 
                      src={content.url} 
                      className="w-full h-full border-0" 
                      title={content.title}
-                     sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+                     // السماح بالسكربتات ولكن داخل نفس الأصل لزيادة التحكم
+                     sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals"
+                     style={{ pointerEvents: 'auto' }}
                    ></iframe>
                 </div>
             </div>
