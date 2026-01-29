@@ -16,7 +16,7 @@ import {
   ExternalLink, ClipboardList, Timer, AlertOctagon, Flag, Save, HelpCircle, 
   Reply, Unlock, Layout, Settings, Trophy, Megaphone, Bell, Download, XCircle, 
   Calendar, Clock, FileWarning, Settings as GearIcon, Star, Bot, Power, Upload,
-  Users, PenTool
+  Users, PenTool, Code
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -675,6 +675,27 @@ const SecureVideoPlayer = ({ video, userName, onClose }) => {
   );
 };
 
+const InteractiveViewer = ({ content, onClose }) => {
+    return (
+        <div className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center p-4">
+            <div className="w-full h-full max-w-7xl bg-white rounded-xl overflow-hidden relative shadow-2xl border border-gray-800 flex flex-col">
+                <div className="bg-slate-900 p-3 flex justify-between items-center text-white border-b border-gray-700">
+                   <h3 className="font-bold flex items-center gap-2"><Code /> {content.title}</h3>
+                   <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white px-4 py-1 rounded font-bold transition">خروج</button>
+                </div>
+                <div className="flex-1 bg-white relative">
+                   <iframe 
+                     src={content.url} 
+                     className="w-full h-full border-0" 
+                     title={content.title}
+                     sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+                   ></iframe>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult = null }) => {
   const [currentQIndex, setCurrentQIndex] = useState(0);
   const [answers, setAnswers] = useState(existingResult?.answers || {});
@@ -1279,7 +1300,11 @@ const AdminDashboard = ({ user }) => {
                       </div>
 
                       <div className="flex gap-2">
-                          <select className="border p-3 rounded flex-1" value={newContent.type} onChange={e=>setNewContent({...newContent, type:e.target.value})}><option value="video">فيديو</option><option value="file">ملف</option></select>
+                          <select className="border p-3 rounded flex-1" value={newContent.type} onChange={e=>setNewContent({...newContent, type:e.target.value})}>
+                              <option value="video">فيديو</option>
+                              <option value="file">ملف (PDF/Link)</option>
+                              <option value="html">ملف تفاعلي (HTML)</option>
+                          </select>
                           <select className="border p-3 rounded flex-1" value={newContent.grade} onChange={e=>setNewContent({...newContent, grade:e.target.value})}><GradeOptions/></select>
                       </div>
                       
@@ -1306,6 +1331,7 @@ const AdminDashboard = ({ user }) => {
                               <div>
                                   <span className="font-bold">{c.title}</span>
                                   {c.allowedEmails && c.allowedEmails.length > 0 && <span className="mr-2 text-xs bg-red-100 text-red-600 px-2 py-1 rounded flex items-center gap-1 inline-flex"><Lock size={10}/> خاص</span>}
+                                  {c.type === 'html' && <span className="mr-2 text-xs bg-purple-100 text-purple-600 px-2 py-1 rounded">HTML</span>}
                               </div>
                               <div className="flex gap-2">
                                   <button onClick={() => handleDeleteContent(c.id)} className="text-red-500 hover:text-red-700"><Trash2 size={18}/></button>
@@ -1317,7 +1343,7 @@ const AdminDashboard = ({ user }) => {
           )}
 
           {activeTab === 'messages' && <div className="bg-white p-6 rounded-xl shadow-sm"><h2 className="font-bold mb-4">الرسائل</h2>{messagesList.map(m=><div key={m.id} className="border-b p-4 bg-slate-50 mb-3 rounded-lg relative"><button onClick={()=>handleDeleteMessage(m.id)} className="absolute top-2 left-2 text-red-400"><Trash2 size={16}/></button><div className="mb-2"><p className="font-bold text-amber-800">{m.senderName} <span className="text-xs text-slate-500">({m.sender})</span></p><p className="text-sm text-slate-400">{m.createdAt?.toDate?m.createdAt.toDate().toLocaleString():'الآن'}</p></div><p className="text-slate-800 bg-white p-3 rounded-lg border border-slate-200 mb-3">{m.text}</p>{m.adminReply?<div className="bg-green-50 p-3 rounded-lg border border-green-200 text-sm"><span className="font-bold text-green-700">ردك: </span>{m.adminReply}</div>:<div className="flex gap-2"><input className="flex-1 border p-2 rounded text-sm" placeholder="اكتب ردك..." value={replyTexts[m.id]||""} onChange={e=>setReplyTexts({...replyTexts,[m.id]:e.target.value})}/><button onClick={()=>handleReplyMessage(m.id)} className="bg-blue-600 text-white px-3 py-1 rounded text-sm"><Reply size={14}/></button></div>}</div>)}</div>}
-            
+           
           {/* تبويب الرد الآلي */}
           {activeTab === 'auto_reply' && (
               <div className="bg-white p-6 rounded-xl shadow-sm">
@@ -1425,6 +1451,7 @@ const StudentDashboard = ({ user, userData }) => {
   const [exams, setExams] = useState([]);
   const [activeExam, setActiveExam] = useState(null);
   const [playingVideo, setPlayingVideo] = useState(null);
+  const [playingHtml, setPlayingHtml] = useState(null);
   const [examResults, setExamResults] = useState([]);
   const [reviewingExam, setReviewingExam] = useState(null);
   
@@ -1482,6 +1509,7 @@ const StudentDashboard = ({ user, userData }) => {
   
   const videos = content.filter(c => c.type === 'video');
   const files = content.filter(c => c.type === 'file');
+  const htmls = content.filter(c => c.type === 'html');
 
   const startExamWithCode = (exam) => {
     const previousResult = examResults.find(r => r.examId === exam.id);
@@ -1517,6 +1545,8 @@ const StudentDashboard = ({ user, userData }) => {
   return (
     <div className="min-h-screen flex bg-slate-50 relative font-['Cairo']" dir="rtl">
       {playingVideo && <SecureVideoPlayer video={playingVideo} userName={userData.name} onClose={() => setPlayingVideo(null)} />}
+      {playingHtml && <InteractiveViewer content={playingHtml} onClose={() => setPlayingHtml(null)} />}
+      
       <FloatingArabicBackground />
       <ChatWidget user={user} />
       
@@ -1526,6 +1556,7 @@ const StudentDashboard = ({ user, userData }) => {
           <button onClick={() => {setActiveTab('home'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='home'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><User/> الرئيسية</button>
           <div onClick={() => setActiveTab('videos')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='videos'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><PlayCircle/> المحاضرات</div>
           <div onClick={() => setActiveTab('files')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='files'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><FileText/> المذكرات</div>
+          <div onClick={() => setActiveTab('htmls')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='htmls'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><Code/> محتوى تفاعلي</div>
           <div onClick={() => setActiveTab('exams')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><ClipboardList/> الامتحانات</div>
           <button onClick={() => {setActiveTab('settings'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='settings'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><Settings/> ملفي الشخصي</button>
         </div>
@@ -1557,9 +1588,26 @@ const StudentDashboard = ({ user, userData }) => {
             )}
         </div>
 
-        {activeTab === 'home' && (<div className="space-y-8"><WisdomBox /><Announcements /><h2 className="text-3xl font-bold text-slate-800">منور يا {userData.name.split(' ')[0]} 👋 <span className="text-sm font-normal text-slate-500 bg-slate-200 px-2 py-1 rounded-full">{getGradeLabel(userData.grade)}</span></h2><div className="grid grid-cols-1 md:grid-cols-3 gap-6"><div onClick={()=>setActiveTab('videos')} className="bg-blue-600 text-white p-8 rounded-3xl shadow-lg relative overflow-hidden cursor-pointer hover:scale-105 transition-transform"><h3 className="relative z-10 text-2xl font-bold mb-2">المحاضرات</h3><p className="relative z-10 text-4xl font-black">{videos.length}</p><PlayCircle className="absolute -bottom-6 -left-6 opacity-20 w-40 h-40"/></div><div onClick={()=>setActiveTab('files')} className="bg-amber-500 text-white p-8 rounded-3xl shadow-lg relative overflow-hidden cursor-pointer hover:scale-105 transition-transform"><h3 className="relative z-10 text-2xl font-bold mb-2">الملفات</h3><p className="relative z-10 text-4xl font-black">{files.length}</p><FileText className="absolute -bottom-6 -left-6 opacity-20 w-40 h-40"/></div><div onClick={()=>setActiveTab('exams')} className="bg-slate-800 text-white p-8 rounded-3xl shadow-lg relative overflow-hidden cursor-pointer hover:scale-105 transition-transform"><h3 className="relative z-10 text-2xl font-bold mb-2">الامتحانات</h3><p className="relative z-10 text-4xl font-black">{exams.length}</p><ClipboardList className="absolute -bottom-6 -left-6 opacity-20 w-40 h-40"/></div></div><Leaderboard /></div>)}
+        {activeTab === 'home' && (<div className="space-y-8"><WisdomBox /><Announcements /><h2 className="text-3xl font-bold text-slate-800">منور يا {userData.name.split(' ')[0]} 👋 <span className="text-sm font-normal text-slate-500 bg-slate-200 px-2 py-1 rounded-full">{getGradeLabel(userData.grade)}</span></h2><div className="grid grid-cols-1 md:grid-cols-4 gap-6"><div onClick={()=>setActiveTab('videos')} className="bg-blue-600 text-white p-8 rounded-3xl shadow-lg relative overflow-hidden cursor-pointer hover:scale-105 transition-transform"><h3 className="relative z-10 text-2xl font-bold mb-2">المحاضرات</h3><p className="relative z-10 text-4xl font-black">{videos.length}</p><PlayCircle className="absolute -bottom-6 -left-6 opacity-20 w-40 h-40"/></div><div onClick={()=>setActiveTab('files')} className="bg-amber-500 text-white p-8 rounded-3xl shadow-lg relative overflow-hidden cursor-pointer hover:scale-105 transition-transform"><h3 className="relative z-10 text-2xl font-bold mb-2">الملفات</h3><p className="relative z-10 text-4xl font-black">{files.length}</p><FileText className="absolute -bottom-6 -left-6 opacity-20 w-40 h-40"/></div><div onClick={()=>setActiveTab('htmls')} className="bg-purple-600 text-white p-8 rounded-3xl shadow-lg relative overflow-hidden cursor-pointer hover:scale-105 transition-transform"><h3 className="relative z-10 text-2xl font-bold mb-2">تفاعلي</h3><p className="relative z-10 text-4xl font-black">{htmls.length}</p><Code className="absolute -bottom-6 -left-6 opacity-20 w-40 h-40"/></div><div onClick={()=>setActiveTab('exams')} className="bg-slate-800 text-white p-8 rounded-3xl shadow-lg relative overflow-hidden cursor-pointer hover:scale-105 transition-transform"><h3 className="relative z-10 text-2xl font-bold mb-2">الامتحانات</h3><p className="relative z-10 text-4xl font-black">{exams.length}</p><ClipboardList className="absolute -bottom-6 -left-6 opacity-20 w-40 h-40"/></div></div><Leaderboard /></div>)}
         {activeTab === 'videos' && <div className="grid grid-cols-1 md:grid-cols-3 gap-6">{videos.map(v => (<div key={v.id} className="bg-white rounded-xl shadow-sm border overflow-hidden cursor-pointer hover:shadow-md transition" onClick={() => setPlayingVideo(v)}><div className="h-40 bg-slate-800 flex items-center justify-center relative group"><PlayCircle className="text-white w-12 h-12 opacity-80 group-hover:scale-110 transition"/><span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded">{getGradeLabel(v.grade)}</span></div><div className="p-4"><h3 className="font-bold text-lg">{v.title}</h3></div></div>))}</div>}
         {activeTab === 'files' && <div className="bg-white rounded-xl shadow-sm border overflow-hidden">{files.map(f => (<div key={f.id} className="p-4 flex justify-between items-center border-b last:border-0 hover:bg-slate-50"><div className="flex items-center gap-4"><div className="bg-red-100 text-red-600 p-3 rounded-lg font-bold text-xs">PDF</div><div><h4 className="font-bold text-lg">{f.title}</h4><span className="text-xs text-slate-500">{getGradeLabel(f.grade)}</span></div></div><a href={f.url} target="_blank" className="bg-blue-50 text-blue-600 px-4 py-2 rounded-lg font-bold hover:bg-blue-100">تحميل</a></div>))}</div>}
+        
+        {activeTab === 'htmls' && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {htmls.map(h => (
+                    <div key={h.id} className="bg-white rounded-xl shadow-sm border overflow-hidden cursor-pointer hover:shadow-md transition" onClick={() => setPlayingHtml(h)}>
+                        <div className="h-40 bg-purple-600 flex items-center justify-center relative group">
+                            <Code className="text-white w-16 h-16 opacity-80 group-hover:scale-110 transition"/>
+                            <span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded">{getGradeLabel(h.grade)}</span>
+                        </div>
+                        <div className="p-4">
+                            <h3 className="font-bold text-lg">{h.title}</h3>
+                            <button className="mt-2 w-full bg-purple-100 text-purple-700 font-bold py-2 rounded-lg hover:bg-purple-200">تشغيل</button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        )}
         
         {activeTab === 'exams' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1631,6 +1679,7 @@ const StudentDashboard = ({ user, userData }) => {
 const LandingPage = ({ onAuthClick }) => {
   const [publicContent, setPublicContent] = useState([]);
   const [playingVideo, setPlayingVideo] = useState(null); 
+  const [playingHtml, setPlayingHtml] = useState(null);
   
   useEffect(() => { const u = onSnapshot(query(collection(db, 'content'), where('isPublic', '==', true)), s => setPublicContent(s.docs.map(d=>d.data()))); return u; }, []);
   const openFacebook = () => window.open("https://www.facebook.com/share/17aiUQWKf5/", "_blank");
@@ -1638,6 +1687,7 @@ const LandingPage = ({ onAuthClick }) => {
   return (
     <div className="min-h-screen font-['Cairo'] relative" dir="rtl">
       {playingVideo && <SecureVideoPlayer video={playingVideo} userName="زائر" onClose={() => setPlayingVideo(null)} />}
+      {playingHtml && <InteractiveViewer content={playingHtml} onClose={() => setPlayingHtml(null)} />}
       <FloatingArabicBackground />
       <ChatWidget />
       <nav className="relative z-10 flex justify-between items-center p-6 max-w-7xl mx-auto">
@@ -1670,11 +1720,15 @@ const LandingPage = ({ onAuthClick }) => {
             </div>
           </div>
           <div className="bg-white/80 backdrop-blur p-6 rounded-3xl border border-white shadow-sm">
-            <h3 className="text-2xl font-bold mb-4 flex items-center gap-2 text-green-700"><UploadCloud /> ملفات للجميع</h3>
+            <h3 className="text-2xl font-bold mb-4 flex items-center gap-2 text-purple-700"><Code /> تفاعلي عام</h3>
             <div className="space-y-4">
-              {publicContent.filter(c => c.type === 'file').length > 0 ? publicContent.filter(c => c.type === 'file').map((f, i) => (
-                 <div key={i} className="flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm"><FileText className="text-red-500"/><span className="font-bold">{f.title}</span><a href={f.url} target="_blank" className="mr-auto text-xs bg-green-100 text-green-700 px-2 py-1 rounded">تحميل</a></div>
-               )) : <p className="text-slate-500">مفيش ملفات عامة حالياً</p>}
+              {publicContent.filter(c => c.type === 'html').length > 0 ? publicContent.filter(c => c.type === 'html').map((h, i) => (
+                 <div key={i} className="flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm cursor-pointer hover:bg-gray-50" onClick={() => setPlayingHtml(h)}>
+                    <Code className="text-purple-500"/>
+                    <span className="font-bold">{h.title}</span>
+                    <span className="mr-auto text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">تشغيل</span>
+                 </div>
+               )) : <p className="text-slate-500">مفيش محتوى تفاعلي عام حالياً</p>}
             </div>
           </div>
         </div>
