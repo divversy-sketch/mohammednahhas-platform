@@ -16,7 +16,7 @@ import {
   ExternalLink, ClipboardList, Timer, AlertOctagon, Flag, Save, HelpCircle, 
   Reply, Unlock, Layout, Settings, Trophy, Megaphone, Bell, Download, XCircle, 
   Calendar, Clock, FileWarning, Settings as GearIcon, Star, Bot, Power, Upload,
-  Users, PenTool, Code
+  Users, PenTool, Code, Sparkles, Lamp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -223,8 +223,17 @@ const DesignSystemLoader = () => {
             window.tailwind.config = {
               theme: {
                 extend: {
-                  fontFamily: { sans: ['Cairo', 'sans-serif'] },
-                  colors: { amber: { 50: '#fffbeb', 100: '#fef3c7', 600: '#d97706', 700: '#b45309' } }
+                  fontFamily: { 
+                      sans: ['Cairo', 'sans-serif'],
+                      arabic: ['Aref Ruqaa', 'serif'], // خط عربي أصيل للعناوين
+                  },
+                  colors: { 
+                      amber: { 50: '#fffbeb', 100: '#fef3c7', 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 700: '#b45309', 900: '#78350f' },
+                      royal: { 900: '#0f172a', 800: '#1e293b' }
+                  },
+                  backgroundImage: {
+                      'arabesque': "url('https://www.transparenttextures.com/patterns/arabesque.png')",
+                  }
                 }
               }
             }
@@ -237,7 +246,7 @@ const DesignSystemLoader = () => {
       const link = document.createElement('link');
       link.id = 'cairo-font';
       link.rel = 'stylesheet';
-      link.href = "https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Reem+Kufi:wght@700&display=swap";
+      link.href = "https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Aref+Ruqaa:wght@400;700&display=swap";
       document.head.appendChild(link);
     }
     
@@ -251,12 +260,49 @@ const DesignSystemLoader = () => {
 
   return (
     <style>{`
-      body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; direction: rtl; user-select: none; }
+      body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; direction: rtl; user-select: none; overflow-x: hidden; }
+      
+      /* تخصيص السكرول بار */
       ::-webkit-scrollbar { width: 8px; }
       ::-webkit-scrollbar-track { background: #f1f1f1; }
-      ::-webkit-scrollbar-thumb { background: #d97706; border-radius: 4px; }
-      .glass-panel { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.5); }
+      ::-webkit-scrollbar-thumb { background: linear-gradient(to bottom, #d97706, #b45309); border-radius: 4px; }
       
+      /* Glassmorphism Classes */
+      .glass-panel { 
+          background: rgba(255, 255, 255, 0.85); 
+          backdrop-filter: blur(16px); 
+          -webkit-backdrop-filter: blur(16px);
+          border: 1px solid rgba(255, 255, 255, 0.6); 
+          box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+      }
+      
+      .glass-card {
+          background: rgba(255, 255, 255, 0.7);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.5);
+          box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+          transition: all 0.3s ease;
+      }
+      
+      .glass-card:hover {
+          transform: translateY(-5px);
+          box-shadow: 0 12px 30px rgba(217, 119, 6, 0.2);
+          border-color: #fbbf24;
+      }
+
+      /* Text Gradients */
+      .text-gradient-gold {
+          background: linear-gradient(45deg, #b45309, #d97706, #fbbf24, #d97706);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-size: 200% auto;
+          animation: shine 3s linear infinite;
+      }
+
+      @keyframes shine {
+          to { background-position: 200% center; }
+      }
+
       /* Dynamic Watermark Styles */
       .watermark-text {
         position: absolute;
@@ -276,7 +322,7 @@ const DesignSystemLoader = () => {
         animation: floatWatermark 10s linear infinite alternate;
         pointer-events: none;
         z-index: 50;
-        color: rgba(0, 0, 0, 0.1); 
+        color: rgba(0, 0, 0, 0.15); 
         font-weight: 900;
         font-size: 1.5rem;
         text-shadow: 0 0 5px rgba(255,255,255,0.5);
@@ -320,18 +366,62 @@ const getGradeLabel = (g) => {
 };
 
 const ModernLogo = () => (
-  <motion.svg width="80" height="80" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" whileHover={{ scale: 1.05 }} className="drop-shadow-xl cursor-pointer">
-    <defs><linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#d97706" /><stop offset="100%" stopColor="#78350f" /></linearGradient></defs>
-    <motion.circle cx="100" cy="100" r="90" stroke="#cbd5e1" strokeWidth="2" strokeDasharray="20 10" opacity="0.5" animate={{ rotate: 360 }} transition={{ duration: 20, repeat: Infinity, ease: "linear" }} />
-    <motion.path d="M160 80 V 130 A 60 60 0 0 1 40 130 V 110" stroke="url(#logoGrad)" strokeWidth="22" strokeLinecap="round" strokeLinejoin="round" fill="none" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.5, ease: "easeInOut" }} />
-    <motion.rect x="85" y="40" width="30" height="30" rx="4" fill="url(#logoGrad)" transform="rotate(45 100 55)" initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 1, type: "spring" }} />
-    <motion.path d="M 160 80 L 140 60" stroke="#1e293b" strokeWidth="8" strokeLinecap="round" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.5 }} />
-  </motion.svg>
+  <motion.div whileHover={{ scale: 1.1, rotate: 5 }} className="relative w-20 h-20 drop-shadow-2xl cursor-pointer">
+      <svg width="80" height="80" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+            <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#fbbf24" />
+                <stop offset="50%" stopColor="#d97706" />
+                <stop offset="100%" stopColor="#78350f" />
+            </linearGradient>
+            <filter id="glow">
+                <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+                <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+        </defs>
+        <motion.path d="M100 20C55.8 20 20 55.8 20 100s35.8 80 80 80 80-35.8 80-80-35.8-80-80-80zm0 150c-38.6 0-70-31.4-70-70s31.4-70 70-70 70 31.4 70 70-31.4 70-70 70z" fill="url(#logoGrad)" opacity="0.2" animate={{ rotate: 360 }} transition={{ duration: 30, repeat: Infinity, ease: "linear" }} />
+        <motion.path d="M160 80 V 130 A 60 60 0 0 1 40 130 V 110" stroke="url(#logoGrad)" strokeWidth="22" strokeLinecap="round" strokeLinejoin="round" fill="none" filter="url(#glow)" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 2, ease: "easeInOut" }} />
+        <motion.rect x="85" y="40" width="30" height="30" rx="4" fill="url(#logoGrad)" transform="rotate(45 100 55)" initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 1.5, type: "spring" }} />
+      </svg>
+  </motion.div>
 );
 
+// خلفية متحركة مع حروف عربية عائمة وزخارف
 const FloatingArabicBackground = () => (
-  <div className="fixed inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 0, background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)' }}>
-    <div className="absolute inset-0 opacity-[0.05]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d97706' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")` }} />
+  <div className="fixed inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 0, background: 'radial-gradient(circle at center, #fdfbf7 0%, #e2e8f0 100%)' }}>
+    {/* Geometric Pattern Overlay */}
+    <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: `url("https://www.transparenttextures.com/patterns/arabesque.png")` }} />
+    
+    {/* Floating Letters */}
+    {['أ', 'ب', 'ج', 'د', 'هـ', 'و', 'ز', 'ح', 'ط', 'ي', 'ض', 'ع'].map((char, i) => (
+        <motion.div
+            key={i}
+            className="absolute text-amber-500/10 font-arabic font-bold select-none"
+            initial={{ 
+                x: Math.random() * window.innerWidth, 
+                y: Math.random() * window.innerHeight,
+                scale: Math.random() * 2 + 1,
+                rotate: Math.random() * 360
+            }}
+            animate={{ 
+                y: [null, Math.random() * -100],
+                rotate: [null, Math.random() * 360],
+            }}
+            transition={{ 
+                duration: Math.random() * 20 + 20, 
+                repeat: Infinity, 
+                repeatType: "reverse",
+                ease: "linear" 
+            }}
+            style={{ fontSize: `${Math.random() * 4 + 2}rem` }}
+        >
+            {char}
+        </motion.div>
+    ))}
+    
+    {/* Glowing Orbs */}
+    <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }} transition={{ duration: 5, repeat: Infinity }} className="absolute top-1/4 left-1/4 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl" />
+    <motion.div animate={{ scale: [1, 1.5, 1], opacity: [0.2, 0.4, 0.2] }} transition={{ duration: 7, repeat: Infinity }} className="absolute bottom-1/3 right-1/4 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl" />
   </div>
 );
 
@@ -359,11 +449,16 @@ const WisdomBox = () => {
   if (quotes.length === 0) return null;
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative bg-gradient-to-r from-amber-600 to-amber-700 text-white p-6 rounded-2xl shadow-xl mb-8 overflow-hidden z-20">
-      <Quote className="absolute top-4 left-4 opacity-20 w-16 h-16" />
+    <motion.div 
+        initial={{ opacity: 0, y: 20 }} 
+        animate={{ opacity: 1, y: 0 }} 
+        className="relative bg-gradient-to-r from-amber-600 to-amber-800 text-white p-8 rounded-2xl shadow-2xl mb-8 overflow-hidden z-20 border-2 border-amber-400/30"
+    >
+      <div className="absolute top-0 right-0 p-4 opacity-10"><Feather size={100} /></div>
+      <Quote className="absolute top-4 left-4 text-amber-300 opacity-40 w-12 h-12" />
       <div className="relative z-10 text-center">
-        <p className="text-xl font-bold mb-2">"{quotes[idx].text}"</p>
-        <span className="bg-white/20 px-3 py-1 rounded text-sm">- {quotes[idx].source}</span>
+        <p className="text-2xl font-arabic font-bold mb-3 drop-shadow-md">"{quotes[idx].text}"</p>
+        <span className="bg-black/20 px-4 py-1 rounded-full text-sm font-bold border border-white/20 text-amber-200">- {quotes[idx].source}</span>
       </div>
     </motion.div>
   );
@@ -379,12 +474,15 @@ const Announcements = () => {
     if(announcements.length === 0) return null;
 
     return (
-        <div className="bg-blue-600 text-white p-4 rounded-xl shadow-lg mb-6 relative overflow-hidden z-20">
-            <div className="absolute top-0 right-0 p-4 opacity-20"><Megaphone size={40}/></div>
-            <h3 className="font-bold flex items-center gap-2 mb-2 relative z-10"><Megaphone size={18}/> تنبيهات هامة</h3>
-            <div className="relative z-10 space-y-1">
+        <div className="bg-gradient-to-r from-blue-900 to-slate-900 text-white p-4 rounded-xl shadow-lg mb-6 relative overflow-hidden z-20 border border-blue-700/50">
+            <div className="absolute top-0 right-0 p-4 opacity-10"><Megaphone size={60}/></div>
+            <h3 className="font-bold font-arabic text-lg flex items-center gap-2 mb-2 relative z-10 text-blue-200"><Megaphone size={20}/> تنبيهات هامة</h3>
+            <div className="relative z-10 space-y-2">
                 {announcements.map((a, i) => (
-                    <p key={i} className="text-sm border-b border-blue-400/30 last:border-0 pb-1">{a.text}</p>
+                    <div key={i} className="text-sm border-b border-blue-800 last:border-0 pb-1 flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
+                        {a.text}
+                    </div>
                 ))}
             </div>
         </div>
@@ -420,17 +518,25 @@ const Leaderboard = () => {
     if(!config.show) return null;
 
     return (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 mb-6">
-            <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-amber-600"><Trophy /> لوحة الشرف (الأوائل)</h3>
+        <div className="glass-panel p-6 rounded-2xl mb-6">
+            <h3 className="text-xl font-bold font-arabic mb-4 flex items-center gap-2 text-amber-700"><Trophy className="text-amber-500 fill-amber-500" /> لوحة الشرف (الأوائل)</h3>
             <div className="space-y-3">
                 {topStudents.length === 0 ? <p className="text-slate-400 text-sm">لسه مفيش حد امتحن..</p> : topStudents.map((s, i) => (
-                    <div key={i} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border-l-4 border-amber-400">
+                    <motion.div 
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.1 }}
+                        key={i} 
+                        className={`flex justify-between items-center p-3 rounded-lg border-b-2 ${i===0 ? 'bg-gradient-to-r from-yellow-50 to-white border-yellow-400' : 'bg-white border-slate-100'}`}
+                    >
                         <div className="flex items-center gap-3">
-                            <span className={`font-bold w-6 h-6 rounded-full flex items-center justify-center text-xs ${i===0?'bg-yellow-400 text-white':i===1?'bg-gray-300':i===2?'bg-orange-300':'bg-slate-200'}`}>{i+1}</span>
+                            <div className={`font-bold w-8 h-8 rounded-full flex items-center justify-center text-sm shadow-md ${i===0?'bg-yellow-400 text-white':i===1?'bg-gray-300 text-gray-700':i===2?'bg-orange-300 text-white':'bg-slate-100 text-slate-500'}`}>
+                                {i < 3 ? <Star size={14} fill="currentColor" /> : i+1}
+                            </div>
                             <span className="font-bold text-slate-800">{s.name}</span>
                         </div>
-                        <span className="text-sm font-bold text-amber-600">{s.score} نقطة</span>
-                    </div>
+                        <span className="text-sm font-bold text-amber-600 bg-amber-50 px-3 py-1 rounded-full">{s.score} نقطة</span>
+                    </motion.div>
                 ))}
             </div>
         </div>
@@ -523,20 +629,20 @@ const ChatWidget = ({ user }) => {
 
   return (
     <>
-      <motion.button initial={{ scale: 0 }} animate={{ scale: 1 }} className="fixed bottom-6 right-6 z-50 bg-amber-600 text-white p-4 rounded-full shadow-2xl hover:bg-amber-700 transition flex items-center gap-2" onClick={() => setIsOpen(!isOpen)}>
+      <motion.button initial={{ scale: 0 }} animate={{ scale: 1 }} className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-amber-600 to-amber-700 text-white p-4 rounded-full shadow-2xl hover:shadow-amber-500/50 transition flex items-center gap-2" onClick={() => setIsOpen(!isOpen)}>
         {isOpen ? <X /> : <MessageCircle size={28} />}
       </motion.button>
       <AnimatePresence>
         {isOpen && (
-          <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 50 }} className="fixed bottom-24 right-6 z-50 w-80 bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col font-['Cairo']" style={{ height: '450px' }}>
-            <div className="bg-amber-600 p-4 text-white font-bold flex justify-between items-center">
+          <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 50 }} className="fixed bottom-24 right-6 z-50 w-80 bg-white/90 backdrop-blur rounded-2xl shadow-2xl border border-white/50 overflow-hidden flex flex-col font-['Cairo']" style={{ height: '450px' }}>
+            <div className="bg-gradient-to-r from-amber-600 to-amber-700 p-4 text-white font-bold flex justify-between items-center shadow-md">
               <div className="flex items-center gap-2"><div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div><span>مساعد النحاس</span></div>
-              <div className="flex gap-2"><Facebook size={18} onClick={openFacebook} className="cursor-pointer"/><Phone size={18} onClick={openWhatsApp} className="cursor-pointer"/></div>
+              <div className="flex gap-2"><Facebook size={18} onClick={openFacebook} className="cursor-pointer hover:text-blue-200"/><Phone size={18} onClick={openWhatsApp} className="cursor-pointer hover:text-green-200"/></div>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-2">
+            <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50 space-y-2">
               {messages.map((msg) => (
                 <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`p-3 rounded-2xl text-sm max-w-[85%] whitespace-pre-line ${msg.sender === 'user' ? 'bg-amber-100 text-amber-900 rounded-br-none' : 'bg-white border text-slate-700 rounded-bl-none shadow-sm'}`}>
+                  <div className={`p-3 rounded-2xl text-sm max-w-[85%] whitespace-pre-line shadow-sm ${msg.sender === 'user' ? 'bg-amber-100 text-amber-900 rounded-br-none' : 'bg-white border text-slate-700 rounded-bl-none'}`}>
                     {msg.text}
                   </div>
                 </div>
@@ -551,7 +657,7 @@ const ChatWidget = ({ user }) => {
             )}
             <div className="p-3 border-t flex gap-2 bg-white">
               <input value={inputText} onChange={(e) => setInputText(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSend()} className="flex-1 border rounded-lg px-3 py-2 text-sm focus:border-amber-500 outline-none" placeholder={isContactAdminMode ? "اكتب رسالتك للمستر..." : "اكتب سؤالك..."} />
-              <button onClick={handleSend} className="bg-amber-600 text-white p-2 rounded-lg"><Send size={16}/></button>
+              <button onClick={handleSend} className="bg-amber-600 text-white p-2 rounded-lg hover:bg-amber-700 transition"><Send size={16}/></button>
             </div>
           </motion.div>
         )}
@@ -589,21 +695,21 @@ const LiveSessionView = ({ session, user, onClose }) => {
   return (
     <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col md:flex-row font-['Cairo']" dir="rtl">
       <div className="flex-1 flex flex-col">
-        <div className="bg-amber-600 p-3 text-white flex justify-between items-center shadow-lg">
+        <div className="bg-gradient-to-r from-red-600 to-red-800 p-3 text-white flex justify-between items-center shadow-lg">
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
+            <span className="w-3 h-3 bg-white rounded-full animate-pulse shadow-[0_0_10px_white]"></span>
             <h2 className="font-bold">بث مباشر: {session.title}</h2>
           </div>
-          <button onClick={onClose} className="text-sm bg-red-700 px-3 py-1 rounded hover:bg-red-800 transition">خروج</button>
+          <button onClick={onClose} className="text-sm bg-black/30 hover:bg-black/50 px-3 py-1 rounded transition">خروج</button>
         </div>
         <div className="flex-1 bg-black relative flex items-center justify-center">
           <div className="watermark-video">{user.displayName}</div>
           {isYouTube ? (
             <iframe width="100%" height="100%" src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&controls=1&rel=0&modestbranding=1`} title="Live" frameBorder="0" allowFullScreen></iframe>
           ) : (
-            <div className="text-center p-8 bg-slate-800 rounded-2xl max-w-md">
+            <div className="text-center p-8 bg-slate-800 rounded-2xl max-w-md border border-slate-700 shadow-2xl">
               <h3 className="text-2xl font-bold text-white mb-4">اجتماع خارجي</h3>
-              <a href={session.liveUrl} target="_blank" className="bg-green-600 text-white text-lg font-bold py-3 px-8 rounded-full hover:bg-green-700 flex items-center justify-center gap-2"><ExternalLink size={20}/> اضغط للانضمام</a>
+              <a href={session.liveUrl} target="_blank" className="bg-green-600 text-white text-lg font-bold py-3 px-8 rounded-full hover:bg-green-700 flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(34,197,94,0.5)]"><ExternalLink size={20}/> اضغط للانضمام</a>
             </div>
           )}
         </div>
@@ -1263,34 +1369,37 @@ const AdminDashboard = ({ user }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 p-6 font-['Cairo']" dir="rtl">
-      <header className="flex justify-between items-center mb-8 bg-white p-4 rounded-xl shadow-sm">
-        <div className="flex items-center gap-2"><ShieldAlert className="text-amber-600"/> <h1 className="text-2xl font-black">لوحة تحكم النحاس (الأدمن)</h1></div>
-        <button onClick={() => signOut(auth)} className="text-red-500 font-bold px-4 py-2 flex gap-2"><LogOut /> خروج</button>
+    <div className="min-h-screen bg-slate-100 font-['Cairo'] relative" dir="rtl">
+      {/* الخلفية الجديدة */}
+      <FloatingArabicBackground />
+      
+      <header className="flex justify-between items-center mb-8 glass-panel p-4 rounded-xl relative z-10 m-4">
+        <div className="flex items-center gap-2"><ShieldAlert className="text-amber-600"/> <h1 className="text-2xl font-bold font-arabic text-slate-800">لوحة تحكم النحاس (الأدمن)</h1></div>
+        <button onClick={() => signOut(auth)} className="text-red-500 font-bold px-4 py-2 flex gap-2 hover:bg-red-50 rounded-lg transition"><LogOut /> خروج</button>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white p-4 rounded-xl shadow-sm h-fit space-y-2">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-6 relative z-10">
+        <div className="glass-panel p-4 rounded-xl h-fit space-y-2">
           {['users', 'all_users', 'exams', 'results', 'live', 'content', 'messages', 'auto_reply', 'quotes', 'settings'].map(tab => (
-            <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 ${activeTab===tab?'bg-amber-100 text-amber-700':'hover:bg-slate-50'}`}>
+            <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 transition-all ${activeTab===tab?'bg-amber-100 text-amber-700 shadow-sm border-r-4 border-amber-500':'hover:bg-slate-50 text-slate-600'}`}>
               {tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : 'الإعدادات'}
             </button>
           ))}
         </div>
 
         <div className="md:col-span-3">
-          {activeTab === 'users' && <div className="bg-white p-6 rounded-xl shadow-sm"><h2 className="font-bold mb-4">طلبات الانضمام</h2>{pendingUsers.map(u=><div key={u.id} className="border p-4 mb-2 rounded-lg flex justify-between bg-slate-50"><div><p className="font-bold">{u.name}</p><p className="text-sm">{u.grade}</p></div><div className="flex gap-2"><button onClick={()=>handleApprove(u.id)} className="bg-green-600 text-white px-3 py-1 rounded"><Check/></button><button onClick={()=>handleReject(u.id)} className="bg-red-600 text-white px-3 py-1 rounded"><X/></button></div></div>)}</div>}
+          {activeTab === 'users' && <div className="glass-panel p-6 rounded-xl"><h2 className="font-bold mb-4 font-arabic text-xl">طلبات الانضمام</h2>{pendingUsers.map(u=><div key={u.id} className="border p-4 mb-2 rounded-lg flex justify-between bg-white/50 backdrop-blur-sm"><div><p className="font-bold">{u.name}</p><p className="text-sm">{u.grade}</p></div><div className="flex gap-2"><button onClick={()=>handleApprove(u.id)} className="bg-green-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-green-500/50 transition"><Check/></button><button onClick={()=>handleReject(u.id)} className="bg-red-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-red-500/50 transition"><X/></button></div></div>)}</div>}
 
-          {activeTab === 'all_users' && <div className="bg-white p-6 rounded-xl shadow-sm"><h2 className="font-bold mb-4">قائمة الطلاب</h2>{editingUser&&<form onSubmit={handleUpdateUser} className="mb-4 bg-amber-50 p-4 rounded grid gap-2"><input className="border p-2" value={editingUser.name} onChange={e=>setEditingUser({...editingUser, name:e.target.value})}/><button className="bg-green-600 text-white px-4 py-1 rounded">حفظ</button></form>}{activeUsersList.map(u=><div key={u.id} className={`border p-4 mb-2 rounded-lg flex justify-between items-center ${u.status==='banned_cheating'?'bg-red-50 border-red-200':''}`}><div><p className="font-bold">{u.name} {u.status==='banned_cheating'&&<span className="text-red-600 text-xs">(محظور)</span>}</p><p className="text-xs text-slate-500">{u.email}</p></div><div className="flex gap-2">{u.status==='banned_cheating'?<button onClick={()=>handleUnban(u.id)} className="bg-green-100 text-green-700 px-3 py-1 rounded text-xs font-bold flex gap-1"><Unlock size={16}/>فك</button>:<button onClick={()=>setEditingUser(u)} className="bg-blue-100 text-blue-600 p-2 rounded"><Edit size={16}/></button>}<button onClick={()=>handleSendResetPassword(u.email)} className="bg-amber-100 text-amber-600 p-2 rounded"><KeyRound size={16}/></button><button onClick={()=>handleDeleteUser(u.id)} className="bg-red-100 text-red-600 p-2 rounded"><Trash2 size={16}/></button></div></div>)}</div>}
+          {activeTab === 'all_users' && <div className="glass-panel p-6 rounded-xl"><h2 className="font-bold mb-4 font-arabic text-xl">قائمة الطلاب</h2>{editingUser&&<form onSubmit={handleUpdateUser} className="mb-4 bg-amber-50 p-4 rounded grid gap-2"><input className="border p-2" value={editingUser.name} onChange={e=>setEditingUser({...editingUser, name:e.target.value})}/><button className="bg-green-600 text-white px-4 py-1 rounded">حفظ</button></form>}{activeUsersList.map(u=><div key={u.id} className={`border p-4 mb-2 rounded-lg flex justify-between items-center ${u.status==='banned_cheating'?'bg-red-50 border-red-200':'bg-white/50'}`}><div><p className="font-bold">{u.name} {u.status==='banned_cheating'&&<span className="text-red-600 text-xs">(محظور)</span>}</p><p className="text-xs text-slate-500">{u.email}</p></div><div className="flex gap-2">{u.status==='banned_cheating'?<button onClick={()=>handleUnban(u.id)} className="bg-green-100 text-green-700 px-3 py-1 rounded text-xs font-bold flex gap-1"><Unlock size={16}/>فك</button>:<button onClick={()=>setEditingUser(u)} className="bg-blue-100 text-blue-600 p-2 rounded"><Edit size={16}/></button>}<button onClick={()=>handleSendResetPassword(u.email)} className="bg-amber-100 text-amber-600 p-2 rounded"><KeyRound size={16}/></button><button onClick={()=>handleDeleteUser(u.id)} className="bg-red-100 text-red-600 p-2 rounded"><Trash2 size={16}/></button></div></div>)}</div>}
 
-          {activeTab === 'exams' && <div className="space-y-8"><div className="bg-white p-6 rounded-xl shadow-sm"><h2 className="text-xl font-bold mb-6 border-b pb-2">إنشاء امتحان</h2><div className="grid grid-cols-4 gap-4 mb-6"><input className="border p-2 rounded col-span-2" placeholder="العنوان" value={examBuilder.title} onChange={e=>setExamBuilder({...examBuilder, title:e.target.value})}/><input className="border p-2 rounded" placeholder="الكود" value={examBuilder.accessCode} onChange={e=>setExamBuilder({...examBuilder, accessCode:e.target.value})}/><input type="number" className="border p-2 rounded" placeholder="المدة (دقائق)" value={examBuilder.duration} onChange={e=>setExamBuilder({...examBuilder, duration:parseInt(e.target.value)})}/><select className="border p-2 rounded col-span-4" value={examBuilder.grade} onChange={e=>setExamBuilder({...examBuilder, grade:e.target.value})}><GradeOptions/></select><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت البدء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, startTime:e.target.value})}/></div><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت الانتهاء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, endTime:e.target.value})}/></div></div><div className="bg-slate-50 p-4 rounded-xl border mb-6"><textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm" placeholder="اكتب الأسئلة هنا... (ضع علامة * قبل الإجابة الصحيحة)" value={bulkText} onChange={e=>setBulkText(e.target.value)}/><button onClick={parseExam} className="mt-4 w-full bg-green-600 text-white py-3 rounded-xl font-bold">نشر</button></div></div><div className="bg-white p-6 rounded-xl shadow-sm"><h3 className="font-bold mb-4">الامتحانات الحالية</h3>{examsList.map(exam=><div key={exam.id} className="flex justify-between items-center border-b py-3 last:border-0"><div><p className="font-bold">{exam.title}</p><p className="text-xs text-slate-500">من: {new Date(exam.startTime).toLocaleString('ar-EG')} | إلى: {new Date(exam.endTime).toLocaleString('ar-EG')}</p><p className="text-xs text-slate-400">كود: {exam.accessCode}</p></div><div className="flex gap-2"><button onClick={()=>handleDeleteExam(exam.id)} className="text-red-500 p-2"><Trash2 size={18}/></button></div></div>)}</div></div>}
+          {activeTab === 'exams' && <div className="space-y-8"><div className="glass-panel p-6 rounded-xl"><h2 className="text-xl font-bold mb-6 border-b pb-2 font-arabic text-amber-700">إنشاء امتحان</h2><div className="grid grid-cols-4 gap-4 mb-6"><input className="border p-2 rounded col-span-2" placeholder="العنوان" value={examBuilder.title} onChange={e=>setExamBuilder({...examBuilder, title:e.target.value})}/><input className="border p-2 rounded" placeholder="الكود" value={examBuilder.accessCode} onChange={e=>setExamBuilder({...examBuilder, accessCode:e.target.value})}/><input type="number" className="border p-2 rounded" placeholder="المدة (دقائق)" value={examBuilder.duration} onChange={e=>setExamBuilder({...examBuilder, duration:parseInt(e.target.value)})}/><select className="border p-2 rounded col-span-4" value={examBuilder.grade} onChange={e=>setExamBuilder({...examBuilder, grade:e.target.value})}><GradeOptions/></select><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت البدء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, startTime:e.target.value})}/></div><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت الانتهاء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, endTime:e.target.value})}/></div></div><div className="bg-slate-50 p-4 rounded-xl border mb-6"><textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm" placeholder="اكتب الأسئلة هنا... (ضع علامة * قبل الإجابة الصحيحة)" value={bulkText} onChange={e=>setBulkText(e.target.value)}/><button onClick={parseExam} className="mt-4 w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-green-500/50 transition">نشر</button></div></div><div className="glass-panel p-6 rounded-xl"><h3 className="font-bold mb-4 font-arabic">الامتحانات الحالية</h3>{examsList.map(exam=><div key={exam.id} className="flex justify-between items-center border-b py-3 last:border-0 hover:bg-slate-50/50 px-2 rounded transition"><div><p className="font-bold">{exam.title}</p><p className="text-xs text-slate-500">من: {new Date(exam.startTime).toLocaleString('ar-EG')} | إلى: {new Date(exam.endTime).toLocaleString('ar-EG')}</p><p className="text-xs text-slate-400">كود: {exam.accessCode}</p></div><div className="flex gap-2"><button onClick={()=>handleDeleteExam(exam.id)} className="text-red-500 p-2"><Trash2 size={18}/></button></div></div>)}</div></div>}
 
           {activeTab === 'results' && (
-             <div className="bg-white p-6 rounded-xl shadow-sm">
+             <div className="glass-panel p-6 rounded-xl">
                <div className="flex justify-between items-center mb-4">
-                 <h2 className="font-bold flex items-center gap-2"><Layout/> نتائج الامتحانات</h2>
+                 <h2 className="font-bold flex items-center gap-2 font-arabic text-xl"><Layout/> نتائج الامتحانات</h2>
                  {!viewingResult && examResults.length > 0 && (
-                     <button onClick={handleDeleteAllResults} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-red-700 transition">
+                     <button onClick={handleDeleteAllResults} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-red-700 transition shadow-lg">
                          <Trash2 size={16}/> حذف جميع النتائج
                      </button>
                  )}
@@ -1334,7 +1443,7 @@ const AdminDashboard = ({ user }) => {
                ) : (
                    <div className="space-y-2">
                        {examResults.map(res => (
-                           <div key={res.id} className="flex justify-between items-center border p-3 rounded hover:bg-slate-50">
+                           <div key={res.id} className="flex justify-between items-center border p-3 rounded hover:bg-slate-50 transition bg-white/50">
                                <div><p className="font-bold">{res.studentName}</p><p className="text-xs text-slate-500">{res.status==='cheated'?'غش 🚫':`درجة: ${res.score}/${res.total}`}</p></div>
                                <div className="flex gap-2"><button onClick={()=>setViewingResult(res)} className="bg-blue-100 text-blue-600 px-3 py-1 rounded text-xs">التفاصيل</button><button onClick={()=>handleDeleteResult(res.id)} className="bg-amber-100 text-amber-600 px-3 py-1 rounded text-xs">إعادة</button></div>
                            </div>
@@ -1344,11 +1453,11 @@ const AdminDashboard = ({ user }) => {
              </div>
           )}
 
-          {activeTab === 'live' && <div className="bg-white p-8 rounded-xl shadow-sm border-t-4 border-red-600"><h2 className="text-2xl font-black mb-6 flex items-center gap-2 text-red-600"><Radio size={32}/> البث المباشر</h2><div className="grid gap-4"><input className="border p-3 rounded-xl" placeholder="العنوان" value={liveData.title} onChange={e=>setLiveData({...liveData, title:e.target.value})}/><input className="border p-3 rounded-xl" placeholder="رابط البث (Zoom/YouTube/Meet)" value={liveData.liveUrl} onChange={e=>setLiveData({...liveData, liveUrl:e.target.value})}/><select className="border p-3 rounded-xl" value={liveData.grade} onChange={e=>setLiveData({...liveData, grade:e.target.value})}><GradeOptions/></select>{!isLive?<button onClick={startLiveStream} className="bg-red-600 text-white py-4 rounded-xl font-bold">بدء البث</button>:<button onClick={stopLiveStream} className="bg-slate-800 text-white py-4 rounded-xl font-bold">إنهاء البث</button>}</div></div>}
+          {activeTab === 'live' && <div className="glass-panel p-8 rounded-xl border-t-4 border-red-600"><h2 className="text-2xl font-bold mb-6 flex items-center gap-2 text-red-600 font-arabic"><Radio size={32}/> البث المباشر</h2><div className="grid gap-4"><input className="border p-3 rounded-xl" placeholder="العنوان" value={liveData.title} onChange={e=>setLiveData({...liveData, title:e.target.value})}/><input className="border p-3 rounded-xl" placeholder="رابط البث (Zoom/YouTube/Meet)" value={liveData.liveUrl} onChange={e=>setLiveData({...liveData, liveUrl:e.target.value})}/><select className="border p-3 rounded-xl" value={liveData.grade} onChange={e=>setLiveData({...liveData, grade:e.target.value})}><GradeOptions/></select>{!isLive?<button onClick={startLiveStream} className="bg-red-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-red-500/30">بدء البث</button>:<button onClick={stopLiveStream} className="bg-slate-800 text-white py-4 rounded-xl font-bold">إنهاء البث</button>}</div></div>}
 
           {activeTab === 'content' && (
-              <div className="bg-white p-6 rounded-xl shadow-sm">
-                  <h2 className="font-bold mb-4">إضافة محتوى</h2>
+              <div className="glass-panel p-6 rounded-xl">
+                  <h2 className="font-bold mb-4 font-arabic text-xl">إضافة محتوى</h2>
                   <form onSubmit={handleAddContent} className="grid gap-4 mb-6">
                       <input className="border p-3 rounded" placeholder="العنوان" value={newContent.title} onChange={e=>setNewContent({...newContent, title:e.target.value})}/>
                       <input className="border p-3 rounded" placeholder="الرابط (يفضل Google Drive للملفات الكبيرة)" value={newContent.url} onChange={e=>setNewContent({...newContent, url:e.target.value})}/>
@@ -1400,11 +1509,11 @@ const AdminDashboard = ({ user }) => {
                       <div className="flex items-center gap-2">
                           <input type="checkbox" checked={newContent.isPublic} onChange={e=>setNewContent({...newContent, isPublic:e.target.checked})}/> <label>عام (للصفحة الرئيسية)</label>
                       </div>
-                      <button className="bg-amber-600 text-white p-3 rounded font-bold">نشر</button>
+                      <button className="bg-amber-600 text-white p-3 rounded font-bold shadow-lg shadow-amber-500/30">نشر</button>
                   </form>
                   <div className="space-y-2">
                       {contentList.map(c=>(
-                          <div key={c.id} className="flex justify-between border-b p-2 items-center">
+                          <div key={c.id} className="flex justify-between border-b p-2 items-center bg-white/50 rounded hover:bg-white transition">
                               <div>
                                   <span className="font-bold">{c.title}</span>
                                   {c.allowedEmails && c.allowedEmails.length > 0 && <span className="mr-2 text-xs bg-red-100 text-red-600 px-2 py-1 rounded flex items-center gap-1 inline-flex"><Lock size={10}/> خاص</span>}
@@ -1419,12 +1528,12 @@ const AdminDashboard = ({ user }) => {
               </div>
           )}
 
-          {activeTab === 'messages' && <div className="bg-white p-6 rounded-xl shadow-sm"><h2 className="font-bold mb-4">الرسائل</h2>{messagesList.map(m=><div key={m.id} className="border-b p-4 bg-slate-50 mb-3 rounded-lg relative"><button onClick={()=>handleDeleteMessage(m.id)} className="absolute top-2 left-2 text-red-400"><Trash2 size={16}/></button><div className="mb-2"><p className="font-bold text-amber-800">{m.senderName} <span className="text-xs text-slate-500">({m.sender})</span></p><p className="text-sm text-slate-400">{m.createdAt?.toDate?m.createdAt.toDate().toLocaleString():'الآن'}</p></div><p className="text-slate-800 bg-white p-3 rounded-lg border border-slate-200 mb-3">{m.text}</p>{m.adminReply?<div className="bg-green-50 p-3 rounded-lg border border-green-200 text-sm"><span className="font-bold text-green-700">ردك: </span>{m.adminReply}</div>:<div className="flex gap-2"><input className="flex-1 border p-2 rounded text-sm" placeholder="اكتب ردك..." value={replyTexts[m.id]||""} onChange={e=>setReplyTexts({...replyTexts,[m.id]:e.target.value})}/><button onClick={()=>handleReplyMessage(m.id)} className="bg-blue-600 text-white px-3 py-1 rounded text-sm"><Reply size={14}/></button></div>}</div>)}</div>}
+          {activeTab === 'messages' && <div className="glass-panel p-6 rounded-xl"><h2 className="font-bold mb-4 font-arabic text-xl">الرسائل</h2>{messagesList.map(m=><div key={m.id} className="border-b p-4 bg-slate-50 mb-3 rounded-lg relative"><button onClick={()=>handleDeleteMessage(m.id)} className="absolute top-2 left-2 text-red-400"><Trash2 size={16}/></button><div className="mb-2"><p className="font-bold text-amber-800">{m.senderName} <span className="text-xs text-slate-500">({m.sender})</span></p><p className="text-sm text-slate-400">{m.createdAt?.toDate?m.createdAt.toDate().toLocaleString():'الآن'}</p></div><p className="text-slate-800 bg-white p-3 rounded-lg border border-slate-200 mb-3">{m.text}</p>{m.adminReply?<div className="bg-green-50 p-3 rounded-lg border border-green-200 text-sm"><span className="font-bold text-green-700">ردك: </span>{m.adminReply}</div>:<div className="flex gap-2"><input className="flex-1 border p-2 rounded text-sm" placeholder="اكتب ردك..." value={replyTexts[m.id]||""} onChange={e=>setReplyTexts({...replyTexts,[m.id]:e.target.value})}/><button onClick={()=>handleReplyMessage(m.id)} className="bg-blue-600 text-white px-3 py-1 rounded text-sm"><Reply size={14}/></button></div>}</div>)}</div>}
            
           {/* تبويب الرد الآلي */}
           {activeTab === 'auto_reply' && (
-              <div className="bg-white p-6 rounded-xl shadow-sm">
-                  <h2 className="font-bold mb-4 flex items-center gap-2"><Bot /> إعدادات الرد الآلي</h2>
+              <div className="glass-panel p-6 rounded-xl">
+                  <h2 className="font-bold mb-4 flex items-center gap-2 font-arabic text-xl"><Bot /> إعدادات الرد الآلي</h2>
                   <div className="bg-slate-50 p-4 rounded-xl border mb-6">
                       <h3 className="font-bold mb-2 text-sm">إضافة قاعدة جديدة</h3>
                       <div className="grid gap-3">
@@ -1457,8 +1566,8 @@ const AdminDashboard = ({ user }) => {
 
           {/* تبويب إدارة الحكم */}
           {activeTab === 'quotes' && (
-              <div className="bg-white p-6 rounded-xl shadow-sm">
-                  <h2 className="font-bold mb-4 flex items-center gap-2"><PenTool /> إدارة الحكم والأقوال</h2>
+              <div className="glass-panel p-6 rounded-xl">
+                  <h2 className="font-bold mb-4 flex items-center gap-2 font-arabic text-xl"><PenTool /> إدارة الحكم والأقوال</h2>
                   <div className="bg-slate-50 p-4 rounded-xl border mb-6">
                       <h3 className="font-bold mb-2 text-sm">إضافة حكمة جديدة</h3>
                       <div className="grid gap-3">
@@ -1485,8 +1594,8 @@ const AdminDashboard = ({ user }) => {
           )}
 
           {activeTab === 'settings' && (
-              <div className="bg-white p-6 rounded-xl shadow-sm space-y-6">
-                  <h2 className="font-bold mb-4">إدارة الموقع</h2>
+              <div className="glass-panel p-6 rounded-xl space-y-6">
+                  <h2 className="font-bold mb-4 font-arabic text-xl">إدارة الموقع</h2>
                   <div className="border p-4 rounded-xl">
                       <h3 className="font-bold mb-2 text-amber-600">شريط الإعلانات</h3>
                       <div className="flex gap-2 mb-2">
@@ -1627,34 +1736,34 @@ const StudentDashboard = ({ user, userData }) => {
       <FloatingArabicBackground />
       <ChatWidget user={user} />
       
-      <aside className={`fixed md:relative z-30 bg-white/95 backdrop-blur h-full w-72 p-6 shadow-xl transition-transform duration-300 ${mobileMenu ? 'translate-x-0' : 'translate-x-full md:translate-x-0'} right-0 border-l border-white flex flex-col`}>
-        <div className="flex items-center gap-3 mb-10 px-2"><ModernLogo /><h1 className="text-2xl font-black text-slate-800">النحاس</h1><button onClick={() => setMobileMenu(false)} className="md:hidden mr-auto"><X /></button></div>
+      <aside className={`fixed md:relative z-30 bg-white/90 backdrop-blur h-full w-72 p-6 shadow-xl transition-transform duration-300 ${mobileMenu ? 'translate-x-0' : 'translate-x-full md:translate-x-0'} right-0 border-l border-white flex flex-col`}>
+        <div className="flex items-center gap-3 mb-10 px-2"><ModernLogo /><h1 className="text-2xl font-bold font-arabic text-amber-800">النحاس</h1><button onClick={() => setMobileMenu(false)} className="md:hidden mr-auto"><X /></button></div>
         <div className="space-y-2 flex-1">
-          <button onClick={() => {setActiveTab('home'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='home'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><User/> الرئيسية</button>
-          <div onClick={() => setActiveTab('videos')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='videos'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><PlayCircle/> المحاضرات</div>
-          <div onClick={() => setActiveTab('files')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='files'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><FileText/> المذكرات</div>
-          <div onClick={() => setActiveTab('htmls')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='htmls'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><Code/> محتوى تفاعلي</div>
-          <div onClick={() => setActiveTab('exams')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><ClipboardList/> الامتحانات</div>
-          <button onClick={() => {setActiveTab('settings'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='settings'?'bg-amber-100 text-amber-700':'text-slate-600 hover:bg-slate-50'}`}><Settings/> ملفي الشخصي</button>
+          <button onClick={() => {setActiveTab('home'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='home'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><User/> الرئيسية</button>
+          <div onClick={() => setActiveTab('videos')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='videos'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><PlayCircle/> المحاضرات</div>
+          <div onClick={() => setActiveTab('files')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='files'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><FileText/> المذكرات</div>
+          <div onClick={() => setActiveTab('htmls')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='htmls'?'bg-purple-100 text-purple-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-purple-600'}`}><Code/> محتوى تفاعلي</div>
+          <div onClick={() => setActiveTab('exams')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><ClipboardList/> الامتحانات</div>
+          <button onClick={() => {setActiveTab('settings'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='settings'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><Settings/> ملفي الشخصي</button>
         </div>
         <div className="mt-auto pt-6"><button onClick={() => signOut(auth)} className="flex items-center gap-3 text-red-500 font-bold hover:bg-red-50 w-full p-4 rounded-xl transition"><LogOut/> خروج</button></div>
       </aside>
 
       <main className="flex-1 p-4 md:p-10 relative z-10 overflow-y-auto h-screen">
-        <div className="md:hidden flex justify-between items-center mb-6 bg-white/80 p-4 rounded-2xl shadow-sm"><h1 className="font-bold text-lg text-slate-800">منصة النحاس</h1><button onClick={() => setMobileMenu(true)} className="p-2 bg-slate-100 rounded-lg"><Menu /></button></div>
+        <div className="md:hidden flex justify-between items-center mb-6 glass-panel p-4 rounded-2xl shadow-sm"><h1 className="font-bold text-lg text-slate-800">منصة النحاس</h1><button onClick={() => setMobileMenu(true)} className="p-2 bg-slate-100 rounded-lg"><Menu /></button></div>
         
         <div className="flex justify-end mb-6 relative">
-            <button onClick={() => {requestNotificationPermission(); setShowNotifications(!showNotifications); setHasNewNotif(false);}} className="relative p-2 bg-white rounded-full shadow-sm hover:bg-slate-50">
+            <button onClick={() => {requestNotificationPermission(); setShowNotifications(!showNotifications); setHasNewNotif(false);}} className="relative p-2 glass-panel rounded-full shadow-sm hover:bg-white transition">
                 <Bell className="text-slate-600"/>
                 {hasNewNotif && <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>}
             </button>
             {showNotifications && (
-                <div className="absolute top-12 left-0 w-80 bg-white rounded-xl shadow-xl border border-slate-100 p-4 z-50 max-h-96 overflow-y-auto">
+                <div className="absolute top-12 left-0 w-80 glass-panel rounded-xl shadow-xl border border-white/50 p-4 z-50 max-h-96 overflow-y-auto">
                     <h3 className="font-bold mb-3 text-sm text-slate-500">الإشعارات</h3>
                     {notifications.length === 0 ? <p className="text-xs text-slate-400">لا توجد إشعارات جديدة</p> : (
                         <div className="space-y-3">
                             {notifications.map((n, i) => (
-                                <div key={i} className="text-sm bg-slate-50 p-2 rounded border-l-4 border-amber-500">
+                                <div key={i} className="text-sm bg-slate-50/50 p-2 rounded border-l-4 border-amber-500">
                                     {n.text}
                                     <div className="text-[10px] text-slate-400 mt-1">{n.createdAt?.toDate().toLocaleDateString()}</div>
                                 </div>
@@ -1665,23 +1774,23 @@ const StudentDashboard = ({ user, userData }) => {
             )}
         </div>
 
-        {activeTab === 'home' && (<div className="space-y-8"><WisdomBox /><Announcements /><h2 className="text-3xl font-bold text-slate-800">منور يا {userData.name.split(' ')[0]} 👋 <span className="text-sm font-normal text-slate-500 bg-slate-200 px-2 py-1 rounded-full">{getGradeLabel(userData.grade)}</span></h2><div className="grid grid-cols-1 md:grid-cols-4 gap-6"><div onClick={()=>setActiveTab('videos')} className="bg-blue-600 text-white p-8 rounded-3xl shadow-lg relative overflow-hidden cursor-pointer hover:scale-105 transition-transform"><h3 className="relative z-10 text-2xl font-bold mb-2">المحاضرات</h3><p className="relative z-10 text-4xl font-black">{videos.length}</p><PlayCircle className="absolute -bottom-6 -left-6 opacity-20 w-40 h-40"/></div><div onClick={()=>setActiveTab('files')} className="bg-amber-500 text-white p-8 rounded-3xl shadow-lg relative overflow-hidden cursor-pointer hover:scale-105 transition-transform"><h3 className="relative z-10 text-2xl font-bold mb-2">الملفات</h3><p className="relative z-10 text-4xl font-black">{files.length}</p><FileText className="absolute -bottom-6 -left-6 opacity-20 w-40 h-40"/></div><div onClick={()=>setActiveTab('htmls')} className="bg-purple-600 text-white p-8 rounded-3xl shadow-lg relative overflow-hidden cursor-pointer hover:scale-105 transition-transform"><h3 className="relative z-10 text-2xl font-bold mb-2">تفاعلي</h3><p className="relative z-10 text-4xl font-black">{htmls.length}</p><Code className="absolute -bottom-6 -left-6 opacity-20 w-40 h-40"/></div><div onClick={()=>setActiveTab('exams')} className="bg-slate-800 text-white p-8 rounded-3xl shadow-lg relative overflow-hidden cursor-pointer hover:scale-105 transition-transform"><h3 className="relative z-10 text-2xl font-bold mb-2">الامتحانات</h3><p className="relative z-10 text-4xl font-black">{exams.length}</p><ClipboardList className="absolute -bottom-6 -left-6 opacity-20 w-40 h-40"/></div></div><Leaderboard /></div>)}
-        {activeTab === 'videos' && <div className="grid grid-cols-1 md:grid-cols-3 gap-6">{videos.map(v => (<div key={v.id} className="bg-white rounded-xl shadow-sm border overflow-hidden cursor-pointer hover:shadow-md transition" onClick={() => setPlayingVideo(v)}><div className="h-40 bg-slate-800 flex items-center justify-center relative group"><PlayCircle className="text-white w-12 h-12 opacity-80 group-hover:scale-110 transition"/><span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded">{getGradeLabel(v.grade)}</span></div><div className="p-4"><h3 className="font-bold text-lg">{v.title}</h3></div></div>))}</div>}
-        {activeTab === 'files' && <div className="bg-white rounded-xl shadow-sm border overflow-hidden">{files.map(f => (<div key={f.id} className="p-4 flex justify-between items-center border-b last:border-0 hover:bg-slate-50"><div className="flex items-center gap-4"><div className="bg-red-100 text-red-600 p-3 rounded-lg font-bold text-xs">PDF</div><div><h4 className="font-bold text-lg">{f.title}</h4><span className="text-xs text-slate-500">{getGradeLabel(f.grade)}</span></div></div><a href={f.url} target="_blank" className="bg-blue-50 text-blue-600 px-4 py-2 rounded-lg font-bold hover:bg-blue-100">تحميل</a></div>))}</div>}
+        {activeTab === 'home' && (<div className="space-y-8"><WisdomBox /><Announcements /><h2 className="text-3xl font-bold text-slate-800 font-arabic">منور يا <span className="text-amber-600">{userData.name.split(' ')[0]}</span> 👋 <span className="text-sm font-normal text-slate-500 bg-slate-200 px-2 py-1 rounded-full font-sans">{getGradeLabel(userData.grade)}</span></h2><div className="grid grid-cols-1 md:grid-cols-4 gap-6"><motion.div whileHover={{ scale: 1.02 }} onClick={()=>setActiveTab('videos')} className="glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group"><h3 className="relative z-10 text-2xl font-bold mb-2 text-blue-900 group-hover:text-blue-600 transition">المحاضرات</h3><p className="relative z-10 text-4xl font-black text-blue-600">{videos.length}</p><PlayCircle className="absolute -bottom-6 -left-6 text-blue-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/></motion.div><motion.div whileHover={{ scale: 1.02 }} onClick={()=>setActiveTab('files')} className="glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group"><h3 className="relative z-10 text-2xl font-bold mb-2 text-amber-900 group-hover:text-amber-600 transition">الملفات</h3><p className="relative z-10 text-4xl font-black text-amber-600">{files.length}</p><FileText className="absolute -bottom-6 -left-6 text-amber-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/></motion.div><motion.div whileHover={{ scale: 1.02 }} onClick={()=>setActiveTab('htmls')} className="glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group"><h3 className="relative z-10 text-2xl font-bold mb-2 text-purple-900 group-hover:text-purple-600 transition">تفاعلي</h3><p className="relative z-10 text-4xl font-black text-purple-600">{htmls.length}</p><Code className="absolute -bottom-6 -left-6 text-purple-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/></motion.div><motion.div whileHover={{ scale: 1.02 }} onClick={()=>setActiveTab('exams')} className="glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group"><h3 className="relative z-10 text-2xl font-bold mb-2 text-slate-900 group-hover:text-slate-600 transition">الامتحانات</h3><p className="relative z-10 text-4xl font-black text-slate-600">{exams.length}</p><ClipboardList className="absolute -bottom-6 -left-6 text-slate-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/></motion.div></div><Leaderboard /></div>)}
+        {activeTab === 'videos' && <div className="grid grid-cols-1 md:grid-cols-3 gap-6">{videos.map(v => (<div key={v.id} className="glass-card rounded-xl overflow-hidden cursor-pointer" onClick={() => setPlayingVideo(v)}><div className="h-48 bg-gradient-to-br from-slate-800 to-black flex items-center justify-center relative group"><PlayCircle className="text-white w-16 h-16 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/><span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(v.grade)}</span></div><div className="p-4"><h3 className="font-bold text-lg text-slate-800">{v.title}</h3></div></div>))}</div>}
+        {activeTab === 'files' && <div className="glass-panel rounded-xl overflow-hidden">{files.map(f => (<div key={f.id} className="p-4 flex justify-between items-center border-b last:border-0 hover:bg-white/50 transition"><div className="flex items-center gap-4"><div className="bg-red-100 text-red-600 p-3 rounded-lg font-bold text-xs shadow-sm">PDF</div><div><h4 className="font-bold text-lg text-slate-800">{f.title}</h4><span className="text-xs text-slate-500">{getGradeLabel(f.grade)}</span></div></div><a href={f.url} target="_blank" className="bg-blue-50 text-blue-600 px-4 py-2 rounded-lg font-bold hover:bg-blue-100 transition shadow-sm">تحميل</a></div>))}</div>}
         
         {activeTab === 'htmls' && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {htmls.map(h => (
-                    <div key={h.id} className="bg-white rounded-xl shadow-sm border overflow-hidden cursor-pointer hover:shadow-md transition" onClick={() => setPlayingHtml(h)}>
-                        <div className="h-40 bg-purple-600 flex items-center justify-center relative group">
-                            <Code className="text-white w-16 h-16 opacity-80 group-hover:scale-110 transition"/>
-                            <span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded">{getGradeLabel(h.grade)}</span>
+                    <motion.div whileHover={{y:-5}} key={h.id} className="glass-card rounded-xl overflow-hidden cursor-pointer" onClick={() => setPlayingHtml(h)}>
+                        <div className="h-48 bg-gradient-to-br from-purple-600 to-indigo-900 flex items-center justify-center relative group">
+                            <Code className="text-white w-20 h-20 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/>
+                            <span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(h.grade)}</span>
                         </div>
                         <div className="p-4">
-                            <h3 className="font-bold text-lg">{h.title}</h3>
-                            <button className="mt-2 w-full bg-purple-100 text-purple-700 font-bold py-2 rounded-lg hover:bg-purple-200">تشغيل</button>
+                            <h3 className="font-bold text-lg text-slate-800">{h.title}</h3>
+                            <button className="mt-2 w-full bg-purple-100 text-purple-700 font-bold py-2 rounded-lg hover:bg-purple-200 transition shadow-sm">تشغيل</button>
                         </div>
-                    </div>
+                    </motion.div>
                 ))}
             </div>
         )}
@@ -1689,7 +1798,7 @@ const StudentDashboard = ({ user, userData }) => {
         {activeTab === 'exams' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {isBanned ? (
-                <div className="col-span-full bg-red-50 border border-red-200 p-8 rounded-3xl text-center">
+                <div className="col-span-full bg-red-50 border border-red-200 p-8 rounded-3xl text-center shadow-inner">
                     <AlertTriangle size={48} className="text-red-500 mx-auto mb-4" />
                     <h3 className="text-2xl font-bold text-red-800 mb-2">عفواً، تم حظرك من الامتحانات</h3>
                     <p className="text-red-600">تم رصد محاولة غش سابقة. يرجى التواصل مع الإدارة لفك الحظر.</p>
@@ -1697,31 +1806,31 @@ const StudentDashboard = ({ user, userData }) => {
             ) : exams.map(e => {
                 const prevResult = examResults.find(r => r.examId === e.id);
                 return (
-                  <div key={e.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden">
-                    {prevResult && <div className="absolute top-0 left-0 bg-green-500 text-white text-xs px-3 py-1 rounded-br-xl font-bold">تم الحل: {prevResult.score} درجة</div>}
-                    <h3 className="text-xl font-bold mb-2">{e.title}</h3>
+                  <motion.div whileHover={{scale:1.01}} key={e.id} className="glass-card p-6 rounded-2xl relative overflow-hidden">
+                    {prevResult && <div className="absolute top-0 left-0 bg-green-500 text-white text-xs px-3 py-1 rounded-br-xl font-bold shadow-md">تم الحل: {prevResult.score} درجة</div>}
+                    <h3 className="text-xl font-bold mb-2 text-slate-800">{e.title}</h3>
                     <div className="flex justify-between text-sm text-slate-500 mb-4"><span>⏳ {e.duration} دقيقة</span><span>📝 {e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0)} سؤال</span></div>
                     {prevResult ? (
                         <div className="flex gap-2">
                              <button disabled className="flex-1 bg-slate-200 text-slate-500 py-3 rounded-xl font-bold cursor-not-allowed">تم الانتهاء</button>
-                             <button onClick={() => setReviewingExam(e)} className="flex-1 bg-blue-100 text-blue-700 py-3 rounded-xl font-bold hover:bg-blue-200">عرض الأخطاء</button>
-                             <button onClick={() => generatePDF('student', {studentName: user.displayName, score: prevResult.score, total: e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0), status: prevResult.status, examTitle: e.title, questions: e.questions.flatMap(q => q.subQuestions), answers: prevResult.answers })} className="flex-1 bg-green-100 text-green-700 py-3 rounded-xl font-bold hover:bg-green-200 flex items-center justify-center gap-1"><Download size={16}/> شهادة</button>
+                             <button onClick={() => setReviewingExam(e)} className="flex-1 bg-blue-100 text-blue-700 py-3 rounded-xl font-bold hover:bg-blue-200 transition shadow-sm">عرض الأخطاء</button>
+                             <button onClick={() => generatePDF('student', {studentName: user.displayName, score: prevResult.score, total: e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0), status: prevResult.status, examTitle: e.title, questions: e.questions.flatMap(q => q.subQuestions), answers: prevResult.answers })} className="flex-1 bg-green-100 text-green-700 py-3 rounded-xl font-bold hover:bg-green-200 flex items-center justify-center gap-1 transition shadow-sm"><Download size={16}/> شهادة</button>
                         </div>
                     ) : (
                         <div className="space-y-2">
                             <p className="text-xs text-slate-500">يبدأ: {new Date(e.startTime).toLocaleString('ar-EG')}</p>
-                            <button onClick={() => startExamWithCode(e)} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 flex items-center justify-center gap-2"><Lock size={16}/> ابدأ الامتحان</button>
+                            <button onClick={() => startExamWithCode(e)} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 flex items-center justify-center gap-2 shadow-lg hover:shadow-slate-500/30 transition"><Lock size={16}/> ابدأ الامتحان</button>
                         </div>
                     )}
-                  </div>
+                  </motion.div>
                 )
             })}
           </div>
         )}
 
         {activeTab === 'settings' && (
-              <div className="bg-white p-8 rounded-xl shadow-sm max-w-2xl mx-auto">
-                <h2 className="text-2xl font-bold mb-6 flex items-center gap-2"><Settings className="text-slate-700"/> إعدادات الحساب</h2>
+              <div className="glass-panel p-8 rounded-xl max-w-2xl mx-auto">
+                <h2 className="text-2xl font-bold mb-6 flex items-center gap-2 font-arabic text-slate-800"><Settings className="text-slate-700"/> إعدادات الحساب</h2>
                 <form onSubmit={handleUpdateMyProfile} className="space-y-4">
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-2">الاسم</label>
@@ -1743,7 +1852,7 @@ const StudentDashboard = ({ user, userData }) => {
                       <GradeOptions />
                     </select>
                   </div>
-                  <button className="w-full bg-amber-600 text-white py-3 rounded-xl font-bold hover:bg-amber-700 transition">حفظ التعديلات</button>
+                  <button className="w-full bg-gradient-to-r from-amber-600 to-amber-700 text-white py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-amber-500/40 transition">حفظ التعديلات</button>
                 </form>
               </div>
         )}
@@ -1765,49 +1874,61 @@ const LandingPage = ({ onAuthClick }) => {
     <div className="min-h-screen font-['Cairo'] relative" dir="rtl">
       {playingVideo && <SecureVideoPlayer video={playingVideo} userName="زائر" onClose={() => setPlayingVideo(null)} />}
       {playingHtml && <InteractiveViewer content={playingHtml} user={null} onClose={() => setPlayingHtml(null)} />}
+      
       <FloatingArabicBackground />
       <ChatWidget />
-      <nav className="relative z-10 flex justify-between items-center p-6 max-w-7xl mx-auto">
-        <div className="flex items-center gap-2"><ModernLogo /><span className="text-2xl font-black text-slate-900">منصة النحاس</span></div>
+      
+      <nav className="relative z-10 flex justify-between items-center p-6 max-w-7xl mx-auto glass-panel mt-4 rounded-full mx-4 shadow-lg">
+        <div className="flex items-center gap-2"><ModernLogo /><span className="text-2xl font-bold font-arabic text-amber-800">منصة النحاس</span></div>
         <div className="flex gap-4 items-center">
-          <button onClick={openFacebook} className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition"><Facebook size={20}/></button>
-          <button onClick={onAuthClick} className="bg-white text-slate-900 px-6 py-2 rounded-full font-bold shadow hover:bg-slate-50 transition border">دخول الطالب</button>
+          <button onClick={openFacebook} className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition shadow-lg hover:shadow-blue-500/50"><Facebook size={20}/></button>
+          <button onClick={onAuthClick} className="bg-slate-900 text-white px-6 py-2 rounded-full font-bold shadow-lg hover:shadow-slate-500/50 transition transform hover:-translate-y-0.5">دخول الطالب</button>
         </div>
       </nav>
-      <main className="relative z-10 px-4 mt-10 max-w-7xl mx-auto text-center">
-        <h1 className="text-5xl md:text-7xl font-black text-slate-900 mb-6">اللغة العربية <span className="text-amber-600">لعبتك</span></h1>
-        <p className="text-xl text-slate-600 mb-8 max-w-2xl mx-auto">أقوى منصة تعليمية للمرحلة الإعدادية والثانوية.</p>
-        <button onClick={onAuthClick} className="bg-amber-600 text-white px-10 py-4 rounded-2xl text-xl font-bold shadow-xl hover:bg-amber-700 transition transform hover:-translate-y-1">اشترك الآن 🚀</button>
+      
+      <main className="relative z-10 px-4 mt-20 max-w-7xl mx-auto text-center">
+        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
+            <h1 className="text-6xl md:text-8xl font-bold text-slate-900 mb-6 font-arabic drop-shadow-sm">
+                اللغة العربية <span className="text-gradient-gold">لعبتك</span>
+            </h1>
+            <p className="text-xl md:text-2xl text-slate-600 mb-10 max-w-2xl mx-auto font-medium">
+                مع الأستاذ <span className="text-amber-700 font-bold">محمد النحاس</span>، النحو والبلاغة في جيبك.
+            </p>
+            <button onClick={onAuthClick} className="bg-gradient-to-r from-amber-500 to-amber-700 text-white px-12 py-5 rounded-full text-2xl font-bold shadow-2xl hover:shadow-amber-500/50 transition transform hover:-translate-y-1 font-arabic border-2 border-amber-400">
+                اشترك الآن مجاناً 🚀
+            </button>
+        </motion.div>
         
-        <div className="my-12">
+        <div className="my-16">
             <WisdomBox />
         </div>
 
         <div className="grid md:grid-cols-2 gap-8 mt-10 mb-20">
-          <div className="bg-white/80 backdrop-blur p-6 rounded-3xl border border-white shadow-sm">
-            <h3 className="text-2xl font-bold mb-4 flex items-center gap-2 text-blue-700"><Video /> فيديوهات مجانية</h3>
+          <motion.div whileHover={{ y: -10 }} className="glass-panel p-8 rounded-3xl border-t-4 border-blue-500">
+            <h3 className="text-3xl font-bold mb-6 flex items-center gap-2 text-blue-800 font-arabic"><Video size={32}/> فيديوهات مجانية</h3>
             <div className="space-y-4">
               {publicContent.filter(c => c.type === 'video').length > 0 ? publicContent.filter(c => c.type === 'video').map((v, i) => (
-                 <div key={i} className="flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm cursor-pointer hover:bg-gray-50" onClick={() => setPlayingVideo(v)}>
-                    <PlayCircle className="text-amber-500"/>
-                    <span className="font-bold">{v.title}</span>
-                    <span className="mr-auto text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">مشاهدة</span>
+                 <div key={i} className="flex items-center gap-3 p-4 bg-white/60 rounded-2xl shadow-sm cursor-pointer hover:bg-white transition" onClick={() => setPlayingVideo(v)}>
+                    <div className="bg-blue-100 p-2 rounded-full"><PlayCircle className="text-blue-600"/></div>
+                    <span className="font-bold text-lg">{v.title}</span>
+                    <span className="mr-auto text-xs bg-blue-600 text-white px-3 py-1 rounded-full shadow">مشاهدة</span>
                  </div>
                )) : <p className="text-slate-500">مفيش فيديوهات عامة حالياً</p>}
             </div>
-          </div>
-          <div className="bg-white/80 backdrop-blur p-6 rounded-3xl border border-white shadow-sm">
-            <h3 className="text-2xl font-bold mb-4 flex items-center gap-2 text-purple-700"><Code /> تفاعلي عام</h3>
+          </motion.div>
+          
+          <motion.div whileHover={{ y: -10 }} className="glass-panel p-8 rounded-3xl border-t-4 border-purple-500">
+            <h3 className="text-3xl font-bold mb-6 flex items-center gap-2 text-purple-800 font-arabic"><Sparkles size={32}/> محتوى تفاعلي</h3>
             <div className="space-y-4">
               {publicContent.filter(c => c.type === 'html').length > 0 ? publicContent.filter(c => c.type === 'html').map((h, i) => (
-                 <div key={i} className="flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm cursor-pointer hover:bg-gray-50" onClick={() => setPlayingHtml(h)}>
-                    <Code className="text-purple-500"/>
-                    <span className="font-bold">{h.title}</span>
-                    <span className="mr-auto text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">تشغيل</span>
+                 <div key={i} className="flex items-center gap-3 p-4 bg-white/60 rounded-2xl shadow-sm cursor-pointer hover:bg-white transition" onClick={() => setPlayingHtml(h)}>
+                    <div className="bg-purple-100 p-2 rounded-full"><Code className="text-purple-600"/></div>
+                    <span className="font-bold text-lg">{h.title}</span>
+                    <span className="mr-auto text-xs bg-purple-600 text-white px-3 py-1 rounded-full shadow">تشغيل</span>
                  </div>
                )) : <p className="text-slate-500">مفيش محتوى تفاعلي عام حالياً</p>}
             </div>
-          </div>
+          </motion.div>
         </div>
       </main>
     </div>
@@ -1854,29 +1975,29 @@ const AuthPage = ({ onBack }) => {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-slate-900 font-['Cairo'] relative overflow-hidden" dir="rtl">
       <FloatingArabicBackground />
-      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl relative z-10 my-10 overflow-y-auto max-h-[90vh]">
+      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white/90 backdrop-blur-xl rounded-3xl p-8 w-full max-w-md shadow-2xl relative z-10 my-10 overflow-y-auto max-h-[90vh] border border-white/50">
         <button onClick={onBack} className="text-slate-500 hover:text-slate-800 text-sm mb-6 flex items-center gap-1 font-bold"><ChevronRight size={18} /> العودة</button>
         <div className="flex justify-center mb-4"><ModernLogo /></div>
-        <h2 className="text-3xl font-black text-slate-800 mb-2 text-center">{isRegister ? 'حساب جديد' : 'تسجيل دخول'}</h2>
+        <h2 className="text-3xl font-bold font-arabic text-slate-800 mb-2 text-center">{isRegister ? 'حساب جديد' : 'تسجيل دخول'}</h2>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 mt-6">
           {isRegister && (
             <>
-              <div className="relative"><User className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="text" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50" placeholder="الاسم ثلاثي" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
-              <div className="relative"><Phone className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50" placeholder="رقم هاتفك" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} /></div>
-              <div className="relative"><Phone className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50" placeholder="رقم ولي الأمر" value={formData.parentPhone} onChange={e => setFormData({...formData, parentPhone: e.target.value})} /></div>
+              <div className="relative"><User className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="text" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="الاسم ثلاثي" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
+              <div className="relative"><Phone className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="رقم هاتفك" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} /></div>
+              <div className="relative"><Phone className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="رقم ولي الأمر" value={formData.parentPhone} onChange={e => setFormData({...formData, parentPhone: e.target.value})} /></div>
               <div className="relative"><GraduationCap className="absolute top-3.5 right-4 text-slate-400" size={20} />
-                <select className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 appearance-none" value={formData.grade} onChange={e => setFormData({...formData, grade: e.target.value})}>
+                <select className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 appearance-none focus:border-amber-500 outline-none transition" value={formData.grade} onChange={e => setFormData({...formData, grade: e.target.value})}>
                   <GradeOptions />
                 </select>
               </div>
             </>
           )}
-          <div className="relative"><Mail className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="email" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50" placeholder="البريد" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></div>
-          <div className="relative"><Lock className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="password" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50" placeholder="كلمة السر" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} /></div>
+          <div className="relative"><Mail className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="email" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="البريد" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></div>
+          <div className="relative"><Lock className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="password" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="كلمة السر" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} /></div>
           {!isRegister && (<div className="text-left"><button type="button" onClick={handleForgotPassword} className="text-xs text-amber-600 font-bold hover:underline">نسيت كلمة السر؟</button></div>)}
-          <button disabled={loading} className="bg-amber-600 text-white py-3 rounded-xl font-bold hover:bg-amber-700 transition shadow-lg mt-2 flex justify-center">{loading ? <Loader2 className="animate-spin" /> : (isRegister ? 'تسجيل' : 'دخول')}</button>
+          <button disabled={loading} className="bg-gradient-to-r from-amber-600 to-amber-700 text-white py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-amber-500/50 transition mt-2 flex justify-center">{loading ? <Loader2 className="animate-spin" /> : (isRegister ? 'تسجيل' : 'دخول')}</button>
         </form>
-        <button onClick={() => setIsRegister(!isRegister)} className="mt-6 text-amber-700 font-bold hover:underline w-full text-center block text-sm">{isRegister ? 'تسجيل الدخول' : 'حساب جديد'}</button>
+        <button onClick={() => setIsRegister(!isRegister)} className="mt-6 text-amber-800 font-bold hover:underline w-full text-center block text-sm">{isRegister ? 'تسجيل الدخول' : 'حساب جديد'}</button>
       </motion.div>
       <ChatWidget />
     </div>
