@@ -225,7 +225,7 @@ const DesignSystemLoader = () => {
                 extend: {
                   fontFamily: { 
                       sans: ['Cairo', 'sans-serif'],
-                      arabic: ['Aref Ruqaa', 'serif'], // خط عربي أصيل للعناوين
+                      arabic: ['Aref Ruqaa', 'serif'],
                   },
                   colors: { 
                       amber: { 50: '#fffbeb', 100: '#fef3c7', 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 700: '#b45309', 900: '#78350f' },
@@ -262,7 +262,6 @@ const DesignSystemLoader = () => {
     <style>{`
       body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; direction: rtl; user-select: none; overflow-x: hidden; }
       
-      /* تخصيص السكرول بار */
       ::-webkit-scrollbar { width: 8px; }
       ::-webkit-scrollbar-track { background: #f1f1f1; }
       ::-webkit-scrollbar-thumb { background: linear-gradient(to bottom, #d97706, #b45309); border-radius: 4px; }
@@ -386,13 +385,9 @@ const ModernLogo = () => (
   </motion.div>
 );
 
-// خلفية متحركة مع حروف عربية عائمة وزخارف
 const FloatingArabicBackground = () => (
   <div className="fixed inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 0, background: 'radial-gradient(circle at center, #fdfbf7 0%, #e2e8f0 100%)' }}>
-    {/* Geometric Pattern Overlay */}
     <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: `url("https://www.transparenttextures.com/patterns/arabesque.png")` }} />
-    
-    {/* Floating Letters */}
     {['أ', 'ب', 'ج', 'د', 'هـ', 'و', 'ز', 'ح', 'ط', 'ي', 'ض', 'ع'].map((char, i) => (
         <motion.div
             key={i}
@@ -418,8 +413,6 @@ const FloatingArabicBackground = () => (
             {char}
         </motion.div>
     ))}
-    
-    {/* Glowing Orbs */}
     <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }} transition={{ duration: 5, repeat: Infinity }} className="absolute top-1/4 left-1/4 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl" />
     <motion.div animate={{ scale: [1, 1.5, 1], opacity: [0.2, 0.4, 0.2] }} transition={{ duration: 7, repeat: Infinity }} className="absolute bottom-1/3 right-1/4 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl" />
   </div>
@@ -863,18 +856,44 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const [wmPositions, setWmPositions] = useState([]);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
 
+  // دالة خلط المصفوفة (Fisher-Yates Shuffle)
+  const shuffleArray = (array) => {
+    const arr = [...array];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  };
+
   // Memoize questions to prevent re-renders breaking selection logic
   const flatQuestions = useMemo(() => {
     const flat = [];
     if (exam.questions) {
-        exam.questions.forEach((block) => {
-        block.subQuestions.forEach((q) => {
-            flat.push({ ...q, blockText: block.text });
-        });
+        // نأخذ نسخة من كتل الأسئلة لنقوم بخلطها
+        let processedBlocks = [...exam.questions];
+
+        // نخلط الكتل فقط إذا لم نكن في وضع المراجعة
+        if (!isReviewMode && !existingResult) {
+            processedBlocks = shuffleArray(processedBlocks);
+        }
+
+        processedBlocks.forEach((block) => {
+            // نأخذ نسخة من الأسئلة الفرعية
+            let subQs = [...block.subQuestions];
+            
+            // نخلط الأسئلة الفرعية داخل الكتلة إذا لم نكن في وضع المراجعة
+            if (!isReviewMode && !existingResult) {
+                subQs = shuffleArray(subQs);
+            }
+
+            subQs.forEach((q) => {
+                flat.push({ ...q, blockText: block.text });
+            });
         });
     }
     return flat;
-  }, [exam.questions]);
+  }, [exam.questions, isReviewMode, existingResult]);
 
   if (flatQuestions.length === 0) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-white">عفواً، لا توجد أسئلة.<button onClick={onClose} className="ml-4 bg-gray-200 px-4 py-2 rounded">خروج</button></div>;
 
@@ -958,6 +977,10 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const handleSubmit = async (auto = false) => {
     setShowSubmitConfirm(false);
     const totalQs = flatQuestions.length;
+    // Auto submit ignores empty answers
+    if (!auto && Object.keys(answers).length < totalQs) {
+        // Just a gentle notification, not blocking via window.confirm to avoid focus loss
+    }
     
     const finalScore = calculateScore();
     const timeTaken = Math.round((Date.now() - startTime) / 1000);
