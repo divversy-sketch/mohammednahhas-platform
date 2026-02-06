@@ -494,7 +494,8 @@ const Leaderboard = () => {
             const scores = {};
             snap.docs.forEach(doc => {
                 const data = doc.data();
-                if(data.score) {
+                // فقط نأخذ الدرجات المكتملة
+                if(data.score && data.status === 'completed') {
                     if(!scores[data.studentName]) scores[data.studentName] = 0;
                     scores[data.studentName] += parseInt(data.score);
                 }
@@ -784,7 +785,6 @@ const InteractiveViewer = ({ content, user, onClose }) => {
         const handleKeyDown = (e) => {
             if (e.key === 'PrintScreen') {
                 alert('غير مسموح بأخذ لقطات شاشة! المحتوى محمي.');
-                // محاولة إفراغ الحافظة (لا تعمل في كل المتصفحات لأسباب أمنية لكنها محاولة إضافية)
                 if (navigator.clipboard && navigator.clipboard.writeText) {
                     navigator.clipboard.writeText('Screenshots are disabled');
                 }
@@ -912,18 +912,30 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     return () => clearInterval(interval);
   }, [isReviewMode]);
 
+  // Handle Refresh or Close tab (Anti-Cheat: Lockout on exit)
   useEffect(() => {
-    if (isReviewMode || isSubmitted) return;
-    const handleVisibilityChange = () => { 
-        // Prevent cheating detection if confirm modal is open
-        if (!showSubmitConfirm && document.hidden) handleCheating(); 
-    };
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    document.addEventListener('contextmenu', event => event.preventDefault()); 
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      document.removeEventListener('contextmenu', event => event.preventDefault());
-    };
+      if (isReviewMode || isSubmitted) return;
+
+      const handleBeforeUnload = (e) => {
+          e.preventDefault();
+          e.returnValue = "هل أنت متأكد؟ الخروج سيمنعك من العودة للامتحان!";
+          return e.returnValue;
+      };
+
+      window.addEventListener('beforeunload', handleBeforeUnload);
+      
+      const handleVisibilityChange = () => { 
+          // Prevent cheating detection if confirm modal is open
+          if (!showSubmitConfirm && document.hidden) handleCheating(); 
+      };
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+      document.addEventListener('contextmenu', event => event.preventDefault()); 
+      
+      return () => {
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+        document.removeEventListener('contextmenu', event => event.preventDefault());
+      };
   }, [isSubmitted, isReviewMode, showSubmitConfirm]);
 
   useEffect(() => {
@@ -941,17 +953,22 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     setIsCheating(true); 
     setIsSubmitted(true);
     const timeTaken = Math.round((Date.now() - startTime) / 1000);
-    await addDoc(collection(db, 'exam_results'), { 
-        examId: exam.id, 
-        studentId: user.uid, 
-        studentName: user.displayName, 
-        score: 0, 
-        total: flatQuestions.length,
-        status: 'cheated', 
-        timeTaken: timeTaken,
-        totalTime: exam.duration,
-        submittedAt: serverTimestamp() 
-    });
+    
+    // التعديل: تحديث المحاولة الموجودة بدلاً من إنشاء جديد
+    if (exam.attemptId) {
+        await setDoc(doc(db, 'exam_results', exam.attemptId), { 
+            examId: exam.id, 
+            studentId: user.uid, 
+            studentName: user.displayName, 
+            score: 0, 
+            total: flatQuestions.length,
+            status: 'cheated', 
+            timeTaken: timeTaken,
+            totalTime: exam.duration,
+            submittedAt: serverTimestamp() 
+        });
+    }
+    
     await updateDoc(doc(db, 'users', user.uid), { status: 'banned_cheating' });
   };
 
@@ -964,7 +981,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const calculateScore = () => {
     let rawScore = 0;
     flatQuestions.forEach(q => { 
-        // Strict equality check, ensuring both are treated as numbers/indices
         if (answers[q.id] === q.correctIdx) rawScore++; 
     });
     return rawScore;
@@ -977,28 +993,27 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const handleSubmit = async (auto = false) => {
     setShowSubmitConfirm(false);
     const totalQs = flatQuestions.length;
-    // Auto submit ignores empty answers
-    if (!auto && Object.keys(answers).length < totalQs) {
-        // Just a gentle notification, not blocking via window.confirm to avoid focus loss
-    }
     
     const finalScore = calculateScore();
     const timeTaken = Math.round((Date.now() - startTime) / 1000);
     setScore(finalScore);
     setIsSubmitted(true);
     
-    await addDoc(collection(db, 'exam_results'), { 
-      examId: exam.id, 
-      studentId: user.uid, 
-      studentName: user.displayName, 
-      score: finalScore, 
-      total: totalQs, 
-      answers, 
-      status: 'completed',
-      timeTaken: timeTaken,
-      totalTime: exam.duration, 
-      submittedAt: serverTimestamp() 
-    });
+    // التعديل: تحديث المحاولة الموجودة لتصبح completed
+    if (exam.attemptId) {
+        await setDoc(doc(db, 'exam_results', exam.attemptId), { 
+            examId: exam.id, 
+            studentId: user.uid, 
+            studentName: user.displayName, 
+            score: finalScore, 
+            total: totalQs, 
+            answers, 
+            status: 'completed',
+            timeTaken: timeTaken,
+            totalTime: exam.duration, 
+            submittedAt: serverTimestamp() 
+        });
+    }
   };
 
   const currentQObj = flatQuestions[currentQIndex];
@@ -1467,7 +1482,7 @@ const AdminDashboard = ({ user }) => {
                    <div className="space-y-2">
                        {examResults.map(res => (
                            <div key={res.id} className="flex justify-between items-center border p-3 rounded hover:bg-slate-50 transition bg-white/50">
-                               <div><p className="font-bold">{res.studentName}</p><p className="text-xs text-slate-500">{res.status==='cheated'?'غش 🚫':`درجة: ${res.score}/${res.total}`}</p></div>
+                               <div><p className="font-bold">{res.studentName}</p><p className="text-xs text-slate-500">{res.status==='cheated'?'غش 🚫': res.status==='in_progress' ? 'قيد التنفيذ (لم يسلم) ⏳' : `درجة: ${res.score}/${res.total}`}</p></div>
                                <div className="flex gap-2"><button onClick={()=>setViewingResult(res)} className="bg-blue-100 text-blue-600 px-3 py-1 rounded text-xs">التفاصيل</button><button onClick={()=>handleDeleteResult(res.id)} className="bg-amber-100 text-amber-600 px-3 py-1 rounded text-xs">إعادة</button></div>
                            </div>
                        ))}
@@ -1720,10 +1735,16 @@ const StudentDashboard = ({ user, userData }) => {
   const files = content.filter(c => c.type === 'file');
   const htmls = content.filter(c => c.type === 'html');
 
-  const startExamWithCode = (exam) => {
+  const startExamWithCode = async (exam) => {
     const previousResult = examResults.find(r => r.examId === exam.id);
+    
+    // فحص المحاولات السابقة (سواء مكتملة أو قيد التنفيذ)
     if (previousResult) {
-        alert(`أنت امتحنت الامتحان ده قبل كده وجبت ${previousResult.score}.`);
+        if (previousResult.status === 'completed') {
+            alert(`أنت امتحنت الامتحان ده قبل كده وجبت ${previousResult.score}.`);
+        } else if (previousResult.status === 'in_progress' || previousResult.status === 'cheated') {
+            alert("لقد بدأت هذا الامتحان بالفعل وتم احتسابه عليك. لا يمكن الإعادة.");
+        }
         return;
     }
 
@@ -1736,7 +1757,24 @@ const StudentDashboard = ({ user, userData }) => {
 
     const code = prompt("أدخل كود الامتحان:");
     if (code === exam.accessCode) {
-        setActiveExam(exam);
+        // إنشاء سجل محاولة "قيد التنفيذ" فوراً
+        try {
+            const attemptRef = await addDoc(collection(db, 'exam_results'), { 
+                examId: exam.id, 
+                studentId: user.uid, 
+                studentName: user.displayName,
+                score: 0,
+                total: 0,
+                status: 'in_progress', // حالة حجز المحاولة
+                submittedAt: serverTimestamp() 
+            });
+            
+            // تمرير معرف المحاولة (attemptId) للامتحان ليتم التحديث عليه لاحقاً
+            setActiveExam({ ...exam, attemptId: attemptRef.id });
+        } catch (error) {
+            console.error("Error creating attempt record:", error);
+            alert("حدث خطأ أثناء بدء الامتحان. حاول مرة أخرى.");
+        }
     } else {
         alert("كود خاطئ!");
     }
@@ -1828,16 +1866,36 @@ const StudentDashboard = ({ user, userData }) => {
                 </div>
             ) : exams.map(e => {
                 const prevResult = examResults.find(r => r.examId === e.id);
+                // تحديد الحالة للعرض
+                let statusText = null;
+                let statusClass = "";
+                if (prevResult) {
+                    if (prevResult.status === 'completed') {
+                        statusText = `تم الحل: ${prevResult.score} درجة`;
+                        statusClass = "bg-green-500 text-white";
+                    } else if (prevResult.status === 'in_progress') {
+                        statusText = "قيد التنفيذ / انسحاب ⚠️";
+                        statusClass = "bg-yellow-500 text-white";
+                    } else if (prevResult.status === 'cheated') {
+                        statusText = "تم الحظر (غش)";
+                        statusClass = "bg-red-600 text-white";
+                    }
+                }
+
                 return (
                   <motion.div whileHover={{scale:1.01}} key={e.id} className="glass-card p-6 rounded-2xl relative overflow-hidden">
-                    {prevResult && <div className="absolute top-0 left-0 bg-green-500 text-white text-xs px-3 py-1 rounded-br-xl font-bold shadow-md">تم الحل: {prevResult.score} درجة</div>}
+                    {statusText && <div className={`absolute top-0 left-0 text-xs px-3 py-1 rounded-br-xl font-bold shadow-md ${statusClass}`}>{statusText}</div>}
                     <h3 className="text-xl font-bold mb-2 text-slate-800">{e.title}</h3>
                     <div className="flex justify-between text-sm text-slate-500 mb-4"><span>⏳ {e.duration} دقيقة</span><span>📝 {e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0)} سؤال</span></div>
-                    {prevResult ? (
+                    {prevResult && prevResult.status === 'completed' ? (
                         <div className="flex gap-2">
                              <button disabled className="flex-1 bg-slate-200 text-slate-500 py-3 rounded-xl font-bold cursor-not-allowed">تم الانتهاء</button>
                              <button onClick={() => setReviewingExam(e)} className="flex-1 bg-blue-100 text-blue-700 py-3 rounded-xl font-bold hover:bg-blue-200 transition shadow-sm">عرض الأخطاء</button>
                              <button onClick={() => generatePDF('student', {studentName: user.displayName, score: prevResult.score, total: e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0), status: prevResult.status, examTitle: e.title, questions: e.questions.flatMap(q => q.subQuestions), answers: prevResult.answers })} className="flex-1 bg-green-100 text-green-700 py-3 rounded-xl font-bold hover:bg-green-200 flex items-center justify-center gap-1 transition shadow-sm"><Download size={16}/> شهادة</button>
+                        </div>
+                    ) : prevResult ? (
+                        <div className="bg-red-50 text-red-600 p-3 rounded-xl font-bold text-center border border-red-200">
+                            لا يمكن إعادة الامتحان
                         </div>
                     ) : (
                         <div className="space-y-2">
@@ -1897,10 +1955,8 @@ const LandingPage = ({ onAuthClick }) => {
     <div className="min-h-screen font-['Cairo'] relative" dir="rtl">
       {playingVideo && <SecureVideoPlayer video={playingVideo} userName="زائر" onClose={() => setPlayingVideo(null)} />}
       {playingHtml && <InteractiveViewer content={playingHtml} user={null} onClose={() => setPlayingHtml(null)} />}
-      
       <FloatingArabicBackground />
       <ChatWidget />
-      
       <nav className="relative z-10 flex justify-between items-center p-6 max-w-7xl mx-auto glass-panel mt-4 rounded-full mx-4 shadow-lg">
         <div className="flex items-center gap-2"><ModernLogo /><span className="text-2xl font-bold font-arabic text-amber-800">منصة النحاس</span></div>
         <div className="flex gap-4 items-center">
@@ -1908,50 +1964,40 @@ const LandingPage = ({ onAuthClick }) => {
           <button onClick={onAuthClick} className="bg-slate-900 text-white px-6 py-2 rounded-full font-bold shadow-lg hover:shadow-slate-500/50 transition transform hover:-translate-y-0.5">دخول الطالب</button>
         </div>
       </nav>
-      
-      <main className="relative z-10 px-4 mt-20 max-w-7xl mx-auto text-center">
-        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
-            <h1 className="text-6xl md:text-8xl font-bold text-slate-900 mb-6 font-arabic drop-shadow-sm">
-                اللغة العربية <span className="text-gradient-gold">لعبتك</span>
-            </h1>
-            <p className="text-xl md:text-2xl text-slate-600 mb-10 max-w-2xl mx-auto font-medium">
-                مع الأستاذ <span className="text-amber-700 font-bold">محمد النحاس</span>، النحو والبلاغة في جيبك.
-            </p>
-            <button onClick={onAuthClick} className="bg-gradient-to-r from-amber-500 to-amber-700 text-white px-12 py-5 rounded-full text-2xl font-bold shadow-2xl hover:shadow-amber-500/50 transition transform hover:-translate-y-1 font-arabic border-2 border-amber-400">
-                اشترك الآن مجاناً 🚀
-            </button>
-        </motion.div>
+      <main className="relative z-10 px-4 mt-10 max-w-7xl mx-auto text-center">
+        <h1 className="text-5xl md:text-7xl font-black text-slate-900 mb-6">اللغة العربية <span className="text-amber-600">لعبتك</span></h1>
+        <p className="text-xl text-slate-600 mb-8 max-w-2xl mx-auto">أقوى منصة تعليمية للمرحلة الإعدادية والثانوية.</p>
+        <button onClick={onAuthClick} className="bg-amber-600 text-white px-10 py-4 rounded-2xl text-xl font-bold shadow-xl hover:bg-amber-700 transition transform hover:-translate-y-1">اشترك الآن 🚀</button>
         
-        <div className="my-16">
+        <div className="my-12">
             <WisdomBox />
         </div>
 
         <div className="grid md:grid-cols-2 gap-8 mt-10 mb-20">
-          <motion.div whileHover={{ y: -10 }} className="glass-panel p-8 rounded-3xl border-t-4 border-blue-500">
-            <h3 className="text-3xl font-bold mb-6 flex items-center gap-2 text-blue-800 font-arabic"><Video size={32}/> فيديوهات مجانية</h3>
+          <div className="bg-white/80 backdrop-blur p-6 rounded-3xl border border-white shadow-sm">
+            <h3 className="text-2xl font-bold mb-4 flex items-center gap-2 text-blue-700"><Video /> فيديوهات مجانية</h3>
             <div className="space-y-4">
               {publicContent.filter(c => c.type === 'video').length > 0 ? publicContent.filter(c => c.type === 'video').map((v, i) => (
-                 <div key={i} className="flex items-center gap-3 p-4 bg-white/60 rounded-2xl shadow-sm cursor-pointer hover:bg-white transition" onClick={() => setPlayingVideo(v)}>
-                    <div className="bg-blue-100 p-2 rounded-full"><PlayCircle className="text-blue-600"/></div>
-                    <span className="font-bold text-lg">{v.title}</span>
-                    <span className="mr-auto text-xs bg-blue-600 text-white px-3 py-1 rounded-full shadow">مشاهدة</span>
+                 <div key={i} className="flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm cursor-pointer hover:bg-gray-50" onClick={() => setPlayingVideo(v)}>
+                    <PlayCircle className="text-amber-500"/>
+                    <span className="font-bold">{v.title}</span>
+                    <span className="mr-auto text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">مشاهدة</span>
                  </div>
                )) : <p className="text-slate-500">مفيش فيديوهات عامة حالياً</p>}
             </div>
-          </motion.div>
-          
-          <motion.div whileHover={{ y: -10 }} className="glass-panel p-8 rounded-3xl border-t-4 border-purple-500">
-            <h3 className="text-3xl font-bold mb-6 flex items-center gap-2 text-purple-800 font-arabic"><Sparkles size={32}/> محتوى تفاعلي</h3>
+          </div>
+          <div className="bg-white/80 backdrop-blur p-6 rounded-3xl border border-white shadow-sm">
+            <h3 className="text-2xl font-bold mb-4 flex items-center gap-2 text-purple-700"><Code /> تفاعلي عام</h3>
             <div className="space-y-4">
               {publicContent.filter(c => c.type === 'html').length > 0 ? publicContent.filter(c => c.type === 'html').map((h, i) => (
-                 <div key={i} className="flex items-center gap-3 p-4 bg-white/60 rounded-2xl shadow-sm cursor-pointer hover:bg-white transition" onClick={() => setPlayingHtml(h)}>
-                    <div className="bg-purple-100 p-2 rounded-full"><Code className="text-purple-600"/></div>
-                    <span className="font-bold text-lg">{h.title}</span>
-                    <span className="mr-auto text-xs bg-purple-600 text-white px-3 py-1 rounded-full shadow">تشغيل</span>
+                 <div key={i} className="flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm cursor-pointer hover:bg-gray-50" onClick={() => setPlayingHtml(h)}>
+                    <Code className="text-purple-500"/>
+                    <span className="font-bold">{h.title}</span>
+                    <span className="mr-auto text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">تشغيل</span>
                  </div>
                )) : <p className="text-slate-500">مفيش محتوى تفاعلي عام حالياً</p>}
             </div>
-          </motion.div>
+          </div>
         </div>
       </main>
     </div>
@@ -1998,29 +2044,29 @@ const AuthPage = ({ onBack }) => {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-slate-900 font-['Cairo'] relative overflow-hidden" dir="rtl">
       <FloatingArabicBackground />
-      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white/90 backdrop-blur-xl rounded-3xl p-8 w-full max-w-md shadow-2xl relative z-10 my-10 overflow-y-auto max-h-[90vh] border border-white/50">
+      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl relative z-10 my-10 overflow-y-auto max-h-[90vh]">
         <button onClick={onBack} className="text-slate-500 hover:text-slate-800 text-sm mb-6 flex items-center gap-1 font-bold"><ChevronRight size={18} /> العودة</button>
         <div className="flex justify-center mb-4"><ModernLogo /></div>
-        <h2 className="text-3xl font-bold font-arabic text-slate-800 mb-2 text-center">{isRegister ? 'حساب جديد' : 'تسجيل دخول'}</h2>
+        <h2 className="text-3xl font-black text-slate-800 mb-2 text-center">{isRegister ? 'حساب جديد' : 'تسجيل دخول'}</h2>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 mt-6">
           {isRegister && (
             <>
-              <div className="relative"><User className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="text" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="الاسم ثلاثي" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
-              <div className="relative"><Phone className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="رقم هاتفك" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} /></div>
-              <div className="relative"><Phone className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="رقم ولي الأمر" value={formData.parentPhone} onChange={e => setFormData({...formData, parentPhone: e.target.value})} /></div>
+              <div className="relative"><User className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="text" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50" placeholder="الاسم ثلاثي" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
+              <div className="relative"><Phone className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50" placeholder="رقم هاتفك" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} /></div>
+              <div className="relative"><Phone className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50" placeholder="رقم ولي الأمر" value={formData.parentPhone} onChange={e => setFormData({...formData, parentPhone: e.target.value})} /></div>
               <div className="relative"><GraduationCap className="absolute top-3.5 right-4 text-slate-400" size={20} />
-                <select className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 appearance-none focus:border-amber-500 outline-none transition" value={formData.grade} onChange={e => setFormData({...formData, grade: e.target.value})}>
+                <select className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 appearance-none" value={formData.grade} onChange={e => setFormData({...formData, grade: e.target.value})}>
                   <GradeOptions />
                 </select>
               </div>
             </>
           )}
-          <div className="relative"><Mail className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="email" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="البريد" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></div>
-          <div className="relative"><Lock className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="password" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="كلمة السر" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} /></div>
+          <div className="relative"><Mail className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="email" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50" placeholder="البريد" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></div>
+          <div className="relative"><Lock className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="password" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50" placeholder="كلمة السر" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} /></div>
           {!isRegister && (<div className="text-left"><button type="button" onClick={handleForgotPassword} className="text-xs text-amber-600 font-bold hover:underline">نسيت كلمة السر؟</button></div>)}
-          <button disabled={loading} className="bg-gradient-to-r from-amber-600 to-amber-700 text-white py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-amber-500/50 transition mt-2 flex justify-center">{loading ? <Loader2 className="animate-spin" /> : (isRegister ? 'تسجيل' : 'دخول')}</button>
+          <button disabled={loading} className="bg-amber-600 text-white py-3 rounded-xl font-bold hover:bg-amber-700 transition shadow-lg mt-2 flex justify-center">{loading ? <Loader2 className="animate-spin" /> : (isRegister ? 'تسجيل' : 'دخول')}</button>
         </form>
-        <button onClick={() => setIsRegister(!isRegister)} className="mt-6 text-amber-800 font-bold hover:underline w-full text-center block text-sm">{isRegister ? 'تسجيل الدخول' : 'حساب جديد'}</button>
+        <button onClick={() => setIsRegister(!isRegister)} className="mt-6 text-amber-700 font-bold hover:underline w-full text-center block text-sm">{isRegister ? 'تسجيل الدخول' : 'حساب جديد'}</button>
       </motion.div>
       <ChatWidget />
     </div>
