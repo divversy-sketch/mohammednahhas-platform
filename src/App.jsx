@@ -16,7 +16,7 @@ import {
   ExternalLink, ClipboardList, Timer, AlertOctagon, Flag, Save, HelpCircle, 
   Reply, Unlock, Layout, Settings, Trophy, Megaphone, Bell, Download, XCircle, 
   Calendar, Clock, FileWarning, Settings as GearIcon, Star, Bot, Power, Upload,
-  Users, PenTool, Code, Sparkles, Lamp
+  Users, PenTool, Code, Sparkles, Lamp, Ban, Shield
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -954,7 +954,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     setIsSubmitted(true);
     const timeTaken = Math.round((Date.now() - startTime) / 1000);
     
-    // التعديل: تحديث المحاولة الموجودة بدلاً من إنشاء جديد
     if (exam.attemptId) {
         await setDoc(doc(db, 'exam_results', exam.attemptId), { 
             examId: exam.id, 
@@ -999,7 +998,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     setScore(finalScore);
     setIsSubmitted(true);
     
-    // التعديل: تحديث المحاولة الموجودة لتصبح completed
     if (exam.attemptId) {
         await setDoc(doc(db, 'exam_results', exam.attemptId), { 
             examId: exam.id, 
@@ -1022,13 +1020,32 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   if (isCheating) return <div className="fixed inset-0 z-[60] bg-red-900 flex items-center justify-center text-white text-center font-['Cairo']"><div><AlertOctagon size={80} className="mx-auto mb-4"/><h1>تم رصد محاولة غش!</h1><p className="text-red-200 mt-2">خرجت من الامتحان. تم رصد درجتك (صفر) وحظرك.</p><button onClick={() => window.location.reload()} className="mt-4 bg-white text-red-900 px-6 py-2 rounded-full font-bold">خروج</button></div></div>;
 
   if (isSubmitted && !isReviewMode) {
+     const endTime = new Date(exam.endTime).getTime();
+     const now = Date.now();
+     const canReview = now > endTime;
+
      return (
         <div className="fixed inset-0 z-[60] bg-slate-50 overflow-y-auto p-4 font-['Cairo']" dir="rtl">
             <div className="max-w-4xl mx-auto bg-white rounded-3xl shadow-xl p-8 mt-10 text-center">
-                <h2 className="text-3xl font-black mb-4">تم الانتهاء من الامتحان</h2>
+                <h2 className="text-3xl font-black mb-4">تم تسليم الامتحان بنجاح</h2>
                 <div className={`text-6xl font-black my-6 ${score >= flatQuestions.length / 2 ? 'text-green-600' : 'text-red-600'}`}>{score} / {flatQuestions.length}</div>
+                
+                {!canReview && (
+                    <div className="mb-6 bg-amber-50 text-amber-800 p-4 rounded-xl border border-amber-200">
+                        <p className="font-bold flex items-center justify-center gap-2">
+                            <Clock size={20}/>
+                            نموذج الإجابة والمراجعة سيظهر تلقائياً بعد انتهاء وقت الامتحان الأصلي.
+                        </p>
+                        <p className="text-sm mt-1">موعد الانتهاء: {new Date(exam.endTime).toLocaleString('ar-EG')}</p>
+                    </div>
+                )}
+
                 <div className="flex gap-4 justify-center">
-                    <button onClick={() => generatePDF('student', {studentName: user.displayName, score, total: flatQuestions.length, status: 'completed', examTitle: exam.title, questions: flatQuestions, answers: answers })} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2"><Download size={18}/> تحميل التقرير الشامل</button>
+                    {canReview ? (
+                        <button onClick={() => generatePDF('student', {studentName: user.displayName, score, total: flatQuestions.length, status: 'completed', examTitle: exam.title, questions: flatQuestions, answers: answers })} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2"><Download size={18}/> تحميل التقرير الشامل</button>
+                    ) : (
+                        <button disabled className="bg-gray-300 text-gray-500 px-6 py-2 rounded-lg font-bold flex items-center gap-2 cursor-not-allowed"><Lock size={18}/> التقرير مغلق حالياً</button>
+                    )}
                     <button onClick={onClose} className="bg-slate-900 text-white py-3 px-8 rounded-xl font-bold">عودة للرئيسية</button>
                 </div>
             </div>
@@ -1183,7 +1200,8 @@ const AdminDashboard = ({ user }) => {
 
   // جلب البيانات
   useEffect(() => { const u = onSnapshot(query(collection(db, 'users'), where('status','==','pending')), s => setPendingUsers(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
-  useEffect(() => { const u = onSnapshot(query(collection(db, 'users'), where('status', 'in', ['active', 'banned_cheating', 'rejected'])), s => setActiveUsersList(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
+  // تعديل لجلب جميع الحالات للطلاب (بما فيها المحظورين بأنواعهم)
+  useEffect(() => { const u = onSnapshot(query(collection(db, 'users'), where('status', 'in', ['active', 'banned_cheating', 'banned_all', 'banned_exam', 'banned_content', 'rejected'])), s => setActiveUsersList(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(query(collection(db, 'content'), orderBy('createdAt','desc')), s => setContentList(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(query(collection(db, 'messages'), orderBy('createdAt','desc')), s => setMessagesList(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(query(collection(db, 'live_sessions'), where('status', '==', 'active')), s => setIsLive(!s.empty)); return u; }, []);
@@ -1198,7 +1216,12 @@ const AdminDashboard = ({ user }) => {
     sendSystemNotification("مبروك! 🎉", "تم تفعيل حسابك بنجاح.");
   };
   const handleReject = async (id) => updateDoc(doc(db,'users',id), {status:'rejected'});
-  const handleUnban = async (id) => updateDoc(doc(db,'users',id), {status:'active'});
+  
+  // دالة لتغيير حالة الطالب (حظر/تنشيط)
+  const handleChangeUserStatus = async (id, newStatus) => {
+      await updateDoc(doc(db,'users',id), {status: newStatus});
+  };
+
   const handleDeleteUser = async (id) => { if(window.confirm("حذف نهائي؟")) await deleteDoc(doc(db,'users',id)); };
   const handleDeleteMessage = async (id) => { if(window.confirm("حذف الرسالة؟")) await deleteDoc(doc(db,'messages',id)); };
   const handleDeleteExam = async (id) => { if(window.confirm("حذف الامتحان؟")) await deleteDoc(doc(db, 'exams', id)); };
@@ -1265,7 +1288,6 @@ const AdminDashboard = ({ user }) => {
       reader.readAsDataURL(file);
   };
 
-  // تعديل وظيفة إضافة المحتوى لتشمل السماح لطلاب محددين
   const handleAddContent = async (e) => { 
       e.preventDefault(); 
       const allowedEmailsArray = newContent.allowedEmails 
@@ -1281,12 +1303,9 @@ const AdminDashboard = ({ user }) => {
       
       await addDoc(collection(db, 'content'), contentData);
       
-      // إذا كان عاماً للجميع، أرسل إشعار
       if (allowedEmailsArray.length === 0) {
           await addDoc(collection(db, 'notifications'), { text: `تم إضافة درس جديد: ${newContent.title}`, grade: newContent.grade, createdAt: serverTimestamp() });
-      } else {
-          // يمكن إضافة إشعار خاص لاحقاً إذا أردت
-      }
+      } 
       
       alert("تم النشر!"); 
       setNewContent({ title: '', url: '', type: 'video', isPublic: false, grade: '3sec', allowedEmails: '' });
@@ -1297,7 +1316,6 @@ const AdminDashboard = ({ user }) => {
   const startLiveStream = async () => { if(!liveData.liveUrl) return alert("الرابط؟"); await addDoc(collection(db, 'live_sessions'), { ...liveData, status: 'active', createdAt: serverTimestamp() }); await addDoc(collection(db, 'notifications'), { text: `🔴 بث مباشر الآن: ${liveData.title}`, grade: liveData.grade, createdAt: serverTimestamp() }); alert("بدا البث!"); };
   const stopLiveStream = async () => { if(window.confirm("إنهاء البث؟")) { const q = query(collection(db, 'live_sessions'), where('status', '==', 'active')); const snap = await getDocs(q); snap.forEach(async (d) => await updateDoc(doc(db, 'live_sessions', d.id), { status: 'ended' })); alert("تم الإنهاء"); } };
 
-  // --- التعديل الأساسي هنا لحل مشكلة الإجابات الصفرية ---
   const parseExam = async () => {
     if (!bulkText.trim()) return alert("أدخل نص الامتحان");
     if (!examBuilder.accessCode) return alert("أدخل كود للامتحان");
@@ -1310,7 +1328,6 @@ const AdminDashboard = ({ user }) => {
     let isReadingPassage = false;
 
     lines.forEach(line => {
-      // منطق التعامل مع القطع النصية
       if (line === 'بداية القطعة') { 
           if (currentBlock.subQuestions.length > 0 || currentQ) { 
               if(currentQ) currentBlock.subQuestions.push(currentQ); 
@@ -1334,23 +1351,17 @@ const AdminDashboard = ({ user }) => {
           currentBlock.text += line + '\n'; 
       } 
       else {
-        // --- الإصلاح: تحسين اكتشاف النجمة والأسئلة ---
         const cleanedLine = line.trim();
         const isCorrect = cleanedLine.startsWith('*');
         const optText = isCorrect ? cleanedLine.substring(1).trim() : cleanedLine;
 
-        // إذا كان لدينا سؤال حالي ولم يكتمل بـ 4 اختيارات، نعتبر السطر الحالي اختياراً
         if (currentQ && currentQ.options.length < 4) {
             if (isCorrect) {
-                // تسجيل رقم الاختيار الحالي كإجابة صحيحة
                 currentQ.correctIdx = currentQ.options.length;
             }
             currentQ.options.push(optText);
         } else {
-            // إذا اكتمل السؤال السابق أو لا يوجد سؤال، نعتبر السطر سؤالاً جديداً
             if (currentQ) currentBlock.subQuestions.push(currentQ);
-            
-            // إنشاء سؤال جديد مع تعيين افتراضي للإجابة (0) تحسباً للنسيان، ولكن سيتم تحديثه إذا وجدنا نجمة
             currentQ = { id: Date.now() + Math.random(), text: optText, options: [], correctIdx: 0 };
         }
       }
@@ -1383,7 +1394,6 @@ const AdminDashboard = ({ user }) => {
       setShowLeaderboard(!showLeaderboard);
   };
 
-  // دوال الرد الآلي
   const handleAddAutoReply = async () => {
       if(!newAutoReply.keywords || !newAutoReply.response) return alert("أكمل البيانات");
       await addDoc(collection(db, 'auto_replies'), newAutoReply);
@@ -1396,7 +1406,6 @@ const AdminDashboard = ({ user }) => {
       if(window.confirm("حذف هذا الرد؟")) await deleteDoc(doc(db, 'auto_replies', id));
   };
 
-  // دوال الحكم
   const handleAddQuote = async () => {
       if(!newQuote.text || !newQuote.source) return alert("أكمل البيانات");
       await addDoc(collection(db, 'quotes'), { ...newQuote, createdAt: serverTimestamp() });
@@ -1408,7 +1417,6 @@ const AdminDashboard = ({ user }) => {
 
   return (
     <div className="min-h-screen bg-slate-100 font-['Cairo'] relative" dir="rtl">
-      {/* الخلفية الجديدة */}
       <FloatingArabicBackground />
       
       <header className="flex justify-between items-center mb-8 glass-panel p-4 rounded-xl relative z-10 m-4">
@@ -1428,8 +1436,54 @@ const AdminDashboard = ({ user }) => {
         <div className="md:col-span-3">
           {activeTab === 'users' && <div className="glass-panel p-6 rounded-xl"><h2 className="font-bold mb-4 font-arabic text-xl">طلبات الانضمام</h2>{pendingUsers.map(u=><div key={u.id} className="border p-4 mb-2 rounded-lg flex justify-between bg-white/50 backdrop-blur-sm"><div><p className="font-bold">{u.name}</p><p className="text-sm">{u.grade}</p></div><div className="flex gap-2"><button onClick={()=>handleApprove(u.id)} className="bg-green-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-green-500/50 transition"><Check/></button><button onClick={()=>handleReject(u.id)} className="bg-red-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-red-500/50 transition"><X/></button></div></div>)}</div>}
 
-          {activeTab === 'all_users' && <div className="glass-panel p-6 rounded-xl"><h2 className="font-bold mb-4 font-arabic text-xl">قائمة الطلاب</h2>{editingUser&&<form onSubmit={handleUpdateUser} className="mb-4 bg-amber-50 p-4 rounded grid gap-2"><input className="border p-2" value={editingUser.name} onChange={e=>setEditingUser({...editingUser, name:e.target.value})}/><button className="bg-green-600 text-white px-4 py-1 rounded">حفظ</button></form>}{activeUsersList.map(u=><div key={u.id} className={`border p-4 mb-2 rounded-lg flex justify-between items-center ${u.status==='banned_cheating'?'bg-red-50 border-red-200':'bg-white/50'}`}><div><p className="font-bold">{u.name} {u.status==='banned_cheating'&&<span className="text-red-600 text-xs">(محظور)</span>}</p><p className="text-xs text-slate-500">{u.email}</p></div><div className="flex gap-2">{u.status==='banned_cheating'?<button onClick={()=>handleUnban(u.id)} className="bg-green-100 text-green-700 px-3 py-1 rounded text-xs font-bold flex gap-1"><Unlock size={16}/>فك</button>:<button onClick={()=>setEditingUser(u)} className="bg-blue-100 text-blue-600 p-2 rounded"><Edit size={16}/></button>}<button onClick={()=>handleSendResetPassword(u.email)} className="bg-amber-100 text-amber-600 p-2 rounded"><KeyRound size={16}/></button><button onClick={()=>handleDeleteUser(u.id)} className="bg-red-100 text-red-600 p-2 rounded"><Trash2 size={16}/></button></div></div>)}</div>}
+          {activeTab === 'all_users' && (
+              <div className="glass-panel p-6 rounded-xl">
+                  <h2 className="font-bold mb-4 font-arabic text-xl">قائمة الطلاب ({activeUsersList.length})</h2>
+                  {editingUser&&<form onSubmit={handleUpdateUser} className="mb-4 bg-amber-50 p-4 rounded grid gap-2"><input className="border p-2" value={editingUser.name} onChange={e=>setEditingUser({...editingUser, name:e.target.value})}/><button className="bg-green-600 text-white px-4 py-1 rounded">حفظ</button></form>}
+                  
+                  <div className="grid gap-4">
+                      {activeUsersList.map(u=>(
+                          <div key={u.id} className={`p-4 rounded-xl border flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all hover:shadow-lg ${u.status.startsWith('banned') ? 'bg-red-50 border-red-200' : 'bg-white/50 border-slate-100'}`}>
+                              <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                      <p className="font-bold text-lg text-slate-800">{u.name}</p>
+                                      <span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600">{getGradeLabel(u.grade)}</span>
+                                      {u.status.startsWith('banned') && <span className="text-xs bg-red-600 text-white px-2 py-1 rounded-full font-bold">محظور</span>}
+                                  </div>
+                                  <div className="text-sm text-slate-500 space-y-1">
+                                      <p className="flex items-center gap-2"><Mail size={14}/> {u.email}</p>
+                                      <p className="flex items-center gap-2"><Phone size={14} className="text-blue-600"/> الطالب: {u.phone}</p>
+                                      <p className="flex items-center gap-2 font-bold text-amber-700"><Users size={14}/> ولي الأمر: {u.parentPhone}</p>
+                                      <p className="text-xs text-slate-400">تاريخ الانضمام: {u.createdAt?.toDate().toLocaleDateString()}</p>
+                                  </div>
+                              </div>
+                              
+                              <div className="flex flex-col gap-2 w-full md:w-auto">
+                                  <div className="flex gap-2">
+                                      <select 
+                                          className="text-xs border p-2 rounded-lg bg-white"
+                                          value={u.status}
+                                          onChange={(e) => handleChangeUserStatus(u.id, e.target.value)}
+                                      >
+                                          <option value="active">نشط (Active)</option>
+                                          <option value="banned_all">حظر شامل (Full Ban)</option>
+                                          <option value="banned_exam">حظر امتحانات (Exam Ban)</option>
+                                          <option value="banned_content">حظر محتوى (Content Ban)</option>
+                                      </select>
+                                  </div>
+                                  <div className="flex gap-2 justify-end">
+                                      <button onClick={()=>setEditingUser(u)} className="bg-blue-100 text-blue-600 p-2 rounded-lg hover:bg-blue-200" title="تعديل"><Edit size={16}/></button>
+                                      <button onClick={()=>handleSendResetPassword(u.email)} className="bg-amber-100 text-amber-600 p-2 rounded-lg hover:bg-amber-200" title="تغيير كلمة السر"><KeyRound size={16}/></button>
+                                      <button onClick={()=>handleDeleteUser(u.id)} className="bg-red-100 text-red-600 p-2 rounded-lg hover:bg-red-200" title="حذف"><Trash2 size={16}/></button>
+                                  </div>
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+          )}
 
+          {/* ... (باقي التبويبات exams, results, live... كما هي بدون تغيير في المنطق) ... */}
           {activeTab === 'exams' && <div className="space-y-8"><div className="glass-panel p-6 rounded-xl"><h2 className="text-xl font-bold mb-6 border-b pb-2 font-arabic text-amber-700">إنشاء امتحان</h2><div className="grid grid-cols-4 gap-4 mb-6"><input className="border p-2 rounded col-span-2" placeholder="العنوان" value={examBuilder.title} onChange={e=>setExamBuilder({...examBuilder, title:e.target.value})}/><input className="border p-2 rounded" placeholder="الكود" value={examBuilder.accessCode} onChange={e=>setExamBuilder({...examBuilder, accessCode:e.target.value})}/><input type="number" className="border p-2 rounded" placeholder="المدة (دقائق)" value={examBuilder.duration} onChange={e=>setExamBuilder({...examBuilder, duration:parseInt(e.target.value)})}/><select className="border p-2 rounded col-span-4" value={examBuilder.grade} onChange={e=>setExamBuilder({...examBuilder, grade:e.target.value})}><GradeOptions/></select><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت البدء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, startTime:e.target.value})}/></div><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت الانتهاء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, endTime:e.target.value})}/></div></div><div className="bg-slate-50 p-4 rounded-xl border mb-6"><textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm" placeholder="اكتب الأسئلة هنا... (ضع علامة * قبل الإجابة الصحيحة)" value={bulkText} onChange={e=>setBulkText(e.target.value)}/><button onClick={parseExam} className="mt-4 w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-green-500/50 transition">نشر</button></div></div><div className="glass-panel p-6 rounded-xl"><h3 className="font-bold mb-4 font-arabic">الامتحانات الحالية</h3>{examsList.map(exam=><div key={exam.id} className="flex justify-between items-center border-b py-3 last:border-0 hover:bg-slate-50/50 px-2 rounded transition"><div><p className="font-bold">{exam.title}</p><p className="text-xs text-slate-500">من: {new Date(exam.startTime).toLocaleString('ar-EG')} | إلى: {new Date(exam.endTime).toLocaleString('ar-EG')}</p><p className="text-xs text-slate-400">كود: {exam.accessCode}</p></div><div className="flex gap-2"><button onClick={()=>handleDeleteExam(exam.id)} className="text-red-500 p-2"><Trash2 size={18}/></button></div></div>)}</div></div>}
 
           {activeTab === 'results' && (
@@ -1500,7 +1554,6 @@ const AdminDashboard = ({ user }) => {
                       <input className="border p-3 rounded" placeholder="العنوان" value={newContent.title} onChange={e=>setNewContent({...newContent, title:e.target.value})}/>
                       <input className="border p-3 rounded" placeholder="الرابط (يفضل Google Drive للملفات الكبيرة)" value={newContent.url} onChange={e=>setNewContent({...newContent, url:e.target.value})}/>
                       
-                      {/* منطقة رفع الملفات */}
                       <div className="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center hover:bg-slate-50 transition relative">
                           <input type="file" onChange={handleFileSelect} className="absolute inset-0 opacity-0 cursor-pointer" />
                           <div className="flex flex-col items-center gap-2 text-slate-500">
@@ -1532,7 +1585,6 @@ const AdminDashboard = ({ user }) => {
                           <select className="border p-3 rounded flex-1" value={newContent.grade} onChange={e=>setNewContent({...newContent, grade:e.target.value})}><GradeOptions/></select>
                       </div>
                       
-                      {/* إضافة تحديد الطلاب المسموح لهم */}
                       <div className="border p-3 rounded-lg bg-gray-50">
                           <label className="block text-sm font-bold text-gray-700 mb-1 flex items-center gap-2"><Lock size={14}/> تخصيص لطلاب محددين (اختياري)</label>
                           <input 
@@ -1568,7 +1620,6 @@ const AdminDashboard = ({ user }) => {
 
           {activeTab === 'messages' && <div className="glass-panel p-6 rounded-xl"><h2 className="font-bold mb-4 font-arabic text-xl">الرسائل</h2>{messagesList.map(m=><div key={m.id} className="border-b p-4 bg-slate-50 mb-3 rounded-lg relative"><button onClick={()=>handleDeleteMessage(m.id)} className="absolute top-2 left-2 text-red-400"><Trash2 size={16}/></button><div className="mb-2"><p className="font-bold text-amber-800">{m.senderName} <span className="text-xs text-slate-500">({m.sender})</span></p><p className="text-sm text-slate-400">{m.createdAt?.toDate?m.createdAt.toDate().toLocaleString():'الآن'}</p></div><p className="text-slate-800 bg-white p-3 rounded-lg border border-slate-200 mb-3">{m.text}</p>{m.adminReply?<div className="bg-green-50 p-3 rounded-lg border border-green-200 text-sm"><span className="font-bold text-green-700">ردك: </span>{m.adminReply}</div>:<div className="flex gap-2"><input className="flex-1 border p-2 rounded text-sm" placeholder="اكتب ردك..." value={replyTexts[m.id]||""} onChange={e=>setReplyTexts({...replyTexts,[m.id]:e.target.value})}/><button onClick={()=>handleReplyMessage(m.id)} className="bg-blue-600 text-white px-3 py-1 rounded text-sm"><Reply size={14}/></button></div>}</div>)}</div>}
            
-          {/* تبويب الرد الآلي */}
           {activeTab === 'auto_reply' && (
               <div className="glass-panel p-6 rounded-xl">
                   <h2 className="font-bold mb-4 flex items-center gap-2 font-arabic text-xl"><Bot /> إعدادات الرد الآلي</h2>
@@ -1580,7 +1631,6 @@ const AdminDashboard = ({ user }) => {
                           <button onClick={handleAddAutoReply} className="bg-amber-600 text-white py-2 rounded font-bold hover:bg-amber-700">إضافة القاعدة</button>
                       </div>
                   </div>
-                  
                   <div className="space-y-3">
                       {autoReplies.map(rule => (
                           <div key={rule.id} className={`p-4 rounded-lg border flex justify-between items-center ${rule.isActive ? 'bg-white border-green-200' : 'bg-gray-50 border-gray-200 opacity-70'}`}>
@@ -1602,7 +1652,6 @@ const AdminDashboard = ({ user }) => {
               </div>
           )}
 
-          {/* تبويب إدارة الحكم */}
           {activeTab === 'quotes' && (
               <div className="glass-panel p-6 rounded-xl">
                   <h2 className="font-bold mb-4 flex items-center gap-2 font-arabic text-xl"><PenTool /> إدارة الحكم والأقوال</h2>
@@ -1614,7 +1663,6 @@ const AdminDashboard = ({ user }) => {
                           <button onClick={handleAddQuote} className="bg-amber-600 text-white py-2 rounded font-bold hover:bg-amber-700">إضافة</button>
                       </div>
                   </div>
-                  
                   <div className="space-y-3">
                       {quotesList.map(q => (
                           <div key={q.id} className="p-3 rounded-lg border bg-white flex justify-between items-center">
@@ -1688,13 +1736,11 @@ const StudentDashboard = ({ user, userData }) => {
   useEffect(() => {
     if(!userData) return;
     
-    // جلب المحتوى وتصفيته حسب الصلاحيات
     const unsubContent = onSnapshot(query(collection(db, 'content'), where('grade', '==', userData.grade)), s => {
         const allContent = s.docs.map(d=>({id:d.id,...d.data()}));
-        // تصفية المحتوى: إما عام (بدون إيميلات) أو المستخدم موجود في القائمة
         const visibleContent = allContent.filter(c => {
-            if (!c.allowedEmails || c.allowedEmails.length === 0) return true; // متاح للجميع
-            return c.allowedEmails.includes(user.email); // متاح لهذا المستخدم تحديداً
+            if (!c.allowedEmails || c.allowedEmails.length === 0) return true;
+            return c.allowedEmails.includes(user.email);
         });
         setContent(visibleContent);
     });
@@ -1726,19 +1772,33 @@ const StudentDashboard = ({ user, userData }) => {
       return <ExamRunner exam={reviewingExam} user={user} onClose={() => setReviewingExam(null)} isReviewMode={true} existingResult={result} />;
   }
 
-  const isBanned = userData?.status === 'banned_cheating';
+  // --- منطق الحظر ---
+  const isBannedAll = userData?.status === 'banned_all' || userData?.status === 'banned_cheating';
+  const isBannedExam = userData?.status === 'banned_exam';
+  const isBannedContent = userData?.status === 'banned_content';
 
   if(userData?.status === 'pending') return <div className="h-screen flex items-center justify-center bg-amber-50 text-center p-4"><div className="bg-white p-8 rounded-2xl shadow-xl"><h2 className="text-2xl font-bold mb-2">طلبك قيد المراجعة ⏳</h2><button onClick={()=>signOut(auth)} className="mt-4 text-red-500 underline">خروج</button></div></div>;
   if(userData?.status === 'rejected') return <div className="h-screen flex items-center justify-center bg-red-50"><div className="text-red-600 font-bold">تم رفض طلبك</div><button onClick={()=>signOut(auth)} className="ml-4 bg-white px-4 py-1 rounded">خروج</button></div>;
   
+  // شاشة الحظر الشامل
+  if (isBannedAll) return (
+      <div className="h-screen flex flex-col items-center justify-center bg-red-50 text-center p-6">
+          <Ban size={80} className="text-red-600 mb-4" />
+          <h2 className="text-3xl font-bold text-red-800 mb-2">تم حظر حسابك</h2>
+          <p className="text-red-600 mb-6">يرجى التواصل مع الإدارة أو المستر لمعرفة السبب.</p>
+          <button onClick={()=>signOut(auth)} className="bg-white text-red-600 px-6 py-2 rounded-full font-bold shadow-md hover:bg-red-100">تسجيل الخروج</button>
+      </div>
+  );
+
   const videos = content.filter(c => c.type === 'video');
   const files = content.filter(c => c.type === 'file');
   const htmls = content.filter(c => c.type === 'html');
 
   const startExamWithCode = async (exam) => {
+    if (isBannedExam) return alert("أنت محظور من دخول الامتحانات.");
+
     const previousResult = examResults.find(r => r.examId === exam.id);
     
-    // فحص المحاولات السابقة (سواء مكتملة أو قيد التنفيذ)
     if (previousResult) {
         if (previousResult.status === 'completed') {
             alert(`أنت امتحنت الامتحان ده قبل كده وجبت ${previousResult.score}.`);
@@ -1757,7 +1817,6 @@ const StudentDashboard = ({ user, userData }) => {
 
     const code = prompt("أدخل كود الامتحان:");
     if (code === exam.accessCode) {
-        // إنشاء سجل محاولة "قيد التنفيذ" فوراً
         try {
             const attemptRef = await addDoc(collection(db, 'exam_results'), { 
                 examId: exam.id, 
@@ -1765,11 +1824,9 @@ const StudentDashboard = ({ user, userData }) => {
                 studentName: user.displayName,
                 score: 0,
                 total: 0,
-                status: 'in_progress', // حالة حجز المحاولة
+                status: 'in_progress', 
                 submittedAt: serverTimestamp() 
             });
-            
-            // تمرير معرف المحاولة (attemptId) للامتحان ليتم التحديث عليه لاحقاً
             setActiveExam({ ...exam, attemptId: attemptRef.id });
         } catch (error) {
             console.error("Error creating attempt record:", error);
@@ -1801,10 +1858,21 @@ const StudentDashboard = ({ user, userData }) => {
         <div className="flex items-center gap-3 mb-10 px-2"><ModernLogo /><h1 className="text-2xl font-bold font-arabic text-amber-800">النحاس</h1><button onClick={() => setMobileMenu(false)} className="md:hidden mr-auto"><X /></button></div>
         <div className="space-y-2 flex-1">
           <button onClick={() => {setActiveTab('home'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='home'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><User/> الرئيسية</button>
-          <div onClick={() => setActiveTab('videos')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='videos'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><PlayCircle/> المحاضرات</div>
-          <div onClick={() => setActiveTab('files')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='files'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><FileText/> المذكرات</div>
-          <div onClick={() => setActiveTab('htmls')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='htmls'?'bg-purple-100 text-purple-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-purple-600'}`}><Code/> محتوى تفاعلي</div>
-          <div onClick={() => setActiveTab('exams')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><ClipboardList/> الامتحانات</div>
+          
+          {/* إخفاء المحتوى إذا كان محظوراً */}
+          {!isBannedContent && (
+              <>
+                <div onClick={() => setActiveTab('videos')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='videos'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><PlayCircle/> المحاضرات</div>
+                <div onClick={() => setActiveTab('files')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='files'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><FileText/> المذكرات</div>
+                <div onClick={() => setActiveTab('htmls')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='htmls'?'bg-purple-100 text-purple-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-purple-600'}`}><Code/> محتوى تفاعلي</div>
+              </>
+          )}
+          
+          {/* إخفاء الامتحانات إذا كان محظوراً */}
+          {!isBannedExam && (
+              <div onClick={() => setActiveTab('exams')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><ClipboardList/> الامتحانات</div>
+          )}
+          
           <button onClick={() => {setActiveTab('settings'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='settings'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><Settings/> ملفي الشخصي</button>
         </div>
         <div className="mt-auto pt-6"><button onClick={() => signOut(auth)} className="flex items-center gap-3 text-red-500 font-bold hover:bg-red-50 w-full p-4 rounded-xl transition"><LogOut/> خروج</button></div>
@@ -1835,11 +1903,12 @@ const StudentDashboard = ({ user, userData }) => {
             )}
         </div>
 
-        {activeTab === 'home' && (<div className="space-y-8"><WisdomBox /><Announcements /><h2 className="text-3xl font-bold text-slate-800 font-arabic">منور يا <span className="text-amber-600">{userData.name.split(' ')[0]}</span> 👋 <span className="text-sm font-normal text-slate-500 bg-slate-200 px-2 py-1 rounded-full font-sans">{getGradeLabel(userData.grade)}</span></h2><div className="grid grid-cols-1 md:grid-cols-4 gap-6"><motion.div whileHover={{ scale: 1.02 }} onClick={()=>setActiveTab('videos')} className="glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group"><h3 className="relative z-10 text-2xl font-bold mb-2 text-blue-900 group-hover:text-blue-600 transition">المحاضرات</h3><p className="relative z-10 text-4xl font-black text-blue-600">{videos.length}</p><PlayCircle className="absolute -bottom-6 -left-6 text-blue-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/></motion.div><motion.div whileHover={{ scale: 1.02 }} onClick={()=>setActiveTab('files')} className="glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group"><h3 className="relative z-10 text-2xl font-bold mb-2 text-amber-900 group-hover:text-amber-600 transition">الملفات</h3><p className="relative z-10 text-4xl font-black text-amber-600">{files.length}</p><FileText className="absolute -bottom-6 -left-6 text-amber-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/></motion.div><motion.div whileHover={{ scale: 1.02 }} onClick={()=>setActiveTab('htmls')} className="glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group"><h3 className="relative z-10 text-2xl font-bold mb-2 text-purple-900 group-hover:text-purple-600 transition">تفاعلي</h3><p className="relative z-10 text-4xl font-black text-purple-600">{htmls.length}</p><Code className="absolute -bottom-6 -left-6 text-purple-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/></motion.div><motion.div whileHover={{ scale: 1.02 }} onClick={()=>setActiveTab('exams')} className="glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group"><h3 className="relative z-10 text-2xl font-bold mb-2 text-slate-900 group-hover:text-slate-600 transition">الامتحانات</h3><p className="relative z-10 text-4xl font-black text-slate-600">{exams.length}</p><ClipboardList className="absolute -bottom-6 -left-6 text-slate-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/></motion.div></div><Leaderboard /></div>)}
-        {activeTab === 'videos' && <div className="grid grid-cols-1 md:grid-cols-3 gap-6">{videos.map(v => (<div key={v.id} className="glass-card rounded-xl overflow-hidden cursor-pointer" onClick={() => setPlayingVideo(v)}><div className="h-48 bg-gradient-to-br from-slate-800 to-black flex items-center justify-center relative group"><PlayCircle className="text-white w-16 h-16 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/><span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(v.grade)}</span></div><div className="p-4"><h3 className="font-bold text-lg text-slate-800">{v.title}</h3></div></div>))}</div>}
-        {activeTab === 'files' && <div className="glass-panel rounded-xl overflow-hidden">{files.map(f => (<div key={f.id} className="p-4 flex justify-between items-center border-b last:border-0 hover:bg-white/50 transition"><div className="flex items-center gap-4"><div className="bg-red-100 text-red-600 p-3 rounded-lg font-bold text-xs shadow-sm">PDF</div><div><h4 className="font-bold text-lg text-slate-800">{f.title}</h4><span className="text-xs text-slate-500">{getGradeLabel(f.grade)}</span></div></div><a href={f.url} target="_blank" className="bg-blue-50 text-blue-600 px-4 py-2 rounded-lg font-bold hover:bg-blue-100 transition shadow-sm">تحميل</a></div>))}</div>}
+        {activeTab === 'home' && (<div className="space-y-8"><WisdomBox /><Announcements /><h2 className="text-3xl font-bold text-slate-800 font-arabic">منور يا <span className="text-amber-600">{userData.name.split(' ')[0]}</span> 👋 <span className="text-sm font-normal text-slate-500 bg-slate-200 px-2 py-1 rounded-full font-sans">{getGradeLabel(userData.grade)}</span></h2><div className="grid grid-cols-1 md:grid-cols-4 gap-6"><motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedContent && setActiveTab('videos')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}><h3 className="relative z-10 text-2xl font-bold mb-2 text-blue-900 group-hover:text-blue-600 transition">المحاضرات</h3><p className="relative z-10 text-4xl font-black text-blue-600">{videos.length}</p><PlayCircle className="absolute -bottom-6 -left-6 text-blue-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/></motion.div><motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedContent && setActiveTab('files')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}><h3 className="relative z-10 text-2xl font-bold mb-2 text-amber-900 group-hover:text-amber-600 transition">الملفات</h3><p className="relative z-10 text-4xl font-black text-amber-600">{files.length}</p><FileText className="absolute -bottom-6 -left-6 text-amber-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/></motion.div><motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedContent && setActiveTab('htmls')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}><h3 className="relative z-10 text-2xl font-bold mb-2 text-purple-900 group-hover:text-purple-600 transition">تفاعلي</h3><p className="relative z-10 text-4xl font-black text-purple-600">{htmls.length}</p><Code className="absolute -bottom-6 -left-6 text-purple-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/></motion.div><motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedExam && setActiveTab('exams')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedExam ? 'opacity-50 grayscale' : ''}`}><h3 className="relative z-10 text-2xl font-bold mb-2 text-slate-900 group-hover:text-slate-600 transition">الامتحانات</h3><p className="relative z-10 text-4xl font-black text-slate-600">{exams.length}</p><ClipboardList className="absolute -bottom-6 -left-6 text-slate-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/></motion.div></div><Leaderboard /></div>)}
         
-        {activeTab === 'htmls' && (
+        {activeTab === 'videos' && !isBannedContent && <div className="grid grid-cols-1 md:grid-cols-3 gap-6">{videos.map(v => (<div key={v.id} className="glass-card rounded-xl overflow-hidden cursor-pointer" onClick={() => setPlayingVideo(v)}><div className="h-48 bg-gradient-to-br from-slate-800 to-black flex items-center justify-center relative group"><PlayCircle className="text-white w-16 h-16 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/><span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(v.grade)}</span></div><div className="p-4"><h3 className="font-bold text-lg text-slate-800">{v.title}</h3></div></div>))}</div>}
+        {activeTab === 'files' && !isBannedContent && <div className="glass-panel rounded-xl overflow-hidden">{files.map(f => (<div key={f.id} className="p-4 flex justify-between items-center border-b last:border-0 hover:bg-white/50 transition"><div className="flex items-center gap-4"><div className="bg-red-100 text-red-600 p-3 rounded-lg font-bold text-xs shadow-sm">PDF</div><div><h4 className="font-bold text-lg text-slate-800">{f.title}</h4><span className="text-xs text-slate-500">{getGradeLabel(f.grade)}</span></div></div><a href={f.url} target="_blank" className="bg-blue-50 text-blue-600 px-4 py-2 rounded-lg font-bold hover:bg-blue-100 transition shadow-sm">تحميل</a></div>))}</div>}
+        
+        {activeTab === 'htmls' && !isBannedContent && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {htmls.map(h => (
                     <motion.div whileHover={{y:-5}} key={h.id} className="glass-card rounded-xl overflow-hidden cursor-pointer" onClick={() => setPlayingHtml(h)}>
@@ -1856,17 +1925,13 @@ const StudentDashboard = ({ user, userData }) => {
             </div>
         )}
         
-        {activeTab === 'exams' && (
+        {activeTab === 'exams' && !isBannedExam && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {isBanned ? (
-                <div className="col-span-full bg-red-50 border border-red-200 p-8 rounded-3xl text-center shadow-inner">
-                    <AlertTriangle size={48} className="text-red-500 mx-auto mb-4" />
-                    <h3 className="text-2xl font-bold text-red-800 mb-2">عفواً، تم حظرك من الامتحانات</h3>
-                    <p className="text-red-600">تم رصد محاولة غش سابقة. يرجى التواصل مع الإدارة لفك الحظر.</p>
-                </div>
-            ) : exams.map(e => {
+             {exams.map(e => {
                 const prevResult = examResults.find(r => r.examId === e.id);
-                // تحديد الحالة للعرض
+                // التحقق من انتهاء وقت الامتحان
+                const isExamTimeOver = Date.now() > new Date(e.endTime).getTime();
+                
                 let statusText = null;
                 let statusClass = "";
                 if (prevResult) {
@@ -1890,7 +1955,11 @@ const StudentDashboard = ({ user, userData }) => {
                     {prevResult && prevResult.status === 'completed' ? (
                         <div className="flex gap-2">
                              <button disabled className="flex-1 bg-slate-200 text-slate-500 py-3 rounded-xl font-bold cursor-not-allowed">تم الانتهاء</button>
-                             <button onClick={() => setReviewingExam(e)} className="flex-1 bg-blue-100 text-blue-700 py-3 rounded-xl font-bold hover:bg-blue-200 transition shadow-sm">عرض الأخطاء</button>
+                             {isExamTimeOver ? (
+                                <button onClick={() => setReviewingExam(e)} className="flex-1 bg-blue-100 text-blue-700 py-3 rounded-xl font-bold hover:bg-blue-200 transition shadow-sm">عرض الأخطاء</button>
+                             ) : (
+                                <button disabled className="flex-1 bg-gray-100 text-gray-400 py-3 rounded-xl font-bold cursor-not-allowed text-xs">المراجعة بعد الوقت</button>
+                             )}
                              <button onClick={() => generatePDF('student', {studentName: user.displayName, score: prevResult.score, total: e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0), status: prevResult.status, examTitle: e.title, questions: e.questions.flatMap(q => q.subQuestions), answers: prevResult.answers })} className="flex-1 bg-green-100 text-green-700 py-3 rounded-xl font-bold hover:bg-green-200 flex items-center justify-center gap-1 transition shadow-sm"><Download size={16}/> شهادة</button>
                         </div>
                     ) : prevResult ? (
