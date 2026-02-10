@@ -16,7 +16,7 @@ import {
   ExternalLink, ClipboardList, Timer, AlertOctagon, Flag, Save, HelpCircle, 
   Reply, Unlock, Layout, Settings, Trophy, Megaphone, Bell, Download, XCircle, 
   Calendar, Clock, FileWarning, Settings as GearIcon, Star, Bot, Power, Upload,
-  Users, PenTool, Code, Sparkles, Lamp, Ban, Shield
+  Users, PenTool, Code, Sparkles, Lamp, Ban, Shield, RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -1263,6 +1263,25 @@ const AdminDashboard = ({ user }) => {
   const handleUpdateUser = async (e) => { e.preventDefault(); if(!editingUser) return; await updateDoc(doc(db, 'users', editingUser.id), { name: editingUser.name, phone: editingUser.phone, parentPhone: editingUser.parentPhone, grade: editingUser.grade }); setEditingUser(null); };
   const handleSendResetPassword = async (email) => { if(window.confirm(`إرسال رابط تغيير كلمة السر لـ ${email}؟`)) await sendPasswordResetEmail(auth, email); };
   
+  // دوال قبول/رفض تغيير المرحلة
+  const approveGrade = async (user) => {
+      if (!user.requestedGrade) return;
+      await updateDoc(doc(db, 'users', user.id), {
+          grade: user.requestedGrade,
+          requestedGrade: null,
+          gradeUpdateStatus: null
+      });
+      alert(`تم تغيير مرحلة الطالب ${user.name} بنجاح.`);
+  };
+
+  const rejectGrade = async (user) => {
+      await updateDoc(doc(db, 'users', user.id), {
+          requestedGrade: null,
+          gradeUpdateStatus: null
+      });
+      alert(`تم رفض طلب تغيير المرحلة للطالب ${user.name}.`);
+  };
+
   const handleFileSelect = (e) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -1443,47 +1462,63 @@ const AdminDashboard = ({ user }) => {
                   
                   <div className="grid gap-4">
                       {activeUsersList.map(u=>(
-                          <div key={u.id} className={`p-4 rounded-xl border flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all hover:shadow-lg ${u.status.startsWith('banned') ? 'bg-red-50 border-red-200' : 'bg-white/50 border-slate-100'}`}>
-                              <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-1">
-                                      <p className="font-bold text-lg text-slate-800">{u.name}</p>
-                                      <span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600">{getGradeLabel(u.grade)}</span>
-                                      {u.status.startsWith('banned') && <span className="text-xs bg-red-600 text-white px-2 py-1 rounded-full font-bold">محظور</span>}
+                          <div key={u.id} className={`p-4 rounded-xl border flex flex-col justify-between gap-4 transition-all hover:shadow-lg ${u.status.startsWith('banned') ? 'bg-red-50 border-red-200' : 'bg-white/50 border-slate-100'}`}>
+                              <div className="flex flex-col md:flex-row justify-between w-full">
+                                  <div className="flex-1">
+                                      <div className="flex items-center gap-2 mb-1">
+                                          <p className="font-bold text-lg text-slate-800">{u.name}</p>
+                                          <span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600">{getGradeLabel(u.grade)}</span>
+                                          {u.status.startsWith('banned') && <span className="text-xs bg-red-600 text-white px-2 py-1 rounded-full font-bold">محظور</span>}
+                                      </div>
+                                      <div className="text-sm text-slate-500 space-y-1">
+                                          <p className="flex items-center gap-2"><Mail size={14}/> {u.email}</p>
+                                          <p className="flex items-center gap-2"><Phone size={14} className="text-blue-600"/> الطالب: {u.phone}</p>
+                                          <p className="flex items-center gap-2 font-bold text-amber-700"><Users size={14}/> ولي الأمر: {u.parentPhone}</p>
+                                          <p className="text-xs text-slate-400">تاريخ الانضمام: {u.createdAt?.toDate().toLocaleDateString()}</p>
+                                      </div>
                                   </div>
-                                  <div className="text-sm text-slate-500 space-y-1">
-                                      <p className="flex items-center gap-2"><Mail size={14}/> {u.email}</p>
-                                      <p className="flex items-center gap-2"><Phone size={14} className="text-blue-600"/> الطالب: {u.phone}</p>
-                                      <p className="flex items-center gap-2 font-bold text-amber-700"><Users size={14}/> ولي الأمر: {u.parentPhone}</p>
-                                      <p className="text-xs text-slate-400">تاريخ الانضمام: {u.createdAt?.toDate().toLocaleDateString()}</p>
+                                  
+                                  <div className="flex flex-col gap-2 w-full md:w-auto mt-4 md:mt-0">
+                                      <div className="flex gap-2">
+                                          <select 
+                                              className="text-xs border p-2 rounded-lg bg-white"
+                                              value={u.status}
+                                              onChange={(e) => handleChangeUserStatus(u.id, e.target.value)}
+                                          >
+                                              <option value="active">نشط (Active)</option>
+                                              <option value="banned_all">حظر شامل (Full Ban)</option>
+                                              <option value="banned_exam">حظر امتحانات (Exam Ban)</option>
+                                              <option value="banned_content">حظر محتوى (Content Ban)</option>
+                                          </select>
+                                      </div>
+                                      <div className="flex gap-2 justify-end">
+                                          <button onClick={()=>setEditingUser(u)} className="bg-blue-100 text-blue-600 p-2 rounded-lg hover:bg-blue-200" title="تعديل"><Edit size={16}/></button>
+                                          <button onClick={()=>handleSendResetPassword(u.email)} className="bg-amber-100 text-amber-600 p-2 rounded-lg hover:bg-amber-200" title="تغيير كلمة السر"><KeyRound size={16}/></button>
+                                          <button onClick={()=>handleDeleteUser(u.id)} className="bg-red-100 text-red-600 p-2 rounded-lg hover:bg-red-200" title="حذف"><Trash2 size={16}/></button>
+                                      </div>
                                   </div>
                               </div>
-                              
-                              <div className="flex flex-col gap-2 w-full md:w-auto">
-                                  <div className="flex gap-2">
-                                      <select 
-                                          className="text-xs border p-2 rounded-lg bg-white"
-                                          value={u.status}
-                                          onChange={(e) => handleChangeUserStatus(u.id, e.target.value)}
-                                      >
-                                          <option value="active">نشط (Active)</option>
-                                          <option value="banned_all">حظر شامل (Full Ban)</option>
-                                          <option value="banned_exam">حظر امتحانات (Exam Ban)</option>
-                                          <option value="banned_content">حظر محتوى (Content Ban)</option>
-                                      </select>
+
+                              {/* عرض طلب تغيير المرحلة إذا وجد */}
+                              {u.gradeUpdateStatus === 'pending' && (
+                                  <div className="w-full bg-yellow-50 border border-yellow-200 p-3 rounded-lg flex justify-between items-center">
+                                      <div className="flex items-center gap-2 text-yellow-800 text-sm font-bold">
+                                          <RefreshCw size={16} className="animate-spin-slow" />
+                                          يريد التحويل إلى: <span className="bg-white px-2 rounded border">{getGradeLabel(u.requestedGrade)}</span>
+                                      </div>
+                                      <div className="flex gap-2">
+                                          <button onClick={() => approveGrade(u)} className="bg-green-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-green-700">موافقة</button>
+                                          <button onClick={() => rejectGrade(u)} className="bg-red-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-red-700">رفض</button>
+                                      </div>
                                   </div>
-                                  <div className="flex gap-2 justify-end">
-                                      <button onClick={()=>setEditingUser(u)} className="bg-blue-100 text-blue-600 p-2 rounded-lg hover:bg-blue-200" title="تعديل"><Edit size={16}/></button>
-                                      <button onClick={()=>handleSendResetPassword(u.email)} className="bg-amber-100 text-amber-600 p-2 rounded-lg hover:bg-amber-200" title="تغيير كلمة السر"><KeyRound size={16}/></button>
-                                      <button onClick={()=>handleDeleteUser(u.id)} className="bg-red-100 text-red-600 p-2 rounded-lg hover:bg-red-200" title="حذف"><Trash2 size={16}/></button>
-                                  </div>
-                              </div>
+                              )}
                           </div>
                       ))}
                   </div>
               </div>
           )}
 
-          {/* ... (باقي التبويبات exams, results, live... كما هي بدون تغيير في المنطق) ... */}
+          {/* ... (باقي التبويبات exams, results, live... كما هي) ... */}
           {activeTab === 'exams' && <div className="space-y-8"><div className="glass-panel p-6 rounded-xl"><h2 className="text-xl font-bold mb-6 border-b pb-2 font-arabic text-amber-700">إنشاء امتحان</h2><div className="grid grid-cols-4 gap-4 mb-6"><input className="border p-2 rounded col-span-2" placeholder="العنوان" value={examBuilder.title} onChange={e=>setExamBuilder({...examBuilder, title:e.target.value})}/><input className="border p-2 rounded" placeholder="الكود" value={examBuilder.accessCode} onChange={e=>setExamBuilder({...examBuilder, accessCode:e.target.value})}/><input type="number" className="border p-2 rounded" placeholder="المدة (دقائق)" value={examBuilder.duration} onChange={e=>setExamBuilder({...examBuilder, duration:parseInt(e.target.value)})}/><select className="border p-2 rounded col-span-4" value={examBuilder.grade} onChange={e=>setExamBuilder({...examBuilder, grade:e.target.value})}><GradeOptions/></select><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت البدء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, startTime:e.target.value})}/></div><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت الانتهاء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, endTime:e.target.value})}/></div></div><div className="bg-slate-50 p-4 rounded-xl border mb-6"><textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm" placeholder="اكتب الأسئلة هنا... (ضع علامة * قبل الإجابة الصحيحة)" value={bulkText} onChange={e=>setBulkText(e.target.value)}/><button onClick={parseExam} className="mt-4 w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-green-500/50 transition">نشر</button></div></div><div className="glass-panel p-6 rounded-xl"><h3 className="font-bold mb-4 font-arabic">الامتحانات الحالية</h3>{examsList.map(exam=><div key={exam.id} className="flex justify-between items-center border-b py-3 last:border-0 hover:bg-slate-50/50 px-2 rounded transition"><div><p className="font-bold">{exam.title}</p><p className="text-xs text-slate-500">من: {new Date(exam.startTime).toLocaleString('ar-EG')} | إلى: {new Date(exam.endTime).toLocaleString('ar-EG')}</p><p className="text-xs text-slate-400">كود: {exam.accessCode}</p></div><div className="flex gap-2"><button onClick={()=>handleDeleteExam(exam.id)} className="text-red-500 p-2"><Trash2 size={18}/></button></div></div>)}</div></div>}
 
           {activeTab === 'results' && (
@@ -1837,13 +1872,25 @@ const StudentDashboard = ({ user, userData }) => {
     }
   };
 
+  // تعديل منطق حفظ بيانات الملف الشخصي
   const handleUpdateMyProfile = async (e) => {
     e.preventDefault();
-    await updateDoc(doc(db, 'users', user.uid), {
-        phone: editFormData.phone,
-        grade: editFormData.grade
-    });
-    alert("تم تحديث بياناتك بنجاح!");
+    
+    // إذا كان هناك تغيير في الصف الدراسي، نرسله كطلب
+    if (editFormData.grade !== userData.grade) {
+        await updateDoc(doc(db, 'users', user.uid), {
+            phone: editFormData.phone,
+            requestedGrade: editFormData.grade,
+            gradeUpdateStatus: 'pending'
+        });
+        alert("تم إرسال طلب تغيير الصف الدراسي إلى الإدارة للموافقة.");
+    } else {
+        // تحديث عادي لرقم الهاتف فقط
+        await updateDoc(doc(db, 'users', user.uid), {
+            phone: editFormData.phone,
+        });
+        alert("تم تحديث بياناتك بنجاح!");
+    }
   };
 
   return (
@@ -1981,6 +2028,14 @@ const StudentDashboard = ({ user, userData }) => {
         {activeTab === 'settings' && (
               <div className="glass-panel p-8 rounded-xl max-w-2xl mx-auto">
                 <h2 className="text-2xl font-bold mb-6 flex items-center gap-2 font-arabic text-slate-800"><Settings className="text-slate-700"/> إعدادات الحساب</h2>
+                
+                {userData.gradeUpdateStatus === 'pending' && (
+                    <div className="mb-4 bg-yellow-50 text-yellow-800 p-4 rounded-xl border border-yellow-200 flex items-center gap-2 font-bold">
+                        <RefreshCw className="animate-spin-slow" size={20} />
+                        لقد قمت بطلب تغيير المرحلة إلى {getGradeLabel(userData.requestedGrade)}. الطلب قيد المراجعة.
+                    </div>
+                )}
+
                 <form onSubmit={handleUpdateMyProfile} className="space-y-4">
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-2">الاسم</label>
@@ -1997,8 +2052,12 @@ const StudentDashboard = ({ user, userData }) => {
                     <p className="text-xs text-red-500 mt-1">لا يمكن تغيير رقم ولي الأمر.</p>
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">الصف الدراسي (يمكنك تغييره عند النجاح)</label>
-                    <select className="w-full border p-3 rounded-xl bg-white" value={editFormData.grade} onChange={e=>setEditFormData({...editFormData, grade:e.target.value})}>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">الصف الدراسي (يتطلب موافقة الأدمن)</label>
+                    <select 
+                        className="w-full border p-3 rounded-xl bg-white" 
+                        value={editFormData.grade} 
+                        onChange={e=>setEditFormData({...editFormData, grade:e.target.value})}
+                    >
                       <GradeOptions />
                     </select>
                   </div>
