@@ -1480,6 +1480,15 @@ const AdminDashboard = ({ user }) => {
                                   
                                   <div className="flex flex-col gap-2 w-full md:w-auto mt-4 md:mt-0">
                                       <div className="flex gap-2">
+                                          {/* زر فك الحظر الصريح */}
+                                          {u.status.startsWith('banned') && (
+                                              <button 
+                                                  onClick={() => handleChangeUserStatus(u.id, 'active')}
+                                                  className="bg-green-100 text-green-700 px-3 py-1 rounded-lg text-xs font-bold hover:bg-green-200 flex items-center gap-1"
+                                              >
+                                                  <Unlock size={14} /> فك الحظر
+                                              </button>
+                                          )}
                                           <select 
                                               className="text-xs border p-2 rounded-lg bg-white"
                                               value={u.status}
