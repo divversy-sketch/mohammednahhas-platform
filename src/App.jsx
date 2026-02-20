@@ -208,7 +208,7 @@ const generatePDF = (type, data) => {
 
 /**
  * =================================================================
- * 3. المكونات الرسومية الأساسية
+ * 3. المكونات الرسومية الأساسية وتحسينات الأداء
  * =================================================================
  */
 
@@ -260,32 +260,41 @@ const DesignSystemLoader = () => {
 
   return (
     <style>{`
-      body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; direction: rtl; user-select: none; overflow-x: hidden; }
+      /* تحسين أداء السكرول ومنع اللاج */
+      html, body {
+          font-family: 'Cairo', sans-serif; 
+          background-color: #f8fafc; 
+          direction: rtl; 
+          -webkit-font-smoothing: antialiased;
+          scroll-behavior: smooth;
+      }
       
       ::-webkit-scrollbar { width: 8px; }
       ::-webkit-scrollbar-track { background: #f1f1f1; }
       ::-webkit-scrollbar-thumb { background: linear-gradient(to bottom, #d97706, #b45309); border-radius: 4px; }
       
-      /* Glassmorphism Classes */
+      /* Glassmorphism Classes Optimized for Mobile */
       .glass-panel { 
-          background: rgba(255, 255, 255, 0.85); 
-          backdrop-filter: blur(16px); 
-          -webkit-backdrop-filter: blur(16px);
-          border: 1px solid rgba(255, 255, 255, 0.6); 
-          box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+          background: rgba(255, 255, 255, 0.9); 
+          backdrop-filter: blur(8px); 
+          -webkit-backdrop-filter: blur(8px);
+          border: 1px solid rgba(255, 255, 255, 0.4); 
+          box-shadow: 0 4px 15px rgba(0,0,0,0.05);
       }
       
       .glass-card {
-          background: rgba(255, 255, 255, 0.7);
-          backdrop-filter: blur(10px);
-          border: 1px solid rgba(255, 255, 255, 0.5);
-          box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-          transition: all 0.3s ease;
+          background: rgba(255, 255, 255, 0.85);
+          backdrop-filter: blur(6px);
+          -webkit-backdrop-filter: blur(6px);
+          border: 1px solid rgba(255, 255, 255, 0.4);
+          box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
+          will-change: transform;
       }
       
       .glass-card:hover {
           transform: translateY(-5px);
-          box-shadow: 0 12px 30px rgba(217, 119, 6, 0.2);
+          box-shadow: 0 10px 25px rgba(217, 119, 6, 0.15);
           border-color: #fbbf24;
       }
 
@@ -302,15 +311,34 @@ const DesignSystemLoader = () => {
           to { background-position: 200% center; }
       }
 
-      /* Dynamic Watermark Styles - Optimized for performance (Hardware Acceleration) */
+      /* Background Animations (Hardware Accelerated) */
+      @keyframes floatChar {
+          0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+          50% { transform: translate3d(0, -30px, 0) rotate(10deg); }
+      }
+      .floating-char {
+          animation: floatChar ease-in-out infinite;
+          will-change: transform;
+      }
+
+      @keyframes pulseSlow {
+          0%, 100% { transform: scale3d(1, 1, 1); opacity: 0.2; }
+          50% { transform: scale3d(1.1, 1.1, 1); opacity: 0.4; }
+      }
+      .animate-pulse-slow {
+          animation: pulseSlow 8s ease-in-out infinite;
+          will-change: transform, opacity;
+      }
+
+      /* Dynamic Watermark Styles - Zero Lag */
       .watermark-text {
         position: absolute;
-        top: 0; left: 0;
         pointer-events: none;
         z-index: 9999;
         color: rgba(0, 0, 0, 0.08);
         font-weight: 900;
         font-size: 1.5rem;
+        transform: rotate(-30deg);
         white-space: nowrap;
         text-shadow: 0 0 2px rgba(255,255,255,0.5);
       }
@@ -321,22 +349,21 @@ const DesignSystemLoader = () => {
         animation: floatWatermark 20s linear infinite alternate;
         pointer-events: none;
         z-index: 50;
-        color: rgba(0, 0, 0, 0.15); 
+        color: rgba(255, 255, 255, 0.2); 
         font-weight: 900;
         font-size: 1.5rem;
-        text-shadow: 0 0 5px rgba(255,255,255,0.5);
+        text-shadow: 0 0 5px rgba(0,0,0,0.8);
         white-space: nowrap;
         will-change: transform;
-        backface-visibility: hidden;
+        -webkit-transform: translateZ(0);
       }
       
-      /* GPU Accelerated Animation for zero lag */
       @keyframes floatWatermark {
-        0% { transform: translate3d(10vw, 10vh, 0) rotate(-15deg); }
-        25% { transform: translate3d(50vw, 70vh, 0) rotate(5deg); }
-        50% { transform: translate3d(10vw, 60vh, 0) rotate(-10deg); }
-        75% { transform: translate3d(60vw, 20vh, 0) rotate(15deg); }
-        100% { transform: translate3d(10vw, 10vh, 0) rotate(-15deg); }
+        0% { transform: translate3d(5vw, 10vh, 0) rotate(-10deg); }
+        25% { transform: translate3d(40vw, 70vh, 0) rotate(5deg); }
+        50% { transform: translate3d(10vw, 50vh, 0) rotate(-5deg); }
+        75% { transform: translate3d(50vw, 20vh, 0) rotate(10deg); }
+        100% { transform: translate3d(5vw, 10vh, 0) rotate(-10deg); }
       }
       
       .no-select { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
@@ -368,7 +395,7 @@ const getGradeLabel = (g) => {
 };
 
 const ModernLogo = () => (
-  <motion.div whileHover={{ scale: 1.1, rotate: 5 }} className="relative w-20 h-20 drop-shadow-2xl cursor-pointer">
+  <div className="relative w-20 h-20 drop-shadow-2xl cursor-pointer hover:scale-105 hover:rotate-6 transition-transform">
       <svg width="80" height="80" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
         <defs>
             <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -381,45 +408,36 @@ const ModernLogo = () => (
                 <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
             </filter>
         </defs>
-        <motion.path d="M100 20C55.8 20 20 55.8 20 100s35.8 80 80 80 80-35.8 80-80-35.8-80-80-80zm0 150c-38.6 0-70-31.4-70-70s31.4-70 70-70 70 31.4 70 70-31.4 70-70 70z" fill="url(#logoGrad)" opacity="0.2" animate={{ rotate: 360 }} transition={{ duration: 30, repeat: Infinity, ease: "linear" }} />
-        <motion.path d="M160 80 V 130 A 60 60 0 0 1 40 130 V 110" stroke="url(#logoGrad)" strokeWidth="22" strokeLinecap="round" strokeLinejoin="round" fill="none" filter="url(#glow)" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 2, ease: "easeInOut" }} />
-        <motion.rect x="85" y="40" width="30" height="30" rx="4" fill="url(#logoGrad)" transform="rotate(45 100 55)" initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 1.5, type: "spring" }} />
+        <path d="M100 20C55.8 20 20 55.8 20 100s35.8 80 80 80 80-35.8 80-80-35.8-80-80-80zm0 150c-38.6 0-70-31.4-70-70s31.4-70 70-70 70 31.4 70 70-31.4 70-70 70z" fill="url(#logoGrad)" opacity="0.2" />
+        <path d="M160 80 V 130 A 60 60 0 0 1 40 130 V 110" stroke="url(#logoGrad)" strokeWidth="22" strokeLinecap="round" strokeLinejoin="round" fill="none" filter="url(#glow)" />
+        <rect x="85" y="40" width="30" height="30" rx="4" fill="url(#logoGrad)" transform="rotate(45 100 55)" />
       </svg>
-  </motion.div>
+  </div>
 );
 
-const FloatingArabicBackground = () => (
+// تم التعديل لمنع استخدام Framer Motion وتخفيف استهلاك الموبايل (استخدام CSS صافي)
+const FloatingArabicBackground = React.memo(() => (
   <div className="fixed inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 0, background: 'radial-gradient(circle at center, #fdfbf7 0%, #e2e8f0 100%)' }}>
     <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: `url("https://www.transparenttextures.com/patterns/arabesque.png")` }} />
     {['أ', 'ب', 'ج', 'د', 'هـ', 'و', 'ز', 'ح', 'ط', 'ي', 'ض', 'ع'].map((char, i) => (
-        <motion.div
+        <div
             key={i}
-            className="absolute text-amber-500/10 font-arabic font-bold select-none"
-            initial={{ 
-                x: Math.random() * window.innerWidth, 
-                y: Math.random() * window.innerHeight,
-                scale: Math.random() * 2 + 1,
-                rotate: Math.random() * 360
+            className="absolute text-amber-500/15 font-arabic font-bold select-none floating-char"
+            style={{ 
+                left: `${(i * 8.5) % 90 + 5}vw`, 
+                top: `${(i * 13) % 90 + 5}vh`,
+                fontSize: `${(i % 3) + 3}rem`,
+                animationDelay: `${i * 0.5}s`,
+                animationDuration: `${15 + (i % 5)}s`
             }}
-            animate={{ 
-                y: [null, Math.random() * -100],
-                rotate: [null, Math.random() * 360],
-            }}
-            transition={{ 
-                duration: Math.random() * 20 + 20, 
-                repeat: Infinity, 
-                repeatType: "reverse",
-                ease: "linear" 
-            }}
-            style={{ fontSize: `${Math.random() * 4 + 2}rem` }}
         >
             {char}
-        </motion.div>
+        </div>
     ))}
-    <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }} transition={{ duration: 5, repeat: Infinity }} className="absolute top-1/4 left-1/4 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl" />
-    <motion.div animate={{ scale: [1, 1.5, 1], opacity: [0.2, 0.4, 0.2] }} transition={{ duration: 7, repeat: Infinity }} className="absolute bottom-1/3 right-1/4 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl" />
+    <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-amber-400/10 rounded-full blur-xl animate-pulse-slow" />
+    <div className="absolute bottom-1/3 right-1/4 w-96 h-96 bg-blue-400/10 rounded-full blur-xl animate-pulse-slow" style={{ animationDelay: '2s' }} />
   </div>
-);
+));
 
 const WisdomBox = () => {
   const [idx, setIdx] = useState(0);
@@ -445,18 +463,14 @@ const WisdomBox = () => {
   if (quotes.length === 0) return null;
 
   return (
-    <motion.div 
-        initial={{ opacity: 0, y: 20 }} 
-        animate={{ opacity: 1, y: 0 }} 
-        className="relative bg-gradient-to-r from-amber-600 to-amber-800 text-white p-8 rounded-2xl shadow-2xl mb-8 overflow-hidden z-20 border-2 border-amber-400/30"
-    >
+    <div className="relative bg-gradient-to-r from-amber-600 to-amber-800 text-white p-8 rounded-2xl shadow-xl mb-8 overflow-hidden z-20 border-2 border-amber-400/30">
       <div className="absolute top-0 right-0 p-4 opacity-10"><Feather size={100} /></div>
       <Quote className="absolute top-4 left-4 text-amber-300 opacity-40 w-12 h-12" />
       <div className="relative z-10 text-center">
-        <p className="text-2xl font-arabic font-bold mb-3 drop-shadow-md">"{quotes[idx].text}"</p>
+        <p className="text-2xl font-arabic font-bold mb-3 drop-shadow-md transition-opacity duration-500">"{quotes[idx].text}"</p>
         <span className="bg-black/20 px-4 py-1 rounded-full text-sm font-bold border border-white/20 text-amber-200">- {quotes[idx].source}</span>
       </div>
-    </motion.div>
+    </div>
   );
 };
 
@@ -518,10 +532,7 @@ const Leaderboard = () => {
             <h3 className="text-xl font-bold font-arabic mb-4 flex items-center gap-2 text-amber-700"><Trophy className="text-amber-500 fill-amber-500" /> لوحة الشرف (الأوائل)</h3>
             <div className="space-y-3">
                 {topStudents.length === 0 ? <p className="text-slate-400 text-sm">لسه مفيش حد امتحن..</p> : topStudents.map((s, i) => (
-                    <motion.div 
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: i * 0.1 }}
+                    <div 
                         key={i} 
                         className={`flex justify-between items-center p-3 rounded-lg border-b-2 ${i===0 ? 'bg-gradient-to-r from-yellow-50 to-white border-yellow-400' : 'bg-white border-slate-100'}`}
                     >
@@ -532,7 +543,7 @@ const Leaderboard = () => {
                             <span className="font-bold text-slate-800">{s.name}</span>
                         </div>
                         <span className="text-sm font-bold text-amber-600 bg-amber-50 px-3 py-1 rounded-full">{s.score} نقطة</span>
-                    </motion.div>
+                    </div>
                 ))}
             </div>
         </div>
@@ -625,12 +636,12 @@ const ChatWidget = ({ user }) => {
 
   return (
     <>
-      <motion.button initial={{ scale: 0 }} animate={{ scale: 1 }} className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-amber-600 to-amber-700 text-white p-4 rounded-full shadow-2xl hover:shadow-amber-500/50 transition flex items-center gap-2" onClick={() => setIsOpen(!isOpen)}>
+      <button className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-amber-600 to-amber-700 text-white p-4 rounded-full shadow-2xl hover:shadow-amber-500/50 transition flex items-center gap-2 transform hover:scale-105" onClick={() => setIsOpen(!isOpen)}>
         {isOpen ? <X /> : <MessageCircle size={28} />}
-      </motion.button>
+      </button>
       <AnimatePresence>
         {isOpen && (
-          <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 50 }} className="fixed bottom-24 right-6 z-50 w-80 bg-white/90 backdrop-blur rounded-2xl shadow-2xl border border-white/50 overflow-hidden flex flex-col font-['Cairo']" style={{ height: '450px' }}>
+          <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 50 }} className="fixed bottom-24 right-6 z-50 w-80 bg-white/95 backdrop-blur rounded-2xl shadow-2xl border border-white/50 overflow-hidden flex flex-col font-['Cairo']" style={{ height: '450px' }}>
             <div className="bg-gradient-to-r from-amber-600 to-amber-700 p-4 text-white font-bold flex justify-between items-center shadow-md">
               <div className="flex items-center gap-2"><div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div><span>مساعد النحاس</span></div>
               <div className="flex gap-2"><Facebook size={18} onClick={openFacebook} className="cursor-pointer hover:text-blue-200"/><Phone size={18} onClick={openWhatsApp} className="cursor-pointer hover:text-green-200"/></div>
@@ -874,7 +885,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const [wmPositions, setWmPositions] = useState([]);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
 
-  // دالة خلط المصفوفة (Fisher-Yates Shuffle)
   const shuffleArray = (array) => {
     const arr = [...array];
     for (let i = arr.length - 1; i > 0; i--) {
@@ -884,23 +894,18 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     return arr;
   };
 
-  // Memoize questions to prevent re-renders breaking selection logic
   const flatQuestions = useMemo(() => {
     const flat = [];
     if (exam.questions) {
         let processedBlocks = [...exam.questions];
-
         if (!isReviewMode && !existingResult) {
             processedBlocks = shuffleArray(processedBlocks);
         }
-
         processedBlocks.forEach((block) => {
             let subQs = [...block.subQuestions];
-            
             if (!isReviewMode && !existingResult) {
                 subQs = shuffleArray(subQs);
             }
-
             subQs.forEach((q) => {
                 flat.push({ ...q, blockText: block.text });
             });
@@ -911,7 +916,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
   if (flatQuestions.length === 0) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-white">عفواً، لا توجد أسئلة.<button onClick={onClose} className="ml-4 bg-gray-200 px-4 py-2 rounded">خروج</button></div>;
 
-  // Watermark random movement logic (Using translated keys for performance)
   useEffect(() => {
     if (isReviewMode) return;
     const updatePositions = () => {
@@ -1208,9 +1212,7 @@ const AdminDashboard = ({ user }) => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
 
-  // جلب البيانات
   useEffect(() => { const u = onSnapshot(query(collection(db, 'users'), where('status','==','pending')), s => setPendingUsers(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
-  // تعديل لجلب جميع الحالات للطلاب (بما فيها المحظورين بأنواعهم)
   useEffect(() => { const u = onSnapshot(query(collection(db, 'users'), where('status', 'in', ['active', 'banned_cheating', 'banned_all', 'banned_exam', 'banned_content', 'rejected'])), s => setActiveUsersList(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(query(collection(db, 'content'), orderBy('createdAt','desc')), s => setContentList(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(query(collection(db, 'messages'), orderBy('createdAt','desc')), s => setMessagesList(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
@@ -1227,7 +1229,6 @@ const AdminDashboard = ({ user }) => {
   };
   const handleReject = async (id) => updateDoc(doc(db,'users',id), {status:'rejected'});
   
-  // دالة لتغيير حالة الطالب (حظر/تنشيط)
   const handleChangeUserStatus = async (id, newStatus) => {
       await updateDoc(doc(db,'users',id), {status: newStatus});
   };
@@ -1273,7 +1274,6 @@ const AdminDashboard = ({ user }) => {
   const handleUpdateUser = async (e) => { e.preventDefault(); if(!editingUser) return; await updateDoc(doc(db, 'users', editingUser.id), { name: editingUser.name, phone: editingUser.phone, parentPhone: editingUser.parentPhone, grade: editingUser.grade }); setEditingUser(null); };
   const handleSendResetPassword = async (email) => { if(window.confirm(`إرسال رابط تغيير كلمة السر لـ ${email}؟`)) await sendPasswordResetEmail(auth, email); };
   
-  // دوال قبول/رفض تغيير المرحلة
   const approveGrade = async (user) => {
       if (!user.requestedGrade) return;
       await updateDoc(doc(db, 'users', user.id), {
@@ -1490,7 +1490,6 @@ const AdminDashboard = ({ user }) => {
                                   
                                   <div className="flex flex-col gap-2 w-full md:w-auto mt-4 md:mt-0">
                                       <div className="flex gap-2">
-                                          {/* زر فك الحظر الصريح */}
                                           {u.status.startsWith('banned') && (
                                               <button 
                                                   onClick={() => handleChangeUserStatus(u.id, 'active')}
@@ -1518,7 +1517,6 @@ const AdminDashboard = ({ user }) => {
                                   </div>
                               </div>
 
-                              {/* عرض طلب تغيير المرحلة إذا وجد */}
                               {u.gradeUpdateStatus === 'pending' && (
                                   <div className="w-full bg-yellow-50 border border-yellow-200 p-3 rounded-lg flex justify-between items-center">
                                       <div className="flex items-center gap-2 text-yellow-800 text-sm font-bold">
@@ -1890,11 +1888,9 @@ const StudentDashboard = ({ user, userData }) => {
     }
   };
 
-  // تعديل منطق حفظ بيانات الملف الشخصي
   const handleUpdateMyProfile = async (e) => {
     e.preventDefault();
     
-    // إذا كان هناك تغيير في الصف الدراسي، نرسله كطلب
     if (editFormData.grade !== userData.grade) {
         await updateDoc(doc(db, 'users', user.uid), {
             phone: editFormData.phone,
@@ -1903,7 +1899,6 @@ const StudentDashboard = ({ user, userData }) => {
         });
         alert("تم إرسال طلب تغيير الصف الدراسي إلى الإدارة للموافقة.");
     } else {
-        // تحديث عادي لرقم الهاتف فقط
         await updateDoc(doc(db, 'users', user.uid), {
             phone: editFormData.phone,
         });
@@ -1912,19 +1907,19 @@ const StudentDashboard = ({ user, userData }) => {
   };
 
   return (
-    <div className="min-h-screen flex bg-slate-50 relative font-['Cairo']" dir="rtl">
+    <div className="bg-slate-50 relative font-['Cairo'] min-h-screen block" dir="rtl">
       {playingVideo && <SecureVideoPlayer video={playingVideo} userName={userData.name} onClose={() => setPlayingVideo(null)} />}
       {playingHtml && <InteractiveViewer content={playingHtml} user={userData} onClose={() => setPlayingHtml(null)} />}
       
       <FloatingArabicBackground />
       <ChatWidget user={user} />
       
-      <aside className={`fixed md:relative z-30 bg-white/90 backdrop-blur h-full w-72 p-6 shadow-xl transition-transform duration-300 ${mobileMenu ? 'translate-x-0' : 'translate-x-full md:translate-x-0'} right-0 border-l border-white flex flex-col`}>
+      {/* التعديل الجوهري لحل مشكلة السكرول: تغيير هيكل الـ Layout */}
+      <aside className={`fixed top-0 bottom-0 right-0 z-40 bg-white/95 backdrop-blur-xl w-72 p-6 shadow-xl transition-transform duration-300 ${mobileMenu ? 'translate-x-0' : 'translate-x-full md:translate-x-0'} border-l border-slate-200 flex flex-col`}>
         <div className="flex items-center gap-3 mb-10 px-2"><ModernLogo /><h1 className="text-2xl font-bold font-arabic text-amber-800">النحاس</h1><button onClick={() => setMobileMenu(false)} className="md:hidden mr-auto"><X /></button></div>
-        <div className="space-y-2 flex-1">
+        <div className="space-y-2 flex-1 overflow-y-auto pr-2">
           <button onClick={() => {setActiveTab('home'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='home'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><User/> الرئيسية</button>
           
-          {/* إخفاء المحتوى إذا كان محظوراً */}
           {!isBannedContent && (
               <>
                 <div onClick={() => setActiveTab('videos')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='videos'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><PlayCircle/> المحاضرات</div>
@@ -1933,7 +1928,6 @@ const StudentDashboard = ({ user, userData }) => {
               </>
           )}
           
-          {/* إخفاء الامتحانات إذا كان محظوراً */}
           {!isBannedExam && (
               <div onClick={() => setActiveTab('exams')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><ClipboardList/> الامتحانات</div>
           )}
@@ -1943,7 +1937,7 @@ const StudentDashboard = ({ user, userData }) => {
         <div className="mt-auto pt-6"><button onClick={() => signOut(auth)} className="flex items-center gap-3 text-red-500 font-bold hover:bg-red-50 w-full p-4 rounded-xl transition"><LogOut/> خروج</button></div>
       </aside>
 
-      <main className="flex-1 p-4 md:p-10 relative z-10 overflow-y-auto h-screen">
+      <main className="p-4 md:p-10 relative z-10 min-h-screen md:pr-72 w-full transition-all">
         <div className="md:hidden flex justify-between items-center mb-6 glass-panel p-4 rounded-2xl shadow-sm"><h1 className="font-bold text-lg text-slate-800">منصة النحاس</h1><button onClick={() => setMobileMenu(true)} className="p-2 bg-slate-100 rounded-lg"><Menu /></button></div>
         
         <div className="flex justify-end mb-6 relative">
