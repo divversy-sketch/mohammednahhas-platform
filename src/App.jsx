@@ -302,23 +302,23 @@ const DesignSystemLoader = () => {
           to { background-position: 200% center; }
       }
 
-      /* Dynamic Watermark Styles */
+      /* Dynamic Watermark Styles - Optimized for performance (Hardware Acceleration) */
       .watermark-text {
         position: absolute;
+        top: 0; left: 0;
         pointer-events: none;
         z-index: 9999;
         color: rgba(0, 0, 0, 0.08);
         font-weight: 900;
         font-size: 1.5rem;
-        transform: rotate(-30deg);
         white-space: nowrap;
         text-shadow: 0 0 2px rgba(255,255,255,0.5);
-        transition: top 3s ease-in-out, left 3s ease-in-out; 
       }
       
       .watermark-video {
         position: absolute;
-        animation: floatWatermark 10s linear infinite alternate;
+        top: 0; left: 0;
+        animation: floatWatermark 20s linear infinite alternate;
         pointer-events: none;
         z-index: 50;
         color: rgba(0, 0, 0, 0.15); 
@@ -326,14 +326,17 @@ const DesignSystemLoader = () => {
         font-size: 1.5rem;
         text-shadow: 0 0 5px rgba(255,255,255,0.5);
         white-space: nowrap;
+        will-change: transform;
+        backface-visibility: hidden;
       }
       
+      /* GPU Accelerated Animation for zero lag */
       @keyframes floatWatermark {
-        0% { top: 5%; left: 5%; }
-        25% { top: 80%; left: 80%; }
-        50% { top: 80%; left: 10%; }
-        75% { top: 10%; left: 80%; }
-        100% { top: 5%; left: 5%; }
+        0% { transform: translate3d(10vw, 10vh, 0) rotate(-15deg); }
+        25% { transform: translate3d(50vw, 70vh, 0) rotate(5deg); }
+        50% { transform: translate3d(10vw, 60vh, 0) rotate(-10deg); }
+        75% { transform: translate3d(60vw, 20vh, 0) rotate(15deg); }
+        100% { transform: translate3d(10vw, 10vh, 0) rotate(-15deg); }
       }
       
       .no-select { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
@@ -494,7 +497,6 @@ const Leaderboard = () => {
             const scores = {};
             snap.docs.forEach(doc => {
                 const data = doc.data();
-                // فقط نأخذ الدرجات المكتملة
                 if(data.score && data.status === 'completed') {
                     if(!scores[data.studentName]) scores[data.studentName] = 0;
                     scores[data.studentName] += parseInt(data.score);
@@ -739,13 +741,14 @@ const SecureVideoPlayer = ({ video, userName, onClose }) => {
     setShowSettings(false);
   };
 
+  // إضافة playsinline=1 إلى رابط اليوتيوب ليشتغل بسلاسة في الموبايل
   const youtubeEmbedUrl = videoId 
-    ? `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1&showinfo=0&iv_load_policy=3&loop=1&playlist=${videoId}` 
+    ? `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1&showinfo=0&iv_load_policy=3&loop=1&playlist=${videoId}&playsinline=1` 
     : '';
 
   return (
-    <div className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center p-4">
-      <div className="w-full max-w-5xl bg-black rounded-xl overflow-hidden relative shadow-2xl border border-gray-800">
+    <div className="fixed inset-0 z-[60] bg-black flex items-center justify-center p-4">
+      <div className="w-full h-full max-w-7xl bg-black rounded-xl overflow-hidden relative shadow-2xl border border-gray-800 flex flex-col justify-center">
         <div className="absolute top-4 right-4 z-50 flex gap-4">
             <div className="relative">
                 <button onClick={() => setShowSettings(!showSettings)} className="bg-black/50 hover:bg-black/80 text-white p-2 rounded-full backdrop-blur-sm transition"><GearIcon size={24}/></button>
@@ -761,14 +764,36 @@ const SecureVideoPlayer = ({ video, userName, onClose }) => {
             <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white p-2 rounded-full"><X size={24}/></button>
         </div>
 
-        <div className="aspect-video relative flex items-center justify-center bg-black">
-          {/* Fixed: Watermark is dynamic now in CSS */}
-          <div className="watermark-video">{userName} - {video.grade}</div>
+        <div className="w-full relative flex items-center justify-center bg-black overflow-hidden" style={{ height: '80vh' }}>
+          <div className="watermark-video">
+             {userName} - {video.grade} — منصة النحاس
+          </div>
           
           {videoId ? (
-            <iframe className="w-full h-full" src={youtubeEmbedUrl} title="Video" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
+            <iframe 
+              className="w-full h-full" 
+              src={youtubeEmbedUrl} 
+              title="Video" 
+              frameBorder="0" 
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+              allowFullScreen
+              loading="lazy"
+              style={{ WebkitTransform: 'translateZ(0)' }}
+            ></iframe>
           ) : (
-             <video ref={videoRef} controls controlsList="nodownload" className="w-full h-full object-contain" src={finalUrl}>المتصفح لا يدعم هذا الفيديو.</video>
+             <video 
+                ref={videoRef} 
+                controls 
+                controlsList="nodownload" 
+                className="w-full h-full object-contain relative z-40" 
+                src={finalUrl}
+                playsInline
+                preload="metadata"
+                disablePictureInPicture
+                style={{ WebkitTransform: 'translateZ(0)' }}
+             >
+                المتصفح لا يدعم هذا الفيديو.
+             </video>
           )}
         </div>
       </div>
@@ -777,10 +802,8 @@ const SecureVideoPlayer = ({ video, userName, onClose }) => {
 };
 
 const InteractiveViewer = ({ content, user, onClose }) => {
-    // منع القائمة المنبثقة (Right Click)
     const handleContextMenu = (e) => e.preventDefault();
     
-    // محاولة تحجيم زر Print Screen (تنبيه)
     useEffect(() => {
         const handleKeyDown = (e) => {
             if (e.key === 'PrintScreen') {
@@ -791,7 +814,6 @@ const InteractiveViewer = ({ content, user, onClose }) => {
             }
         };
         
-        // تعطيل النسخ واللصق والقص
         const handleCopy = (e) => { e.preventDefault(); alert("النسخ غير مسموح!"); };
         
         window.addEventListener('keydown', handleKeyDown);
@@ -814,29 +836,25 @@ const InteractiveViewer = ({ content, user, onClose }) => {
                 <div className="bg-slate-900 p-3 flex justify-between items-center text-white border-b border-gray-700 select-none">
                    <div className="flex items-center gap-4">
                        <h3 className="font-bold flex items-center gap-2"><Code /> {content.title}</h3>
-                       {/* عرض اسم الموقع والمعلم في الشريط العلوي */}
                        <span className="hidden md:block text-xs bg-amber-600 px-3 py-1 rounded-full text-white font-bold">منصة النحاس - أ/ محمد النحاس</span>
                    </div>
                    <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white px-4 py-1 rounded font-bold transition">خروج</button>
                 </div>
                 <div className="flex-1 bg-white relative overflow-hidden">
-                   {/* العلامة المائية الشاملة داخل المحتوى (تتحرك) */}
                    {user && (
                        <div className="watermark-video" style={{ pointerEvents: 'none', zIndex: 9999 }}>
                            {user.name} - {user.grade} — منصة النحاس — أ/ محمد النحاس
                        </div>
                    )}
                    
-                   {/* طبقة شفافة لمنع التحديد المباشر في بعض الحالات، مع السماح بالتفاعل */}
                    <div className="absolute inset-0 z-[9998] pointer-events-none select-none"></div>
 
                    <iframe 
                      src={content.url} 
-                     className="w-full h-full border-0" 
+                     className="w-full h-full border-0 relative z-40" 
                      title={content.title}
-                     // السماح بالسكربتات ولكن داخل نفس الأصل لزيادة التحكم
                      sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals"
-                     style={{ pointerEvents: 'auto' }}
+                     style={{ pointerEvents: 'auto', WebkitTransform: 'translateZ(0)' }}
                    ></iframe>
                 </div>
             </div>
@@ -870,19 +888,15 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const flatQuestions = useMemo(() => {
     const flat = [];
     if (exam.questions) {
-        // نأخذ نسخة من كتل الأسئلة لنقوم بخلطها
         let processedBlocks = [...exam.questions];
 
-        // نخلط الكتل فقط إذا لم نكن في وضع المراجعة
         if (!isReviewMode && !existingResult) {
             processedBlocks = shuffleArray(processedBlocks);
         }
 
         processedBlocks.forEach((block) => {
-            // نأخذ نسخة من الأسئلة الفرعية
             let subQs = [...block.subQuestions];
             
-            // نخلط الأسئلة الفرعية داخل الكتلة إذا لم نكن في وضع المراجعة
             if (!isReviewMode && !existingResult) {
                 subQs = shuffleArray(subQs);
             }
@@ -897,7 +911,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
   if (flatQuestions.length === 0) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-white">عفواً، لا توجد أسئلة.<button onClick={onClose} className="ml-4 bg-gray-200 px-4 py-2 rounded">خروج</button></div>;
 
-  // Watermark random movement logic
+  // Watermark random movement logic (Using translated keys for performance)
   useEffect(() => {
     if (isReviewMode) return;
     const updatePositions = () => {
@@ -908,11 +922,10 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
         setWmPositions(newPos);
     };
     updatePositions();
-    const interval = setInterval(updatePositions, 4000); // Move every 4 seconds
+    const interval = setInterval(updatePositions, 6000); 
     return () => clearInterval(interval);
   }, [isReviewMode]);
 
-  // Handle Refresh or Close tab (Anti-Cheat: Lockout on exit)
   useEffect(() => {
       if (isReviewMode || isSubmitted) return;
 
@@ -925,7 +938,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
       window.addEventListener('beforeunload', handleBeforeUnload);
       
       const handleVisibilityChange = () => { 
-          // Prevent cheating detection if confirm modal is open
           if (!showSubmitConfirm && document.hidden) handleCheating(); 
       };
       document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -1026,8 +1038,8 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
      return (
         <div className="fixed inset-0 z-[60] bg-slate-50 overflow-y-auto p-4 font-['Cairo']" dir="rtl">
-            <div className="max-w-4xl mx-auto bg-white rounded-3xl shadow-xl p-8 mt-10 text-center">
-                <h2 className="text-3xl font-black mb-4">تم تسليم الامتحان بنجاح</h2>
+            <div className="max-w-4xl mx-auto bg-white rounded-3xl shadow-xl p-8 mt-10 text-center border border-slate-200">
+                <h2 className="text-3xl font-black mb-4 font-arabic text-amber-700">تم تسليم الامتحان بنجاح</h2>
                 <div className={`text-6xl font-black my-6 ${score >= flatQuestions.length / 2 ? 'text-green-600' : 'text-red-600'}`}>{score} / {flatQuestions.length}</div>
                 
                 {!canReview && (
@@ -1036,17 +1048,17 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                             <Clock size={20}/>
                             نموذج الإجابة والمراجعة سيظهر تلقائياً بعد انتهاء وقت الامتحان الأصلي.
                         </p>
-                        <p className="text-sm mt-1">موعد الانتهاء: {new Date(exam.endTime).toLocaleString('ar-EG')}</p>
+                        <p className="text-sm mt-1 font-bold">موعد الانتهاء: {new Date(exam.endTime).toLocaleString('ar-EG')}</p>
                     </div>
                 )}
 
                 <div className="flex gap-4 justify-center">
                     {canReview ? (
-                        <button onClick={() => generatePDF('student', {studentName: user.displayName, score, total: flatQuestions.length, status: 'completed', examTitle: exam.title, questions: flatQuestions, answers: answers })} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2"><Download size={18}/> تحميل التقرير الشامل</button>
+                        <button onClick={() => generatePDF('student', {studentName: user.displayName, score, total: flatQuestions.length, status: 'completed', examTitle: exam.title, questions: flatQuestions, answers: answers })} className="bg-gradient-to-r from-blue-600 to-blue-800 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg"><Download size={18}/> تحميل التقرير الشامل</button>
                     ) : (
                         <button disabled className="bg-gray-300 text-gray-500 px-6 py-2 rounded-lg font-bold flex items-center gap-2 cursor-not-allowed"><Lock size={18}/> التقرير مغلق حالياً</button>
                     )}
-                    <button onClick={onClose} className="bg-slate-900 text-white py-3 px-8 rounded-xl font-bold">عودة للرئيسية</button>
+                    <button onClick={onClose} className="bg-slate-900 text-white py-3 px-8 rounded-xl font-bold shadow-lg">عودة للرئيسية</button>
                 </div>
             </div>
         </div>
@@ -1055,7 +1067,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   
   return (
     <div className="fixed inset-0 z-50 bg-slate-100 flex flex-col font-['Cairo'] no-select" dir="rtl">
-      {/* Dynamic Watermark Layer */}
       {!isReviewMode && (
         <div className="fixed inset-0 pointer-events-none z-[9999] overflow-hidden">
             {wmPositions.map((pos, i) => (
@@ -1066,16 +1077,15 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
         </div>
       )}
       
-      {/* Custom Confirmation Modal */}
       {showSubmitConfirm && (
-        <div className="fixed inset-0 z-[10000] bg-black/50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl text-center">
+        <div className="fixed inset-0 z-[10000] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl text-center border-t-4 border-amber-500">
                 <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-4"/>
                 <h3 className="text-xl font-bold mb-2">هل أنت متأكد من التسليم؟</h3>
                 <p className="text-gray-600 mb-6">لن يمكنك تعديل الإجابات بعد ذلك.</p>
                 <div className="flex gap-3">
-                    <button onClick={() => handleSubmit(false)} className="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold hover:bg-green-700">نعم، سلم الامتحان</button>
-                    <button onClick={() => setShowSubmitConfirm(false)} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg font-bold hover:bg-gray-300">تراجع</button>
+                    <button onClick={() => handleSubmit(false)} className="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold hover:bg-green-700 shadow-md">نعم، سلم الامتحان</button>
+                    <button onClick={() => setShowSubmitConfirm(false)} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg font-bold hover:bg-gray-300 shadow-sm">تراجع</button>
                 </div>
             </div>
         </div>
@@ -1083,31 +1093,31 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
       <div className="bg-slate-900 text-white p-4 flex justify-between items-center shadow-md relative z-50">
         <div className="flex items-center gap-4">
-            <h2 className="font-bold text-lg">{exam.title} {isReviewMode ? '(مراجعة الإجابات)' : ''}</h2>
-            {!isReviewMode && <div className="bg-slate-700 px-4 py-1 rounded-full font-mono">{Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</div>}
+            <h2 className="font-bold text-lg font-arabic text-amber-400">{exam.title} {isReviewMode ? '(مراجعة الإجابات)' : ''}</h2>
+            {!isReviewMode && <div className="bg-slate-700 px-4 py-1 rounded-full font-mono shadow-inner border border-slate-600">{Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</div>}
         </div>
         {!isReviewMode ? (
-            <button onClick={confirmSubmit} className="bg-green-600 px-6 py-2 rounded-lg font-bold">تسليم</button>
+            <button onClick={confirmSubmit} className="bg-gradient-to-r from-green-500 to-green-600 px-6 py-2 rounded-lg font-bold shadow-lg hover:shadow-green-500/50 transition">تسليم</button>
         ) : (
-            <button onClick={onClose} className="bg-slate-700 px-6 py-2 rounded-lg font-bold">إغلاق</button>
+            <button onClick={onClose} className="bg-slate-700 px-6 py-2 rounded-lg font-bold hover:bg-slate-600 transition">إغلاق</button>
         )}
       </div>
 
       <div className="flex-1 flex overflow-hidden relative z-50">
-        <div className="w-16 md:w-24 bg-white border-l flex flex-col p-2 overflow-y-auto">
+        <div className="w-16 md:w-24 bg-white border-l flex flex-col p-2 overflow-y-auto shadow-inner">
           <div className="grid grid-cols-1 gap-2">
               {flatQuestions.map((q, idx) => {
-                  let statusClass = 'bg-slate-100 text-slate-600';
+                  let statusClass = 'bg-slate-100 text-slate-600 hover:bg-slate-200';
                   if (isReviewMode) {
-                      if (answers[q.id] === q.correctIdx) statusClass = 'bg-green-100 text-green-700 border border-green-400';
-                      else statusClass = 'bg-red-100 text-red-700 border border-red-400';
+                      if (answers[q.id] === q.correctIdx) statusClass = 'bg-green-100 text-green-700 border border-green-400 shadow-sm';
+                      else statusClass = 'bg-red-100 text-red-700 border border-red-400 shadow-sm';
                   } else if (answers[q.id] !== undefined) {
-                      statusClass = 'bg-blue-100 text-blue-700 border border-blue-400';
+                      statusClass = 'bg-blue-100 text-blue-700 border border-blue-400 shadow-sm';
                   }
                   return (
-                    <button key={idx} onClick={() => setCurrentQIndex(idx)} className={`aspect-square rounded-lg font-bold text-sm ${currentQIndex === idx ? 'ring-2 ring-amber-500 shadow-md' : ''} ${statusClass}`}>
+                    <button key={idx} onClick={() => setCurrentQIndex(idx)} className={`aspect-square rounded-lg font-bold text-sm transition-all ${currentQIndex === idx ? 'ring-2 ring-amber-500 shadow-md scale-105' : ''} ${statusClass}`}>
                         {idx + 1}
-                        {flagged[q.id] && !isReviewMode && <div className="absolute top-0 right-0 w-2 h-2 bg-amber-500 rounded-full"></div>}
+                        {flagged[q.id] && !isReviewMode && <div className="absolute top-0 right-0 w-3 h-3 bg-amber-500 rounded-full border-2 border-white shadow-sm"></div>}
                     </button>
                   )
               })}
@@ -1116,20 +1126,20 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
         <div className={`flex-1 flex flex-col ${hasPassage ? 'md:flex-row' : 'items-center'} h-full overflow-hidden bg-slate-50 w-full`}>
           {hasPassage && (
-            <div className="flex-1 w-full bg-amber-50 p-8 overflow-y-auto border-l border-amber-200 shadow-inner">
-              <h3 className="font-bold text-amber-800 mb-6 flex items-center gap-2 text-xl border-b border-amber-200 pb-2"><BookOpen size={24}/> اقرأ النص التالي بعناية:</h3>
-              <p className="whitespace-pre-line leading-loose text-lg font-medium text-slate-800 font-serif">{currentQObj.blockText}</p>
+            <div className="flex-1 w-full bg-gradient-to-b from-amber-50 to-orange-50 p-8 overflow-y-auto border-l border-amber-200 shadow-inner">
+              <h3 className="font-bold text-amber-900 mb-6 flex items-center gap-2 text-xl border-b border-amber-200 pb-2 font-arabic"><BookOpen size={24}/> اقرأ النص التالي بعناية:</h3>
+              <p className="whitespace-pre-line leading-loose text-lg font-medium text-slate-800 font-arabic">{currentQObj.blockText}</p>
             </div>
           )}
           
-          <div className={`${hasPassage ? 'flex-1' : 'w-full max-w-4xl mx-auto'} bg-white p-8 overflow-y-auto flex flex-col shadow-sm m-4 rounded-3xl h-fit max-h-[95%] border border-slate-200`}>
+          <div className={`${hasPassage ? 'flex-1' : 'w-full max-w-4xl mx-auto'} bg-white p-8 overflow-y-auto flex flex-col shadow-lg m-4 rounded-3xl h-fit max-h-[95%] border border-slate-100`}>
             <div className="flex justify-between items-start mb-8">
-              <span className="bg-slate-100 text-slate-600 px-4 py-1 rounded-full text-sm font-bold">سؤال {currentQIndex + 1}</span>
-              {!isReviewMode && <button onClick={() => { setFlagged({...flagged, [currentQObj.id]: !flagged[currentQObj.id]}) }} className={`flex items-center gap-2 px-4 py-1 rounded-full text-sm font-bold transition ${flagged[currentQObj.id] ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}><Flag size={16} /> مراجعة لاحقاً</button>}
+              <span className="bg-slate-100 text-slate-600 px-4 py-1 rounded-full text-sm font-bold shadow-sm">سؤال {currentQIndex + 1}</span>
+              {!isReviewMode && <button onClick={() => { setFlagged({...flagged, [currentQObj.id]: !flagged[currentQObj.id]}) }} className={`flex items-center gap-2 px-4 py-1 rounded-full text-sm font-bold transition shadow-sm ${flagged[currentQObj.id] ? 'bg-amber-100 text-amber-700 border border-amber-300' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}><Flag size={16} /> مراجعة لاحقاً</button>}
             </div>
             
             <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 mb-8 shadow-inner">
-              <h3 className="text-2xl font-bold text-slate-900 leading-relaxed">{currentQObj.text}</h3>
+              <h3 className="text-2xl font-bold text-slate-900 leading-relaxed font-arabic">{currentQObj.text}</h3>
             </div>
 
             <div className="space-y-4">
@@ -1138,17 +1148,17 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                   const isSelected = answers[currentQObj.id] === idx;
                   
                   if (isReviewMode) {
-                      if (idx === currentQObj.correctIdx) optionClass = 'border-green-500 bg-green-50 text-green-900'; 
-                      else if (isSelected) optionClass = 'border-red-500 bg-red-50 text-red-900'; 
+                      if (idx === currentQObj.correctIdx) optionClass = 'border-green-500 bg-green-50 text-green-900 shadow-sm'; 
+                      else if (isSelected) optionClass = 'border-red-500 bg-red-50 text-red-900 shadow-sm'; 
                   } else {
-                      if (isSelected) optionClass = 'border-amber-500 bg-amber-50 text-amber-900 shadow-sm';
+                      if (isSelected) optionClass = 'border-amber-500 bg-amber-50 text-amber-900 shadow-md transform scale-[1.01]';
                   }
 
                   return (
-                    <div key={idx} onClick={() => handleAnswer(currentQObj.id, idx)} className={`p-5 rounded-xl border-2 cursor-pointer transition flex items-center gap-4 text-lg font-medium ${optionClass}`}>
-                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${isSelected || (isReviewMode && idx === currentQObj.correctIdx) ? 'border-transparent bg-current' : 'border-slate-300'}`}>
+                    <div key={idx} onClick={() => handleAnswer(currentQObj.id, idx)} className={`p-5 rounded-xl border-2 cursor-pointer transition-all flex items-center gap-4 text-lg font-medium ${optionClass}`}>
+                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${isSelected || (isReviewMode && idx === currentQObj.correctIdx) ? 'border-transparent bg-current' : 'border-slate-300'}`}>
                       </div>
-                      <span>{opt}</span>
+                      <span className="font-arabic">{opt}</span>
                       {isReviewMode && idx === currentQObj.correctIdx && <CheckCircle className="text-green-600 mr-auto"/>}
                       {isReviewMode && isSelected && idx !== currentQObj.correctIdx && <XCircle className="text-red-600 mr-auto"/>}
                     </div>
@@ -1157,8 +1167,8 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
             </div>
 
             <div className="mt-12 flex justify-between">
-              <button disabled={currentQIndex === 0} onClick={() => setCurrentQIndex(p => p - 1)} className="px-8 py-3 rounded-xl bg-slate-200 text-slate-600 font-bold disabled:opacity-50 hover:bg-slate-300 transition">السابق</button>
-              <button disabled={currentQIndex === flatQuestions.length - 1} onClick={() => setCurrentQIndex(p => p + 1)} className="px-8 py-3 rounded-xl bg-slate-900 text-white font-bold disabled:opacity-50 hover:bg-slate-800 transition">التالي</button>
+              <button disabled={currentQIndex === 0} onClick={() => setCurrentQIndex(p => p - 1)} className="px-8 py-3 rounded-xl bg-slate-200 text-slate-600 font-bold disabled:opacity-50 hover:bg-slate-300 transition shadow-sm">السابق</button>
+              <button disabled={currentQIndex === flatQuestions.length - 1} onClick={() => setCurrentQIndex(p => p + 1)} className="px-8 py-3 rounded-xl bg-slate-900 text-white font-bold disabled:opacity-50 hover:bg-slate-800 transition shadow-sm">التالي</button>
             </div>
           </div>
         </div>
@@ -1527,7 +1537,6 @@ const AdminDashboard = ({ user }) => {
               </div>
           )}
 
-          {/* ... (باقي التبويبات exams, results, live... كما هي) ... */}
           {activeTab === 'exams' && <div className="space-y-8"><div className="glass-panel p-6 rounded-xl"><h2 className="text-xl font-bold mb-6 border-b pb-2 font-arabic text-amber-700">إنشاء امتحان</h2><div className="grid grid-cols-4 gap-4 mb-6"><input className="border p-2 rounded col-span-2" placeholder="العنوان" value={examBuilder.title} onChange={e=>setExamBuilder({...examBuilder, title:e.target.value})}/><input className="border p-2 rounded" placeholder="الكود" value={examBuilder.accessCode} onChange={e=>setExamBuilder({...examBuilder, accessCode:e.target.value})}/><input type="number" className="border p-2 rounded" placeholder="المدة (دقائق)" value={examBuilder.duration} onChange={e=>setExamBuilder({...examBuilder, duration:parseInt(e.target.value)})}/><select className="border p-2 rounded col-span-4" value={examBuilder.grade} onChange={e=>setExamBuilder({...examBuilder, grade:e.target.value})}><GradeOptions/></select><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت البدء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, startTime:e.target.value})}/></div><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت الانتهاء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, endTime:e.target.value})}/></div></div><div className="bg-slate-50 p-4 rounded-xl border mb-6"><textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm" placeholder="اكتب الأسئلة هنا... (ضع علامة * قبل الإجابة الصحيحة)" value={bulkText} onChange={e=>setBulkText(e.target.value)}/><button onClick={parseExam} className="mt-4 w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-green-500/50 transition">نشر</button></div></div><div className="glass-panel p-6 rounded-xl"><h3 className="font-bold mb-4 font-arabic">الامتحانات الحالية</h3>{examsList.map(exam=><div key={exam.id} className="flex justify-between items-center border-b py-3 last:border-0 hover:bg-slate-50/50 px-2 rounded transition"><div><p className="font-bold">{exam.title}</p><p className="text-xs text-slate-500">من: {new Date(exam.startTime).toLocaleString('ar-EG')} | إلى: {new Date(exam.endTime).toLocaleString('ar-EG')}</p><p className="text-xs text-slate-400">كود: {exam.accessCode}</p></div><div className="flex gap-2"><button onClick={()=>handleDeleteExam(exam.id)} className="text-red-500 p-2"><Trash2 size={18}/></button></div></div>)}</div></div>}
 
           {activeTab === 'results' && (
@@ -1828,8 +1837,8 @@ const StudentDashboard = ({ user, userData }) => {
   if (isBannedAll) return (
       <div className="h-screen flex flex-col items-center justify-center bg-red-50 text-center p-6">
           <Ban size={80} className="text-red-600 mb-4" />
-          <h2 className="text-3xl font-bold text-red-800 mb-2">تم حظر حسابك</h2>
-          <p className="text-red-600 mb-6">يرجى التواصل مع الإدارة أو المستر لمعرفة السبب.</p>
+          <h2 className="text-3xl font-bold text-red-800 mb-2 font-arabic">تم حظر حسابك</h2>
+          <p className="text-red-600 mb-6 font-bold">يرجى التواصل مع الإدارة أو المستر لمعرفة السبب.</p>
           <button onClick={()=>signOut(auth)} className="bg-white text-red-600 px-6 py-2 rounded-full font-bold shadow-md hover:bg-red-100">تسجيل الخروج</button>
       </div>
   );
@@ -2181,29 +2190,29 @@ const AuthPage = ({ onBack }) => {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-slate-900 font-['Cairo'] relative overflow-hidden" dir="rtl">
       <FloatingArabicBackground />
-      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl relative z-10 my-10 overflow-y-auto max-h-[90vh]">
+      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white/90 backdrop-blur-xl rounded-3xl p-8 w-full max-w-md shadow-2xl relative z-10 my-10 overflow-y-auto max-h-[90vh] border border-white/50">
         <button onClick={onBack} className="text-slate-500 hover:text-slate-800 text-sm mb-6 flex items-center gap-1 font-bold"><ChevronRight size={18} /> العودة</button>
         <div className="flex justify-center mb-4"><ModernLogo /></div>
-        <h2 className="text-3xl font-black text-slate-800 mb-2 text-center">{isRegister ? 'حساب جديد' : 'تسجيل دخول'}</h2>
+        <h2 className="text-3xl font-bold font-arabic text-slate-800 mb-2 text-center">{isRegister ? 'حساب جديد' : 'تسجيل دخول'}</h2>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 mt-6">
           {isRegister && (
             <>
-              <div className="relative"><User className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="text" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50" placeholder="الاسم ثلاثي" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
-              <div className="relative"><Phone className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50" placeholder="رقم هاتفك" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} /></div>
-              <div className="relative"><Phone className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50" placeholder="رقم ولي الأمر" value={formData.parentPhone} onChange={e => setFormData({...formData, parentPhone: e.target.value})} /></div>
+              <div className="relative"><User className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="text" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="الاسم ثلاثي" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
+              <div className="relative"><Phone className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="رقم هاتفك" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} /></div>
+              <div className="relative"><Phone className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="رقم ولي الأمر" value={formData.parentPhone} onChange={e => setFormData({...formData, parentPhone: e.target.value})} /></div>
               <div className="relative"><GraduationCap className="absolute top-3.5 right-4 text-slate-400" size={20} />
-                <select className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 appearance-none" value={formData.grade} onChange={e => setFormData({...formData, grade: e.target.value})}>
+                <select className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 appearance-none focus:border-amber-500 outline-none transition" value={formData.grade} onChange={e => setFormData({...formData, grade: e.target.value})}>
                   <GradeOptions />
                 </select>
               </div>
             </>
           )}
-          <div className="relative"><Mail className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="email" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50" placeholder="البريد" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></div>
-          <div className="relative"><Lock className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="password" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50" placeholder="كلمة السر" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} /></div>
+          <div className="relative"><Mail className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="email" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="البريد" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></div>
+          <div className="relative"><Lock className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="password" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="كلمة السر" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} /></div>
           {!isRegister && (<div className="text-left"><button type="button" onClick={handleForgotPassword} className="text-xs text-amber-600 font-bold hover:underline">نسيت كلمة السر؟</button></div>)}
-          <button disabled={loading} className="bg-amber-600 text-white py-3 rounded-xl font-bold hover:bg-amber-700 transition shadow-lg mt-2 flex justify-center">{loading ? <Loader2 className="animate-spin" /> : (isRegister ? 'تسجيل' : 'دخول')}</button>
+          <button disabled={loading} className="bg-gradient-to-r from-amber-600 to-amber-700 text-white py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-amber-500/50 transition mt-2 flex justify-center">{loading ? <Loader2 className="animate-spin" /> : (isRegister ? 'تسجيل' : 'دخول')}</button>
         </form>
-        <button onClick={() => setIsRegister(!isRegister)} className="mt-6 text-amber-700 font-bold hover:underline w-full text-center block text-sm">{isRegister ? 'تسجيل الدخول' : 'حساب جديد'}</button>
+        <button onClick={() => setIsRegister(!isRegister)} className="mt-6 text-amber-800 font-bold hover:underline w-full text-center block text-sm">{isRegister ? 'تسجيل الدخول' : 'حساب جديد'}</button>
       </motion.div>
       <ChatWidget />
     </div>
