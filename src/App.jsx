@@ -16,7 +16,7 @@ import {
   ExternalLink, ClipboardList, Timer, AlertOctagon, Flag, Save, HelpCircle, 
   Reply, Unlock, Layout, Settings, Trophy, Megaphone, Bell, Download, XCircle, 
   Calendar, Clock, FileWarning, Settings as GearIcon, Star, Bot, Power, Upload,
-  Users, PenTool, Code, Sparkles, Lamp, Ban, Shield, RefreshCw
+  Users, PenTool, Code, Sparkles, Lamp, Ban, Shield, RefreshCw, Link as LinkIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -415,7 +415,6 @@ const ModernLogo = () => (
   </div>
 );
 
-// تم التعديل لمنع استخدام Framer Motion وتخفيف استهلاك الموبايل (استخدام CSS صافي)
 const FloatingArabicBackground = React.memo(() => (
   <div className="fixed inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 0, background: 'radial-gradient(circle at center, #fdfbf7 0%, #e2e8f0 100%)' }}>
     <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: `url("https://www.transparenttextures.com/patterns/arabesque.png")` }} />
@@ -673,6 +672,7 @@ const ChatWidget = ({ user }) => {
   );
 };
 
+// تم تعديل شاشة البث للتعامل مع الروابط الخارجية (مثل Google Meet) بشكل أفضل
 const LiveSessionView = ({ session, user, onClose }) => {
   const [messages, setMessages] = useState([]);
   const [msgInput, setMsgInput] = useState("");
@@ -707,16 +707,29 @@ const LiveSessionView = ({ session, user, onClose }) => {
             <span className="w-3 h-3 bg-white rounded-full animate-pulse shadow-[0_0_10px_white]"></span>
             <h2 className="font-bold">بث مباشر: {session.title}</h2>
           </div>
-          <button onClick={onClose} className="text-sm bg-black/30 hover:bg-black/50 px-3 py-1 rounded transition">خروج</button>
+          <button onClick={onClose} className="text-sm bg-black/30 hover:bg-black/50 px-3 py-1 rounded transition">العودة للمنصة</button>
         </div>
-        <div className="flex-1 bg-black relative flex items-center justify-center">
-          <div className="watermark-video">{user.displayName}</div>
+        <div className="flex-1 bg-black relative flex items-center justify-center overflow-hidden">
+          <div className="watermark-video z-50">{user.displayName}</div>
           {isYouTube ? (
-            <iframe width="100%" height="100%" src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&controls=1&rel=0&modestbranding=1`} title="Live" frameBorder="0" allowFullScreen></iframe>
+            <iframe width="100%" height="100%" src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&controls=1&rel=0&modestbranding=1&playsinline=1`} title="Live" frameBorder="0" allowFullScreen style={{ WebkitTransform: 'translateZ(0)' }}></iframe>
           ) : (
-            <div className="text-center p-8 bg-slate-800 rounded-2xl max-w-md border border-slate-700 shadow-2xl">
-              <h3 className="text-2xl font-bold text-white mb-4">اجتماع خارجي</h3>
-              <a href={session.liveUrl} target="_blank" className="bg-green-600 text-white text-lg font-bold py-3 px-8 rounded-full hover:bg-green-700 flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(34,197,94,0.5)]"><ExternalLink size={20}/> اضغط للانضمام</a>
+            <div className="w-full h-full relative">
+              <iframe 
+                width="100%" 
+                height="100%" 
+                src={session.liveUrl} 
+                title="Live Meeting" 
+                frameBorder="0" 
+                allow="camera; microphone; display-capture; autoplay; clipboard-write; fullscreen" 
+                allowFullScreen
+                className="relative z-10"
+                style={{ WebkitTransform: 'translateZ(0)' }}
+              ></iframe>
+              {/* زر احتياطي للطوارئ في حال منعت متصفحات الهواتف الصارمة تشغيل الكاميرا داخل الإطار */}
+              <a href={session.liveUrl} target="_blank" rel="noopener noreferrer" className="absolute top-4 left-4 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-full text-xs font-bold backdrop-blur-md border border-white/20 transition flex items-center gap-2 z-50 shadow-lg">
+                  <ExternalLink size={14}/> للموبايل (لو البث مش شغال)
+              </a>
             </div>
           )}
         </div>
@@ -752,7 +765,6 @@ const SecureVideoPlayer = ({ video, userName, onClose }) => {
     setShowSettings(false);
   };
 
-  // إضافة playsinline=1 إلى رابط اليوتيوب ليشتغل بسلاسة في الموبايل
   const youtubeEmbedUrl = videoId 
     ? `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1&showinfo=0&iv_load_policy=3&loop=1&playlist=${videoId}&playsinline=1` 
     : '';
@@ -1189,8 +1201,8 @@ const AdminDashboard = ({ user }) => {
   const [contentList, setContentList] = useState([]);
   const [messagesList, setMessagesList] = useState([]); 
   const [newContent, setNewContent] = useState({ title: '', url: '', type: 'video', isPublic: false, grade: '3sec', allowedEmails: '' });
-  const [liveData, setLiveData] = useState({ title: '', liveUrl: '', grade: '3sec' });
-  const [isLive, setIsLive] = useState(false);
+  const [liveData, setLiveData] = useState({ title: '', liveUrl: '', grade: '3sec', passcode: '', allowedEmails: '' }); // إضافة الخانات الجديدة للبث
+  const [activeLiveSessions, setActiveLiveSessions] = useState([]); // عرض البث المباشر النشط
   const [editingUser, setEditingUser] = useState(null);
   const [replyTexts, setReplyTexts] = useState({});
   const [examBuilder, setExamBuilder] = useState({ title: '', grade: '3sec', duration: 60, startTime: '', endTime: '', questions: [], accessCode: '' });
@@ -1202,13 +1214,11 @@ const AdminDashboard = ({ user }) => {
   const [showLeaderboard, setShowLeaderboard] = useState(true);
   const [announcements, setAnnouncements] = useState([]);
   
-  // خاص بالرد الآلي والحكم
   const [autoReplies, setAutoReplies] = useState([]);
   const [newAutoReply, setNewAutoReply] = useState({ keywords: '', response: '', isActive: true });
   const [quotesList, setQuotesList] = useState([]);
   const [newQuote, setNewQuote] = useState({ text: '', source: '' });
 
-  // حالات رفع الملف
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -1216,7 +1226,7 @@ const AdminDashboard = ({ user }) => {
   useEffect(() => { const u = onSnapshot(query(collection(db, 'users'), where('status', 'in', ['active', 'banned_cheating', 'banned_all', 'banned_exam', 'banned_content', 'rejected'])), s => setActiveUsersList(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(query(collection(db, 'content'), orderBy('createdAt','desc')), s => setContentList(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(query(collection(db, 'messages'), orderBy('createdAt','desc')), s => setMessagesList(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
-  useEffect(() => { const u = onSnapshot(query(collection(db, 'live_sessions'), where('status', '==', 'active')), s => setIsLive(!s.empty)); return u; }, []);
+  useEffect(() => { const u = onSnapshot(query(collection(db, 'live_sessions'), where('status', '==', 'active')), s => setActiveLiveSessions(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(query(collection(db, 'exams'), orderBy('createdAt', 'desc')), s => setExamsList(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(query(collection(db, 'exam_results'), orderBy('submittedAt', 'desc')), s => setExamResults(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(query(collection(db, 'announcements'), orderBy('createdAt', 'desc')), s => setAnnouncements(s.docs.map(d => ({id: d.id, ...d.data()})))); return u; }, []);
@@ -1342,8 +1352,28 @@ const AdminDashboard = ({ user }) => {
   
   const handleDeleteContent = async (id) => { if(window.confirm("حذف هذا المحتوى؟")) await deleteDoc(doc(db, 'content', id)); };
 
-  const startLiveStream = async () => { if(!liveData.liveUrl) return alert("الرابط؟"); await addDoc(collection(db, 'live_sessions'), { ...liveData, status: 'active', createdAt: serverTimestamp() }); await addDoc(collection(db, 'notifications'), { text: `🔴 بث مباشر الآن: ${liveData.title}`, grade: liveData.grade, createdAt: serverTimestamp() }); alert("بدا البث!"); };
-  const stopLiveStream = async () => { if(window.confirm("إنهاء البث؟")) { const q = query(collection(db, 'live_sessions'), where('status', '==', 'active')); const snap = await getDocs(q); snap.forEach(async (d) => await updateDoc(doc(db, 'live_sessions', d.id), { status: 'ended' })); alert("تم الإنهاء"); } };
+  const startLiveStream = async () => { 
+      if(!liveData.liveUrl) return alert("الرابط مطلوب!"); 
+      const allowedEmailsArray = liveData.allowedEmails ? liveData.allowedEmails.split(',').map(email => email.trim()) : [];
+      await addDoc(collection(db, 'live_sessions'), { 
+          ...liveData, 
+          allowedEmails: allowedEmailsArray,
+          status: 'active', 
+          createdAt: serverTimestamp() 
+      }); 
+      if (allowedEmailsArray.length === 0) {
+          await addDoc(collection(db, 'notifications'), { text: `🔴 بث مباشر الآن: ${liveData.title}`, grade: liveData.grade, createdAt: serverTimestamp() }); 
+      }
+      alert("بدأ البث!"); 
+      setLiveData({ title: '', liveUrl: '', grade: '3sec', passcode: '', allowedEmails: '' });
+  };
+
+  const stopLiveStream = async (id) => { 
+      if(window.confirm("إنهاء البث؟")) { 
+          await updateDoc(doc(db, 'live_sessions', id), { status: 'ended' }); 
+          alert("تم الإنهاء"); 
+      } 
+  };
 
   const parseExam = async () => {
     if (!bulkText.trim()) return alert("أدخل نص الامتحان");
@@ -1490,6 +1520,7 @@ const AdminDashboard = ({ user }) => {
                                   
                                   <div className="flex flex-col gap-2 w-full md:w-auto mt-4 md:mt-0">
                                       <div className="flex gap-2">
+                                          {/* زر فك الحظر الصريح */}
                                           {u.status.startsWith('banned') && (
                                               <button 
                                                   onClick={() => handleChangeUserStatus(u.id, 'active')}
@@ -1517,6 +1548,7 @@ const AdminDashboard = ({ user }) => {
                                   </div>
                               </div>
 
+                              {/* عرض طلب تغيير المرحلة إذا وجد */}
                               {u.gradeUpdateStatus === 'pending' && (
                                   <div className="w-full bg-yellow-50 border border-yellow-200 p-3 rounded-lg flex justify-between items-center">
                                       <div className="flex items-center gap-2 text-yellow-800 text-sm font-bold">
@@ -1535,6 +1567,7 @@ const AdminDashboard = ({ user }) => {
               </div>
           )}
 
+          {/* ... (باقي التبويبات exams, results... كما هي) ... */}
           {activeTab === 'exams' && <div className="space-y-8"><div className="glass-panel p-6 rounded-xl"><h2 className="text-xl font-bold mb-6 border-b pb-2 font-arabic text-amber-700">إنشاء امتحان</h2><div className="grid grid-cols-4 gap-4 mb-6"><input className="border p-2 rounded col-span-2" placeholder="العنوان" value={examBuilder.title} onChange={e=>setExamBuilder({...examBuilder, title:e.target.value})}/><input className="border p-2 rounded" placeholder="الكود" value={examBuilder.accessCode} onChange={e=>setExamBuilder({...examBuilder, accessCode:e.target.value})}/><input type="number" className="border p-2 rounded" placeholder="المدة (دقائق)" value={examBuilder.duration} onChange={e=>setExamBuilder({...examBuilder, duration:parseInt(e.target.value)})}/><select className="border p-2 rounded col-span-4" value={examBuilder.grade} onChange={e=>setExamBuilder({...examBuilder, grade:e.target.value})}><GradeOptions/></select><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت البدء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, startTime:e.target.value})}/></div><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت الانتهاء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, endTime:e.target.value})}/></div></div><div className="bg-slate-50 p-4 rounded-xl border mb-6"><textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm" placeholder="اكتب الأسئلة هنا... (ضع علامة * قبل الإجابة الصحيحة)" value={bulkText} onChange={e=>setBulkText(e.target.value)}/><button onClick={parseExam} className="mt-4 w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-green-500/50 transition">نشر</button></div></div><div className="glass-panel p-6 rounded-xl"><h3 className="font-bold mb-4 font-arabic">الامتحانات الحالية</h3>{examsList.map(exam=><div key={exam.id} className="flex justify-between items-center border-b py-3 last:border-0 hover:bg-slate-50/50 px-2 rounded transition"><div><p className="font-bold">{exam.title}</p><p className="text-xs text-slate-500">من: {new Date(exam.startTime).toLocaleString('ar-EG')} | إلى: {new Date(exam.endTime).toLocaleString('ar-EG')}</p><p className="text-xs text-slate-400">كود: {exam.accessCode}</p></div><div className="flex gap-2"><button onClick={()=>handleDeleteExam(exam.id)} className="text-red-500 p-2"><Trash2 size={18}/></button></div></div>)}</div></div>}
 
           {activeTab === 'results' && (
@@ -1596,7 +1629,36 @@ const AdminDashboard = ({ user }) => {
              </div>
           )}
 
-          {activeTab === 'live' && <div className="glass-panel p-8 rounded-xl border-t-4 border-red-600"><h2 className="text-2xl font-bold mb-6 flex items-center gap-2 text-red-600 font-arabic"><Radio size={32}/> البث المباشر</h2><div className="grid gap-4"><input className="border p-3 rounded-xl" placeholder="العنوان" value={liveData.title} onChange={e=>setLiveData({...liveData, title:e.target.value})}/><input className="border p-3 rounded-xl" placeholder="رابط البث (Zoom/YouTube/Meet)" value={liveData.liveUrl} onChange={e=>setLiveData({...liveData, liveUrl:e.target.value})}/><select className="border p-3 rounded-xl" value={liveData.grade} onChange={e=>setLiveData({...liveData, grade:e.target.value})}><GradeOptions/></select>{!isLive?<button onClick={startLiveStream} className="bg-red-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-red-500/30">بدء البث</button>:<button onClick={stopLiveStream} className="bg-slate-800 text-white py-4 rounded-xl font-bold">إنهاء البث</button>}</div></div>}
+          {activeTab === 'live' && (
+              <div className="glass-panel p-8 rounded-xl border-t-4 border-red-600">
+                  <h2 className="text-2xl font-bold mb-6 flex items-center gap-2 text-red-600 font-arabic"><Radio size={32}/> البث المباشر</h2>
+                  <div className="grid gap-4 mb-8">
+                      <input className="border p-3 rounded-xl" placeholder="العنوان" value={liveData.title} onChange={e=>setLiveData({...liveData, title:e.target.value})}/>
+                      <input className="border p-3 rounded-xl" placeholder="رابط البث (Zoom/YouTube/Meet)" value={liveData.liveUrl} onChange={e=>setLiveData({...liveData, liveUrl:e.target.value})}/>
+                      <input className="border p-3 rounded-xl" placeholder="الرقم السري (اختياري، اتركه فارغاً للدخول بدون كود)" value={liveData.passcode} onChange={e=>setLiveData({...liveData, passcode:e.target.value})}/>
+                      <input className="border p-3 rounded-xl" placeholder="إيميلات مخصصة (اختياري، افصل بفاصلة)" value={liveData.allowedEmails} onChange={e=>setLiveData({...liveData, allowedEmails:e.target.value})}/>
+                      <select className="border p-3 rounded-xl" value={liveData.grade} onChange={e=>setLiveData({...liveData, grade:e.target.value})}><GradeOptions/></select>
+                      <button onClick={startLiveStream} className="bg-red-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-red-500/30">بدء بث جديد</button>
+                  </div>
+                  
+                  {activeLiveSessions.length > 0 && (
+                      <div className="mt-8 border-t pt-6">
+                          <h3 className="font-bold mb-4">البث المباشر الحالي</h3>
+                          <div className="space-y-3">
+                              {activeLiveSessions.map(session => (
+                                  <div key={session.id} className="p-4 bg-red-50 border border-red-200 rounded-xl flex justify-between items-center">
+                                      <div>
+                                          <p className="font-bold text-red-800">{session.title} <span className="text-xs bg-red-200 px-2 py-1 rounded-full text-red-700">{getGradeLabel(session.grade)}</span></p>
+                                          {session.passcode && <p className="text-xs text-red-600 mt-1">كود الدخول: {session.passcode}</p>}
+                                      </div>
+                                      <button onClick={() => stopLiveStream(session.id)} className="bg-slate-800 text-white px-4 py-2 rounded-lg font-bold hover:bg-slate-900 transition">إنهاء البث</button>
+                                  </div>
+                              ))}
+                          </div>
+                      </div>
+                  )}
+              </div>
+          )}
 
           {activeTab === 'content' && (
               <div className="glass-panel p-6 rounded-xl">
@@ -1629,9 +1691,10 @@ const AdminDashboard = ({ user }) => {
 
                       <div className="flex gap-2">
                           <select className="border p-3 rounded flex-1" value={newContent.type} onChange={e=>setNewContent({...newContent, type:e.target.value})}>
-                              <option value="video">فيديو</option>
-                              <option value="file">ملف (PDF/Link)</option>
+                              <option value="video">فيديو مدمج</option>
+                              <option value="file">ملف (PDF)</option>
                               <option value="html">ملف تفاعلي (HTML)</option>
+                              <option value="link">رابط خارجي (Google Meet, Drive, etc)</option>
                           </select>
                           <select className="border p-3 rounded flex-1" value={newContent.grade} onChange={e=>setNewContent({...newContent, grade:e.target.value})}><GradeOptions/></select>
                       </div>
@@ -1659,6 +1722,7 @@ const AdminDashboard = ({ user }) => {
                                   <span className="font-bold">{c.title}</span>
                                   {c.allowedEmails && c.allowedEmails.length > 0 && <span className="mr-2 text-xs bg-red-100 text-red-600 px-2 py-1 rounded flex items-center gap-1 inline-flex"><Lock size={10}/> خاص</span>}
                                   {c.type === 'html' && <span className="mr-2 text-xs bg-purple-100 text-purple-600 px-2 py-1 rounded">HTML</span>}
+                                  {c.type === 'link' && <span className="mr-2 text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded">رابط خارجي</span>}
                               </div>
                               <div className="flex gap-2">
                                   <button onClick={() => handleDeleteContent(c.id)} className="text-red-500 hover:text-red-700"><Trash2 size={18}/></button>
@@ -1669,6 +1733,7 @@ const AdminDashboard = ({ user }) => {
               </div>
           )}
 
+          {/* ... (باقي التبويبات messages, auto_reply, quotes, settings... كما هي) ... */}
           {activeTab === 'messages' && <div className="glass-panel p-6 rounded-xl"><h2 className="font-bold mb-4 font-arabic text-xl">الرسائل</h2>{messagesList.map(m=><div key={m.id} className="border-b p-4 bg-slate-50 mb-3 rounded-lg relative"><button onClick={()=>handleDeleteMessage(m.id)} className="absolute top-2 left-2 text-red-400"><Trash2 size={16}/></button><div className="mb-2"><p className="font-bold text-amber-800">{m.senderName} <span className="text-xs text-slate-500">({m.sender})</span></p><p className="text-sm text-slate-400">{m.createdAt?.toDate?m.createdAt.toDate().toLocaleString():'الآن'}</p></div><p className="text-slate-800 bg-white p-3 rounded-lg border border-slate-200 mb-3">{m.text}</p>{m.adminReply?<div className="bg-green-50 p-3 rounded-lg border border-green-200 text-sm"><span className="font-bold text-green-700">ردك: </span>{m.adminReply}</div>:<div className="flex gap-2"><input className="flex-1 border p-2 rounded text-sm" placeholder="اكتب ردك..." value={replyTexts[m.id]||""} onChange={e=>setReplyTexts({...replyTexts,[m.id]:e.target.value})}/><button onClick={()=>handleReplyMessage(m.id)} className="bg-blue-600 text-white px-3 py-1 rounded text-sm"><Reply size={14}/></button></div>}</div>)}</div>}
            
           {activeTab === 'auto_reply' && (
@@ -1770,7 +1835,8 @@ const StudentDashboard = ({ user, userData }) => {
   const [activeTab, setActiveTab] = useState('home');
   const [mobileMenu, setMobileMenu] = useState(false);
   const [content, setContent] = useState([]);
-  const [liveSession, setLiveSession] = useState(null);
+  const [liveSessions, setLiveSessions] = useState([]); // تحول إلى مصفوفة لعدم الإجبار على الدخول
+  const [activeLiveView, setActiveLiveView] = useState(null); // البث الذي يشاهده حالياً
   const [exams, setExams] = useState([]);
   const [activeExam, setActiveExam] = useState(null);
   const [playingVideo, setPlayingVideo] = useState(null);
@@ -1796,7 +1862,16 @@ const StudentDashboard = ({ user, userData }) => {
         setContent(visibleContent);
     });
 
-    const unsubLive = onSnapshot(query(collection(db, 'live_sessions'), where('status', '==', 'active'), where('grade', '==', userData.grade)), s => setLiveSession(s.empty ? null : {id:s.docs[0].id, ...s.docs[0].data()}));
+    const unsubLive = onSnapshot(query(collection(db, 'live_sessions'), where('status', '==', 'active'), where('grade', '==', userData.grade)), s => {
+        const activeSessions = s.docs.map(d=>({id:d.id, ...d.data()}));
+        // تصفية البث المباشر المخصص لطلاب معينين
+        const visibleSessions = activeSessions.filter(ls => {
+            if (!ls.allowedEmails || ls.allowedEmails.length === 0) return true;
+            return ls.allowedEmails.includes(user.email);
+        });
+        setLiveSessions(visibleSessions);
+    });
+
     const unsubExams = onSnapshot(query(collection(db, 'exams'), where('grade', '==', userData.grade)), s => setExams(s.docs.map(d=>({id:d.id,...d.data()}))));
     const unsubResults = onSnapshot(query(collection(db, 'exam_results'), where('studentId', '==', user.uid)), s => setExamResults(s.docs.map(d=>({id:d.id,...d.data()}))));
     
@@ -1814,7 +1889,7 @@ const StudentDashboard = ({ user, userData }) => {
     return () => { unsubContent(); unsubLive(); unsubExams(); unsubResults(); unsubNotif(); };
   }, [userData, user]);
 
-  if(liveSession) return <LiveSessionView session={liveSession} user={user} onClose={() => window.location.reload()} />;
+  if(activeLiveView) return <LiveSessionView session={activeLiveView} user={user} onClose={() => setActiveLiveView(null)} />;
   
   if (activeExam) return <ExamRunner exam={activeExam} user={user} onClose={() => setActiveExam(null)} />;
   
@@ -1842,8 +1917,18 @@ const StudentDashboard = ({ user, userData }) => {
   );
 
   const videos = content.filter(c => c.type === 'video');
-  const files = content.filter(c => c.type === 'file');
+  const filesAndLinks = content.filter(c => c.type === 'file' || c.type === 'link');
   const htmls = content.filter(c => c.type === 'html');
+
+  const handleJoinLive = (session) => {
+      if (session.passcode) {
+          const code = prompt("أدخل الكود السري الخاص بالبث المباشر:");
+          if (code !== session.passcode) {
+              return alert("عفواً، الكود غير صحيح!");
+          }
+      }
+      setActiveLiveView(session);
+  };
 
   const startExamWithCode = async (exam) => {
     if (isBannedExam) return alert("أنت محظور من دخول الامتحانات.");
@@ -1890,7 +1975,6 @@ const StudentDashboard = ({ user, userData }) => {
 
   const handleUpdateMyProfile = async (e) => {
     e.preventDefault();
-    
     if (editFormData.grade !== userData.grade) {
         await updateDoc(doc(db, 'users', user.uid), {
             phone: editFormData.phone,
@@ -1914,7 +1998,6 @@ const StudentDashboard = ({ user, userData }) => {
       <FloatingArabicBackground />
       <ChatWidget user={user} />
       
-      {/* التعديل الجوهري لحل مشكلة السكرول: تغيير هيكل الـ Layout */}
       <aside className={`fixed top-0 bottom-0 right-0 z-40 bg-white/95 backdrop-blur-xl w-72 p-6 shadow-xl transition-transform duration-300 ${mobileMenu ? 'translate-x-0' : 'translate-x-full md:translate-x-0'} border-l border-slate-200 flex flex-col`}>
         <div className="flex items-center gap-3 mb-10 px-2"><ModernLogo /><h1 className="text-2xl font-bold font-arabic text-amber-800">النحاس</h1><button onClick={() => setMobileMenu(false)} className="md:hidden mr-auto"><X /></button></div>
         <div className="space-y-2 flex-1 overflow-y-auto pr-2">
@@ -1923,7 +2006,7 @@ const StudentDashboard = ({ user, userData }) => {
           {!isBannedContent && (
               <>
                 <div onClick={() => setActiveTab('videos')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='videos'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><PlayCircle/> المحاضرات</div>
-                <div onClick={() => setActiveTab('files')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='files'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><FileText/> المذكرات</div>
+                <div onClick={() => setActiveTab('files')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='files'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><FileText/> الملفات و الروابط</div>
                 <div onClick={() => setActiveTab('htmls')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='htmls'?'bg-purple-100 text-purple-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-purple-600'}`}><Code/> محتوى تفاعلي</div>
               </>
           )}
@@ -1962,10 +2045,73 @@ const StudentDashboard = ({ user, userData }) => {
             )}
         </div>
 
-        {activeTab === 'home' && (<div className="space-y-8"><WisdomBox /><Announcements /><h2 className="text-3xl font-bold text-slate-800 font-arabic">منور يا <span className="text-amber-600">{userData.name.split(' ')[0]}</span> 👋 <span className="text-sm font-normal text-slate-500 bg-slate-200 px-2 py-1 rounded-full font-sans">{getGradeLabel(userData.grade)}</span></h2><div className="grid grid-cols-1 md:grid-cols-4 gap-6"><motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedContent && setActiveTab('videos')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}><h3 className="relative z-10 text-2xl font-bold mb-2 text-blue-900 group-hover:text-blue-600 transition">المحاضرات</h3><p className="relative z-10 text-4xl font-black text-blue-600">{videos.length}</p><PlayCircle className="absolute -bottom-6 -left-6 text-blue-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/></motion.div><motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedContent && setActiveTab('files')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}><h3 className="relative z-10 text-2xl font-bold mb-2 text-amber-900 group-hover:text-amber-600 transition">الملفات</h3><p className="relative z-10 text-4xl font-black text-amber-600">{files.length}</p><FileText className="absolute -bottom-6 -left-6 text-amber-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/></motion.div><motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedContent && setActiveTab('htmls')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}><h3 className="relative z-10 text-2xl font-bold mb-2 text-purple-900 group-hover:text-purple-600 transition">تفاعلي</h3><p className="relative z-10 text-4xl font-black text-purple-600">{htmls.length}</p><Code className="absolute -bottom-6 -left-6 text-purple-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/></motion.div><motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedExam && setActiveTab('exams')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedExam ? 'opacity-50 grayscale' : ''}`}><h3 className="relative z-10 text-2xl font-bold mb-2 text-slate-900 group-hover:text-slate-600 transition">الامتحانات</h3><p className="relative z-10 text-4xl font-black text-slate-600">{exams.length}</p><ClipboardList className="absolute -bottom-6 -left-6 text-slate-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/></motion.div></div><Leaderboard /></div>)}
+        {activeTab === 'home' && (
+            <div className="space-y-8">
+                {/* شريط الإشعارات للبث المباشر (يظهر للطلاب المسموح لهم فقط) */}
+                {liveSessions.map(ls => (
+                    <div key={ls.id} className="bg-gradient-to-r from-red-600 to-red-800 text-white p-4 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-lg border border-red-500/50 animate-pulse-slow">
+                        <div>
+                           <h3 className="font-bold font-arabic text-xl flex items-center gap-2"><Radio className="animate-pulse"/> بث مباشر الآن: {ls.title}</h3>
+                           {ls.passcode && <p className="text-xs text-red-200 mt-1">هذا البث محمي برقم سري</p>}
+                        </div>
+                        <button onClick={() => handleJoinLive(ls)} className="bg-white text-red-700 px-6 py-2 rounded-full font-bold shadow-md hover:bg-red-50 transition w-full md:w-auto">انضمام الآن</button>
+                    </div>
+                ))}
+
+                <WisdomBox />
+                <Announcements />
+                <h2 className="text-3xl font-bold text-slate-800 font-arabic">منور يا <span className="text-amber-600">{userData.name.split(' ')[0]}</span> 👋 <span className="text-sm font-normal text-slate-500 bg-slate-200 px-2 py-1 rounded-full font-sans">{getGradeLabel(userData.grade)}</span></h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedContent && setActiveTab('videos')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}>
+                        <h3 className="relative z-10 text-2xl font-bold mb-2 text-blue-900 group-hover:text-blue-600 transition">المحاضرات</h3>
+                        <p className="relative z-10 text-4xl font-black text-blue-600">{videos.length}</p>
+                        <PlayCircle className="absolute -bottom-6 -left-6 text-blue-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
+                    </motion.div>
+                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedContent && setActiveTab('files')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}>
+                        <h3 className="relative z-10 text-2xl font-bold mb-2 text-amber-900 group-hover:text-amber-600 transition">الملفات</h3>
+                        <p className="relative z-10 text-4xl font-black text-amber-600">{filesAndLinks.length}</p>
+                        <FileText className="absolute -bottom-6 -left-6 text-amber-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
+                    </motion.div>
+                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedContent && setActiveTab('htmls')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}>
+                        <h3 className="relative z-10 text-2xl font-bold mb-2 text-purple-900 group-hover:text-purple-600 transition">تفاعلي</h3>
+                        <p className="relative z-10 text-4xl font-black text-purple-600">{htmls.length}</p>
+                        <Code className="absolute -bottom-6 -left-6 text-purple-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
+                    </motion.div>
+                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedExam && setActiveTab('exams')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedExam ? 'opacity-50 grayscale' : ''}`}>
+                        <h3 className="relative z-10 text-2xl font-bold mb-2 text-slate-900 group-hover:text-slate-600 transition">الامتحانات</h3>
+                        <p className="relative z-10 text-4xl font-black text-slate-600">{exams.length}</p>
+                        <ClipboardList className="absolute -bottom-6 -left-6 text-slate-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
+                    </motion.div>
+                </div>
+                <Leaderboard />
+            </div>
+        )}
         
         {activeTab === 'videos' && !isBannedContent && <div className="grid grid-cols-1 md:grid-cols-3 gap-6">{videos.map(v => (<div key={v.id} className="glass-card rounded-xl overflow-hidden cursor-pointer" onClick={() => setPlayingVideo(v)}><div className="h-48 bg-gradient-to-br from-slate-800 to-black flex items-center justify-center relative group"><PlayCircle className="text-white w-16 h-16 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/><span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(v.grade)}</span></div><div className="p-4"><h3 className="font-bold text-lg text-slate-800">{v.title}</h3></div></div>))}</div>}
-        {activeTab === 'files' && !isBannedContent && <div className="glass-panel rounded-xl overflow-hidden">{files.map(f => (<div key={f.id} className="p-4 flex justify-between items-center border-b last:border-0 hover:bg-white/50 transition"><div className="flex items-center gap-4"><div className="bg-red-100 text-red-600 p-3 rounded-lg font-bold text-xs shadow-sm">PDF</div><div><h4 className="font-bold text-lg text-slate-800">{f.title}</h4><span className="text-xs text-slate-500">{getGradeLabel(f.grade)}</span></div></div><a href={f.url} target="_blank" className="bg-blue-50 text-blue-600 px-4 py-2 rounded-lg font-bold hover:bg-blue-100 transition shadow-sm">تحميل</a></div>))}</div>}
+        
+        {activeTab === 'files' && !isBannedContent && (
+            <div className="glass-panel rounded-xl overflow-hidden">
+                {filesAndLinks.map(f => (
+                    <div key={f.id} className="p-4 flex justify-between items-center border-b last:border-0 hover:bg-white/50 transition">
+                        <div className="flex items-center gap-4">
+                            {f.type === 'link' ? (
+                                <div className="bg-blue-100 text-blue-600 p-3 rounded-lg font-bold text-xs shadow-sm flex items-center justify-center"><LinkIcon size={16}/></div>
+                            ) : (
+                                <div className="bg-red-100 text-red-600 p-3 rounded-lg font-bold text-xs shadow-sm">PDF</div>
+                            )}
+                            <div>
+                                <h4 className="font-bold text-lg text-slate-800">{f.title}</h4>
+                                <span className="text-xs text-slate-500">{getGradeLabel(f.grade)}</span>
+                            </div>
+                        </div>
+                        <a href={f.url} target="_blank" rel="noopener noreferrer" className={`px-4 py-2 rounded-lg font-bold transition shadow-sm ${f.type === 'link' ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' : 'bg-green-50 text-green-700 hover:bg-green-100'}`}>
+                            {f.type === 'link' ? 'فتح الرابط' : 'تحميل'}
+                        </a>
+                    </div>
+                ))}
+            </div>
+        )}
         
         {activeTab === 'htmls' && !isBannedContent && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1988,7 +2134,6 @@ const StudentDashboard = ({ user, userData }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
              {exams.map(e => {
                 const prevResult = examResults.find(r => r.examId === e.id);
-                // التحقق من انتهاء وقت الامتحان
                 const isExamTimeOver = Date.now() > new Date(e.endTime).getTime();
                 
                 let statusText = null;
