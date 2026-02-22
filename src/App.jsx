@@ -973,7 +973,8 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
           });
       }
       
-      await updateDoc(doc(db, 'users', user.uid), { status: 'banned_cheating' });
+      // التعديل: جعل الحظر مقتصر على الامتحانات فقط وليس حظر كامل
+      await updateDoc(doc(db, 'users', user.uid), { status: 'banned_exam' });
   };
 
   useEffect(() => {
@@ -989,22 +990,30 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
       window.addEventListener('beforeunload', handleBeforeUnload);
       
-      const handleVisibilityChange = () => { 
+      // التعديل: تفعيل رادار المراقبة الشامل ضد تغيير التبويب أو غلق الشاشة
+      const handleAntiCheat = () => { 
           const { showSubmitConfirm, isSubmitted } = stateRefs.current;
-          // إذا اختفت الشاشة بأي شكل (تغيير تبويب، الخروج لتطبيق آخر) يتم الحظر فوراً
-          if (!showSubmitConfirm && !isSubmitted && document.hidden) {
+          if (!showSubmitConfirm && !isSubmitted) {
               handleCheatingRef.current();
           }
+      };
+
+      const handleVisibilityChange = () => { 
+          if (document.hidden) handleAntiCheat(); 
       };
       
       const blockContextMenu = (e) => e.preventDefault();
 
       document.addEventListener("visibilitychange", handleVisibilityChange);
+      window.addEventListener("blur", handleAntiCheat);
+      window.addEventListener("pagehide", handleAntiCheat);
       document.addEventListener('contextmenu', blockContextMenu); 
       
       return () => {
           window.removeEventListener('beforeunload', handleBeforeUnload);
           document.removeEventListener("visibilitychange", handleVisibilityChange);
+          window.removeEventListener("blur", handleAntiCheat);
+          window.removeEventListener("pagehide", handleAntiCheat);
           document.removeEventListener('contextmenu', blockContextMenu);
       };
   }, [isReviewMode]);
@@ -1018,29 +1027,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
       handleSubmit(true);
     }
   }, [timeLeft, isSubmitted, isCheating, isReviewMode]);
-
-  const handleCheating = async () => {
-    if(isReviewMode || isSubmitted) return;
-    setIsCheating(true); 
-    setIsSubmitted(true);
-    const timeTaken = Math.round((Date.now() - startTime) / 1000);
-    
-    if (exam.attemptId) {
-        await setDoc(doc(db, 'exam_results', exam.attemptId), { 
-            examId: exam.id, 
-            studentId: user.uid, 
-            studentName: user.displayName, 
-            score: 0, 
-            total: flatQuestions.length,
-            status: 'cheated', 
-            timeTaken: timeTaken,
-            totalTime: exam.duration,
-            submittedAt: serverTimestamp() 
-        });
-    }
-    
-    await updateDoc(doc(db, 'users', user.uid), { status: 'banned_cheating' });
-  };
 
   const handleAnswer = (qId, optionIdx) => { 
     if(!isReviewMode && !isSubmitted) {
@@ -1088,7 +1074,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const currentQObj = flatQuestions[currentQIndex];
   const hasPassage = currentQObj?.blockText && currentQObj.blockText.trim().length > 0;
 
-  if (isCheating) return <div className="fixed inset-0 z-[60] bg-red-900 flex items-center justify-center text-white text-center font-['Cairo']"><div><AlertOctagon size={80} className="mx-auto mb-4"/><h1>تم رصد محاولة غش!</h1><p className="text-red-200 mt-2">خرجت من الامتحان. تم رصد درجتك (صفر) وحظرك.</p><button onClick={() => window.location.reload()} className="mt-4 bg-white text-red-900 px-6 py-2 rounded-full font-bold">خروج</button></div></div>;
+  if (isCheating) return <div className="fixed inset-0 z-[60] bg-red-900 flex items-center justify-center text-white text-center font-['Cairo']"><div><AlertOctagon size={80} className="mx-auto mb-4"/><h1>تم رصد محاولة غش!</h1><p className="text-red-200 mt-2">خرجت من الامتحان. تم رصد درجتك (صفر) وحظرك من الامتحانات القادمة.</p><button onClick={() => window.location.reload()} className="mt-4 bg-white text-red-900 px-6 py-2 rounded-full font-bold">العودة للرئيسية</button></div></div>;
 
   if (isSubmitted && !isReviewMode) {
      const endTime = new Date(exam.endTime).getTime();
@@ -1198,7 +1184,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
             </div>
             
             <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 mb-8 shadow-inner">
-              {/* تكبير خط السؤال وتلوينه */}
               <h3 className="text-3xl md:text-4xl font-black text-blue-900 leading-relaxed font-arabic drop-shadow-sm">{currentQObj.text}</h3>
             </div>
 
@@ -1218,7 +1203,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                     <div key={idx} onClick={() => handleAnswer(currentQObj.id, idx)} className={`p-5 rounded-xl border-2 cursor-pointer transition-all flex items-center gap-4 ${optionClass}`}>
                       <div className={`w-6 h-6 md:w-8 md:h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${isSelected || (isReviewMode && idx === currentQObj.correctIdx) ? 'border-transparent bg-current' : 'border-slate-300'}`}>
                       </div>
-                      {/* تكبير خط الإجابات */}
                       <span className="font-arabic text-xl md:text-2xl font-bold">{opt}</span>
                       {isReviewMode && idx === currentQObj.correctIdx && <CheckCircle className="text-green-600 mr-auto w-8 h-8"/>}
                       {isReviewMode && isSelected && idx !== currentQObj.correctIdx && <XCircle className="text-red-600 mr-auto w-8 h-8"/>}
@@ -1241,6 +1225,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 // --- لوحة تحكم الأدمن ---
 const AdminDashboard = ({ user }) => {
   const [activeTab, setActiveTab] = useState('users'); 
+  const [adminGradeFilter, setAdminGradeFilter] = useState('all'); // فلتر المرحلة الدراسية
   const [pendingUsers, setPendingUsers] = useState([]);
   const [activeUsersList, setActiveUsersList] = useState([]);
   const [contentList, setContentList] = useState([]);
@@ -1420,7 +1405,6 @@ const AdminDashboard = ({ user }) => {
       } 
   };
 
-  // --- التعديل الأساسي: دالة قراءة الامتحان الذكية الجديدة ---
   const parseExam = async () => {
     if (!bulkText.trim()) return alert("أدخل نص الامتحان");
     if (!examBuilder.accessCode) return alert("أدخل كود للامتحان");
@@ -1452,7 +1436,6 @@ const AdminDashboard = ({ user }) => {
           if(line !== '') currentBlock.text += line + '\n'; 
       } 
       else {
-        // إذا كان السطر فارغاً، فهذا يعني نهاية السؤال الحالي
         if (line === '') {
             if (currentQ && currentQ.options.length > 0) {
                 currentBlock.subQuestions.push(currentQ);
@@ -1464,7 +1447,6 @@ const AdminDashboard = ({ user }) => {
         const isCorrect = line.startsWith('*');
         const optText = isCorrect ? line.substring(1).trim() : line.trim();
 
-        // الخوارزمية الذكية: إذا كان السؤال الحالي اكتمل بـ 4 اختيارات والسطر الجديد ليس اختياراً صحيحاً (بدون نجمة)، إذن هو سؤال جديد حتى لو لم يترك المستر سطراً فارغاً
         if (currentQ && currentQ.options.length >= 4 && !isCorrect) {
             currentBlock.subQuestions.push(currentQ);
             currentQ = null;
@@ -1529,13 +1511,30 @@ const AdminDashboard = ({ user }) => {
       if(window.confirm("حذف هذه الحكمة؟")) await deleteDoc(doc(db, 'quotes', id));
   };
 
+  // تطبيق الفلترة على القوائم بناءً على اختيار الأدمن
+  const filteredPendingUsers = pendingUsers.filter(u => adminGradeFilter === 'all' || u.grade === adminGradeFilter);
+  const filteredActiveUsers = activeUsersList.filter(u => adminGradeFilter === 'all' || u.grade === adminGradeFilter);
+  const filteredContentList = contentList.filter(c => adminGradeFilter === 'all' || c.grade === adminGradeFilter);
+  const filteredExamsList = examsList.filter(e => adminGradeFilter === 'all' || e.grade === adminGradeFilter);
+  const filteredLiveSessions = activeLiveSessions.filter(ls => adminGradeFilter === 'all' || ls.grade === adminGradeFilter);
+
   return (
     <div className="min-h-screen bg-slate-100 font-['Cairo'] relative" dir="rtl">
       <FloatingArabicBackground />
       
       <header className="flex justify-between items-center mb-8 glass-panel p-4 rounded-xl relative z-10 m-4">
         <div className="flex items-center gap-2"><ShieldAlert className="text-amber-600"/> <h1 className="text-2xl font-bold font-arabic text-slate-800">لوحة تحكم النحاس (الأدمن)</h1></div>
-        <button onClick={() => signOut(auth)} className="text-red-500 font-bold px-4 py-2 flex gap-2 hover:bg-red-50 rounded-lg transition"><LogOut /> خروج</button>
+        <div className="flex gap-4 items-center">
+            <select 
+                className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg font-bold shadow-sm cursor-pointer"
+                value={adminGradeFilter}
+                onChange={(e) => setAdminGradeFilter(e.target.value)}
+            >
+                <option value="all">كل المراحل الدراسية</option>
+                <GradeOptions />
+            </select>
+            <button onClick={() => signOut(auth)} className="text-red-500 font-bold px-4 py-2 flex gap-2 hover:bg-red-50 rounded-lg transition"><LogOut /> خروج</button>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-6 relative z-10">
@@ -1548,15 +1547,15 @@ const AdminDashboard = ({ user }) => {
         </div>
 
         <div className="md:col-span-3">
-          {activeTab === 'users' && <div className="glass-panel p-6 rounded-xl"><h2 className="font-bold mb-4 font-arabic text-xl">طلبات الانضمام</h2>{pendingUsers.map(u=><div key={u.id} className="border p-4 mb-2 rounded-lg flex justify-between bg-white/50 backdrop-blur-sm"><div><p className="font-bold">{u.name}</p><p className="text-sm">{u.grade}</p></div><div className="flex gap-2"><button onClick={()=>handleApprove(u.id)} className="bg-green-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-green-500/50 transition"><Check/></button><button onClick={()=>handleReject(u.id)} className="bg-red-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-red-500/50 transition"><X/></button></div></div>)}</div>}
+          {activeTab === 'users' && <div className="glass-panel p-6 rounded-xl"><h2 className="font-bold mb-4 font-arabic text-xl">طلبات الانضمام</h2>{filteredPendingUsers.map(u=><div key={u.id} className="border p-4 mb-2 rounded-lg flex justify-between bg-white/50 backdrop-blur-sm"><div><p className="font-bold">{u.name}</p><p className="text-sm">{u.grade}</p></div><div className="flex gap-2"><button onClick={()=>handleApprove(u.id)} className="bg-green-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-green-500/50 transition"><Check/></button><button onClick={()=>handleReject(u.id)} className="bg-red-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-red-500/50 transition"><X/></button></div></div>)}</div>}
 
           {activeTab === 'all_users' && (
               <div className="glass-panel p-6 rounded-xl">
-                  <h2 className="font-bold mb-4 font-arabic text-xl">قائمة الطلاب ({activeUsersList.length})</h2>
+                  <h2 className="font-bold mb-4 font-arabic text-xl">قائمة الطلاب ({filteredActiveUsers.length})</h2>
                   {editingUser&&<form onSubmit={handleUpdateUser} className="mb-4 bg-amber-50 p-4 rounded grid gap-2"><input className="border p-2" value={editingUser.name} onChange={e=>setEditingUser({...editingUser, name:e.target.value})}/><button className="bg-green-600 text-white px-4 py-1 rounded">حفظ</button></form>}
                   
                   <div className="grid gap-4">
-                      {activeUsersList.map(u=>(
+                      {filteredActiveUsers.map(u=>(
                           <div key={u.id} className={`p-4 rounded-xl border flex flex-col justify-between gap-4 transition-all hover:shadow-lg ${u.status.startsWith('banned') ? 'bg-red-50 border-red-200' : 'bg-white/50 border-slate-100'}`}>
                               <div className="flex flex-col md:flex-row justify-between w-full">
                                   <div className="flex-1">
@@ -1620,7 +1619,7 @@ const AdminDashboard = ({ user }) => {
               </div>
           )}
 
-          {activeTab === 'exams' && <div className="space-y-8"><div className="glass-panel p-6 rounded-xl"><h2 className="text-xl font-bold mb-6 border-b pb-2 font-arabic text-amber-700">إنشاء امتحان</h2><div className="grid grid-cols-4 gap-4 mb-6"><input className="border p-2 rounded col-span-2" placeholder="العنوان" value={examBuilder.title} onChange={e=>setExamBuilder({...examBuilder, title:e.target.value})}/><input className="border p-2 rounded" placeholder="الكود" value={examBuilder.accessCode} onChange={e=>setExamBuilder({...examBuilder, accessCode:e.target.value})}/><input type="number" className="border p-2 rounded" placeholder="المدة (دقائق)" value={examBuilder.duration} onChange={e=>setExamBuilder({...examBuilder, duration:parseInt(e.target.value)})}/><select className="border p-2 rounded col-span-4" value={examBuilder.grade} onChange={e=>setExamBuilder({...examBuilder, grade:e.target.value})}><GradeOptions/></select><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت البدء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, startTime:e.target.value})}/></div><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت الانتهاء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, endTime:e.target.value})}/></div></div><div className="bg-slate-50 p-4 rounded-xl border mb-6"><textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm" placeholder="اكتب الأسئلة هنا...&#10;(هام: افصل بين كل سؤال والذي يليه بسطر فارغ تماماً، وضع علامة * قبل الإجابة الصحيحة)" value={bulkText} onChange={e=>setBulkText(e.target.value)}/><button onClick={parseExam} className="mt-4 w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-green-500/50 transition">نشر</button></div></div><div className="glass-panel p-6 rounded-xl"><h3 className="font-bold mb-4 font-arabic">الامتحانات الحالية</h3>{examsList.map(exam=><div key={exam.id} className="flex justify-between items-center border-b py-3 last:border-0 hover:bg-slate-50/50 px-2 rounded transition"><div><p className="font-bold">{exam.title}</p><p className="text-xs text-slate-500">من: {new Date(exam.startTime).toLocaleString('ar-EG')} | إلى: {new Date(exam.endTime).toLocaleString('ar-EG')}</p><p className="text-xs text-slate-400">كود: {exam.accessCode}</p></div><div className="flex gap-2"><button onClick={()=>handleDeleteExam(exam.id)} className="text-red-500 p-2"><Trash2 size={18}/></button></div></div>)}</div></div>}
+          {activeTab === 'exams' && <div className="space-y-8"><div className="glass-panel p-6 rounded-xl"><h2 className="text-xl font-bold mb-6 border-b pb-2 font-arabic text-amber-700">إنشاء امتحان</h2><div className="grid grid-cols-4 gap-4 mb-6"><input className="border p-2 rounded col-span-2" placeholder="العنوان" value={examBuilder.title} onChange={e=>setExamBuilder({...examBuilder, title:e.target.value})}/><input className="border p-2 rounded" placeholder="الكود" value={examBuilder.accessCode} onChange={e=>setExamBuilder({...examBuilder, accessCode:e.target.value})}/><input type="number" className="border p-2 rounded" placeholder="المدة (دقائق)" value={examBuilder.duration} onChange={e=>setExamBuilder({...examBuilder, duration:parseInt(e.target.value)})}/><select className="border p-2 rounded col-span-4" value={examBuilder.grade} onChange={e=>setExamBuilder({...examBuilder, grade:e.target.value})}><GradeOptions/></select><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت البدء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, startTime:e.target.value})}/></div><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت الانتهاء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, endTime:e.target.value})}/></div></div><div className="bg-slate-50 p-4 rounded-xl border mb-6"><textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm" placeholder="اكتب الأسئلة هنا...&#10;(هام: افصل بين كل سؤال والذي يليه بسطر فارغ تماماً، وضع علامة * قبل الإجابة الصحيحة)" value={bulkText} onChange={e=>setBulkText(e.target.value)}/><button onClick={parseExam} className="mt-4 w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-green-500/50 transition">نشر</button></div></div><div className="glass-panel p-6 rounded-xl"><h3 className="font-bold mb-4 font-arabic">الامتحانات الحالية</h3>{filteredExamsList.map(exam=><div key={exam.id} className="flex justify-between items-center border-b py-3 last:border-0 hover:bg-slate-50/50 px-2 rounded transition"><div><p className="font-bold">{exam.title}</p><p className="text-xs text-slate-500">من: {new Date(exam.startTime).toLocaleString('ar-EG')} | إلى: {new Date(exam.endTime).toLocaleString('ar-EG')}</p><p className="text-xs text-slate-400">كود: {exam.accessCode}</p></div><div className="flex gap-2"><button onClick={()=>handleDeleteExam(exam.id)} className="text-red-500 p-2"><Trash2 size={18}/></button></div></div>)}</div></div>}
 
           {activeTab === 'results' && (
              <div className="glass-panel p-6 rounded-xl">
@@ -1693,11 +1692,11 @@ const AdminDashboard = ({ user }) => {
                       <button onClick={startLiveStream} className="bg-red-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-red-500/30">بدء بث جديد</button>
                   </div>
                   
-                  {activeLiveSessions.length > 0 && (
+                  {filteredLiveSessions.length > 0 && (
                       <div className="mt-8 border-t pt-6">
                           <h3 className="font-bold mb-4">البث المباشر الحالي</h3>
                           <div className="space-y-3">
-                              {activeLiveSessions.map(session => (
+                              {filteredLiveSessions.map(session => (
                                   <div key={session.id} className="p-4 bg-red-50 border border-red-200 rounded-xl flex justify-between items-center">
                                       <div>
                                           <p className="font-bold text-red-800">{session.title} <span className="text-xs bg-red-200 px-2 py-1 rounded-full text-red-700">{getGradeLabel(session.grade)}</span></p>
@@ -1768,7 +1767,7 @@ const AdminDashboard = ({ user }) => {
                       <button className="bg-amber-600 text-white p-3 rounded font-bold shadow-lg shadow-amber-500/30">نشر</button>
                   </form>
                   <div className="space-y-2">
-                      {contentList.map(c=>(
+                      {filteredContentList.map(c=>(
                           <div key={c.id} className="flex justify-between border-b p-2 items-center bg-white/50 rounded hover:bg-white transition">
                               <div>
                                   <span className="font-bold">{c.title}</span>
@@ -1785,7 +1784,6 @@ const AdminDashboard = ({ user }) => {
               </div>
           )}
 
-          {/* ... (باقي التبويبات messages, auto_reply, quotes, settings... كما هي) ... */}
           {activeTab === 'messages' && <div className="glass-panel p-6 rounded-xl"><h2 className="font-bold mb-4 font-arabic text-xl">الرسائل</h2>{messagesList.map(m=><div key={m.id} className="border-b p-4 bg-slate-50 mb-3 rounded-lg relative"><button onClick={()=>handleDeleteMessage(m.id)} className="absolute top-2 left-2 text-red-400"><Trash2 size={16}/></button><div className="mb-2"><p className="font-bold text-amber-800">{m.senderName} <span className="text-xs text-slate-500">({m.sender})</span></p><p className="text-sm text-slate-400">{m.createdAt?.toDate?m.createdAt.toDate().toLocaleString():'الآن'}</p></div><p className="text-slate-800 bg-white p-3 rounded-lg border border-slate-200 mb-3">{m.text}</p>{m.adminReply?<div className="bg-green-50 p-3 rounded-lg border border-green-200 text-sm"><span className="font-bold text-green-700">ردك: </span>{m.adminReply}</div>:<div className="flex gap-2"><input className="flex-1 border p-2 rounded text-sm" placeholder="اكتب ردك..." value={replyTexts[m.id]||""} onChange={e=>setReplyTexts({...replyTexts,[m.id]:e.target.value})}/><button onClick={()=>handleReplyMessage(m.id)} className="bg-blue-600 text-white px-3 py-1 rounded text-sm"><Reply size={14}/></button></div>}</div>)}</div>}
            
           {activeTab === 'auto_reply' && (
@@ -1950,14 +1948,13 @@ const StudentDashboard = ({ user, userData }) => {
   }
 
   // --- منطق الحظر ---
-  const isBannedAll = userData?.status === 'banned_all' || userData?.status === 'banned_cheating';
-  const isBannedExam = userData?.status === 'banned_exam';
+  const isBannedAll = userData?.status === 'banned_all';
+  const isBannedExam = userData?.status === 'banned_exam' || userData?.status === 'banned_cheating'; // الغش يمنع من الامتحانات فقط
   const isBannedContent = userData?.status === 'banned_content';
 
   if(userData?.status === 'pending') return <div className="h-screen flex items-center justify-center bg-amber-50 text-center p-4"><div className="bg-white p-8 rounded-2xl shadow-xl"><h2 className="text-2xl font-bold mb-2">طلبك قيد المراجعة ⏳</h2><button onClick={()=>signOut(auth)} className="mt-4 text-red-500 underline">خروج</button></div></div>;
   if(userData?.status === 'rejected') return <div className="h-screen flex items-center justify-center bg-red-50"><div className="text-red-600 font-bold">تم رفض طلبك</div><button onClick={()=>signOut(auth)} className="ml-4 bg-white px-4 py-1 rounded">خروج</button></div>;
   
-  // شاشة الحظر الشامل
   if (isBannedAll) return (
       <div className="h-screen flex flex-col items-center justify-center bg-red-50 text-center p-6">
           <Ban size={80} className="text-red-600 mb-4" />
