@@ -672,7 +672,6 @@ const ChatWidget = ({ user }) => {
   );
 };
 
-// تم تعديل شاشة البث للتعامل مع الروابط الخارجية (مثل Google Meet) بشكل أفضل
 const LiveSessionView = ({ session, user, onClose }) => {
   const [messages, setMessages] = useState([]);
   const [msgInput, setMsgInput] = useState("");
@@ -726,7 +725,6 @@ const LiveSessionView = ({ session, user, onClose }) => {
                 className="relative z-10"
                 style={{ WebkitTransform: 'translateZ(0)' }}
               ></iframe>
-              {/* زر احتياطي للطوارئ في حال منعت متصفحات الهواتف الصارمة تشغيل الكاميرا داخل الإطار */}
               <a href={session.liveUrl} target="_blank" rel="noopener noreferrer" className="absolute top-4 left-4 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-full text-xs font-bold backdrop-blur-md border border-white/20 transition flex items-center gap-2 z-50 shadow-lg">
                   <ExternalLink size={14}/> للموبايل (لو البث مش شغال)
               </a>
@@ -910,14 +908,18 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     const flat = [];
     if (exam.questions) {
         let processedBlocks = [...exam.questions];
+
         if (!isReviewMode && !existingResult) {
             processedBlocks = shuffleArray(processedBlocks);
         }
+
         processedBlocks.forEach((block) => {
             let subQs = [...block.subQuestions];
+            
             if (!isReviewMode && !existingResult) {
                 subQs = shuffleArray(subQs);
             }
+
             subQs.forEach((q) => {
                 flat.push({ ...q, blockText: block.text });
             });
@@ -942,29 +944,70 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     return () => clearInterval(interval);
   }, [isReviewMode]);
 
+  // تحديث جذري لنظام الحماية: استخدام المراجع الحية لضمان عدم تهرب الطالب
+  const stateRefs = useRef({ isSubmitted, showSubmitConfirm, isCheating });
   useEffect(() => {
-      if (isReviewMode || isSubmitted) return;
+      stateRefs.current = { isSubmitted, showSubmitConfirm, isCheating };
+  });
+
+  const handleCheatingRef = useRef();
+  handleCheatingRef.current = async () => {
+      const { isSubmitted, isCheating } = stateRefs.current;
+      if(isReviewMode || isSubmitted || isCheating) return;
+      
+      setIsCheating(true); 
+      setIsSubmitted(true);
+      const timeTaken = Math.round((Date.now() - startTime) / 1000);
+      
+      if (exam.attemptId) {
+          await setDoc(doc(db, 'exam_results', exam.attemptId), { 
+              examId: exam.id, 
+              studentId: user.uid, 
+              studentName: user.displayName, 
+              score: 0, 
+              total: flatQuestions.length,
+              status: 'cheated', 
+              timeTaken: timeTaken,
+              totalTime: exam.duration,
+              submittedAt: serverTimestamp() 
+          });
+      }
+      
+      await updateDoc(doc(db, 'users', user.uid), { status: 'banned_cheating' });
+  };
+
+  useEffect(() => {
+      if (isReviewMode) return;
 
       const handleBeforeUnload = (e) => {
-          e.preventDefault();
-          e.returnValue = "هل أنت متأكد؟ الخروج سيمنعك من العودة للامتحان!";
-          return e.returnValue;
+          if (!stateRefs.current.isSubmitted) {
+              e.preventDefault();
+              e.returnValue = "هل أنت متأكد؟ الخروج سيمنعك من العودة للامتحان!";
+              return e.returnValue;
+          }
       };
 
       window.addEventListener('beforeunload', handleBeforeUnload);
       
       const handleVisibilityChange = () => { 
-          if (!showSubmitConfirm && document.hidden) handleCheating(); 
+          const { showSubmitConfirm, isSubmitted } = stateRefs.current;
+          // إذا اختفت الشاشة بأي شكل (تغيير تبويب، الخروج لتطبيق آخر) يتم الحظر فوراً
+          if (!showSubmitConfirm && !isSubmitted && document.hidden) {
+              handleCheatingRef.current();
+          }
       };
+      
+      const blockContextMenu = (e) => e.preventDefault();
+
       document.addEventListener("visibilitychange", handleVisibilityChange);
-      document.addEventListener('contextmenu', event => event.preventDefault()); 
+      document.addEventListener('contextmenu', blockContextMenu); 
       
       return () => {
-        window.removeEventListener('beforeunload', handleBeforeUnload);
-        document.removeEventListener("visibilitychange", handleVisibilityChange);
-        document.removeEventListener('contextmenu', event => event.preventDefault());
+          window.removeEventListener('beforeunload', handleBeforeUnload);
+          document.removeEventListener("visibilitychange", handleVisibilityChange);
+          document.removeEventListener('contextmenu', blockContextMenu);
       };
-  }, [isSubmitted, isReviewMode, showSubmitConfirm]);
+  }, [isReviewMode]);
 
   useEffect(() => {
     if (isReviewMode || isSubmitted) return;
@@ -1155,7 +1198,8 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
             </div>
             
             <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 mb-8 shadow-inner">
-              <h3 className="text-2xl font-bold text-slate-900 leading-relaxed font-arabic">{currentQObj.text}</h3>
+              {/* تكبير خط السؤال وتلوينه */}
+              <h3 className="text-3xl md:text-4xl font-black text-blue-900 leading-relaxed font-arabic drop-shadow-sm">{currentQObj.text}</h3>
             </div>
 
             <div className="space-y-4">
@@ -1171,12 +1215,13 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                   }
 
                   return (
-                    <div key={idx} onClick={() => handleAnswer(currentQObj.id, idx)} className={`p-5 rounded-xl border-2 cursor-pointer transition-all flex items-center gap-4 text-lg font-medium ${optionClass}`}>
-                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${isSelected || (isReviewMode && idx === currentQObj.correctIdx) ? 'border-transparent bg-current' : 'border-slate-300'}`}>
+                    <div key={idx} onClick={() => handleAnswer(currentQObj.id, idx)} className={`p-5 rounded-xl border-2 cursor-pointer transition-all flex items-center gap-4 ${optionClass}`}>
+                      <div className={`w-6 h-6 md:w-8 md:h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${isSelected || (isReviewMode && idx === currentQObj.correctIdx) ? 'border-transparent bg-current' : 'border-slate-300'}`}>
                       </div>
-                      <span className="font-arabic">{opt}</span>
-                      {isReviewMode && idx === currentQObj.correctIdx && <CheckCircle className="text-green-600 mr-auto"/>}
-                      {isReviewMode && isSelected && idx !== currentQObj.correctIdx && <XCircle className="text-red-600 mr-auto"/>}
+                      {/* تكبير خط الإجابات */}
+                      <span className="font-arabic text-xl md:text-2xl font-bold">{opt}</span>
+                      {isReviewMode && idx === currentQObj.correctIdx && <CheckCircle className="text-green-600 mr-auto w-8 h-8"/>}
+                      {isReviewMode && isSelected && idx !== currentQObj.correctIdx && <XCircle className="text-red-600 mr-auto w-8 h-8"/>}
                     </div>
                   )
               })}
@@ -1201,8 +1246,8 @@ const AdminDashboard = ({ user }) => {
   const [contentList, setContentList] = useState([]);
   const [messagesList, setMessagesList] = useState([]); 
   const [newContent, setNewContent] = useState({ title: '', url: '', type: 'video', isPublic: false, grade: '3sec', allowedEmails: '' });
-  const [liveData, setLiveData] = useState({ title: '', liveUrl: '', grade: '3sec', passcode: '', allowedEmails: '' }); // إضافة الخانات الجديدة للبث
-  const [activeLiveSessions, setActiveLiveSessions] = useState([]); // عرض البث المباشر النشط
+  const [liveData, setLiveData] = useState({ title: '', liveUrl: '', grade: '3sec', passcode: '', allowedEmails: '' });
+  const [activeLiveSessions, setActiveLiveSessions] = useState([]);
   const [editingUser, setEditingUser] = useState(null);
   const [replyTexts, setReplyTexts] = useState({});
   const [examBuilder, setExamBuilder] = useState({ title: '', grade: '3sec', duration: 60, startTime: '', endTime: '', questions: [], accessCode: '' });
@@ -1375,12 +1420,13 @@ const AdminDashboard = ({ user }) => {
       } 
   };
 
+  // --- التعديل الأساسي: دالة قراءة الامتحان الذكية الجديدة ---
   const parseExam = async () => {
     if (!bulkText.trim()) return alert("أدخل نص الامتحان");
     if (!examBuilder.accessCode) return alert("أدخل كود للامتحان");
     if (!examBuilder.startTime || !examBuilder.endTime) return alert("يرجى تحديد وقت البدء والانتهاء");
 
-    const lines = bulkText.split('\n').map(l => l.trim()).filter(l => l);
+    const lines = bulkText.split('\n').map(l => l.trim());
     const blocks = [];
     let currentBlock = { text: '', subQuestions: [] };
     let currentQ = null;
@@ -1388,49 +1434,58 @@ const AdminDashboard = ({ user }) => {
 
     lines.forEach(line => {
       if (line === 'بداية القطعة') { 
-          if (currentBlock.subQuestions.length > 0 || currentQ) { 
-              if(currentQ) currentBlock.subQuestions.push(currentQ); 
-              blocks.push(currentBlock); 
-          } 
+          if (currentQ) { currentBlock.subQuestions.push(currentQ); currentQ = null; }
+          if (currentBlock.subQuestions.length > 0) { blocks.push(currentBlock); } 
           currentBlock = { text: '', subQuestions: [] }; 
-          currentQ = null; 
           isReadingPassage = true; 
           return; 
       }
       if (line === 'نهاية القطعة') { isReadingPassage = false; return; }
       if (line === 'حذف القطعة') { 
-          if(currentQ) currentBlock.subQuestions.push(currentQ); 
-          blocks.push(currentBlock); 
+          if(currentQ) { currentBlock.subQuestions.push(currentQ); currentQ = null; } 
+          if (currentBlock.subQuestions.length > 0) { blocks.push(currentBlock); }
           currentBlock = { text: '', subQuestions: [] }; 
-          currentQ = null; 
           return; 
       }
 
       if (isReadingPassage) { 
-          currentBlock.text += line + '\n'; 
+          if(line !== '') currentBlock.text += line + '\n'; 
       } 
       else {
-        const cleanedLine = line.trim();
-        const isCorrect = cleanedLine.startsWith('*');
-        const optText = isCorrect ? cleanedLine.substring(1).trim() : cleanedLine;
+        // إذا كان السطر فارغاً، فهذا يعني نهاية السؤال الحالي
+        if (line === '') {
+            if (currentQ && currentQ.options.length > 0) {
+                currentBlock.subQuestions.push(currentQ);
+                currentQ = null;
+            }
+            return;
+        }
 
-        if (currentQ && currentQ.options.length < 4) {
+        const isCorrect = line.startsWith('*');
+        const optText = isCorrect ? line.substring(1).trim() : line.trim();
+
+        // الخوارزمية الذكية: إذا كان السؤال الحالي اكتمل بـ 4 اختيارات والسطر الجديد ليس اختياراً صحيحاً (بدون نجمة)، إذن هو سؤال جديد حتى لو لم يترك المستر سطراً فارغاً
+        if (currentQ && currentQ.options.length >= 4 && !isCorrect) {
+            currentBlock.subQuestions.push(currentQ);
+            currentQ = null;
+        }
+
+        if (!currentQ) {
+            currentQ = { id: Date.now() + Math.random(), text: optText, options: [], correctIdx: 0 };
+        } else {
             if (isCorrect) {
                 currentQ.correctIdx = currentQ.options.length;
             }
             currentQ.options.push(optText);
-        } else {
-            if (currentQ) currentBlock.subQuestions.push(currentQ);
-            currentQ = { id: Date.now() + Math.random(), text: optText, options: [], correctIdx: 0 };
         }
       }
     });
     
-    if (currentQ) currentBlock.subQuestions.push(currentQ);
-    blocks.push(currentBlock);
+    if (currentQ && currentQ.options.length > 0) currentBlock.subQuestions.push(currentQ);
+    if (currentBlock.subQuestions.length > 0) blocks.push(currentBlock);
 
     const finalBlocks = blocks.filter(b => b.subQuestions.length > 0);
-    if (finalBlocks.length === 0) return alert("لم يتم التعرف على أسئلة.");
+    if (finalBlocks.length === 0) return alert("لم يتم التعرف على أسئلة بشكل صحيح. تأكد من وجود إجابات تحت كل سؤال.");
 
     await addDoc(collection(db, 'exams'), { 
         title: examBuilder.title, grade: examBuilder.grade, duration: examBuilder.duration, 
@@ -1520,7 +1575,6 @@ const AdminDashboard = ({ user }) => {
                                   
                                   <div className="flex flex-col gap-2 w-full md:w-auto mt-4 md:mt-0">
                                       <div className="flex gap-2">
-                                          {/* زر فك الحظر الصريح */}
                                           {u.status.startsWith('banned') && (
                                               <button 
                                                   onClick={() => handleChangeUserStatus(u.id, 'active')}
@@ -1548,7 +1602,6 @@ const AdminDashboard = ({ user }) => {
                                   </div>
                               </div>
 
-                              {/* عرض طلب تغيير المرحلة إذا وجد */}
                               {u.gradeUpdateStatus === 'pending' && (
                                   <div className="w-full bg-yellow-50 border border-yellow-200 p-3 rounded-lg flex justify-between items-center">
                                       <div className="flex items-center gap-2 text-yellow-800 text-sm font-bold">
@@ -1567,8 +1620,7 @@ const AdminDashboard = ({ user }) => {
               </div>
           )}
 
-          {/* ... (باقي التبويبات exams, results... كما هي) ... */}
-          {activeTab === 'exams' && <div className="space-y-8"><div className="glass-panel p-6 rounded-xl"><h2 className="text-xl font-bold mb-6 border-b pb-2 font-arabic text-amber-700">إنشاء امتحان</h2><div className="grid grid-cols-4 gap-4 mb-6"><input className="border p-2 rounded col-span-2" placeholder="العنوان" value={examBuilder.title} onChange={e=>setExamBuilder({...examBuilder, title:e.target.value})}/><input className="border p-2 rounded" placeholder="الكود" value={examBuilder.accessCode} onChange={e=>setExamBuilder({...examBuilder, accessCode:e.target.value})}/><input type="number" className="border p-2 rounded" placeholder="المدة (دقائق)" value={examBuilder.duration} onChange={e=>setExamBuilder({...examBuilder, duration:parseInt(e.target.value)})}/><select className="border p-2 rounded col-span-4" value={examBuilder.grade} onChange={e=>setExamBuilder({...examBuilder, grade:e.target.value})}><GradeOptions/></select><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت البدء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, startTime:e.target.value})}/></div><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت الانتهاء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, endTime:e.target.value})}/></div></div><div className="bg-slate-50 p-4 rounded-xl border mb-6"><textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm" placeholder="اكتب الأسئلة هنا... (ضع علامة * قبل الإجابة الصحيحة)" value={bulkText} onChange={e=>setBulkText(e.target.value)}/><button onClick={parseExam} className="mt-4 w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-green-500/50 transition">نشر</button></div></div><div className="glass-panel p-6 rounded-xl"><h3 className="font-bold mb-4 font-arabic">الامتحانات الحالية</h3>{examsList.map(exam=><div key={exam.id} className="flex justify-between items-center border-b py-3 last:border-0 hover:bg-slate-50/50 px-2 rounded transition"><div><p className="font-bold">{exam.title}</p><p className="text-xs text-slate-500">من: {new Date(exam.startTime).toLocaleString('ar-EG')} | إلى: {new Date(exam.endTime).toLocaleString('ar-EG')}</p><p className="text-xs text-slate-400">كود: {exam.accessCode}</p></div><div className="flex gap-2"><button onClick={()=>handleDeleteExam(exam.id)} className="text-red-500 p-2"><Trash2 size={18}/></button></div></div>)}</div></div>}
+          {activeTab === 'exams' && <div className="space-y-8"><div className="glass-panel p-6 rounded-xl"><h2 className="text-xl font-bold mb-6 border-b pb-2 font-arabic text-amber-700">إنشاء امتحان</h2><div className="grid grid-cols-4 gap-4 mb-6"><input className="border p-2 rounded col-span-2" placeholder="العنوان" value={examBuilder.title} onChange={e=>setExamBuilder({...examBuilder, title:e.target.value})}/><input className="border p-2 rounded" placeholder="الكود" value={examBuilder.accessCode} onChange={e=>setExamBuilder({...examBuilder, accessCode:e.target.value})}/><input type="number" className="border p-2 rounded" placeholder="المدة (دقائق)" value={examBuilder.duration} onChange={e=>setExamBuilder({...examBuilder, duration:parseInt(e.target.value)})}/><select className="border p-2 rounded col-span-4" value={examBuilder.grade} onChange={e=>setExamBuilder({...examBuilder, grade:e.target.value})}><GradeOptions/></select><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت البدء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, startTime:e.target.value})}/></div><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت الانتهاء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, endTime:e.target.value})}/></div></div><div className="bg-slate-50 p-4 rounded-xl border mb-6"><textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm" placeholder="اكتب الأسئلة هنا...&#10;(هام: افصل بين كل سؤال والذي يليه بسطر فارغ تماماً، وضع علامة * قبل الإجابة الصحيحة)" value={bulkText} onChange={e=>setBulkText(e.target.value)}/><button onClick={parseExam} className="mt-4 w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-green-500/50 transition">نشر</button></div></div><div className="glass-panel p-6 rounded-xl"><h3 className="font-bold mb-4 font-arabic">الامتحانات الحالية</h3>{examsList.map(exam=><div key={exam.id} className="flex justify-between items-center border-b py-3 last:border-0 hover:bg-slate-50/50 px-2 rounded transition"><div><p className="font-bold">{exam.title}</p><p className="text-xs text-slate-500">من: {new Date(exam.startTime).toLocaleString('ar-EG')} | إلى: {new Date(exam.endTime).toLocaleString('ar-EG')}</p><p className="text-xs text-slate-400">كود: {exam.accessCode}</p></div><div className="flex gap-2"><button onClick={()=>handleDeleteExam(exam.id)} className="text-red-500 p-2"><Trash2 size={18}/></button></div></div>)}</div></div>}
 
           {activeTab === 'results' && (
              <div className="glass-panel p-6 rounded-xl">
@@ -1600,15 +1652,15 @@ const AdminDashboard = ({ user }) => {
                                const questions = getQuestionsForExam(examData);
                                return questions.map((q, idx) => (
                                    <div key={idx} className="bg-white p-4 rounded border">
-                                           <p className="font-bold mb-2">{q.text}</p>
+                                           <p className="font-bold mb-2 text-xl text-blue-900 font-arabic">{q.text}</p>
                                            <div className="grid grid-cols-2 gap-2 text-sm">
                                                {q.options.map((opt, oIdx) => {
                                                    const isCorrect = oIdx === q.correctIdx;
                                                    const isSelected = viewingResult.answers[q.id] === oIdx;
                                                    let style = "bg-gray-50 text-gray-500";
-                                                   if (isCorrect) style = "bg-green-100 text-green-800 border-green-500 border font-bold";
-                                                   if (isSelected && !isCorrect) style = "bg-red-100 text-red-800 border-red-500 border font-bold";
-                                                   return <div key={oIdx} className={`p-2 rounded ${style}`}>{opt}</div>
+                                                   if (isCorrect) style = "bg-green-100 text-green-800 border-green-500 border font-bold text-lg";
+                                                   if (isSelected && !isCorrect) style = "bg-red-100 text-red-800 border-red-500 border font-bold text-lg";
+                                                   return <div key={oIdx} className={`p-2 rounded font-arabic ${style}`}>{opt}</div>
                                                })}
                                            </div>
                                    </div>
@@ -1835,8 +1887,8 @@ const StudentDashboard = ({ user, userData }) => {
   const [activeTab, setActiveTab] = useState('home');
   const [mobileMenu, setMobileMenu] = useState(false);
   const [content, setContent] = useState([]);
-  const [liveSessions, setLiveSessions] = useState([]); // تحول إلى مصفوفة لعدم الإجبار على الدخول
-  const [activeLiveView, setActiveLiveView] = useState(null); // البث الذي يشاهده حالياً
+  const [liveSessions, setLiveSessions] = useState([]); 
+  const [activeLiveView, setActiveLiveView] = useState(null); 
   const [exams, setExams] = useState([]);
   const [activeExam, setActiveExam] = useState(null);
   const [playingVideo, setPlayingVideo] = useState(null);
@@ -1864,7 +1916,6 @@ const StudentDashboard = ({ user, userData }) => {
 
     const unsubLive = onSnapshot(query(collection(db, 'live_sessions'), where('status', '==', 'active'), where('grade', '==', userData.grade)), s => {
         const activeSessions = s.docs.map(d=>({id:d.id, ...d.data()}));
-        // تصفية البث المباشر المخصص لطلاب معينين
         const visibleSessions = activeSessions.filter(ls => {
             if (!ls.allowedEmails || ls.allowedEmails.length === 0) return true;
             return ls.allowedEmails.includes(user.email);
@@ -2047,7 +2098,6 @@ const StudentDashboard = ({ user, userData }) => {
 
         {activeTab === 'home' && (
             <div className="space-y-8">
-                {/* شريط الإشعارات للبث المباشر (يظهر للطلاب المسموح لهم فقط) */}
                 {liveSessions.map(ls => (
                     <div key={ls.id} className="bg-gradient-to-r from-red-600 to-red-800 text-white p-4 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-lg border border-red-500/50 animate-pulse-slow">
                         <div>
