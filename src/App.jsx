@@ -824,6 +824,36 @@ const SecureVideoPlayer = ({ video, userName, onClose }) => {
 
 const InteractiveViewer = ({ content, user, onClose }) => {
     const handleContextMenu = (e) => e.preventDefault();
+    const [iframeSrc, setIframeSrc] = useState('');
+    
+    // الخدعة السحرية لحل مشكلة حظر جوجل كروم لملفات HTML
+    useEffect(() => {
+        let activeBlobUrl = null;
+        
+        if (content.url && content.url.startsWith('data:')) {
+            // تحويل الملف من Data URL المحظور إلى Blob URL الآمن جداً
+            fetch(content.url)
+                .then(res => res.blob())
+                .then(blob => {
+                    activeBlobUrl = URL.createObjectURL(blob);
+                    setIframeSrc(activeBlobUrl);
+                })
+                .catch(err => {
+                    console.error("Error creating blob:", err);
+                    setIframeSrc(content.url);
+                });
+        } else {
+            // لو كان رابط خارجي عادي بنسيبه زي ما هو
+            setIframeSrc(content.url);
+        }
+
+        return () => {
+            // تنظيف الذاكرة عند إغلاق الملف
+            if (activeBlobUrl) {
+                URL.revokeObjectURL(activeBlobUrl);
+            }
+        };
+    }, [content.url]);
     
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -871,8 +901,8 @@ const InteractiveViewer = ({ content, user, onClose }) => {
                    <div className="absolute inset-0 z-[9998] pointer-events-none select-none"></div>
 
                    <iframe 
-                     src={content.url} 
-                     className="w-full h-full border-0 relative z-40" 
+                     src={iframeSrc} 
+                     className="w-full h-full border-0 relative z-40 bg-white" 
                      title={content.title}
                      sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals"
                      style={{ pointerEvents: 'auto', WebkitTransform: 'translateZ(0)' }}
