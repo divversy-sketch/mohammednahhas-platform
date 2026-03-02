@@ -1114,7 +1114,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
      return (
         <div className="fixed inset-0 z-[60] bg-slate-50 overflow-y-auto p-4 font-['Cairo']" dir="rtl">
             <div className="max-w-4xl mx-auto bg-white rounded-3xl shadow-xl p-8 mt-10 text-center border border-slate-200">
-                <h2 className="text-3xl font-black mb-4 font-arabic text-amber-700">تم تسليم الامتحان بنجاح</h2>
+                <h2 className="text-3xl font-bold mb-4 font-sans text-amber-700">تم تسليم الامتحان بنجاح</h2>
                 <div className={`text-6xl font-black my-6 ${score >= flatQuestions.length / 2 ? 'text-green-600' : 'text-red-600'}`}>{score} / {flatQuestions.length}</div>
                 
                 {!canReview && (
@@ -1168,7 +1168,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
       <div className="bg-slate-900 text-white p-4 flex justify-between items-center shadow-md relative z-50">
         <div className="flex items-center gap-4">
-            <h2 className="font-bold text-lg font-arabic text-amber-400">{exam.title} {isReviewMode ? '(مراجعة الإجابات)' : ''}</h2>
+            <h2 className="font-bold text-lg font-sans text-amber-400">{exam.title} {isReviewMode ? '(مراجعة الإجابات)' : ''}</h2>
             {!isReviewMode && <div className="bg-slate-700 px-4 py-1 rounded-full font-mono shadow-inner border border-slate-600">{Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</div>}
         </div>
         {!isReviewMode ? (
@@ -1202,8 +1202,8 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
         <div className={`flex-1 flex flex-col ${hasPassage ? 'md:flex-row' : 'items-center'} h-full overflow-hidden bg-slate-50 w-full`}>
           {hasPassage && (
             <div className="flex-1 w-full bg-gradient-to-b from-amber-50 to-orange-50 p-8 overflow-y-auto border-l border-amber-200 shadow-inner">
-              <h3 className="font-bold text-amber-900 mb-6 flex items-center gap-2 text-xl border-b border-amber-200 pb-2 font-arabic"><BookOpen size={24}/> اقرأ النص التالي بعناية:</h3>
-              <p className="whitespace-pre-line leading-loose text-lg font-medium text-slate-800 font-arabic">{currentQObj.blockText}</p>
+              <h3 className="font-bold text-amber-900 mb-6 flex items-center gap-2 text-xl border-b border-amber-200 pb-2 font-sans"><BookOpen size={24}/> اقرأ النص التالي بعناية:</h3>
+              <p className="whitespace-pre-line leading-loose text-lg font-bold text-slate-800 font-sans">{currentQObj.blockText}</p>
             </div>
           )}
           
@@ -1214,7 +1214,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
             </div>
             
             <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 mb-8 shadow-inner">
-              <h3 className="text-3xl md:text-4xl font-black text-blue-900 leading-relaxed font-arabic drop-shadow-sm">{currentQObj.text}</h3>
+              <h3 className="text-3xl md:text-4xl font-bold text-blue-900 leading-relaxed font-sans drop-shadow-sm">{currentQObj.text}</h3>
             </div>
 
             <div className="space-y-4">
@@ -1233,7 +1233,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                     <div key={idx} onClick={() => handleAnswer(currentQObj.id, idx)} className={`p-5 rounded-xl border-2 cursor-pointer transition-all flex items-center gap-4 ${optionClass}`}>
                       <div className={`w-6 h-6 md:w-8 md:h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${isSelected || (isReviewMode && idx === currentQObj.correctIdx) ? 'border-transparent bg-current' : 'border-slate-300'}`}>
                       </div>
-                      <span className="font-arabic text-xl md:text-2xl font-bold">{opt}</span>
+                      <span className="font-sans text-xl md:text-2xl font-bold">{opt}</span>
                       {isReviewMode && idx === currentQObj.correctIdx && <CheckCircle className="text-green-600 mr-auto w-8 h-8"/>}
                       {isReviewMode && isSelected && idx !== currentQObj.correctIdx && <XCircle className="text-red-600 mr-auto w-8 h-8"/>}
                     </div>
@@ -1681,7 +1681,7 @@ const AdminDashboard = ({ user }) => {
                                const questions = getQuestionsForExam(examData);
                                return questions.map((q, idx) => (
                                    <div key={idx} className="bg-white p-4 rounded border">
-                                           <p className="font-bold mb-2 text-xl text-blue-900 font-arabic">{q.text}</p>
+                                           <p className="font-bold mb-2 text-xl text-blue-900 font-sans">{q.text}</p>
                                            <div className="grid grid-cols-2 gap-2 text-sm">
                                                {q.options.map((opt, oIdx) => {
                                                    const isCorrect = oIdx === q.correctIdx;
@@ -1689,7 +1689,7 @@ const AdminDashboard = ({ user }) => {
                                                    let style = "bg-gray-50 text-gray-500";
                                                    if (isCorrect) style = "bg-green-100 text-green-800 border-green-500 border font-bold text-lg";
                                                    if (isSelected && !isCorrect) style = "bg-red-100 text-red-800 border-red-500 border font-bold text-lg";
-                                                   return <div key={oIdx} className={`p-2 rounded font-arabic ${style}`}>{opt}</div>
+                                                   return <div key={oIdx} className={`p-2 rounded font-sans font-bold ${style}`}>{opt}</div>
                                                })}
                                            </div>
                                    </div>
@@ -2255,7 +2255,7 @@ const StudentDashboard = ({ user, userData }) => {
                     )}
                   </motion.div>
                 )
-            })}
+             })}
           </div>
         )}
 
