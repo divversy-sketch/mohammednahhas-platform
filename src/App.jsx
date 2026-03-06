@@ -1775,6 +1775,7 @@ const AdminDashboard = ({ user }) => {
                               <option value="video">فيديو مدمج</option>
                               <option value="file">ملف (PDF)</option>
                               <option value="html">ملف تفاعلي (HTML)</option>
+                              <option value="interactive_exam">امتحان تفاعلي (رابط/HTML)</option>
                               <option value="link">رابط خارجي (Google Meet, Drive, etc)</option>
                           </select>
                           <select className="border p-3 rounded flex-1" value={newContent.grade} onChange={e=>setNewContent({...newContent, grade:e.target.value})}><GradeOptions/></select>
@@ -1802,6 +1803,7 @@ const AdminDashboard = ({ user }) => {
                               <div>
                                   <span className="font-bold">{c.title}</span>
                                   {c.allowedEmails && c.allowedEmails.length > 0 && <span className="mr-2 text-xs bg-red-100 text-red-600 px-2 py-1 rounded flex items-center gap-1 inline-flex"><Lock size={10}/> خاص</span>}
+                                  {c.type === 'interactive_exam' && <span className="mr-2 text-xs bg-emerald-100 text-emerald-600 px-2 py-1 rounded">امتحان تفاعلي</span>}
                                   {c.type === 'html' && <span className="mr-2 text-xs bg-purple-100 text-purple-600 px-2 py-1 rounded">HTML</span>}
                                   {c.type === 'link' && <span className="mr-2 text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded">رابط خارجي</span>}
                               </div>
@@ -1979,7 +1981,7 @@ const StudentDashboard = ({ user, userData }) => {
 
   // --- منطق الحظر ---
   const isBannedAll = userData?.status === 'banned_all';
-  const isBannedExam = userData?.status === 'banned_exam' || userData?.status === 'banned_cheating'; // الغش يمنع من الامتحانات فقط
+  const isBannedExam = userData?.status === 'banned_exam' || userData?.status === 'banned_cheating'; 
   const isBannedContent = userData?.status === 'banned_content';
 
   if(userData?.status === 'pending') return <div className="h-screen flex items-center justify-center bg-amber-50 text-center p-4"><div className="bg-white p-8 rounded-2xl shadow-xl"><h2 className="text-2xl font-bold mb-2">طلبك قيد المراجعة ⏳</h2><button onClick={()=>signOut(auth)} className="mt-4 text-red-500 underline">خروج</button></div></div>;
@@ -1997,6 +1999,7 @@ const StudentDashboard = ({ user, userData }) => {
   const videos = content.filter(c => c.type === 'video');
   const filesAndLinks = content.filter(c => c.type === 'file' || c.type === 'link');
   const htmls = content.filter(c => c.type === 'html');
+  const interactiveExams = content.filter(c => c.type === 'interactive_exam');
 
   const handleJoinLive = (session) => {
       if (session.passcode) {
@@ -2090,7 +2093,10 @@ const StudentDashboard = ({ user, userData }) => {
           )}
           
           {!isBannedExam && (
-              <div onClick={() => setActiveTab('exams')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><ClipboardList/> الامتحانات</div>
+              <>
+                <div onClick={() => setActiveTab('exams')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><ClipboardList/> الامتحانات</div>
+                <div onClick={() => setActiveTab('interactive_exams')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='interactive_exams'?'bg-emerald-100 text-emerald-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-emerald-600'}`}><Sparkles/> امتحان تفاعلي</div>
+              </>
           )}
           
           <button onClick={() => {setActiveTab('settings'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='settings'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><Settings/> ملفي الشخصي</button>
@@ -2139,26 +2145,31 @@ const StudentDashboard = ({ user, userData }) => {
                 <Announcements />
                 <h2 className="text-3xl font-bold text-slate-800 font-arabic">منور يا <span className="text-amber-600">{userData.name.split(' ')[0]}</span> 👋 <span className="text-sm font-normal text-slate-500 bg-slate-200 px-2 py-1 rounded-full font-sans">{getGradeLabel(userData.grade)}</span></h2>
                 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
                     <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedContent && setActiveTab('videos')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}>
-                        <h3 className="relative z-10 text-2xl font-bold mb-2 text-blue-900 group-hover:text-blue-600 transition">المحاضرات</h3>
-                        <p className="relative z-10 text-4xl font-black text-blue-600">{videos.length}</p>
+                        <h3 className="relative z-10 text-xl font-bold mb-2 text-blue-900 group-hover:text-blue-600 transition">المحاضرات</h3>
+                        <p className="relative z-10 text-3xl font-black text-blue-600">{videos.length}</p>
                         <PlayCircle className="absolute -bottom-6 -left-6 text-blue-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
                     </motion.div>
                     <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedContent && setActiveTab('files')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}>
-                        <h3 className="relative z-10 text-2xl font-bold mb-2 text-amber-900 group-hover:text-amber-600 transition">الملفات</h3>
-                        <p className="relative z-10 text-4xl font-black text-amber-600">{filesAndLinks.length}</p>
+                        <h3 className="relative z-10 text-xl font-bold mb-2 text-amber-900 group-hover:text-amber-600 transition">الملفات</h3>
+                        <p className="relative z-10 text-3xl font-black text-amber-600">{filesAndLinks.length}</p>
                         <FileText className="absolute -bottom-6 -left-6 text-amber-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
                     </motion.div>
                     <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedContent && setActiveTab('htmls')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}>
-                        <h3 className="relative z-10 text-2xl font-bold mb-2 text-purple-900 group-hover:text-purple-600 transition">تفاعلي</h3>
-                        <p className="relative z-10 text-4xl font-black text-purple-600">{htmls.length}</p>
+                        <h3 className="relative z-10 text-xl font-bold mb-2 text-purple-900 group-hover:text-purple-600 transition">تفاعلي</h3>
+                        <p className="relative z-10 text-3xl font-black text-purple-600">{htmls.length}</p>
                         <Code className="absolute -bottom-6 -left-6 text-purple-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
                     </motion.div>
                     <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedExam && setActiveTab('exams')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedExam ? 'opacity-50 grayscale' : ''}`}>
-                        <h3 className="relative z-10 text-2xl font-bold mb-2 text-slate-900 group-hover:text-slate-600 transition">الامتحانات</h3>
-                        <p className="relative z-10 text-4xl font-black text-slate-600">{exams.length}</p>
+                        <h3 className="relative z-10 text-xl font-bold mb-2 text-slate-900 group-hover:text-slate-600 transition">الامتحانات</h3>
+                        <p className="relative z-10 text-3xl font-black text-slate-600">{exams.length}</p>
                         <ClipboardList className="absolute -bottom-6 -left-6 text-slate-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
+                    </motion.div>
+                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedExam && setActiveTab('interactive_exams')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedExam ? 'opacity-50 grayscale' : ''}`}>
+                        <h3 className="relative z-10 text-xl font-bold mb-2 text-emerald-900 group-hover:text-emerald-600 transition">امتحان تفاعلي</h3>
+                        <p className="relative z-10 text-3xl font-black text-emerald-600">{interactiveExams.length}</p>
+                        <Sparkles className="absolute -bottom-6 -left-6 text-emerald-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
                     </motion.div>
                 </div>
                 <Leaderboard />
@@ -2201,6 +2212,23 @@ const StudentDashboard = ({ user, userData }) => {
                         <div className="p-4">
                             <h3 className="font-bold text-lg text-slate-800">{h.title}</h3>
                             <button className="mt-2 w-full bg-purple-100 text-purple-700 font-bold py-2 rounded-lg hover:bg-purple-200 transition shadow-sm">تشغيل</button>
+                        </div>
+                    </motion.div>
+                ))}
+            </div>
+        )}
+
+        {activeTab === 'interactive_exams' && !isBannedExam && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {interactiveExams.map(h => (
+                    <motion.div whileHover={{y:-5}} key={h.id} className="glass-card rounded-xl overflow-hidden cursor-pointer" onClick={() => setPlayingHtml(h)}>
+                        <div className="h-48 bg-gradient-to-br from-emerald-600 to-teal-900 flex items-center justify-center relative group">
+                            <Sparkles className="text-white w-20 h-20 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/>
+                            <span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(h.grade)}</span>
+                        </div>
+                        <div className="p-4">
+                            <h3 className="font-bold text-lg text-slate-800">{h.title}</h3>
+                            <button className="mt-2 w-full bg-emerald-100 text-emerald-700 font-bold py-2 rounded-lg hover:bg-emerald-200 transition shadow-sm">بدء الامتحان</button>
                         </div>
                     </motion.div>
                 ))}
