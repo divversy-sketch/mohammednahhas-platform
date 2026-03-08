@@ -16,7 +16,7 @@ import {
   ExternalLink, ClipboardList, Timer, AlertOctagon, Flag, Save, HelpCircle, 
   Reply, Unlock, Layout, Settings, Trophy, Megaphone, Bell, Download, XCircle, 
   Calendar, Clock, FileWarning, Settings as GearIcon, Star, Bot, Power, Upload,
-  Users, PenTool, Code, Sparkles, Lamp, Ban, Shield, RefreshCw, Link as LinkIcon
+  Users, PenTool, Code, Sparkles, Lamp, Ban, Shield, RefreshCw, Link as LinkIcon, History
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -117,7 +117,7 @@ const generatePDF = (type, data) => {
                         return `
                         <tr style="background-color: ${isCorrect ? '#f0fdf4' : '#fef2f2'};">
                             <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${i + 1}</td>
-                            <td style="border: 1px solid #ddd; padding: 8px;">${q.text}</td>
+                            <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">${q.text}</td>
                             <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">${studentAnsText}</td>
                             <td style="border: 1px solid #ddd; padding: 8px; color: green;">${correctAnsText}</td>
                             <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">
@@ -356,14 +356,6 @@ const DesignSystemLoader = () => {
         white-space: nowrap;
         will-change: transform;
         -webkit-transform: translateZ(0);
-      }
-      
-      @keyframes floatWatermark {
-        0% { transform: translate3d(5vw, 10vh, 0) rotate(-10deg); }
-        25% { transform: translate3d(40vw, 70vh, 0) rotate(5deg); }
-        50% { transform: translate3d(10vw, 50vh, 0) rotate(-5deg); }
-        75% { transform: translate3d(50vw, 20vh, 0) rotate(10deg); }
-        100% { transform: translate3d(5vw, 10vh, 0) rotate(-10deg); }
       }
       
       .no-select { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
@@ -709,7 +701,7 @@ const LiveSessionView = ({ session, user, onClose }) => {
           <button onClick={onClose} className="text-sm bg-black/30 hover:bg-black/50 px-3 py-1 rounded transition">العودة للمنصة</button>
         </div>
         <div className="flex-1 bg-black relative flex items-center justify-center overflow-hidden">
-          <div className="watermark-video z-50">{user.displayName}</div>
+          <div className="watermark-video z-50">{user?.displayName || 'طالب'}</div>
           {isYouTube ? (
             <iframe width="100%" height="100%" src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&controls=1&rel=0&modestbranding=1&playsinline=1`} title="Live" frameBorder="0" allowFullScreen style={{ WebkitTransform: 'translateZ(0)' }}></iframe>
           ) : (
@@ -752,11 +744,35 @@ const LiveSessionView = ({ session, user, onClose }) => {
   );
 };
 
-const SecureVideoPlayer = ({ video, userName, onClose }) => {
+const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
   const videoId = getYouTubeID(video.url || video.file);
   const [showSettings, setShowSettings] = useState(false);
   const videoRef = useRef(null);
   const finalUrl = video.url || video.file;
+
+  // Tracking Video Views
+  useEffect(() => {
+      if (!user || !video.id) return;
+      const trackVideoView = async () => {
+          try {
+              // Check if already viewed
+              const q = query(collection(db, 'video_views'), where('userId', '==', user.uid), where('videoId', '==', video.id));
+              const snap = await getDocs(q);
+              if (snap.empty) {
+                  await addDoc(collection(db, 'video_views'), {
+                      userId: user.uid,
+                      userName: userName,
+                      videoId: video.id,
+                      videoTitle: video.title,
+                      viewedAt: serverTimestamp()
+                  });
+              }
+          } catch (error) {
+              console.error("Error tracking view:", error);
+          }
+      };
+      trackVideoView();
+  }, [user, video.id, video.title, userName]);
 
   const changeSpeed = (rate) => {
     if(videoRef.current) videoRef.current.playbackRate = rate;
@@ -1281,6 +1297,10 @@ const AdminDashboard = ({ user }) => {
 
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  
+  // Tracking Logic
+  const [viewingStudentHistory, setViewingStudentHistory] = useState(null);
+  const [studentHistoryData, setStudentHistoryData] = useState([]);
 
   useEffect(() => { const u = onSnapshot(query(collection(db, 'users'), where('status','==','pending')), s => setPendingUsers(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(query(collection(db, 'users'), where('status', 'in', ['active', 'banned_cheating', 'banned_all', 'banned_exam', 'banned_content', 'rejected'])), s => setActiveUsersList(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
@@ -1319,6 +1339,35 @@ const AdminDashboard = ({ user }) => {
       await batch.commit();
       alert("تم حذف جميع النتائج بنجاح.");
     }
+  };
+
+  // WhatsApp Logic
+  const sendWhatsAppToParent = (result) => {
+      const student = activeUsersList.find(u => u.id === result.studentId);
+      if (!student || !student.parentPhone) {
+          return alert("لا يوجد رقم ولي أمر مسجل لهذا الطالب!");
+      }
+
+      // Format phone number for WhatsApp (e.g., 010... -> 2010...)
+      let phone = student.parentPhone.trim();
+      if (phone.startsWith('0')) {
+          phone = '20' + phone.substring(1);
+      }
+
+      const examName = examsList.find(e => e.id === result.examId)?.title || 'اختبار';
+      
+      const message = `مرحباً ولي أمر الطالب/ة: *${result.studentName}* 🎓\n\nنحيط سيادتكم علماً بنتيجة امتحان: *${examName}*\nالدرجة التي حصل عليها: *${result.score}* من *${result.total}* 📊\n\nمع خالص تحيات إدارة منصة النحاس.`;
+      
+      const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+      window.open(whatsappUrl, '_blank');
+  };
+
+  // Watch History Logic
+  const viewStudentHistory = async (studentId, studentName) => {
+      setViewingStudentHistory({ id: studentId, name: studentName });
+      const q = query(collection(db, 'video_views'), where('userId', '==', studentId), orderBy('viewedAt', 'desc'));
+      const snap = await getDocs(q);
+      setStudentHistoryData(snap.docs.map(d => d.data()));
   };
 
   const handleReplyMessage = async (msgId) => {
@@ -1552,6 +1601,34 @@ const AdminDashboard = ({ user }) => {
     <div className="min-h-screen bg-slate-100 font-['Cairo'] relative" dir="rtl">
       <FloatingArabicBackground />
       
+      {/* نافذة سجل المشاهدات */}
+      {viewingStudentHistory && (
+          <div className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl relative max-h-[80vh] flex flex-col">
+                  <button onClick={() => setViewingStudentHistory(null)} className="absolute top-4 left-4 text-slate-400 hover:text-red-500"><X size={24}/></button>
+                  <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-blue-800 border-b pb-2"><Eye/> سجل مشاهدات: {viewingStudentHistory.name}</h3>
+                  <div className="overflow-y-auto pr-2 space-y-3 flex-1">
+                      {studentHistoryData.length === 0 ? (
+                          <p className="text-center text-slate-500 py-10">لم يقم هذا الطالب بفتح أي فيديو حتى الآن.</p>
+                      ) : (
+                          studentHistoryData.map((record, i) => (
+                              <div key={i} className="bg-slate-50 border border-slate-200 p-3 rounded-xl flex justify-between items-center">
+                                  <div className="flex items-center gap-3">
+                                      <PlayCircle className="text-amber-500 w-8 h-8"/>
+                                      <div>
+                                          <p className="font-bold text-slate-800">{record.videoTitle || 'فيديو بدون عنوان'}</p>
+                                          <p className="text-xs text-slate-500">{record.viewedAt?.toDate().toLocaleString('ar-EG') || 'الآن'}</p>
+                                      </div>
+                                  </div>
+                                  <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-bold">تم الفتح</span>
+                              </div>
+                          ))
+                      )}
+                  </div>
+              </div>
+          </div>
+      )}
+
       <header className="flex justify-between items-center mb-8 glass-panel p-4 rounded-xl relative z-10 m-4">
         <div className="flex items-center gap-2"><ShieldAlert className="text-amber-600"/> <h1 className="text-2xl font-bold font-arabic text-slate-800">لوحة تحكم النحاس (الأدمن)</h1></div>
         <div className="flex gap-4 items-center">
@@ -1624,6 +1701,7 @@ const AdminDashboard = ({ user }) => {
                                           </select>
                                       </div>
                                       <div className="flex gap-2 justify-end">
+                                          <button onClick={()=>viewStudentHistory(u.id, u.name)} className="bg-purple-100 text-purple-600 p-2 rounded-lg hover:bg-purple-200" title="سجل المشاهدات"><History size={16}/></button>
                                           <button onClick={()=>setEditingUser(u)} className="bg-blue-100 text-blue-600 p-2 rounded-lg hover:bg-blue-200" title="تعديل"><Edit size={16}/></button>
                                           <button onClick={()=>handleSendResetPassword(u.email)} className="bg-amber-100 text-amber-600 p-2 rounded-lg hover:bg-amber-200" title="تغيير كلمة السر"><KeyRound size={16}/></button>
                                           <button onClick={()=>handleDeleteUser(u.id)} className="bg-red-100 text-red-600 p-2 rounded-lg hover:bg-red-200" title="حذف"><Trash2 size={16}/></button>
@@ -1669,7 +1747,10 @@ const AdminDashboard = ({ user }) => {
                                const examData = examsList.find(e => e.id === viewingResult.examId);
                                const questions = getQuestionsForExam(examData);
                                return (
-                                   <button onClick={() => generatePDF('admin', {...viewingResult, total: viewingResult.total || 0, examTitle: examData?.title, questions: questions, answers: viewingResult.answers })} className="bg-blue-600 text-white px-4 py-1 rounded text-sm flex items-center gap-2"><Download size={16}/> تحميل التقرير الكامل</button>
+                                   <div className="flex gap-2">
+                                       <button onClick={() => sendWhatsAppToParent(viewingResult)} className="bg-green-500 text-white px-4 py-1 rounded text-sm flex items-center gap-2 font-bold hover:bg-green-600"><MessageCircle size={16}/> واتساب لولي الأمر</button>
+                                       <button onClick={() => generatePDF('admin', {...viewingResult, total: viewingResult.total || 0, examTitle: examData?.title, questions: questions, answers: viewingResult.answers })} className="bg-blue-600 text-white px-4 py-1 rounded text-sm flex items-center gap-2"><Download size={16}/> التقرير</button>
+                                   </div>
                                );
                            })()}
                        </div>
@@ -1702,7 +1783,11 @@ const AdminDashboard = ({ user }) => {
                        {examResults.map(res => (
                            <div key={res.id} className="flex justify-between items-center border p-3 rounded hover:bg-slate-50 transition bg-white/50">
                                <div><p className="font-bold">{res.studentName}</p><p className="text-xs text-slate-500">{res.status==='cheated'?'غش 🚫': res.status==='in_progress' ? 'قيد التنفيذ (لم يسلم) ⏳' : `درجة: ${res.score}/${res.total}`}</p></div>
-                               <div className="flex gap-2"><button onClick={()=>setViewingResult(res)} className="bg-blue-100 text-blue-600 px-3 py-1 rounded text-xs">التفاصيل</button><button onClick={()=>handleDeleteResult(res.id)} className="bg-amber-100 text-amber-600 px-3 py-1 rounded text-xs">إعادة</button></div>
+                               <div className="flex gap-2">
+                                  {res.status === 'completed' && <button onClick={()=>sendWhatsAppToParent(res)} className="bg-green-100 text-green-700 px-3 py-1 rounded text-xs font-bold flex items-center gap-1 hover:bg-green-200"><MessageCircle size={14}/> إرسال لولي الأمر</button>}
+                                  <button onClick={()=>setViewingResult(res)} className="bg-blue-100 text-blue-600 px-3 py-1 rounded text-xs">التفاصيل</button>
+                                  <button onClick={()=>handleDeleteResult(res.id)} className="bg-amber-100 text-amber-600 px-3 py-1 rounded text-xs">إعادة</button>
+                               </div>
                            </div>
                        ))}
                    </div>
@@ -2073,7 +2158,7 @@ const StudentDashboard = ({ user, userData }) => {
 
   return (
     <div className="bg-slate-50 relative font-['Cairo'] min-h-screen block" dir="rtl">
-      {playingVideo && <SecureVideoPlayer video={playingVideo} userName={userData.name} onClose={() => setPlayingVideo(null)} />}
+      {playingVideo && <SecureVideoPlayer video={playingVideo} user={user} userName={userData.name} onClose={() => setPlayingVideo(null)} />}
       {playingHtml && <InteractiveViewer content={playingHtml} user={userData} onClose={() => setPlayingHtml(null)} />}
       
       <FloatingArabicBackground />
@@ -2343,7 +2428,7 @@ const LandingPage = ({ onAuthClick }) => {
 
   return (
     <div className="min-h-screen font-['Cairo'] relative" dir="rtl">
-      {playingVideo && <SecureVideoPlayer video={playingVideo} userName="زائر" onClose={() => setPlayingVideo(null)} />}
+      {playingVideo && <SecureVideoPlayer video={playingVideo} user={null} userName="زائر" onClose={() => setPlayingVideo(null)} />}
       {playingHtml && <InteractiveViewer content={playingHtml} user={null} onClose={() => setPlayingHtml(null)} />}
       <FloatingArabicBackground />
       <ChatWidget />
