@@ -760,18 +760,18 @@ const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
       if (!user || !video.id) return;
       const trackVideoView = async () => {
           try {
-              // Check if already viewed
-              const q = query(collection(db, 'video_views'), where('userId', '==', user.uid), where('videoId', '==', video.id));
-              const snap = await getDocs(q);
-              if (snap.empty) {
-                  await addDoc(collection(db, 'video_views'), {
-                      userId: user.uid,
-                      userName: userName,
-                      videoId: video.id,
-                      videoTitle: video.title,
-                      viewedAt: serverTimestamp()
-                  });
-              }
+              // عمل كود مميز لكل طالب مع كل فيديو لتجنب التكرار ولتحديث وقت المشاهدة
+              const viewId = `${user.uid}_${video.id}`;
+              const viewRef = doc(db, 'video_views', viewId);
+              
+              // setDoc with merge: true بيسجل المشاهدة لو أول مرة، أو بيحدث الوقت لو دخل تاني
+              await setDoc(viewRef, {
+                  userId: user.uid,
+                  userName: userName,
+                  videoId: video.id,
+                  videoTitle: video.title,
+                  viewedAt: serverTimestamp()
+              }, { merge: true });
           } catch (error) {
               console.error("Error tracking view:", error);
           }
@@ -1537,9 +1537,19 @@ const AdminDashboard = ({ user }) => {
   // Watch History Logic
   const viewStudentHistory = async (studentId, studentName) => {
       setViewingStudentHistory({ id: studentId, name: studentName });
-      const q = query(collection(db, 'video_views'), where('userId', '==', studentId), orderBy('viewedAt', 'desc'));
-      const snap = await getDocs(q);
-      setStudentHistoryData(snap.docs.map(d => d.data()));
+      try {
+          // إلغاء orderBy من الداتا بيز عشان مشكلة الفهارس (Indexes)
+          const q = query(collection(db, 'video_views'), where('userId', '==', studentId));
+          const snap = await getDocs(q);
+          const history = snap.docs.map(d => d.data());
+          
+          // الترتيب برمجياً (من الأحدث للأقدم)
+          history.sort((a, b) => (b.viewedAt?.seconds || 0) - (a.viewedAt?.seconds || 0));
+          
+          setStudentHistoryData(history);
+      } catch (error) {
+          console.error("Error fetching history:", error);
+      }
   };
 
   // Update Exam Time
