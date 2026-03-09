@@ -1361,6 +1361,8 @@ const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
             studentName: user.displayName,
             homeworkId: homeworkData.id,
             homeworkTitle: homeworkData.title,
+            bookName: homeworkData.bookName || 'عام',
+            grade: homeworkData.grade || 'غير محدد',
             score: aiResult.score,
             total: aiResult.total,
             feedback: aiResult.feedback,
@@ -1376,7 +1378,7 @@ const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
     return (
         <div className="fixed inset-0 z-[100] bg-slate-900 text-white flex flex-col font-['Cairo']" dir="rtl">
             <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800">
-                <h2 className="font-bold flex items-center gap-2 text-blue-400"><QrCode/> تسليم الواجب: {homeworkData.title}</h2>
+                <h2 className="font-bold flex items-center gap-2 text-blue-400"><QrCode/> تسليم الواجب: {homeworkData.title} {homeworkData.bookName && `(${homeworkData.bookName})`}</h2>
                 <button onClick={onClose} className="bg-red-600 px-4 py-1 rounded text-sm font-bold">إلغاء</button>
             </div>
             
@@ -1465,7 +1467,7 @@ const AdminDashboard = ({ user }) => {
 
   // Smart Homework Logic (Admin)
   const [smartHomeworks, setSmartHomeworks] = useState([]);
-  const [newSmartHw, setNewSmartHw] = useState({ title: '', answerKey: '' });
+  const [newSmartHw, setNewSmartHw] = useState({ title: '', answerKey: '', grade: '3sec', bookName: '' });
   const [hwResults, setHwResults] = useState([]);
 
   useEffect(() => { const u = onSnapshot(query(collection(db, 'users'), where('status','==','pending')), s => setPendingUsers(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
@@ -1560,12 +1562,13 @@ const AdminDashboard = ({ user }) => {
   // Create Smart HW
   const handleCreateSmartHw = async (e) => {
       e.preventDefault();
-      if (!newSmartHw.title || !newSmartHw.answerKey) return alert("أكمل البيانات");
+      if (!newSmartHw.title || !newSmartHw.answerKey || !newSmartHw.bookName) return alert("أكمل البيانات (الاسم، الإجابة، والكتاب)");
       await addDoc(collection(db, 'smart_homeworks'), {
           ...newSmartHw,
           createdAt: serverTimestamp()
       });
-      setNewSmartHw({ title: '', answerKey: '' });
+      // نحتفظ باسم الكتاب والمرحلة عشان يسهل إضافة الصفحات اللي بعدها
+      setNewSmartHw(prev => ({ ...prev, title: '', answerKey: '' }));
       alert("تم إنشاء الواجب! يمكنك نسخ الرابط الآن.");
   };
 
@@ -1953,44 +1956,82 @@ const AdminDashboard = ({ user }) => {
                   <div className="glass-panel p-6 rounded-xl">
                       <h2 className="text-xl font-bold mb-4 font-arabic text-blue-700 flex items-center gap-2"><QrCode/> إضافة واجب (للكتاب)</h2>
                       <form onSubmit={handleCreateSmartHw} className="grid gap-4">
-                          <input className="border p-3 rounded" placeholder="اسم الواجب (مثال: تدريبات صفحة 15)" value={newSmartHw.title} onChange={e=>setNewSmartHw({...newSmartHw, title:e.target.value})} required/>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                  <label className="block text-xs font-bold mb-1 text-slate-500">المرحلة الدراسية</label>
+                                  <select className="border p-3 rounded w-full bg-white" value={newSmartHw.grade} onChange={e=>setNewSmartHw({...newSmartHw, grade:e.target.value})}>
+                                      <GradeOptions/>
+                                  </select>
+                              </div>
+                              <div>
+                                  <label className="block text-xs font-bold mb-1 text-slate-500">اسم الكتاب (سيتم تجميع الصفحات تحته)</label>
+                                  <input className="border p-3 rounded w-full" placeholder="مثال: كتاب النحو الجزء الأول" value={newSmartHw.bookName} onChange={e=>setNewSmartHw({...newSmartHw, bookName:e.target.value})} required/>
+                              </div>
+                          </div>
+                          <input className="border p-3 rounded" placeholder="اسم الواجب/رقم الصفحة (مثال: تدريبات صفحة 15)" value={newSmartHw.title} onChange={e=>setNewSmartHw({...newSmartHw, title:e.target.value})} required/>
                           <textarea className="border p-3 rounded h-24" placeholder="نموذج الإجابة (مثال: 1-أ, 2-ج, 3-د...)" value={newSmartHw.answerKey} onChange={e=>setNewSmartHw({...newSmartHw, answerKey:e.target.value})} required/>
                           <button type="submit" className="bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-blue-500/50">توليد رابط للصفحة</button>
                       </form>
                   </div>
                   
                   <div className="glass-panel p-6 rounded-xl">
-                      <h3 className="font-bold mb-4">الواجبات المضافة (لنسخ الرابط)</h3>
-                      <div className="space-y-3">
-                          {smartHomeworks.map(hw => {
-                              const hwLink = `${window.location.origin}/?hw=${hw.id}`;
-                              return (
-                                  <div key={hw.id} className="bg-white border p-4 rounded-xl flex flex-col md:flex-row justify-between gap-4">
-                                      <div>
-                                          <p className="font-bold text-lg">{hw.title}</p>
-                                          <p className="text-sm text-slate-500 mb-2">الإجابات: {hw.answerKey}</p>
-                                          <code className="bg-slate-100 p-2 rounded text-xs break-all border block select-all">{hwLink}</code>
-                                      </div>
-                                      <div className="flex gap-2 items-center">
-                                          <button onClick={() => { navigator.clipboard.writeText(hwLink); alert("تم نسخ الرابط! اذهب لموقع QR Generator لتحويله."); }} className="bg-slate-200 px-4 py-2 rounded-lg font-bold hover:bg-slate-300 text-sm h-fit">نسخ الرابط</button>
-                                          <button onClick={async () => { if(window.confirm('حذف؟')) await deleteDoc(doc(db, 'smart_homeworks', hw.id)); }} className="text-red-500 hover:text-red-700 p-2"><Trash2 size={18}/></button>
+                      <h3 className="font-bold mb-4">الواجبات المضافة (مقسمة حسب المرحلة التي تم اختيارها من الأعلى)</h3>
+                      <div className="space-y-6">
+                          {(() => {
+                              // فلترة الواجبات حسب المرحلة المختارة للأدمن
+                              const filteredHw = smartHomeworks.filter(hw => adminGradeFilter === 'all' || hw.grade === adminGradeFilter);
+                              
+                              if (filteredHw.length === 0) return <p className="text-slate-500">لا توجد واجبات في هذه المرحلة.</p>;
+
+                              // تجميع الواجبات حسب اسم الكتاب
+                              const hwByBook = filteredHw.reduce((acc, hw) => {
+                                  const book = hw.bookName || 'كتب غير مصنفة';
+                                  if(!acc[book]) acc[book] = [];
+                                  acc[book].push(hw);
+                                  return acc;
+                              }, {});
+
+                              return Object.entries(hwByBook).map(([bookName, hws]) => (
+                                  <div key={bookName} className="mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                      <h4 className="font-bold text-lg text-amber-700 bg-amber-100 p-2 rounded-lg mb-4 flex items-center gap-2 inline-flex"><BookOpen size={20}/> كتاب: {bookName}</h4>
+                                      <div className="space-y-3 pl-4 border-r-4 border-amber-300 pr-4">
+                                          {hws.map(hw => {
+                                              const hwLink = `${window.location.origin}/?hw=${hw.id}`;
+                                              return (
+                                                  <div key={hw.id} className="bg-white border shadow-sm p-4 rounded-xl flex flex-col md:flex-row justify-between gap-4 hover:border-amber-400 transition">
+                                                      <div className="flex-1">
+                                                          <p className="font-bold text-lg text-slate-800">{hw.title} <span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600">{getGradeLabel(hw.grade)}</span></p>
+                                                          <p className="text-sm text-slate-500 mb-2 mt-1 bg-slate-50 p-2 rounded">الإجابات: <span className="font-mono text-blue-600">{hw.answerKey}</span></p>
+                                                          <code className="bg-slate-100 p-2 rounded text-xs break-all border block select-all">{hwLink}</code>
+                                                      </div>
+                                                      <div className="flex gap-2 items-center flex-shrink-0">
+                                                          <button onClick={() => { navigator.clipboard.writeText(hwLink); alert("تم نسخ الرابط! اذهب لموقع QR Generator لتحويله."); }} className="bg-slate-800 text-white px-4 py-2 rounded-lg font-bold hover:bg-slate-700 text-sm h-fit shadow-md">نسخ الرابط</button>
+                                                          <button onClick={async () => { if(window.confirm('هل أنت متأكد من حذف هذه الصفحة؟')) await deleteDoc(doc(db, 'smart_homeworks', hw.id)); }} className="text-red-500 bg-red-50 hover:bg-red-100 p-2 rounded-lg"><Trash2 size={18}/></button>
+                                                      </div>
+                                                  </div>
+                                              )
+                                          })}
                                       </div>
                                   </div>
-                              )
-                          })}
+                              ));
+                          })()}
                       </div>
                   </div>
 
                   <div className="glass-panel p-6 rounded-xl">
                       <h3 className="font-bold mb-4 text-green-700">نتائج تصحيح الذكاء الاصطناعي</h3>
                       <div className="space-y-2">
-                          {hwResults.map(res => (
+                          {hwResults.filter(res => adminGradeFilter === 'all' || res.grade === adminGradeFilter).map(res => (
                               <div key={res.id} className="flex justify-between items-center border p-3 rounded hover:bg-slate-50 transition bg-white/50">
                                   <div>
-                                      <p className="font-bold">{res.studentName} <span className="text-slate-400 text-xs font-normal">({res.homeworkTitle})</span></p>
-                                      <p className="text-xs text-green-600 font-bold">الدرجة: {res.score}/{res.total}</p>
+                                      <p className="font-bold">{res.studentName} <span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600 mx-1">{getGradeLabel(res.grade)}</span></p>
+                                      <p className="text-slate-500 text-xs font-bold mt-1">الكتاب: {res.bookName} - {res.homeworkTitle}</p>
+                                      <p className="text-sm text-green-600 font-bold mt-1">الدرجة: {res.score}/{res.total}</p>
                                   </div>
-                                  <div className="text-xs text-slate-500">{res.submittedAt?.toDate().toLocaleDateString('ar-EG')}</div>
+                                  <div className="text-xs text-slate-500 bg-slate-100 p-2 rounded-lg text-center">
+                                      {res.submittedAt?.toDate().toLocaleDateString('ar-EG')}<br/>
+                                      {res.submittedAt?.toDate().toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}
+                                  </div>
                               </div>
                           ))}
                       </div>
@@ -2280,6 +2321,7 @@ const StudentDashboard = ({ user, userData }) => {
   const [playingVideo, setPlayingVideo] = useState(null);
   const [playingHtml, setPlayingHtml] = useState(null);
   const [examResults, setExamResults] = useState([]);
+  const [hwResults, setHwResults] = useState([]); // سجل واجبات الطالب
   const [reviewingExam, setReviewingExam] = useState(null);
   
   const [notifications, setNotifications] = useState([]);
@@ -2324,6 +2366,13 @@ const StudentDashboard = ({ user, userData }) => {
     const unsubExams = onSnapshot(query(collection(db, 'exams'), where('grade', '==', userData.grade)), s => setExams(s.docs.map(d=>({id:d.id,...d.data()}))));
     const unsubResults = onSnapshot(query(collection(db, 'exam_results'), where('studentId', '==', user.uid)), s => setExamResults(s.docs.map(d=>({id:d.id,...d.data()}))));
     
+    // جلب نتائج الواجبات الذكية الخاصة بالطالب
+    const unsubHwResults = onSnapshot(query(collection(db, 'homework_results'), where('studentId', '==', user.uid)), s => {
+        const results = s.docs.map(d=>({id:d.id,...d.data()}));
+        results.sort((a,b) => (b.submittedAt?.seconds || 0) - (a.submittedAt?.seconds || 0));
+        setHwResults(results);
+    });
+
     const unsubNotif = onSnapshot(query(collection(db, 'notifications'), where('grade', 'in', ['all', userData.grade]), orderBy('createdAt', 'desc'), limit(10)), s => {
         const newNotifs = s.docs.map(d => d.data());
         setNotifications(newNotifs);
@@ -2335,7 +2384,7 @@ const StudentDashboard = ({ user, userData }) => {
 
     setEditFormData({ name: userData.name, phone: userData.phone, parentPhone: userData.parentPhone, grade: userData.grade });
 
-    return () => { unsubContent(); unsubLive(); unsubExams(); unsubResults(); unsubNotif(); };
+    return () => { unsubContent(); unsubLive(); unsubExams(); unsubResults(); unsubHwResults(); unsubNotif(); };
   }, [userData, user]);
 
   if (scanningHwId) return <SmartHomeworkScanner hwId={scanningHwId} user={user} onClose={() => setScanningHwId(null)} />;
@@ -2466,6 +2515,7 @@ const StudentDashboard = ({ user, userData }) => {
               <>
                 <div onClick={() => setActiveTab('exams')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><ClipboardList/> الامتحانات</div>
                 <div onClick={() => setActiveTab('interactive_exams')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='interactive_exams'?'bg-emerald-100 text-emerald-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-emerald-600'}`}><Sparkles/> امتحان تفاعلي</div>
+                <div onClick={() => setActiveTab('smart_hw_results')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='smart_hw_results'?'bg-blue-100 text-blue-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-blue-600'}`}><QrCode/> سجل الواجبات (QR)</div>
               </>
           )}
           
@@ -2540,6 +2590,11 @@ const StudentDashboard = ({ user, userData }) => {
                         <h3 className="relative z-10 text-xl font-bold mb-2 text-emerald-900 group-hover:text-emerald-600 transition">امتحان تفاعلي</h3>
                         <p className="relative z-10 text-3xl font-black text-emerald-600">{interactiveExams.length}</p>
                         <Sparkles className="absolute -bottom-6 -left-6 text-emerald-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
+                    </motion.div>
+                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedExam && setActiveTab('smart_hw_results')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedExam ? 'opacity-50 grayscale' : ''}`}>
+                        <h3 className="relative z-10 text-xl font-bold mb-2 text-blue-900 group-hover:text-blue-600 transition">واجبات (QR)</h3>
+                        <p className="relative z-10 text-3xl font-black text-blue-600">{hwResults.length}</p>
+                        <QrCode className="absolute -bottom-6 -left-6 text-blue-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
                     </motion.div>
                 </div>
                 <Leaderboard />
@@ -2655,6 +2710,47 @@ const StudentDashboard = ({ user, userData }) => {
                 )
              })}
           </div>
+        )}
+
+        {activeTab === 'smart_hw_results' && !isBannedExam && (
+            <div className="glass-panel p-6 rounded-xl">
+                <h2 className="text-2xl font-bold mb-6 font-arabic text-blue-800 flex items-center gap-2"><QrCode/> سجل الواجبات الذكية (QR)</h2>
+                {hwResults.length === 0 ? (
+                    <p className="text-slate-500 text-center py-10 bg-white rounded-xl border font-bold">لم تقم بتسليم أي واجب ذكي عبر الكاميرا حتى الآن.</p>
+                ) : (
+                    <div className="space-y-6">
+                        {(() => {
+                            // تجميع واجبات الطالب حسب اسم الكتاب
+                            const hwByBook = hwResults.reduce((acc, hw) => {
+                                const book = hw.bookName || 'كتب غير مصنفة';
+                                if(!acc[book]) acc[book] = [];
+                                acc[book].push(hw);
+                                return acc;
+                            }, {});
+
+                            return Object.entries(hwByBook).map(([bookName, hws]) => (
+                                <div key={bookName} className="mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                    <h4 className="font-bold text-lg text-amber-700 bg-amber-100 p-2 rounded-lg mb-4 flex items-center gap-2 inline-flex"><BookOpen size={20}/> كتاب: {bookName}</h4>
+                                    <div className="space-y-3 pl-4 border-r-4 border-amber-300 pr-4">
+                                        {hws.map(hw => (
+                                            <div key={hw.id} className="bg-white border shadow-sm p-4 rounded-xl flex flex-col md:flex-row justify-between gap-4 hover:border-amber-400 transition">
+                                                <div className="flex-1">
+                                                    <p className="font-bold text-lg text-slate-800">{hw.homeworkTitle}</p>
+                                                    <p className="text-sm text-slate-500 mb-2 mt-1 bg-slate-50 p-2 rounded">تعليق المصحح: <span className="font-bold text-blue-600">{hw.feedback}</span></p>
+                                                </div>
+                                                <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                                                    <span className="text-xl font-black text-green-600 bg-green-50 px-4 py-2 rounded-lg border border-green-200">{hw.score} / {hw.total}</span>
+                                                    <span className="text-xs text-slate-400">{hw.submittedAt?.toDate().toLocaleDateString('ar-EG')}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ));
+                        })()}
+                    </div>
+                )}
+            </div>
         )}
 
         {activeTab === 'settings' && (
