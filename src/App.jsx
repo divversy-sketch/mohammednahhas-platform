@@ -345,17 +345,22 @@ const DesignSystemLoader = () => {
       
       .watermark-video {
         position: absolute;
-        top: 0; left: 0;
-        animation: floatWatermark 20s linear infinite alternate;
         pointer-events: none;
-        z-index: 50;
-        color: rgba(255, 255, 255, 0.2); 
+        z-index: 9999;
+        color: rgba(255, 255, 255, 0.4); 
         font-weight: 900;
         font-size: 1.5rem;
-        text-shadow: 0 0 5px rgba(0,0,0,0.8);
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
         white-space: nowrap;
-        will-change: transform;
-        -webkit-transform: translateZ(0);
+        animation: moveWatermark 25s linear infinite;
+      }
+      
+      @keyframes moveWatermark {
+        0% { top: 10%; left: 10%; transform: rotate(-5deg); }
+        25% { top: 80%; left: 50%; transform: rotate(5deg); }
+        50% { top: 30%; left: 80%; transform: rotate(-5deg); }
+        75% { top: 70%; left: 10%; transform: rotate(5deg); }
+        100% { top: 10%; left: 10%; transform: rotate(-5deg); }
       }
       
       .no-select { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
@@ -814,8 +819,6 @@ const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
               frameBorder="0" 
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
               allowFullScreen
-              loading="lazy"
-              style={{ WebkitTransform: 'translateZ(0)' }}
             ></iframe>
           ) : (
              <video 
@@ -825,9 +828,8 @@ const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
                 className="w-full h-full object-contain relative z-40" 
                 src={finalUrl}
                 playsInline
-                preload="metadata"
+                preload="auto"
                 disablePictureInPicture
-                style={{ WebkitTransform: 'translateZ(0)' }}
              >
                 المتصفح لا يدعم هذا الفيديو.
              </video>
