@@ -16,7 +16,7 @@ import {
   ExternalLink, ClipboardList, Timer, AlertOctagon, Flag, Save, HelpCircle, 
   Reply, Unlock, Layout, Settings, Trophy, Megaphone, Bell, Download, XCircle, 
   Calendar, Clock, FileWarning, Settings as GearIcon, Star, Bot, Power, Upload,
-  Users, PenTool, Code, Sparkles, Lamp, Ban, Shield, RefreshCw, Link as LinkIcon, History
+  Users, PenTool, Code, Sparkles, Lamp, Ban, Shield, RefreshCw, Link as LinkIcon, History, Camera, QrCode
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -1268,6 +1268,161 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   );
 };
 
+// --- الكاميرا والذكاء الاصطناعي لتصحيح الواجب الورقي ---
+const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
+    const [homeworkData, setHomeworkData] = useState(null);
+    const [imageSrc, setImageSrc] = useState(null);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [result, setResult] = useState(null);
+    const fileInputRef = useRef(null);
+
+    // Get Homework Data from DB
+    useEffect(() => {
+        const fetchHw = async () => {
+            const docRef = doc(db, 'smart_homeworks', hwId);
+            const snap = await getDoc(docRef);
+            if (snap.exists()) {
+                setHomeworkData({ id: snap.id, ...snap.data() });
+            } else {
+                alert("الواجب غير موجود أو تم حذفه.");
+                onClose();
+            }
+        };
+        fetchHw();
+    }, [hwId, onClose]);
+
+    const handleImageCapture = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                setImageSrc(event.target.result);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const analyzeImageWithGemini = async () => {
+        if (!imageSrc || !homeworkData) return;
+        setIsAnalyzing(true);
+        
+        try {
+            const base64Data = imageSrc.split(',')[1];
+            // تحذير للأدمن: لتشغيل هذه الميزة فعلياً، يجب وضع مفتاح Gemini API هنا
+            const apiKey = "AIzaSyAkxZD3GCtHK1_9DgsdCOPr69M1nOV13Hw"; 
+            
+            if(!apiKey) {
+                // محاكاة للنتيجة في حالة عدم وضع مفتاح حقيقي
+                setTimeout(async () => {
+                    const dummyResult = { score: Math.floor(Math.random() * 10), total: 10, feedback: "تم استلام الواجب (محاكاة)." };
+                    await saveResult(dummyResult);
+                }, 2000);
+                return;
+            }
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            const promptText = `أنت معلم لغة عربية. قم بتصحيح صورة الواجب هذه المكونة من أسئلة اختيار من متعدد. مفتاح الإجابة الصحيح هو: ${homeworkData.answerKey}. قم بإرجاع النتيجة بصيغة JSON فقط تحتوي على: {"score": عدد الإجابات الصحيحة, "total": العدد الكلي للأسئلة, "feedback": "تعليق قصير"}`;
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{
+                        role: "user",
+                        parts: [
+                            { text: promptText },
+                            { inlineData: { mimeType: "image/jpeg", data: base64Data } }
+                        ]
+                    }]
+                })
+            });
+
+            const data = await response.json();
+            const textResult = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            
+            // Clean markdown JSON if present
+            const cleanJson = textResult.replace(/```json/g, '').replace(/```/g, '');
+            const parsedResult = JSON.parse(cleanJson);
+            
+            await saveResult(parsedResult);
+
+        } catch (error) {
+            console.error("Error analyzing image:", error);
+            alert("حدث خطأ أثناء التصحيح. تأكد من وضوح الصورة.");
+            setIsAnalyzing(false);
+        }
+    };
+
+    const saveResult = async (aiResult) => {
+        const finalData = {
+            studentId: user.uid,
+            studentName: user.displayName,
+            homeworkId: homeworkData.id,
+            homeworkTitle: homeworkData.title,
+            score: aiResult.score,
+            total: aiResult.total,
+            feedback: aiResult.feedback,
+            submittedAt: serverTimestamp()
+        };
+        await addDoc(collection(db, 'homework_results'), finalData);
+        setResult(aiResult);
+        setIsAnalyzing(false);
+    };
+
+    if (!homeworkData) return <div className="fixed inset-0 z-[100] bg-white flex items-center justify-center"><Loader2 className="animate-spin text-blue-600 w-12 h-12"/></div>;
+
+    return (
+        <div className="fixed inset-0 z-[100] bg-slate-900 text-white flex flex-col font-['Cairo']" dir="rtl">
+            <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800">
+                <h2 className="font-bold flex items-center gap-2 text-blue-400"><QrCode/> تسليم الواجب: {homeworkData.title}</h2>
+                <button onClick={onClose} className="bg-red-600 px-4 py-1 rounded text-sm font-bold">إلغاء</button>
+            </div>
+            
+            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+                {!imageSrc ? (
+                    <div className="space-y-6">
+                        <div className="w-32 h-32 bg-slate-800 rounded-full flex items-center justify-center mx-auto border-4 border-blue-500 border-dashed">
+                            <Camera size={48} className="text-blue-400"/>
+                        </div>
+                        <h3 className="text-2xl font-bold">صوّر صفحة الواجب</h3>
+                        <p className="text-slate-400 max-w-md">تأكد من أن الإضاءة جيدة وأن الإجابات (أ، ب، ج، د) واضحة في الصورة ليتمكن الذكاء الاصطناعي من قراءتها بدقة.</p>
+                        
+                        <button onClick={() => fileInputRef.current.click()} className="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-blue-700 shadow-lg flex items-center gap-2 mx-auto">
+                            <Camera /> افتح الكاميرا
+                        </button>
+                        <input type="file" accept="image/*" capture="environment" ref={fileInputRef} onChange={handleImageCapture} className="hidden" />
+                    </div>
+                ) : !result ? (
+                    <div className="space-y-6 w-full max-w-md">
+                        <img src={imageSrc} alt="Homework" className="w-full h-80 object-cover rounded-xl border-4 border-slate-700" />
+                        {isAnalyzing ? (
+                            <div className="bg-slate-800 p-6 rounded-xl border border-blue-500/50 flex flex-col items-center">
+                                <Loader2 className="animate-spin text-blue-500 w-10 h-10 mb-4"/>
+                                <p className="font-bold text-blue-400">الذكاء الاصطناعي يقوم بالتصحيح الآن...</p>
+                                <p className="text-xs text-slate-400 mt-2">يرجى الانتظار ثوانٍ قليلة</p>
+                            </div>
+                        ) : (
+                            <div className="flex gap-4">
+                                <button onClick={() => setImageSrc(null)} className="flex-1 bg-slate-700 py-3 rounded-xl font-bold hover:bg-slate-600">إعادة التصوير</button>
+                                <button onClick={analyzeImageWithGemini} className="flex-1 bg-green-600 py-3 rounded-xl font-bold hover:bg-green-700 shadow-lg shadow-green-500/20">تأكيد وتصحيح</button>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white text-slate-900 p-8 rounded-3xl w-full max-w-sm shadow-2xl">
+                        <CheckCircle className="text-green-500 w-20 h-20 mx-auto mb-4"/>
+                        <h2 className="text-3xl font-black mb-2 text-slate-800">النتيجة</h2>
+                        <div className="text-5xl font-black text-amber-600 mb-6">{result.score} / {result.total}</div>
+                        <p className="text-slate-600 font-bold mb-6">{result.feedback}</p>
+                        <p className="text-xs text-slate-400 mb-6">تم إرسال الدرجة للمستر بنجاح.</p>
+                        <button onClick={onClose} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800">العودة للمنصة</button>
+                    </motion.div>
+                )}
+            </div>
+        </div>
+    );
+};
+
 // --- لوحة تحكم الأدمن ---
 const AdminDashboard = ({ user }) => {
   const [activeTab, setActiveTab] = useState('users'); 
@@ -1302,6 +1457,15 @@ const AdminDashboard = ({ user }) => {
   const [viewingStudentHistory, setViewingStudentHistory] = useState(null);
   const [studentHistoryData, setStudentHistoryData] = useState([]);
 
+  // Time Edit Logic
+  const [editingExamTime, setEditingExamTime] = useState(null);
+  const [newEndTime, setNewEndTime] = useState('');
+
+  // Smart Homework Logic (Admin)
+  const [smartHomeworks, setSmartHomeworks] = useState([]);
+  const [newSmartHw, setNewSmartHw] = useState({ title: '', answerKey: '' });
+  const [hwResults, setHwResults] = useState([]);
+
   useEffect(() => { const u = onSnapshot(query(collection(db, 'users'), where('status','==','pending')), s => setPendingUsers(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(query(collection(db, 'users'), where('status', 'in', ['active', 'banned_cheating', 'banned_all', 'banned_exam', 'banned_content', 'rejected'])), s => setActiveUsersList(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(query(collection(db, 'content'), orderBy('createdAt','desc')), s => setContentList(s.docs.map(d=>({id:d.id,...d.data()})))); return u; }, []);
@@ -1312,6 +1476,10 @@ const AdminDashboard = ({ user }) => {
   useEffect(() => { const u = onSnapshot(query(collection(db, 'announcements'), orderBy('createdAt', 'desc')), s => setAnnouncements(s.docs.map(d => ({id: d.id, ...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(collection(db, 'auto_replies'), s => setAutoReplies(s.docs.map(d => ({id: d.id, ...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(collection(db, 'quotes'), s => setQuotesList(s.docs.map(d => ({id: d.id, ...d.data()})))); return u; }, []);
+  
+  // Fetch Smart HWs
+  useEffect(() => { const u = onSnapshot(collection(db, 'smart_homeworks'), s => setSmartHomeworks(s.docs.map(d => ({id: d.id, ...d.data()})))); return u; }, []);
+  useEffect(() => { const u = onSnapshot(query(collection(db, 'homework_results'), orderBy('submittedAt', 'desc')), s => setHwResults(s.docs.map(d => ({id: d.id, ...d.data()})))); return u; }, []);
 
   const handleApprove = async (id) => {
     await updateDoc(doc(db,'users',id), {status:'active'});
@@ -1368,6 +1536,35 @@ const AdminDashboard = ({ user }) => {
       const q = query(collection(db, 'video_views'), where('userId', '==', studentId), orderBy('viewedAt', 'desc'));
       const snap = await getDocs(q);
       setStudentHistoryData(snap.docs.map(d => d.data()));
+  };
+
+  // Update Exam Time
+  const handleUpdateExamTime = async (e) => {
+      e.preventDefault();
+      if (!newEndTime) return;
+      try {
+          await updateDoc(doc(db, 'exams', editingExamTime.id), {
+              endTime: newEndTime
+          });
+          alert("تم تمديد وقت الامتحان بنجاح!");
+          setEditingExamTime(null);
+          setNewEndTime('');
+      } catch (error) {
+          console.error("Error updating exam time:", error);
+          alert("حدث خطأ أثناء تعديل الوقت.");
+      }
+  };
+
+  // Create Smart HW
+  const handleCreateSmartHw = async (e) => {
+      e.preventDefault();
+      if (!newSmartHw.title || !newSmartHw.answerKey) return alert("أكمل البيانات");
+      await addDoc(collection(db, 'smart_homeworks'), {
+          ...newSmartHw,
+          createdAt: serverTimestamp()
+      });
+      setNewSmartHw({ title: '', answerKey: '' });
+      alert("تم إنشاء الواجب! يمكنك نسخ الرابط الآن.");
   };
 
   const handleReplyMessage = async (msgId) => {
@@ -1629,6 +1826,28 @@ const AdminDashboard = ({ user }) => {
           </div>
       )}
 
+      {/* نافذة تمديد وقت الامتحان */}
+      {editingExamTime && (
+          <div className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl relative">
+                  <button onClick={() => setEditingExamTime(null)} className="absolute top-4 left-4 text-slate-400 hover:text-red-500"><X size={24}/></button>
+                  <h3 className="text-xl font-bold mb-4 text-blue-800 flex items-center gap-2"><Calendar size={24}/> تمديد وقت الامتحان</h3>
+                  <p className="text-sm text-slate-600 mb-6 font-bold">{editingExamTime.title}</p>
+                  <form onSubmit={handleUpdateExamTime}>
+                      <label className="block text-sm font-bold mb-2 text-slate-800">تاريخ ووقت الانتهاء الجديد:</label>
+                      <input 
+                          type="datetime-local" 
+                          className="w-full border-2 border-blue-200 p-3 rounded-xl mb-6 bg-blue-50 focus:border-blue-500 outline-none transition" 
+                          value={newEndTime} 
+                          onChange={(e) => setNewEndTime(e.target.value)} 
+                          required
+                      />
+                      <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg hover:shadow-blue-500/50">حفظ التعديل</button>
+                  </form>
+              </div>
+          </div>
+      )}
+
       <header className="flex justify-between items-center mb-8 glass-panel p-4 rounded-xl relative z-10 m-4">
         <div className="flex items-center gap-2"><ShieldAlert className="text-amber-600"/> <h1 className="text-2xl font-bold font-arabic text-slate-800">لوحة تحكم النحاس (الأدمن)</h1></div>
         <div className="flex gap-4 items-center">
@@ -1646,9 +1865,9 @@ const AdminDashboard = ({ user }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-6 relative z-10">
         <div className="glass-panel p-4 rounded-xl h-fit space-y-2">
-          {['users', 'all_users', 'exams', 'results', 'live', 'content', 'messages', 'auto_reply', 'quotes', 'settings'].map(tab => (
+          {['users', 'all_users', 'exams', 'results', 'smart_hw', 'live', 'content', 'messages', 'auto_reply', 'quotes', 'settings'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 transition-all ${activeTab===tab?'bg-amber-100 text-amber-700 shadow-sm border-r-4 border-amber-500':'hover:bg-slate-50 text-slate-600'}`}>
-              {tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : 'الإعدادات'}
+              {tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : 'الإعدادات'}
             </button>
           ))}
         </div>
@@ -1727,7 +1946,57 @@ const AdminDashboard = ({ user }) => {
               </div>
           )}
 
-          {activeTab === 'exams' && <div className="space-y-8"><div className="glass-panel p-6 rounded-xl"><h2 className="text-xl font-bold mb-6 border-b pb-2 font-arabic text-amber-700">إنشاء امتحان</h2><div className="grid grid-cols-4 gap-4 mb-6"><input className="border p-2 rounded col-span-2" placeholder="العنوان" value={examBuilder.title} onChange={e=>setExamBuilder({...examBuilder, title:e.target.value})}/><input className="border p-2 rounded" placeholder="الكود" value={examBuilder.accessCode} onChange={e=>setExamBuilder({...examBuilder, accessCode:e.target.value})}/><input type="number" className="border p-2 rounded" placeholder="المدة (دقائق)" value={examBuilder.duration} onChange={e=>setExamBuilder({...examBuilder, duration:parseInt(e.target.value)})}/><select className="border p-2 rounded col-span-4" value={examBuilder.grade} onChange={e=>setExamBuilder({...examBuilder, grade:e.target.value})}><GradeOptions/></select><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت البدء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, startTime:e.target.value})}/></div><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت الانتهاء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, endTime:e.target.value})}/></div></div><div className="bg-slate-50 p-4 rounded-xl border mb-6"><textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm" placeholder="اكتب الأسئلة هنا...&#10;(هام: افصل بين كل سؤال والذي يليه بسطر فارغ تماماً، وضع علامة * قبل الإجابة الصحيحة)" value={bulkText} onChange={e=>setBulkText(e.target.value)}/><button onClick={parseExam} className="mt-4 w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-green-500/50 transition">نشر</button></div></div><div className="glass-panel p-6 rounded-xl"><h3 className="font-bold mb-4 font-arabic">الامتحانات الحالية</h3>{filteredExamsList.map(exam=><div key={exam.id} className="flex justify-between items-center border-b py-3 last:border-0 hover:bg-slate-50/50 px-2 rounded transition"><div><p className="font-bold">{exam.title}</p><p className="text-xs text-slate-500">من: {new Date(exam.startTime).toLocaleString('ar-EG')} | إلى: {new Date(exam.endTime).toLocaleString('ar-EG')}</p><p className="text-xs text-slate-400">كود: {exam.accessCode}</p></div><div className="flex gap-2"><button onClick={()=>handleDeleteExam(exam.id)} className="text-red-500 p-2"><Trash2 size={18}/></button></div></div>)}</div></div>}
+          {activeTab === 'smart_hw' && (
+              <div className="space-y-6">
+                  <div className="glass-panel p-6 rounded-xl">
+                      <h2 className="text-xl font-bold mb-4 font-arabic text-blue-700 flex items-center gap-2"><QrCode/> إضافة واجب (للكتاب)</h2>
+                      <form onSubmit={handleCreateSmartHw} className="grid gap-4">
+                          <input className="border p-3 rounded" placeholder="اسم الواجب (مثال: تدريبات صفحة 15)" value={newSmartHw.title} onChange={e=>setNewSmartHw({...newSmartHw, title:e.target.value})} required/>
+                          <textarea className="border p-3 rounded h-24" placeholder="نموذج الإجابة (مثال: 1-أ, 2-ج, 3-د...)" value={newSmartHw.answerKey} onChange={e=>setNewSmartHw({...newSmartHw, answerKey:e.target.value})} required/>
+                          <button type="submit" className="bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-blue-500/50">توليد رابط للصفحة</button>
+                      </form>
+                  </div>
+                  
+                  <div className="glass-panel p-6 rounded-xl">
+                      <h3 className="font-bold mb-4">الواجبات المضافة (لنسخ الرابط)</h3>
+                      <div className="space-y-3">
+                          {smartHomeworks.map(hw => {
+                              const hwLink = `${window.location.origin}/?hw=${hw.id}`;
+                              return (
+                                  <div key={hw.id} className="bg-white border p-4 rounded-xl flex flex-col md:flex-row justify-between gap-4">
+                                      <div>
+                                          <p className="font-bold text-lg">{hw.title}</p>
+                                          <p className="text-sm text-slate-500 mb-2">الإجابات: {hw.answerKey}</p>
+                                          <code className="bg-slate-100 p-2 rounded text-xs break-all border block select-all">{hwLink}</code>
+                                      </div>
+                                      <div className="flex gap-2 items-center">
+                                          <button onClick={() => { navigator.clipboard.writeText(hwLink); alert("تم نسخ الرابط! اذهب لموقع QR Generator لتحويله."); }} className="bg-slate-200 px-4 py-2 rounded-lg font-bold hover:bg-slate-300 text-sm h-fit">نسخ الرابط</button>
+                                          <button onClick={async () => { if(window.confirm('حذف؟')) await deleteDoc(doc(db, 'smart_homeworks', hw.id)); }} className="text-red-500 hover:text-red-700 p-2"><Trash2 size={18}/></button>
+                                      </div>
+                                  </div>
+                              )
+                          })}
+                      </div>
+                  </div>
+
+                  <div className="glass-panel p-6 rounded-xl">
+                      <h3 className="font-bold mb-4 text-green-700">نتائج تصحيح الذكاء الاصطناعي</h3>
+                      <div className="space-y-2">
+                          {hwResults.map(res => (
+                              <div key={res.id} className="flex justify-between items-center border p-3 rounded hover:bg-slate-50 transition bg-white/50">
+                                  <div>
+                                      <p className="font-bold">{res.studentName} <span className="text-slate-400 text-xs font-normal">({res.homeworkTitle})</span></p>
+                                      <p className="text-xs text-green-600 font-bold">الدرجة: {res.score}/{res.total}</p>
+                                  </div>
+                                  <div className="text-xs text-slate-500">{res.submittedAt?.toDate().toLocaleDateString('ar-EG')}</div>
+                              </div>
+                          ))}
+                      </div>
+                  </div>
+              </div>
+          )}
+
+          {activeTab === 'exams' && <div className="space-y-8"><div className="glass-panel p-6 rounded-xl"><h2 className="text-xl font-bold mb-6 border-b pb-2 font-arabic text-amber-700">إنشاء امتحان</h2><div className="grid grid-cols-4 gap-4 mb-6"><input className="border p-2 rounded col-span-2" placeholder="العنوان" value={examBuilder.title} onChange={e=>setExamBuilder({...examBuilder, title:e.target.value})}/><input className="border p-2 rounded" placeholder="الكود" value={examBuilder.accessCode} onChange={e=>setExamBuilder({...examBuilder, accessCode:e.target.value})}/><input type="number" className="border p-2 rounded" placeholder="المدة (دقائق)" value={examBuilder.duration} onChange={e=>setExamBuilder({...examBuilder, duration:parseInt(e.target.value)})}/><select className="border p-2 rounded col-span-4" value={examBuilder.grade} onChange={e=>setExamBuilder({...examBuilder, grade:e.target.value})}><GradeOptions/></select><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت البدء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, startTime:e.target.value})}/></div><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت الانتهاء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, endTime:e.target.value})}/></div></div><div className="bg-slate-50 p-4 rounded-xl border mb-6"><textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm" placeholder="اكتب الأسئلة هنا...&#10;(هام: افصل بين كل سؤال والذي يليه بسطر فارغ تماماً، وضع علامة * قبل الإجابة الصحيحة)" value={bulkText} onChange={e=>setBulkText(e.target.value)}/><button onClick={parseExam} className="mt-4 w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-green-500/50 transition">نشر</button></div></div><div className="glass-panel p-6 rounded-xl"><h3 className="font-bold mb-4 font-arabic">الامتحانات الحالية</h3>{filteredExamsList.map(exam=><div key={exam.id} className="flex justify-between items-center border-b py-3 last:border-0 hover:bg-slate-50/50 px-2 rounded transition"><div><p className="font-bold">{exam.title}</p><p className="text-xs text-slate-500">من: {new Date(exam.startTime).toLocaleString('ar-EG')} | إلى: {new Date(exam.endTime).toLocaleString('ar-EG')}</p><p className="text-xs text-slate-400">كود: {exam.accessCode}</p></div><div className="flex gap-2"><button onClick={() => { setEditingExamTime(exam); setNewEndTime(exam.endTime); }} className="text-blue-600 p-2 bg-blue-100 rounded-lg hover:bg-blue-200" title="تمديد الوقت"><Calendar size={18}/></button><button onClick={()=>handleDeleteExam(exam.id)} className="text-red-600 p-2 bg-red-100 rounded-lg hover:bg-red-200" title="حذف"><Trash2 size={18}/></button></div></div>)}</div></div>}
 
           {activeTab === 'results' && (
              <div className="glass-panel p-6 rounded-xl">
@@ -2017,9 +2286,21 @@ const StudentDashboard = ({ user, userData }) => {
 
   const [editFormData, setEditFormData] = useState({ name: '', phone: '', parentPhone: '', grade: '' });
 
+  // Smart HW Logic
+  const [scanningHwId, setScanningHwId] = useState(null);
+
   useEffect(() => {
     if(!userData) return;
     
+    // Check URL for Smart HW QR Scan
+    const urlParams = new URLSearchParams(window.location.search);
+    const hwParam = urlParams.get('hw');
+    if (hwParam) {
+        setScanningHwId(hwParam);
+        // Remove param from URL without reloading
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
     const unsubContent = onSnapshot(query(collection(db, 'content'), where('grade', '==', userData.grade)), s => {
         const allContent = s.docs.map(d=>({id:d.id,...d.data()}));
         const visibleContent = allContent.filter(c => {
@@ -2054,6 +2335,8 @@ const StudentDashboard = ({ user, userData }) => {
 
     return () => { unsubContent(); unsubLive(); unsubExams(); unsubResults(); unsubNotif(); };
   }, [userData, user]);
+
+  if (scanningHwId) return <SmartHomeworkScanner hwId={scanningHwId} user={user} onClose={() => setScanningHwId(null)} />;
 
   if(activeLiveView) return <LiveSessionView session={activeLiveView} user={user} onClose={() => setActiveLiveView(null)} />;
   
