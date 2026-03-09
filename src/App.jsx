@@ -1883,7 +1883,37 @@ const AdminDashboard = ({ user }) => {
           {activeTab === 'all_users' && (
               <div className="glass-panel p-6 rounded-xl">
                   <h2 className="font-bold mb-4 font-arabic text-xl">قائمة الطلاب ({filteredActiveUsers.length})</h2>
-                  {editingUser&&<form onSubmit={handleUpdateUser} className="mb-4 bg-amber-50 p-4 rounded grid gap-2"><input className="border p-2" value={editingUser.name} onChange={e=>setEditingUser({...editingUser, name:e.target.value})}/><button className="bg-green-600 text-white px-4 py-1 rounded">حفظ</button></form>}
+                  
+                  {/* نافذة تعديل بيانات الطالب الشاملة */}
+                  {editingUser && (
+                      <div className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
+                              <button onClick={() => setEditingUser(null)} className="absolute top-4 left-4 text-slate-400 hover:text-red-500"><X size={24}/></button>
+                              <h3 className="text-xl font-bold mb-6 text-blue-800 flex items-center gap-2 border-b pb-2"><Edit size={24}/> تعديل بيانات الطالب</h3>
+                              <form onSubmit={handleUpdateUser} className="space-y-4">
+                                  <div>
+                                      <label className="block text-sm font-bold mb-1 text-slate-700">اسم الطالب</label>
+                                      <input className="w-full border-2 border-blue-100 p-3 rounded-xl bg-blue-50 focus:border-blue-500 outline-none transition" value={editingUser.name || ''} onChange={e=>setEditingUser({...editingUser, name:e.target.value})} required/>
+                                  </div>
+                                  <div>
+                                      <label className="block text-sm font-bold mb-1 text-slate-700">رقم هاتف الطالب</label>
+                                      <input type="tel" className="w-full border-2 border-blue-100 p-3 rounded-xl bg-blue-50 focus:border-blue-500 outline-none transition" value={editingUser.phone || ''} onChange={e=>setEditingUser({...editingUser, phone:e.target.value})} required/>
+                                  </div>
+                                  <div>
+                                      <label className="block text-sm font-bold mb-1 text-slate-700">رقم هاتف ولي الأمر</label>
+                                      <input type="tel" className="w-full border-2 border-blue-100 p-3 rounded-xl bg-blue-50 focus:border-blue-500 outline-none transition" value={editingUser.parentPhone || ''} onChange={e=>setEditingUser({...editingUser, parentPhone:e.target.value})} required/>
+                                  </div>
+                                  <div>
+                                      <label className="block text-sm font-bold mb-1 text-slate-700">المرحلة الدراسية</label>
+                                      <select className="w-full border-2 border-blue-100 p-3 rounded-xl bg-white focus:border-blue-500 outline-none transition" value={editingUser.grade || '1sec'} onChange={e=>setEditingUser({...editingUser, grade:e.target.value})}>
+                                          <GradeOptions />
+                                      </select>
+                                  </div>
+                                  <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg hover:shadow-blue-500/50 mt-2">حفظ التعديلات</button>
+                              </form>
+                          </div>
+                      </div>
+                  )}
                   
                   <div className="grid gap-4">
                       {filteredActiveUsers.map(u=>(
