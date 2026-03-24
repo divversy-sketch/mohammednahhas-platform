@@ -6,7 +6,7 @@ import {
 } from 'firebase/auth';
 import { 
   getFirestore, doc, setDoc, getDoc, getDocs, collection, addDoc, query, where, 
-  onSnapshot, updateDoc, deleteDoc, orderBy, serverTimestamp, writeBatch, limit 
+  onSnapshot, updateDoc, deleteDoc, orderBy, serverTimestamp, writeBatch, limit, increment 
 } from 'firebase/firestore';
 import { 
   PlayCircle, FileText, LogOut, User, GraduationCap, Quote, CheckCircle, 
@@ -16,7 +16,7 @@ import {
   ExternalLink, ClipboardList, Timer, AlertOctagon, Flag, Save, HelpCircle, 
   Reply, Unlock, Layout, Settings, Trophy, Megaphone, Bell, Download, XCircle, 
   Calendar, Clock, FileWarning, Settings as GearIcon, Star, Bot, Power, Upload,
-  Users, PenTool, Code, Sparkles, Lamp, Ban, Shield, RefreshCw, Link as LinkIcon, History, Camera, QrCode
+  Users, PenTool, Code, Sparkles, Lamp, Ban, Shield, RefreshCw, Link as LinkIcon, History, Camera, QrCode, FileCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -49,6 +49,15 @@ try {
  * 2. دوال مساعدة (Utility Functions)
  * =================================================================
  */
+
+// دالة تحويل الثواني لدقائق وثواني للعرض في لوحة الأدمن
+const formatWatchTime = (totalSeconds) => {
+    if (!totalSeconds) return 'أقل من 5 ثوانٍ';
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    if (m === 0) return `${s} ثانية`;
+    return `${m} دقيقة و ${s} ثانية`;
+};
 
 const requestNotificationPermission = () => {
   if (!("Notification" in window)) return;
@@ -755,28 +764,49 @@ const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
   const videoRef = useRef(null);
   const finalUrl = video.url || video.file;
 
-  // Tracking Video Views
+  // Tracking Smart Video Views (With Timer)
   useEffect(() => {
       if (!user || !video.id) return;
-      const trackVideoView = async () => {
+      
+      const viewId = `${user.uid}_${video.id}`;
+      const viewRef = doc(db, 'video_views', viewId);
+      let timerInterval;
+
+      const initTracking = async () => {
           try {
-              // عمل كود مميز لكل طالب مع كل فيديو لتجنب التكرار ولتحديث وقت المشاهدة
-              const viewId = `${user.uid}_${video.id}`;
-              const viewRef = doc(db, 'video_views', viewId);
-              
-              // setDoc with merge: true بيسجل المشاهدة لو أول مرة، أو بيحدث الوقت لو دخل تاني
+              // تسجيل فتح الفيديو لأول مرة وتحديث وقت آخر مشاهدة
               await setDoc(viewRef, {
                   userId: user.uid,
                   userName: userName,
                   videoId: video.id,
                   videoTitle: video.title,
-                  viewedAt: serverTimestamp()
+                  viewedAt: serverTimestamp() // يتحدث كل مرة يفتح فيها الفيديو
               }, { merge: true });
+              
+              // تشغيل العداد لإضافة 5 ثوانٍ لرصيد مشاهدة الطالب كل 5 ثوانٍ
+              timerInterval = setInterval(async () => {
+                  // تحديث العداد فقط إذا كان المتصفح مفتوح ونشط (الطالب يتفرج فعلاً)
+                  if (!document.hidden) {
+                      try {
+                          await updateDoc(viewRef, {
+                              watchedSeconds: increment(5)
+                          });
+                      } catch (e) {
+                          console.error("Timer update error:", e);
+                      }
+                  }
+              }, 5000);
+              
           } catch (error) {
               console.error("Error tracking view:", error);
           }
       };
-      trackVideoView();
+      
+      initTracking();
+
+      return () => {
+          if (timerInterval) clearInterval(timerInterval);
+      };
   }, [user, video.id, video.title, userName]);
 
   const changeSpeed = (rate) => {
@@ -1457,8 +1487,8 @@ const AdminDashboard = ({ user }) => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   
-  // Tracking Logic
-  const [viewingStudentHistory, setViewingStudentHistory] = useState(null);
+  // Tracking Logic (تم تحويله إلى صفحة الملف الشامل)
+  const [viewingStudentProfile, setViewingStudentProfile] = useState(null);
   const [studentHistoryData, setStudentHistoryData] = useState([]);
 
   // Time Edit Logic
@@ -1534,18 +1564,14 @@ const AdminDashboard = ({ user }) => {
       window.open(whatsappUrl, '_blank');
   };
 
-  // Watch History Logic
-  const viewStudentHistory = async (studentId, studentName) => {
-      setViewingStudentHistory({ id: studentId, name: studentName });
+  // Student Comprehensive Profile Logic
+  const openStudentProfile = async (student) => {
+      setViewingStudentProfile(student);
       try {
-          // إلغاء orderBy من الداتا بيز عشان مشكلة الفهارس (Indexes)
-          const q = query(collection(db, 'video_views'), where('userId', '==', studentId));
+          const q = query(collection(db, 'video_views'), where('userId', '==', student.id));
           const snap = await getDocs(q);
           const history = snap.docs.map(d => d.data());
-          
-          // الترتيب برمجياً (من الأحدث للأقدم)
           history.sort((a, b) => (b.viewedAt?.seconds || 0) - (a.viewedAt?.seconds || 0));
-          
           setStudentHistoryData(history);
       } catch (error) {
           console.error("Error fetching history:", error);
@@ -1812,34 +1838,6 @@ const AdminDashboard = ({ user }) => {
   return (
     <div className="min-h-screen bg-slate-100 font-['Cairo'] relative" dir="rtl">
       <FloatingArabicBackground />
-      
-      {/* نافذة سجل المشاهدات */}
-      {viewingStudentHistory && (
-          <div className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl relative max-h-[80vh] flex flex-col">
-                  <button onClick={() => setViewingStudentHistory(null)} className="absolute top-4 left-4 text-slate-400 hover:text-red-500"><X size={24}/></button>
-                  <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-blue-800 border-b pb-2"><Eye/> سجل مشاهدات: {viewingStudentHistory.name}</h3>
-                  <div className="overflow-y-auto pr-2 space-y-3 flex-1">
-                      {studentHistoryData.length === 0 ? (
-                          <p className="text-center text-slate-500 py-10">لم يقم هذا الطالب بفتح أي فيديو حتى الآن.</p>
-                      ) : (
-                          studentHistoryData.map((record, i) => (
-                              <div key={i} className="bg-slate-50 border border-slate-200 p-3 rounded-xl flex justify-between items-center">
-                                  <div className="flex items-center gap-3">
-                                      <PlayCircle className="text-amber-500 w-8 h-8"/>
-                                      <div>
-                                          <p className="font-bold text-slate-800">{record.videoTitle || 'فيديو بدون عنوان'}</p>
-                                          <p className="text-xs text-slate-500">{record.viewedAt?.toDate().toLocaleString('ar-EG') || 'الآن'}</p>
-                                      </div>
-                                  </div>
-                                  <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-bold">تم الفتح</span>
-                              </div>
-                          ))
-                      )}
-                  </div>
-              </div>
-          </div>
-      )}
 
       {/* نافذة تمديد وقت الامتحان */}
       {editingExamTime && (
@@ -1859,6 +1857,100 @@ const AdminDashboard = ({ user }) => {
                       />
                       <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg hover:shadow-blue-500/50">حفظ التعديل</button>
                   </form>
+              </div>
+          </div>
+      )}
+
+      {/* النافذة الشاملة لملف الطالب */}
+      {viewingStudentProfile && (
+          <div className="fixed inset-0 z-[1000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-slate-50 rounded-3xl w-full max-w-6xl h-[90vh] shadow-2xl flex flex-col relative overflow-hidden border border-slate-300">
+                  
+                  {/* Header */}
+                  <div className="bg-white border-b border-slate-200 p-6 flex justify-between items-start flex-shrink-0">
+                      <div className="flex gap-4 items-center">
+                          <div className="w-16 h-16 bg-blue-100 text-blue-700 rounded-2xl flex items-center justify-center font-bold text-2xl shadow-inner">
+                              {viewingStudentProfile.name.charAt(0)}
+                          </div>
+                          <div>
+                              <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">{viewingStudentProfile.name} <span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600">{getGradeLabel(viewingStudentProfile.grade)}</span></h2>
+                              <div className="flex gap-4 mt-2 text-sm text-slate-500 font-bold">
+                                  <span className="flex items-center gap-1"><Phone size={14}/> {viewingStudentProfile.phone}</span>
+                                  <span className="flex items-center gap-1 text-amber-600"><Users size={14}/> ولي الأمر: {viewingStudentProfile.parentPhone}</span>
+                              </div>
+                          </div>
+                      </div>
+                      <button onClick={() => setViewingStudentProfile(null)} className="bg-slate-100 p-2 rounded-full text-slate-500 hover:bg-red-100 hover:text-red-500 transition"><X size={24}/></button>
+                  </div>
+
+                  {/* Content Grid */}
+                  <div className="flex-1 overflow-y-auto p-6">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          
+                          {/* عمود 1: مشاهدات الفيديو */}
+                          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col h-[500px]">
+                              <h3 className="font-bold text-lg mb-4 text-blue-800 flex items-center gap-2 border-b pb-2"><PlayCircle/> سجل مشاهدات الفيديوهات</h3>
+                              <div className="flex-1 overflow-y-auto space-y-3 pr-2">
+                                  {studentHistoryData.length === 0 ? <p className="text-slate-400 text-center py-10">لم يفتح أي فيديو.</p> : studentHistoryData.map((v, i) => (
+                                      <div key={i} className="bg-slate-50 p-3 rounded-xl flex justify-between items-center border border-slate-100">
+                                          <div>
+                                              <p className="font-bold text-slate-800">{v.videoTitle}</p>
+                                              <p className="text-xs text-slate-400 mt-1">آخر فتح: {v.viewedAt?.toDate().toLocaleString('ar-EG')}</p>
+                                          </div>
+                                          <div className="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg text-xs font-bold text-center">
+                                              شاهد لمدة<br/>
+                                              <span className="text-sm">{formatWatchTime(v.watchedSeconds)}</span>
+                                          </div>
+                                      </div>
+                                  ))}
+                              </div>
+                          </div>
+
+                          {/* عمود 2: الامتحانات والواجبات */}
+                          <div className="flex flex-col gap-6 h-[500px]">
+                              
+                              {/* الامتحانات */}
+                              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex-1 flex flex-col overflow-hidden">
+                                  <h3 className="font-bold text-lg mb-4 text-emerald-800 flex items-center gap-2 border-b pb-2"><ClipboardList/> نتائج الامتحانات</h3>
+                                  <div className="flex-1 overflow-y-auto space-y-3 pr-2">
+                                      {(() => {
+                                          const sExams = examResults.filter(r => r.studentId === viewingStudentProfile.id);
+                                          if (sExams.length === 0) return <p className="text-slate-400 text-center py-4">لم يقم بحل أي امتحان.</p>;
+                                          return sExams.map(ex => (
+                                              <div key={ex.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                                  <p className="font-bold text-slate-700 text-sm">{examsList.find(e => e.id === ex.examId)?.title || 'امتحان محذوف'}</p>
+                                                  <span className={`px-3 py-1 rounded-lg text-sm font-bold ${ex.status === 'cheated' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-700'}`}>
+                                                      {ex.status === 'cheated' ? 'غش 🚫' : `${ex.score}/${ex.total}`}
+                                                  </span>
+                                              </div>
+                                          ))
+                                      })()}
+                                  </div>
+                              </div>
+
+                              {/* واجبات QR */}
+                              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex-1 flex flex-col overflow-hidden">
+                                  <h3 className="font-bold text-lg mb-4 text-amber-800 flex items-center gap-2 border-b pb-2"><QrCode/> سجل واجبات (QR)</h3>
+                                  <div className="flex-1 overflow-y-auto space-y-3 pr-2">
+                                      {(() => {
+                                          const sHw = hwResults.filter(r => r.studentId === viewingStudentProfile.id);
+                                          if (sHw.length === 0) return <p className="text-slate-400 text-center py-4">لم يقم بتسليم أي واجب QR.</p>;
+                                          return sHw.map(hw => (
+                                              <div key={hw.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                                  <div>
+                                                      <p className="font-bold text-slate-700 text-sm">{hw.homeworkTitle}</p>
+                                                      <p className="text-xs text-slate-400">{hw.bookName}</p>
+                                                  </div>
+                                                  <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-lg text-sm font-bold">{hw.score}/${hw.total}</span>
+                                              </div>
+                                          ))
+                                      })()}
+                                  </div>
+                              </div>
+
+                          </div>
+                      </div>
+                  </div>
               </div>
           </div>
       )}
@@ -1939,7 +2031,6 @@ const AdminDashboard = ({ user }) => {
                                           <p className="flex items-center gap-2"><Mail size={14}/> {u.email}</p>
                                           <p className="flex items-center gap-2"><Phone size={14} className="text-blue-600"/> الطالب: {u.phone}</p>
                                           <p className="flex items-center gap-2 font-bold text-amber-700"><Users size={14}/> ولي الأمر: {u.parentPhone}</p>
-                                          <p className="text-xs text-slate-400">تاريخ الانضمام: {u.createdAt?.toDate().toLocaleDateString()}</p>
                                       </div>
                                   </div>
                                   
@@ -1965,7 +2056,7 @@ const AdminDashboard = ({ user }) => {
                                           </select>
                                       </div>
                                       <div className="flex gap-2 justify-end">
-                                          <button onClick={()=>viewStudentHistory(u.id, u.name)} className="bg-purple-100 text-purple-600 p-2 rounded-lg hover:bg-purple-200" title="سجل المشاهدات"><History size={16}/></button>
+                                          <button onClick={()=>openStudentProfile(u)} className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-bold shadow-md flex items-center gap-2" title="ملف الطالب الشامل"><FileCheck size={16}/> ملف الطالب</button>
                                           <button onClick={()=>setEditingUser(u)} className="bg-blue-100 text-blue-600 p-2 rounded-lg hover:bg-blue-200" title="تعديل"><Edit size={16}/></button>
                                           <button onClick={()=>handleSendResetPassword(u.email)} className="bg-amber-100 text-amber-600 p-2 rounded-lg hover:bg-amber-200" title="تغيير كلمة السر"><KeyRound size={16}/></button>
                                           <button onClick={()=>handleDeleteUser(u.id)} className="bg-red-100 text-red-600 p-2 rounded-lg hover:bg-red-200" title="حذف"><Trash2 size={16}/></button>
@@ -2625,11 +2716,6 @@ const StudentDashboard = ({ user, userData }) => {
                         <h3 className="relative z-10 text-xl font-bold mb-2 text-slate-900 group-hover:text-slate-600 transition">الامتحانات</h3>
                         <p className="relative z-10 text-3xl font-black text-slate-600">{exams.length}</p>
                         <ClipboardList className="absolute -bottom-6 -left-6 text-slate-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
-                    </motion.div>
-                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedExam && setActiveTab('interactive_exams')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedExam ? 'opacity-50 grayscale' : ''}`}>
-                        <h3 className="relative z-10 text-xl font-bold mb-2 text-emerald-900 group-hover:text-emerald-600 transition">امتحان تفاعلي</h3>
-                        <p className="relative z-10 text-3xl font-black text-emerald-600">{interactiveExams.length}</p>
-                        <Sparkles className="absolute -bottom-6 -left-6 text-emerald-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
                     </motion.div>
                     <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedExam && setActiveTab('smart_hw_results')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedExam ? 'opacity-50 grayscale' : ''}`}>
                         <h3 className="relative z-10 text-xl font-bold mb-2 text-blue-900 group-hover:text-blue-600 transition">واجبات (QR)</h3>
