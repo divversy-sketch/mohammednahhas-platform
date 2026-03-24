@@ -764,50 +764,67 @@ const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
   const videoRef = useRef(null);
   const finalUrl = video.url || video.file;
 
-  // Tracking Smart Video Views (With Timer)
+  // Tracking Video Views (Optimized & Highly Accurate)
   useEffect(() => {
       if (!user || !video.id) return;
       
       const viewId = `${user.uid}_${video.id}`;
       const viewRef = doc(db, 'video_views', viewId);
+      
       let timerInterval;
+      let localSeconds = 0;
+      let lastSyncedSeconds = 0;
 
-      const initTracking = async () => {
+      // دالة رفع الثواني لقاعدة البيانات
+      const syncToDatabase = async (secondsToAdd) => {
           try {
-              // تسجيل فتح الفيديو لأول مرة وتحديث وقت آخر مشاهدة
               await setDoc(viewRef, {
                   userId: user.uid,
                   userName: userName,
                   videoId: video.id,
                   videoTitle: video.title,
-                  viewedAt: serverTimestamp() // يتحدث كل مرة يفتح فيها الفيديو
-              }, { merge: true });
-              
-              // تشغيل العداد لإضافة 5 ثوانٍ لرصيد مشاهدة الطالب كل 5 ثوانٍ
-              timerInterval = setInterval(async () => {
-                  // تحديث العداد فقط إذا كان المتصفح مفتوح ونشط (الطالب يتفرج فعلاً)
-                  if (!document.hidden) {
-                      try {
-                          await updateDoc(viewRef, {
-                              watchedSeconds: increment(5)
-                          });
-                      } catch (e) {
-                          console.error("Timer update error:", e);
-                      }
-                  }
-              }, 5000);
-              
-          } catch (error) {
-              console.error("Error tracking view:", error);
+                  viewedAt: serverTimestamp(), 
+                  watchedSeconds: increment(secondsToAdd)
+              }, { merge: true }); // merge: true بتمنع مسح الداتا القديمة وبتزود عليها
+          } catch (e) {
+              console.error("Sync error:", e);
           }
       };
-      
-      initTracking();
 
+      // تسجيل أول فتح للفيديو بصفر ثواني عشان يظهر عند الأدمن فوراً إن الطالب فتح
+      syncToDatabase(0);
+
+      // العداد بيشتغل كل ثانية واحدة
+      timerInterval = setInterval(() => {
+          let isPlaying = true;
+          
+          // لو فيديو مرفوع على المنصة (مش يوتيوب)، نتأكد إنه شغال ومش معموله Pause
+          if (!videoId && videoRef.current) {
+              isPlaying = !videoRef.current.paused && !videoRef.current.ended;
+          }
+
+          // العداد هيحسب لو الطالب فاتح الشاشة، والفيديو شغال فعلاً
+          if (!document.hidden && isPlaying) {
+              localSeconds += 1;
+              
+              // نرفع الداتا المجمعة كل 15 ثانية عشان منعملش ضغط على السيرفر ويفوت داتا
+              if (localSeconds - lastSyncedSeconds >= 15) {
+                  syncToDatabase(localSeconds - lastSyncedSeconds);
+                  lastSyncedSeconds = localSeconds;
+              }
+          }
+      }, 1000);
+
+      // أول ما الطالب يدوس "خروج" أو يقفل الفيديو
       return () => {
-          if (timerInterval) clearInterval(timerInterval);
+          clearInterval(timerInterval);
+          // نبعت أي ثواني متبقية متعملهاش Sync
+          const remaining = localSeconds - lastSyncedSeconds;
+          if (remaining > 0) {
+              syncToDatabase(remaining);
+          }
       };
-  }, [user, video.id, video.title, userName]);
+  }, [user, video.id, video.title, userName, videoId]);
 
   const changeSpeed = (rate) => {
     if(videoRef.current) videoRef.current.playbackRate = rate;
@@ -1487,7 +1504,7 @@ const AdminDashboard = ({ user }) => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   
-  // Tracking Logic (تم تحويله إلى صفحة الملف الشامل)
+  // Tracking Logic
   const [viewingStudentProfile, setViewingStudentProfile] = useState(null);
   const [studentHistoryData, setStudentHistoryData] = useState([]);
 
