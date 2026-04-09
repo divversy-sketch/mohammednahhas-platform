@@ -16,7 +16,7 @@ import {
   ExternalLink, ClipboardList, Timer, AlertOctagon, Flag, Save, HelpCircle, 
   Reply, Unlock, Layout, Settings, Trophy, Megaphone, Bell, Download, XCircle, 
   Calendar, Clock, FileWarning, Settings as GearIcon, Star, Bot, Power, Upload,
-  Users, PenTool, Code, Sparkles, Lamp, Ban, Shield, RefreshCw, Link as LinkIcon, History, Camera, QrCode, FileCheck
+  Users, PenTool, Code, Sparkles, Lamp, Ban, Shield, RefreshCw, Link as LinkIcon, History, Camera, QrCode, FileCheck, MousePointerClick, BarChart3, Layers
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -50,13 +50,19 @@ try {
  * =================================================================
  */
 
-// دالة تحويل الثواني لدقائق وثواني للعرض في لوحة الأدمن
+// تحديث دالة الوقت لتكون أكثر دقة ووضوحاً
 const formatWatchTime = (totalSeconds) => {
-    if (!totalSeconds) return 'أقل من 5 ثوانٍ';
-    const m = Math.floor(totalSeconds / 60);
+    if (!totalSeconds || totalSeconds < 0) return 'أقل من ثانية';
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
     const s = totalSeconds % 60;
-    if (m === 0) return `${s} ثانية`;
-    return `${m} دقيقة و ${s} ثانية`;
+    
+    let res = [];
+    if (h > 0) res.push(`${h} ساعة`);
+    if (m > 0) res.push(`${m} دقيقة`);
+    if (s > 0 || res.length === 0) res.push(`${s} ثانية`);
+    
+    return res.join(' و ');
 };
 
 const requestNotificationPermission = () => {
@@ -110,6 +116,7 @@ const generatePDF = (type, data) => {
                     <tr style="background-color: #f3f4f6; color: #333;">
                         <th style="border: 1px solid #ddd; padding: 10px; width: 5%;">#</th>
                         <th style="border: 1px solid #ddd; padding: 10px; text-align: right;">السؤال</th>
+                        <th style="border: 1px solid #ddd; padding: 10px; width: 10%;">الفرع</th>
                         <th style="border: 1px solid #ddd; padding: 10px; width: 15%;">إجابتك</th>
                         <th style="border: 1px solid #ddd; padding: 10px; width: 15%;">الصح</th>
                         <th style="border: 1px solid #ddd; padding: 10px; width: 10%;">الحالة</th>
@@ -122,11 +129,13 @@ const generatePDF = (type, data) => {
                         const isCorrect = studentAnsIdx === correctAnsIdx;
                         const studentAnsText = studentAnsIdx !== undefined ? q.options[studentAnsIdx] : 'لم يجب';
                         const correctAnsText = q.options[correctAnsIdx];
+                        const branchName = q.branch || 'عام';
                         
                         return `
                         <tr style="background-color: ${isCorrect ? '#f0fdf4' : '#fef2f2'};">
                             <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${i + 1}</td>
                             <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">${q.text}</td>
+                            <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold; color: #0284c7;">${branchName}</td>
                             <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">${studentAnsText}</td>
                             <td style="border: 1px solid #ddd; padding: 8px; color: green;">${correctAnsText}</td>
                             <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">
@@ -990,6 +999,9 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const [wmPositions, setWmPositions] = useState([]);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
 
+  // حالة لتبويبات الفروع في وضع المراجعة
+  const [activeBranchTab, setActiveBranchTab] = useState('الكل');
+
   const shuffleArray = (array) => {
     const arr = [...array];
     for (let i = arr.length - 1; i > 0; i--) {
@@ -1016,12 +1028,27 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
             }
 
             subQs.forEach((q) => {
-                flat.push({ ...q, blockText: block.text });
+                // دمج اسم الفرع مع السؤال، ولو مش موجود نخليه "عام"
+                flat.push({ ...q, blockText: block.text, branch: q.branch || 'عام' });
             });
         });
     }
     return flat;
   }, [exam.questions, isReviewMode, existingResult]);
+
+  // استخراج أسماء الفروع الفريدة لاستخدامها في التبويبات والإحصائيات
+  const uniqueBranches = useMemo(() => ['الكل', ...new Set(flatQuestions.map(q => q.branch))], [flatQuestions]);
+
+  // تصفية الأسئلة بناءً على التبويب المختار (في وضع المراجعة فقط)
+  const displayQuestions = useMemo(() => {
+      if (!isReviewMode || activeBranchTab === 'الكل') return flatQuestions;
+      return flatQuestions.filter(q => q.branch === activeBranchTab);
+  }, [flatQuestions, isReviewMode, activeBranchTab]);
+
+  // عند تغيير التبويب، نرجع للسؤال الأول في هذه القائمة
+  useEffect(() => {
+      if (isReviewMode) setCurrentQIndex(0);
+  }, [activeBranchTab, isReviewMode]);
 
   if (flatQuestions.length === 0) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-white">عفواً، لا توجد أسئلة.<button onClick={onClose} className="ml-4 bg-gray-200 px-4 py-2 rounded">خروج</button></div>;
 
@@ -1039,7 +1066,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     return () => clearInterval(interval);
   }, [isReviewMode]);
 
-  // تحديث جذري لنظام الحماية: استخدام المراجع الحية لضمان عدم تهرب الطالب
+  // تحديث جذري لنظام الحماية
   const stateRefs = useRef({ isSubmitted, showSubmitConfirm, isCheating });
   useEffect(() => {
       stateRefs.current = { isSubmitted, showSubmitConfirm, isCheating };
@@ -1067,8 +1094,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
               submittedAt: serverTimestamp() 
           });
       }
-      
-      // التعديل: جعل الحظر مقتصر على الامتحانات فقط وليس حظر كامل
       await updateDoc(doc(db, 'users', user.uid), { status: 'banned_exam' });
   };
 
@@ -1085,7 +1110,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
       window.addEventListener('beforeunload', handleBeforeUnload);
       
-      // التعديل: تفعيل رادار المراقبة الشامل ضد تغيير التبويب أو غلق الشاشة
       const handleAntiCheat = () => { 
           const { showSubmitConfirm, isSubmitted } = stateRefs.current;
           if (!showSubmitConfirm && !isSubmitted) {
@@ -1166,7 +1190,10 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     }
   };
 
-  const currentQObj = flatQuestions[currentQIndex];
+  // تأكد من أن السؤال الحالي يُسحب من القائمة المعروضة حالياً (ليتوافق مع التبويبات)
+  const currentQObj = displayQuestions[currentQIndex];
+  if (!currentQObj) return null; // في حالة التبديل بين التبويبات
+
   const hasPassage = currentQObj?.blockText && currentQObj.blockText.trim().length > 0;
 
   if (isCheating) return <div className="fixed inset-0 z-[60] bg-red-900 flex items-center justify-center text-white text-center font-['Cairo']"><div><AlertOctagon size={80} className="mx-auto mb-4"/><h1>تم رصد محاولة غش!</h1><p className="text-red-200 mt-2">خرجت من الامتحان. تم رصد درجتك (صفر) وحظرك من الامتحانات القادمة.</p><button onClick={() => window.location.reload()} className="mt-4 bg-white text-red-900 px-6 py-2 rounded-full font-bold">العودة للرئيسية</button></div></div>;
@@ -1175,30 +1202,142 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
      const endTime = new Date(exam.endTime).getTime();
      const now = Date.now();
      const canReview = now > endTime;
+     
+     // حسابات النتيجة المحدثة
+     const totalQs = flatQuestions.length;
+     const solvedQs = Object.keys(answers).length;
+     const unsolvedQs = totalQs - solvedQs;
+     const correctQs = score;
+     const wrongQs = solvedQs - correctQs;
+     const percentage = totalQs > 0 ? Math.round((score / totalQs) * 100) : 0;
+     const timeTakenInSeconds = Math.round((Date.now() - startTime) / 1000);
+     
+     // حساب الإحصائيات لكل فرع
+     const branchStats = {};
+     flatQuestions.forEach(q => {
+         const b = q.branch;
+         if (!branchStats[b]) branchStats[b] = { total: 0, correct: 0, wrong: 0, unsolved: 0 };
+         branchStats[b].total++;
+         
+         const isSelected = answers[q.id] !== undefined;
+         const isCorrect = answers[q.id] === q.correctIdx;
+         
+         if (!isSelected) branchStats[b].unsolved++;
+         else if (isCorrect) branchStats[b].correct++;
+         else branchStats[b].wrong++;
+     });
+
+     // تهيئة وقت البدء للعرض بشكل احترافي
+     const startD = new Date(startTime);
+     const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+     const months = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+     const formattedStart = `${startD.getHours()}:${String(startD.getMinutes()).padStart(2, '0')} ${days[startD.getDay()]}، ${startD.getDate()} ${months[startD.getMonth()]} ${startD.getFullYear()}`;
 
      return (
         <div className="fixed inset-0 z-[60] bg-slate-50 overflow-y-auto p-4 font-['Cairo']" dir="rtl">
-            <div className="max-w-4xl mx-auto bg-white rounded-3xl shadow-xl p-8 mt-10 text-center border border-slate-200">
-                <h2 className="text-3xl font-bold mb-4 font-sans text-amber-700">تم تسليم الامتحان بنجاح</h2>
-                <div className={`text-6xl font-black my-6 ${score >= flatQuestions.length / 2 ? 'text-green-600' : 'text-red-600'}`}>{score} / {flatQuestions.length}</div>
-                
+            <div className="max-w-4xl mx-auto bg-white rounded-3xl shadow-xl p-6 mt-6 border border-slate-200">
+                {/* Header Logo/Title */}
+                <div className="text-center mb-8 flex flex-col items-center justify-center">
+                    <ModernLogo />
+                    <h2 className="text-2xl font-bold text-blue-900 mt-2">نتيجة الامتحان</h2>
+                </div>
+
+                {/* Grid 3x2 للمربعات الملونة الرئيسية */}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8 text-center">
+                    {/* الصف الأول */}
+                    <div className="bg-slate-50 rounded-2xl p-4 shadow-sm border border-slate-100 flex flex-col items-center justify-center">
+                        <span className="text-slate-500 text-sm font-bold mb-2">عدد الأسئلة</span>
+                        <span className="text-4xl font-black text-slate-800">{totalQs}</span>
+                    </div>
+                    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col items-center justify-center">
+                        <span className="text-slate-500 text-sm font-bold mb-2">النتيجة</span>
+                        <span className="text-4xl font-black text-slate-800">{percentage}%</span>
+                    </div>
+                    <div className="bg-cyan-100 rounded-2xl p-4 shadow-sm border border-cyan-200 flex flex-col items-center justify-center cursor-pointer hover:bg-cyan-200 transition">
+                        <span className="text-cyan-700 text-sm font-bold mb-2 flex items-center gap-1"><MousePointerClick size={16}/> الأسئلة المحلولة</span>
+                        <span className="text-4xl font-black text-cyan-800">{solvedQs}</span>
+                    </div>
+
+                    {/* الصف الثاني */}
+                    <div className="bg-orange-100 rounded-2xl p-4 shadow-sm border border-orange-200 flex flex-col items-center justify-center cursor-pointer hover:bg-orange-200 transition">
+                        <span className="text-orange-700 text-sm font-bold mb-2 flex items-center gap-1"><MousePointerClick size={16}/> غير محلولة</span>
+                        <span className="text-4xl font-black text-orange-800">{unsolvedQs}</span>
+                    </div>
+                    <div className="bg-emerald-100 rounded-2xl p-4 shadow-sm border border-emerald-200 flex flex-col items-center justify-center cursor-pointer hover:bg-emerald-200 transition">
+                        <span className="text-emerald-700 text-sm font-bold mb-2 flex items-center gap-1"><MousePointerClick size={16}/> الأسئلة الصحيحة</span>
+                        <span className="text-4xl font-black text-emerald-800">{correctQs}</span>
+                    </div>
+                    <div className="bg-pink-100 rounded-2xl p-4 shadow-sm border border-pink-200 flex flex-col items-center justify-center cursor-pointer hover:bg-pink-200 transition">
+                        <span className="text-pink-700 text-sm font-bold mb-2 flex items-center gap-1"><MousePointerClick size={16}/> الأسئلة الخاطئة</span>
+                        <span className="text-4xl font-black text-pink-800">{wrongQs}</span>
+                    </div>
+                </div>
+
+                {/* تحليل الفروع */}
+                {Object.keys(branchStats).length > 1 && (
+                    <div className="mb-8 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-blue-800"><BarChart3/> تحليل مستواك حسب فروع المادة</h3>
+                        <div className="grid gap-4">
+                            {Object.entries(branchStats).map(([branch, stats], idx) => {
+                                const bPercent = Math.round((stats.correct / stats.total) * 100);
+                                let colorClass = "bg-green-500";
+                                if (bPercent < 50) colorClass = "bg-red-500";
+                                else if (bPercent < 75) colorClass = "bg-amber-500";
+
+                                return (
+                                    <div key={idx} className="flex flex-col gap-1">
+                                        <div className="flex justify-between text-sm font-bold text-slate-700">
+                                            <span>{branch} <span className="text-xs text-slate-400 font-normal">({stats.total} أسئلة)</span></span>
+                                            <span>{bPercent}%</span>
+                                        </div>
+                                        <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+                                            <div className={`${colorClass} h-3 rounded-full transition-all duration-1000`} style={{ width: `${bPercent}%` }}></div>
+                                        </div>
+                                        <div className="flex gap-4 text-xs text-slate-500 mt-1">
+                                            <span className="text-emerald-600">✔ صح: {stats.correct}</span>
+                                            <span className="text-pink-600">✘ خطأ: {stats.wrong}</span>
+                                            {stats.unsolved > 0 && <span className="text-orange-600">⏳ فارغ: {stats.unsolved}</span>}
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                {/* مربعات الوقت */}
+                <div className="grid md:grid-cols-2 gap-4 mb-8">
+                    <div className="bg-slate-50 rounded-2xl p-6 text-center border border-slate-100 shadow-sm">
+                        <p className="text-slate-500 text-sm font-bold mb-2">وقت البدء</p>
+                        <p className="text-xl font-bold text-slate-800" dir="rtl">{formattedStart}</p>
+                    </div>
+                    <div className="bg-slate-50 rounded-2xl p-6 text-center border border-slate-100 shadow-sm">
+                        <p className="text-slate-500 text-sm font-bold mb-2">المدة المستغرقة</p>
+                        <p className="text-xl font-bold text-slate-800">{formatWatchTime(timeTakenInSeconds)}</p>
+                    </div>
+                </div>
+
+                {/* أزرار الإجراءات */}
                 {!canReview && (
-                    <div className="mb-6 bg-amber-50 text-amber-800 p-4 rounded-xl border border-amber-200">
+                    <div className="mb-6 bg-amber-50 text-amber-800 p-4 rounded-xl border border-amber-200 text-center">
                         <p className="font-bold flex items-center justify-center gap-2">
                             <Clock size={20}/>
                             نموذج الإجابة والمراجعة سيظهر تلقائياً بعد انتهاء وقت الامتحان الأصلي.
                         </p>
-                        <p className="text-sm mt-1 font-bold">موعد الانتهاء: {new Date(exam.endTime).toLocaleString('ar-EG')}</p>
                     </div>
                 )}
-
-                <div className="flex gap-4 justify-center">
-                    {canReview ? (
-                        <button onClick={() => generatePDF('student', {studentName: user.displayName, score, total: flatQuestions.length, status: 'completed', examTitle: exam.title, questions: flatQuestions, answers: answers })} className="bg-gradient-to-r from-blue-600 to-blue-800 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg"><Download size={18}/> تحميل التقرير الشامل</button>
-                    ) : (
-                        <button disabled className="bg-gray-300 text-gray-500 px-6 py-2 rounded-lg font-bold flex items-center gap-2 cursor-not-allowed"><Lock size={18}/> التقرير مغلق حالياً</button>
+                <div className="flex flex-col md:flex-row gap-3">
+                    {canReview && (
+                        <button onClick={() => { onClose(); }} className="flex-1 bg-blue-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-blue-500/30 flex justify-center items-center gap-2 hover:bg-blue-700 transition">
+                            <ClipboardList size={20}/> إظهار تفاصيل الإجابات 
+                        </button>
                     )}
-                    <button onClick={onClose} className="bg-slate-900 text-white py-3 px-8 rounded-xl font-bold shadow-lg">عودة للرئيسية</button>
+                    <button onClick={() => generatePDF('student', {studentName: user.displayName, score, total: flatQuestions.length, status: 'completed', examTitle: exam.title, questions: flatQuestions, answers: answers })} className="flex-1 bg-slate-100 text-slate-700 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-200 transition">
+                        <Download size={18}/> تحميل التقرير الشامل
+                    </button>
+                    <button onClick={onClose} className="flex-1 bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 shadow-lg transition">
+                        العودة للرئيسية
+                    </button>
                 </div>
             </div>
         </div>
@@ -1231,22 +1370,38 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
         </div>
       )}
 
-      <div className="bg-slate-900 text-white p-4 flex justify-between items-center shadow-md relative z-50">
-        <div className="flex items-center gap-4">
-            <h2 className="font-bold text-lg font-sans text-amber-400">{exam.title} {isReviewMode ? '(مراجعة الإجابات)' : ''}</h2>
+      <div className="bg-slate-900 text-white p-4 flex flex-col md:flex-row justify-between items-center shadow-md relative z-50 gap-4">
+        <div className="flex items-center gap-4 w-full md:w-auto justify-between">
+            <h2 className="font-bold text-lg font-sans text-amber-400 truncate">{exam.title} {isReviewMode ? '(مراجعة الإجابات)' : ''}</h2>
             {!isReviewMode && <div className="bg-slate-700 px-4 py-1 rounded-full font-mono shadow-inner border border-slate-600">{Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</div>}
         </div>
+
+        {/* تبويبات الفروع في وضع المراجعة فقط */}
+        {isReviewMode && uniqueBranches.length > 2 && (
+            <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-hide">
+                {uniqueBranches.map((branch, i) => (
+                    <button 
+                        key={i} 
+                        onClick={() => setActiveBranchTab(branch)}
+                        className={`whitespace-nowrap px-4 py-1 rounded-full text-sm font-bold transition-colors ${activeBranchTab === branch ? 'bg-amber-500 text-slate-900 shadow-md' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                    >
+                        {branch}
+                    </button>
+                ))}
+            </div>
+        )}
+
         {!isReviewMode ? (
-            <button onClick={confirmSubmit} className="bg-gradient-to-r from-green-500 to-green-600 px-6 py-2 rounded-lg font-bold shadow-lg hover:shadow-green-500/50 transition">تسليم</button>
+            <button onClick={confirmSubmit} className="bg-gradient-to-r from-green-500 to-green-600 px-6 py-2 rounded-lg font-bold shadow-lg hover:shadow-green-500/50 transition whitespace-nowrap">تسليم</button>
         ) : (
-            <button onClick={onClose} className="bg-slate-700 px-6 py-2 rounded-lg font-bold hover:bg-slate-600 transition">إغلاق</button>
+            <button onClick={onClose} className="bg-slate-700 px-6 py-2 rounded-lg font-bold hover:bg-slate-600 transition whitespace-nowrap">إغلاق المراجعة</button>
         )}
       </div>
 
       <div className="flex-1 flex overflow-hidden relative z-50">
         <div className="w-16 md:w-24 bg-white border-l flex flex-col p-2 overflow-y-auto shadow-inner">
           <div className="grid grid-cols-1 gap-2">
-              {flatQuestions.map((q, idx) => {
+              {displayQuestions.map((q, idx) => {
                   let statusClass = 'bg-slate-100 text-slate-600 hover:bg-slate-200';
                   if (isReviewMode) {
                       if (answers[q.id] === q.correctIdx) statusClass = 'bg-green-100 text-green-700 border border-green-400 shadow-sm';
@@ -1254,9 +1409,13 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                   } else if (answers[q.id] !== undefined) {
                       statusClass = 'bg-blue-100 text-blue-700 border border-blue-400 shadow-sm';
                   }
+                  
+                  // حساب الرقم الفعلي للسؤال بالنسبة للأسئلة كلها (للعرض فقط)
+                  const originalIndex = flatQuestions.findIndex(origQ => origQ.id === q.id) + 1;
+
                   return (
                     <button key={idx} onClick={() => setCurrentQIndex(idx)} className={`aspect-square rounded-lg font-bold text-sm transition-all ${currentQIndex === idx ? 'ring-2 ring-amber-500 shadow-md scale-105' : ''} ${statusClass}`}>
-                        {idx + 1}
+                        {originalIndex}
                         {flagged[q.id] && !isReviewMode && <div className="absolute top-0 right-0 w-3 h-3 bg-amber-500 rounded-full border-2 border-white shadow-sm"></div>}
                     </button>
                   )
@@ -1266,20 +1425,27 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
         <div className={`flex-1 flex flex-col ${hasPassage ? 'md:flex-row' : 'items-center'} h-full overflow-hidden bg-slate-50 w-full`}>
           {hasPassage && (
-            <div className="flex-1 w-full bg-gradient-to-b from-amber-50 to-orange-50 p-8 overflow-y-auto border-l border-amber-200 shadow-inner">
-              <h3 className="font-bold text-amber-900 mb-6 flex items-center gap-2 text-xl border-b border-amber-200 pb-2 font-sans"><BookOpen size={24}/> اقرأ النص التالي بعناية:</h3>
-              <p className="whitespace-pre-line leading-loose text-lg font-bold text-slate-800 font-sans">{currentQObj.blockText}</p>
+            <div className="flex-1 w-full bg-gradient-to-b from-blue-50 to-indigo-50 p-6 md:p-10 overflow-y-auto border-l border-blue-200 shadow-inner">
+              <h3 className="font-bold text-blue-900 mb-6 flex items-center gap-2 text-xl border-b border-blue-200 pb-2 font-sans"><FileText size={24}/> نص المراجعة / القراءة:</h3>
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-blue-100">
+                  <p className="whitespace-pre-line leading-10 text-lg md:text-xl font-bold text-slate-800 font-arabic">{currentQObj.blockText}</p>
+              </div>
             </div>
           )}
           
-          <div className={`${hasPassage ? 'flex-1' : 'w-full max-w-4xl mx-auto'} bg-white p-8 overflow-y-auto flex flex-col shadow-lg m-4 rounded-3xl h-fit max-h-[95%] border border-slate-100`}>
-            <div className="flex justify-between items-start mb-8">
-              <span className="bg-slate-100 text-slate-600 px-4 py-1 rounded-full text-sm font-bold shadow-sm">سؤال {currentQIndex + 1}</span>
-              {!isReviewMode && <button onClick={() => { setFlagged({...flagged, [currentQObj.id]: !flagged[currentQObj.id]}) }} className={`flex items-center gap-2 px-4 py-1 rounded-full text-sm font-bold transition shadow-sm ${flagged[currentQObj.id] ? 'bg-amber-100 text-amber-700 border border-amber-300' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}><Flag size={16} /> مراجعة لاحقاً</button>}
+          <div className={`${hasPassage ? 'flex-1' : 'w-full max-w-4xl mx-auto'} bg-white p-6 md:p-10 overflow-y-auto flex flex-col shadow-lg m-4 rounded-3xl h-fit max-h-[95%] border border-slate-100 relative`}>
+            <div className="flex justify-between items-center mb-8 border-b pb-4">
+              <div className="flex items-center gap-3">
+                  <span className="bg-slate-800 text-white px-4 py-1.5 rounded-full text-sm font-bold shadow-md">سؤال {flatQuestions.findIndex(origQ => origQ.id === currentQObj.id) + 1}</span>
+                  {currentQObj.branch && currentQObj.branch !== 'عام' && (
+                      <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-bold border border-blue-200 flex items-center gap-1"><Layers size={14}/> {currentQObj.branch}</span>
+                  )}
+              </div>
+              {!isReviewMode && <button onClick={() => { setFlagged({...flagged, [currentQObj.id]: !flagged[currentQObj.id]}) }} className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-bold transition shadow-sm ${flagged[currentQObj.id] ? 'bg-amber-100 text-amber-700 border border-amber-300' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}><Flag size={16} /> مراجعة لاحقاً</button>}
             </div>
             
-            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 mb-8 shadow-inner">
-              <h3 className="text-3xl md:text-4xl font-bold text-blue-900 leading-relaxed font-sans drop-shadow-sm">{currentQObj.text}</h3>
+            <div className="bg-slate-50 p-6 md:p-8 rounded-2xl border border-slate-200 mb-8 shadow-inner">
+              <h3 className="text-2xl md:text-4xl font-bold text-slate-900 leading-relaxed font-sans drop-shadow-sm">{currentQObj.text}</h3>
             </div>
 
             <div className="space-y-4">
@@ -1295,10 +1461,10 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                   }
 
                   return (
-                    <div key={idx} onClick={() => handleAnswer(currentQObj.id, idx)} className={`p-5 rounded-xl border-2 cursor-pointer transition-all flex items-center gap-4 ${optionClass}`}>
+                    <div key={idx} onClick={() => handleAnswer(currentQObj.id, idx)} className={`p-4 md:p-6 rounded-2xl border-2 cursor-pointer transition-all flex items-center gap-4 ${optionClass}`}>
                       <div className={`w-6 h-6 md:w-8 md:h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${isSelected || (isReviewMode && idx === currentQObj.correctIdx) ? 'border-transparent bg-current' : 'border-slate-300'}`}>
                       </div>
-                      <span className="font-sans text-xl md:text-2xl font-bold">{opt}</span>
+                      <span className="font-sans text-lg md:text-2xl font-bold">{opt}</span>
                       {isReviewMode && idx === currentQObj.correctIdx && <CheckCircle className="text-green-600 mr-auto w-8 h-8"/>}
                       {isReviewMode && isSelected && idx !== currentQObj.correctIdx && <XCircle className="text-red-600 mr-auto w-8 h-8"/>}
                     </div>
@@ -1307,8 +1473,8 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
             </div>
 
             <div className="mt-12 flex justify-between">
-              <button disabled={currentQIndex === 0} onClick={() => setCurrentQIndex(p => p - 1)} className="px-8 py-3 rounded-xl bg-slate-200 text-slate-600 font-bold disabled:opacity-50 hover:bg-slate-300 transition shadow-sm">السابق</button>
-              <button disabled={currentQIndex === flatQuestions.length - 1} onClick={() => setCurrentQIndex(p => p + 1)} className="px-8 py-3 rounded-xl bg-slate-900 text-white font-bold disabled:opacity-50 hover:bg-slate-800 transition shadow-sm">التالي</button>
+              <button disabled={currentQIndex === 0} onClick={() => setCurrentQIndex(p => p - 1)} className="px-8 py-4 rounded-xl bg-slate-200 text-slate-600 font-bold disabled:opacity-50 hover:bg-slate-300 transition shadow-sm">السابق</button>
+              <button disabled={currentQIndex === displayQuestions.length - 1} onClick={() => setCurrentQIndex(p => p + 1)} className="px-8 py-4 rounded-xl bg-slate-900 text-white font-bold disabled:opacity-50 hover:bg-slate-800 transition shadow-sm">التالي</button>
             </div>
           </div>
         </div>
@@ -1749,8 +1915,15 @@ const AdminDashboard = ({ user }) => {
     let currentBlock = { text: '', subQuestions: [] };
     let currentQ = null;
     let isReadingPassage = false;
+    let currentBranch = 'عام'; // الافتراضي
 
     lines.forEach(line => {
+      // قراءة الفرع
+      if (line.startsWith('#فرع:') || line.startsWith('#الفرع:')) {
+          currentBranch = line.replace('#فرع:', '').replace('#الفرع:', '').trim();
+          return;
+      }
+
       if (line === 'بداية القطعة') { 
           if (currentQ) { currentBlock.subQuestions.push(currentQ); currentQ = null; }
           if (currentBlock.subQuestions.length > 0) { blocks.push(currentBlock); } 
@@ -1787,7 +1960,8 @@ const AdminDashboard = ({ user }) => {
         }
 
         if (!currentQ) {
-            currentQ = { id: Date.now() + Math.random(), text: optText, options: [], correctIdx: 0 };
+            // دمج الفرع مع السؤال
+            currentQ = { id: Date.now() + Math.random(), text: optText, options: [], correctIdx: 0, branch: currentBranch };
         } else {
             if (isCorrect) {
                 currentQ.correctIdx = currentQ.options.length;
@@ -2187,7 +2361,7 @@ const AdminDashboard = ({ user }) => {
               </div>
           )}
 
-          {activeTab === 'exams' && <div className="space-y-8"><div className="glass-panel p-6 rounded-xl"><h2 className="text-xl font-bold mb-6 border-b pb-2 font-arabic text-amber-700">إنشاء امتحان</h2><div className="grid grid-cols-4 gap-4 mb-6"><input className="border p-2 rounded col-span-2" placeholder="العنوان" value={examBuilder.title} onChange={e=>setExamBuilder({...examBuilder, title:e.target.value})}/><input className="border p-2 rounded" placeholder="الكود" value={examBuilder.accessCode} onChange={e=>setExamBuilder({...examBuilder, accessCode:e.target.value})}/><input type="number" className="border p-2 rounded" placeholder="المدة (دقائق)" value={examBuilder.duration} onChange={e=>setExamBuilder({...examBuilder, duration:parseInt(e.target.value)})}/><select className="border p-2 rounded col-span-4" value={examBuilder.grade} onChange={e=>setExamBuilder({...examBuilder, grade:e.target.value})}><GradeOptions/></select><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت البدء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, startTime:e.target.value})}/></div><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت الانتهاء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, endTime:e.target.value})}/></div></div><div className="bg-slate-50 p-4 rounded-xl border mb-6"><textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm" placeholder="اكتب الأسئلة هنا...&#10;(هام: افصل بين كل سؤال والذي يليه بسطر فارغ تماماً، وضع علامة * قبل الإجابة الصحيحة)" value={bulkText} onChange={e=>setBulkText(e.target.value)}/><button onClick={parseExam} className="mt-4 w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-green-500/50 transition">نشر</button></div></div><div className="glass-panel p-6 rounded-xl"><h3 className="font-bold mb-4 font-arabic">الامتحانات الحالية</h3>{filteredExamsList.map(exam=><div key={exam.id} className="flex justify-between items-center border-b py-3 last:border-0 hover:bg-slate-50/50 px-2 rounded transition"><div><p className="font-bold">{exam.title}</p><p className="text-xs text-slate-500">من: {new Date(exam.startTime).toLocaleString('ar-EG')} | إلى: {new Date(exam.endTime).toLocaleString('ar-EG')}</p><p className="text-xs text-slate-400">كود: {exam.accessCode}</p></div><div className="flex gap-2"><button onClick={() => { setEditingExamTime(exam); setNewEndTime(exam.endTime); }} className="text-blue-600 p-2 bg-blue-100 rounded-lg hover:bg-blue-200" title="تمديد الوقت"><Calendar size={18}/></button><button onClick={()=>handleDeleteExam(exam.id)} className="text-red-600 p-2 bg-red-100 rounded-lg hover:bg-red-200" title="حذف"><Trash2 size={18}/></button></div></div>)}</div></div>}
+          {activeTab === 'exams' && <div className="space-y-8"><div className="glass-panel p-6 rounded-xl"><h2 className="text-xl font-bold mb-6 border-b pb-2 font-arabic text-amber-700">إنشاء امتحان</h2><div className="grid grid-cols-4 gap-4 mb-6"><input className="border p-2 rounded col-span-2" placeholder="العنوان" value={examBuilder.title} onChange={e=>setExamBuilder({...examBuilder, title:e.target.value})}/><input className="border p-2 rounded" placeholder="الكود" value={examBuilder.accessCode} onChange={e=>setExamBuilder({...examBuilder, accessCode:e.target.value})}/><input type="number" className="border p-2 rounded" placeholder="المدة (دقائق)" value={examBuilder.duration} onChange={e=>setExamBuilder({...examBuilder, duration:parseInt(e.target.value)})}/><select className="border p-2 rounded col-span-4" value={examBuilder.grade} onChange={e=>setExamBuilder({...examBuilder, grade:e.target.value})}><GradeOptions/></select><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت البدء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, startTime:e.target.value})}/></div><div className="col-span-2"><label className="block text-xs font-bold mb-1">وقت الانتهاء</label><input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, endTime:e.target.value})}/></div></div><div className="bg-slate-50 p-4 rounded-xl border mb-6"><textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm" placeholder="اكتب الأسئلة هنا...&#10;(هام 1: افصل بين كل سؤال والذي يليه بسطر فارغ تماماً، وضع علامة * قبل الإجابة الصحيحة)&#10;(هام 2: لتحديد فرع، اكتب #فرع: اسم_الفرع في سطر لوحده)" value={bulkText} onChange={e=>setBulkText(e.target.value)}/><button onClick={parseExam} className="mt-4 w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-green-500/50 transition">نشر</button></div></div><div className="glass-panel p-6 rounded-xl"><h3 className="font-bold mb-4 font-arabic">الامتحانات الحالية</h3>{filteredExamsList.map(exam=><div key={exam.id} className="flex justify-between items-center border-b py-3 last:border-0 hover:bg-slate-50/50 px-2 rounded transition"><div><p className="font-bold">{exam.title}</p><p className="text-xs text-slate-500">من: {new Date(exam.startTime).toLocaleString('ar-EG')} | إلى: {new Date(exam.endTime).toLocaleString('ar-EG')}</p><p className="text-xs text-slate-400">كود: {exam.accessCode}</p></div><div className="flex gap-2"><button onClick={() => { setEditingExamTime(exam); setNewEndTime(exam.endTime); }} className="text-blue-600 p-2 bg-blue-100 rounded-lg hover:bg-blue-200" title="تمديد الوقت"><Calendar size={18}/></button><button onClick={()=>handleDeleteExam(exam.id)} className="text-red-600 p-2 bg-red-100 rounded-lg hover:bg-red-200" title="حذف"><Trash2 size={18}/></button></div></div>)}</div></div>}
 
           {activeTab === 'results' && (
              <div className="glass-panel p-6 rounded-xl">
@@ -2221,8 +2395,9 @@ const AdminDashboard = ({ user }) => {
                                if(!examData) return <p>بيانات الامتحان محذوفة</p>;
                                const questions = getQuestionsForExam(examData);
                                return questions.map((q, idx) => (
-                                   <div key={idx} className="bg-white p-4 rounded border">
-                                           <p className="font-bold mb-2 text-xl text-blue-900 font-sans">{q.text}</p>
+                                   <div key={idx} className="bg-white p-4 rounded border relative">
+                                           {q.branch && q.branch !== 'عام' && <span className="absolute top-2 left-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">{q.branch}</span>}
+                                           <p className="font-bold mb-2 text-xl text-blue-900 font-sans pr-10">{q.text}</p>
                                            <div className="grid grid-cols-2 gap-2 text-sm">
                                                {q.options.map((opt, oIdx) => {
                                                    const isCorrect = oIdx === q.correctIdx;
