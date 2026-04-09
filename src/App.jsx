@@ -16,7 +16,8 @@ import {
   ExternalLink, ClipboardList, Timer, AlertOctagon, Flag, Save, HelpCircle, 
   Reply, Unlock, Layout, Settings, Trophy, Megaphone, Bell, Download, XCircle, 
   Calendar, Clock, FileWarning, Settings as GearIcon, Star, Bot, Power, Upload,
-  Users, PenTool, Code, Sparkles, Lamp, Ban, Shield, RefreshCw, Link as LinkIcon, History, Camera, QrCode, FileCheck, MousePointerClick, BarChart3, Layers
+  Users, PenTool, Code, Sparkles, Lamp, Ban, Shield, RefreshCw, Link as LinkIcon, History, Camera, QrCode, FileCheck, MousePointerClick, BarChart3, Layers,
+  BrainCircuit, Headphones, DownloadCloud, PenLine, Play, Pause, SkipForward // إضافات جديدة
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -767,13 +768,27 @@ const LiveSessionView = ({ session, user, onClose }) => {
   );
 };
 
+// --- دفتر الملاحظات ومربع المشاهدة المحدث ---
 const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
   const videoId = getYouTubeID(video.url || video.file);
   const [showSettings, setShowSettings] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
+  const [notes, setNotes] = useState([]);
+  const [currentNote, setCurrentNote] = useState("");
   const videoRef = useRef(null);
   const finalUrl = video.url || video.file;
 
-  // Tracking Video Views (Optimized & Highly Accurate)
+  // جلب ملاحظات الطالب لهذا الفيديو المحدداً
+  useEffect(() => {
+      if(!user || !video.id) return;
+      const q = query(collection(db, 'video_notes'), where('userId', '==', user.uid), where('videoId', '==', video.id), orderBy('timestamp', 'asc'));
+      const unsub = onSnapshot(q, (snap) => {
+          setNotes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+      return () => unsub();
+  }, [user, video.id]);
+
+  // Tracking Video Views 
   useEffect(() => {
       if (!user || !video.id) return;
       
@@ -784,7 +799,6 @@ const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
       let localSeconds = 0;
       let lastSyncedSeconds = 0;
 
-      // دالة رفع الثواني لقاعدة البيانات
       const syncToDatabase = async (secondsToAdd) => {
           try {
               await setDoc(viewRef, {
@@ -794,29 +808,23 @@ const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
                   videoTitle: video.title,
                   viewedAt: serverTimestamp(), 
                   watchedSeconds: increment(secondsToAdd)
-              }, { merge: true }); // merge: true بتمنع مسح الداتا القديمة وبتزود عليها
+              }, { merge: true }); 
           } catch (e) {
               console.error("Sync error:", e);
           }
       };
 
-      // تسجيل أول فتح للفيديو بصفر ثواني عشان يظهر عند الأدمن فوراً إن الطالب فتح
       syncToDatabase(0);
 
-      // العداد بيشتغل كل ثانية واحدة
       timerInterval = setInterval(() => {
           let isPlaying = true;
           
-          // لو فيديو مرفوع على المنصة (مش يوتيوب)، نتأكد إنه شغال ومش معموله Pause
           if (!videoId && videoRef.current) {
               isPlaying = !videoRef.current.paused && !videoRef.current.ended;
           }
 
-          // العداد هيحسب لو الطالب فاتح الشاشة، والفيديو شغال فعلاً
           if (!document.hidden && isPlaying) {
               localSeconds += 1;
-              
-              // نرفع الداتا المجمعة كل 15 ثانية عشان منعملش ضغط على السيرفر ويفوت داتا
               if (localSeconds - lastSyncedSeconds >= 15) {
                   syncToDatabase(localSeconds - lastSyncedSeconds);
                   lastSyncedSeconds = localSeconds;
@@ -824,14 +832,10 @@ const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
           }
       }, 1000);
 
-      // أول ما الطالب يدوس "خروج" أو يقفل الفيديو
       return () => {
           clearInterval(timerInterval);
-          // نبعت أي ثواني متبقية متعملهاش Sync
           const remaining = localSeconds - lastSyncedSeconds;
-          if (remaining > 0) {
-              syncToDatabase(remaining);
-          }
+          if (remaining > 0) syncToDatabase(remaining);
       };
   }, [user, video.id, video.title, userName, videoId]);
 
@@ -840,16 +844,121 @@ const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
     setShowSettings(false);
   };
 
+  const handleAddNote = async (e) => {
+      e.preventDefault();
+      if(!currentNote.trim()) return;
+
+      let currentTime = 0;
+      // جلب الوقت من الفيديو الأصلي إذا كان متاحاً
+      if (videoRef.current) {
+          currentTime = videoRef.current.currentTime;
+      }
+      // ملاحظة: لو الفيديو يوتيوب داخل iframe لا يمكننا قراءة الوقت الحالي بدقة بدون YT API الكاملة
+      // لذا سنسجل الملاحظة بوقت 0 في حالة اليوتيوب كإجراء احتياطي.
+
+      await addDoc(collection(db, 'video_notes'), {
+          userId: user.uid,
+          videoId: video.id,
+          text: currentNote,
+          timestamp: currentTime,
+          createdAt: serverTimestamp()
+      });
+      setCurrentNote("");
+  };
+
+  const handleJumpToTime = (time) => {
+      if(videoRef.current) {
+          videoRef.current.currentTime = time;
+          videoRef.current.play();
+      } else if(videoId) {
+          alert("عفواً، ميزة القفز للوقت المحدد تعمل مع الفيديوهات المرفوعة على المنصة فقط وليس يوتيوب.");
+      }
+  };
+
+  const deleteNote = async (noteId) => {
+      if(window.confirm("حذف هذه الملاحظة؟")) {
+          await deleteDoc(doc(db, 'video_notes', noteId));
+      }
+  };
+
+  const formatMinSec = (seconds) => {
+      const m = Math.floor(seconds / 60);
+      const s = Math.floor(seconds % 60);
+      return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
   const youtubeEmbedUrl = videoId 
     ? `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1&showinfo=0&iv_load_policy=3&loop=1&playlist=${videoId}&playsinline=1` 
     : '';
 
   return (
-    <div className="fixed inset-0 z-[60] bg-black flex items-center justify-center p-4">
-      <div className="w-full h-full max-w-7xl bg-black rounded-xl overflow-hidden relative shadow-2xl border border-gray-800 flex flex-col justify-center">
+    <div className="fixed inset-0 z-[60] bg-black flex flex-col md:flex-row items-center justify-center p-0 md:p-4 font-['Cairo']" dir="rtl">
+      
+      {/* لوحة الملاحظات الجانبية */}
+      <AnimatePresence>
+          {showNotes && (
+              <motion.div 
+                  initial={{ opacity: 0, x: 300 }} 
+                  animate={{ opacity: 1, x: 0 }} 
+                  exit={{ opacity: 0, x: 300 }} 
+                  className="w-full md:w-80 h-1/2 md:h-full bg-white rounded-t-2xl md:rounded-l-none md:rounded-r-2xl flex flex-col shadow-2xl relative z-[70] overflow-hidden"
+              >
+                  <div className="p-4 bg-blue-600 text-white font-bold flex justify-between items-center shadow-md">
+                      <div className="flex items-center gap-2"><PenLine size={20}/> دفتر الملاحظات</div>
+                      <button onClick={() => setShowNotes(false)} className="hover:bg-blue-700 p-1 rounded"><X size={20}/></button>
+                  </div>
+                  
+                  <div className="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-3">
+                      {notes.length === 0 ? (
+                          <div className="text-center text-slate-400 mt-10">
+                              <PenLine size={40} className="mx-auto mb-2 opacity-50"/>
+                              <p>لم تضف أي ملاحظات بعد.</p>
+                              <p className="text-xs mt-1">الملاحظات بتتربط بوقت الفيديو عشان ترجعلها بسرعة.</p>
+                          </div>
+                      ) : (
+                          notes.map(note => (
+                              <div key={note.id} className="bg-white p-3 rounded-xl shadow-sm border border-slate-200 group">
+                                  <div className="flex justify-between items-start mb-2">
+                                      <button 
+                                          onClick={() => handleJumpToTime(note.timestamp)} 
+                                          className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold hover:bg-blue-200 transition flex items-center gap-1"
+                                      >
+                                          <Play size={10} fill="currentColor"/> الدقيقة {formatMinSec(note.timestamp)}
+                                      </button>
+                                      <button onClick={() => deleteNote(note.id)} className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition"><Trash2 size={14}/></button>
+                                  </div>
+                                  <p className="text-sm text-slate-700 font-bold whitespace-pre-wrap">{note.text}</p>
+                              </div>
+                          ))
+                      )}
+                  </div>
+
+                  <form onSubmit={handleAddNote} className="p-4 bg-white border-t border-slate-200 flex flex-col gap-2">
+                      <textarea 
+                          className="w-full border-2 border-slate-200 rounded-xl p-2 text-sm focus:border-blue-500 outline-none transition resize-none h-20" 
+                          placeholder="اكتب ملاحظتك هنا (سيتم حفظها بوقت الفيديو الحالي)..."
+                          value={currentNote}
+                          onChange={e => setCurrentNote(e.target.value)}
+                      />
+                      <button type="submit" className="w-full bg-blue-600 text-white font-bold py-2 rounded-xl shadow-md hover:bg-blue-700 transition">إضافة الملاحظة</button>
+                  </form>
+              </motion.div>
+          )}
+      </AnimatePresence>
+
+      <div className={`w-full h-full md:max-w-7xl bg-black ${showNotes ? 'md:rounded-l-2xl' : 'rounded-xl'} overflow-hidden relative shadow-2xl border border-gray-800 flex flex-col justify-center flex-1 transition-all duration-300`}>
         <div className="absolute top-4 right-4 z-50 flex gap-4">
+            
+            {/* زر فتح دفتر الملاحظات */}
+            <button 
+                onClick={() => setShowNotes(!showNotes)} 
+                className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold backdrop-blur-md transition shadow-lg ${showNotes ? 'bg-blue-600 text-white' : 'bg-black/50 text-white hover:bg-black/80 border border-white/20'}`}
+            >
+                <PenLine size={18}/> <span className="hidden md:inline">ملاحظاتي</span>
+            </button>
+
             <div className="relative">
-                <button onClick={() => setShowSettings(!showSettings)} className="bg-black/50 hover:bg-black/80 text-white p-2 rounded-full backdrop-blur-sm transition"><GearIcon size={24}/></button>
+                <button onClick={() => setShowSettings(!showSettings)} className="bg-black/50 hover:bg-black/80 text-white p-2 rounded-full backdrop-blur-sm transition border border-white/20"><GearIcon size={24}/></button>
                 {showSettings && (
                     <div className="absolute top-12 left-0 bg-white text-black rounded-lg shadow-xl py-2 w-40 z-50 text-sm font-bold">
                         <div className="px-4 py-2 border-b text-gray-400 text-xs">سرعة التشغيل</div>
@@ -859,10 +968,10 @@ const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
                     </div>
                 )}
             </div>
-            <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white p-2 rounded-full"><X size={24}/></button>
+            <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white p-2 rounded-full shadow-lg"><X size={24}/></button>
         </div>
 
-        <div className="w-full relative flex items-center justify-center bg-black overflow-hidden" style={{ height: '80vh' }}>
+        <div className="w-full relative flex items-center justify-center bg-black overflow-hidden" style={{ height: showNotes ? '50vh' : '100%', md: { height: '100%' } }}>
           <div className="watermark-video">
              {userName} - {video.grade} — منصة النحاس
           </div>
@@ -894,6 +1003,117 @@ const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
       </div>
     </div>
   );
+};
+
+// --- وضع التركيز (Pomodoro Focus Mode) ---
+const PomodoroFocusMode = ({ onClose }) => {
+    const [timeLeft, setTimeLeft] = useState(25 * 60); // 25 minutes default
+    const [isActive, setIsActive] = useState(false);
+    const [isBreak, setIsBreak] = useState(false);
+    const [tasks, setTasks] = useState([]);
+    const [newTask, setNewTask] = useState("");
+    const audioRef = useRef(null);
+
+    useEffect(() => {
+        let interval = null;
+        if (isActive && timeLeft > 0) {
+            interval = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
+        } else if (timeLeft === 0) {
+            // Switch mode
+            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+            audio.play();
+            if (isBreak) {
+                setIsBreak(false);
+                setTimeLeft(25 * 60);
+                setIsActive(false);
+            } else {
+                setIsBreak(true);
+                setTimeLeft(5 * 60);
+                setIsActive(false);
+            }
+        }
+        return () => clearInterval(interval);
+    }, [isActive, timeLeft, isBreak]);
+
+    const toggleTimer = () => {
+        setIsActive(!isActive);
+        if(!isActive && audioRef.current && !isBreak) {
+            audioRef.current.play().catch(e => console.log("Audio play blocked"));
+        } else if(isActive && audioRef.current) {
+            audioRef.current.pause();
+        }
+    };
+
+    const addTask = (e) => {
+        e.preventDefault();
+        if(newTask.trim()) {
+            setTasks([...tasks, { id: Date.now(), text: newTask, done: false }]);
+            setNewTask("");
+        }
+    };
+
+    const toggleTask = (id) => {
+        setTasks(tasks.map(t => t.id === id ? { ...t, done: !t.done } : t));
+    };
+
+    const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
+    const s = (timeLeft % 60).toString().padStart(2, '0');
+
+    return (
+        <div className="fixed inset-0 z-[100] bg-slate-900 text-white flex flex-col font-['Cairo']" dir="rtl">
+            <audio ref={audioRef} loop src="https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3" />
+            
+            <div className="flex justify-between items-center p-6 border-b border-slate-800">
+                <div className="flex items-center gap-2 text-2xl font-bold text-amber-400"><Headphones/> وضع التركيز (Pomodoro)</div>
+                <button onClick={onClose} className="bg-slate-800 hover:bg-slate-700 p-2 rounded-full transition"><X size={24}/></button>
+            </div>
+
+            <div className="flex-1 flex flex-col lg:flex-row p-6 gap-8 overflow-y-auto">
+                {/* جزء العداد */}
+                <div className="flex-1 flex flex-col items-center justify-center bg-slate-800/50 rounded-3xl p-8 border border-slate-700 relative overflow-hidden">
+                    <div className="absolute top-6 left-6 flex gap-2">
+                        <button onClick={() => { setIsBreak(false); setTimeLeft(25 * 60); setIsActive(false); }} className={`px-4 py-1 rounded-full text-sm font-bold transition ${!isBreak ? 'bg-amber-500 text-slate-900' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>مذاكرة (25)</button>
+                        <button onClick={() => { setIsBreak(true); setTimeLeft(5 * 60); setIsActive(false); }} className={`px-4 py-1 rounded-full text-sm font-bold transition ${isBreak ? 'bg-green-500 text-slate-900' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>راحة (5)</button>
+                    </div>
+
+                    <div className={`text-9xl font-black font-sans my-12 drop-shadow-2xl tracking-widest ${isBreak ? 'text-green-400' : 'text-amber-400'}`}>
+                        {m}:{s}
+                    </div>
+
+                    <div className="flex items-center gap-6">
+                        <button onClick={toggleTimer} className={`w-24 h-24 rounded-full flex items-center justify-center shadow-xl transition-transform hover:scale-105 ${isActive ? 'bg-red-500 text-white shadow-red-500/50' : 'bg-white text-slate-900 shadow-white/20'}`}>
+                            {isActive ? <Pause size={40} fill="currentColor"/> : <Play size={40} fill="currentColor" className="ml-2"/>}
+                        </button>
+                        <button onClick={() => setTimeLeft(isBreak ? 5*60 : 25*60)} className="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center hover:bg-slate-600 transition text-slate-300">
+                            <RefreshCw size={24}/>
+                        </button>
+                    </div>
+                    <p className="mt-8 text-slate-400 flex items-center gap-2"><Headphones size={16}/> موسيقى Lo-Fi للتركيز تعمل تلقائياً أثناء جلسة المذاكرة</p>
+                </div>
+
+                {/* جزء المهام */}
+                <div className="w-full lg:w-96 flex flex-col gap-4">
+                    <div className="bg-slate-800 rounded-3xl p-6 border border-slate-700 flex-1 flex flex-col">
+                        <h3 className="text-xl font-bold mb-4 text-white flex items-center gap-2"><CheckCircle className="text-amber-400"/> مهام الجلسة</h3>
+                        <div className="flex-1 overflow-y-auto space-y-3 pr-2 mb-4">
+                            {tasks.length === 0 ? <p className="text-slate-500 text-center mt-10">أضف مهامك هنا لتركز عليها.</p> : tasks.map(t => (
+                                <div key={t.id} onClick={() => toggleTask(t.id)} className={`p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition ${t.done ? 'bg-slate-700/50 border-slate-600 text-slate-500 line-through' : 'bg-slate-700 border-slate-500 text-white'}`}>
+                                    <div className={`w-5 h-5 rounded flex items-center justify-center border-2 ${t.done ? 'border-amber-500 bg-amber-500 text-slate-900' : 'border-slate-400'}`}>
+                                        {t.done && <Check size={14} strokeWidth={4}/>}
+                                    </div>
+                                    <span className="font-bold">{t.text}</span>
+                                </div>
+                            ))}
+                        </div>
+                        <form onSubmit={addTask} className="flex gap-2">
+                            <input value={newTask} onChange={e=>setNewTask(e.target.value)} placeholder="أضف مهمة جديدة..." className="flex-1 bg-slate-900 border border-slate-600 rounded-xl p-3 outline-none focus:border-amber-500 transition"/>
+                            <button type="submit" className="bg-amber-600 text-white p-3 rounded-xl font-bold hover:bg-amber-700"><PlusCircle/></button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 const InteractiveViewer = ({ content, user, onClose }) => {
@@ -1173,9 +1393,32 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     const timeTaken = Math.round((Date.now() - startTime) / 1000);
     setScore(finalScore);
     setIsSubmitted(true);
-    
-    if (exam.attemptId) {
-        await setDoc(doc(db, 'exam_results', exam.attemptId), { 
+
+    // --- ميزة بنك الأخطاء الجديدة: تسجيل الأسئلة الخاطئة ---
+    const batch = writeBatch(db);
+    flatQuestions.forEach(q => {
+        const studentAns = answers[q.id];
+        const isAnswered = studentAns !== undefined;
+        const isCorrect = studentAns === q.correctIdx;
+        
+        if (isAnswered && !isCorrect) {
+            const mistakeRef = doc(collection(db, 'student_mistakes'));
+            batch.set(mistakeRef, {
+                userId: user.uid,
+                examTitle: exam.title,
+                question: {
+                    ...q,
+                    studentAnswerText: q.options[studentAns],
+                    correctAnswerText: q.options[q.correctIdx]
+                },
+                timestamp: serverTimestamp()
+            });
+        }
+    });
+
+    if (exam.attemptId && exam.id !== 'custom_mistakes_exam') {
+        const attemptRef = doc(db, 'exam_results', exam.attemptId);
+        batch.set(attemptRef, { 
             examId: exam.id, 
             studentId: user.uid, 
             studentName: user.displayName, 
@@ -1186,13 +1429,18 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
             timeTaken: timeTaken,
             totalTime: exam.duration, 
             submittedAt: serverTimestamp() 
-        });
+        }, { merge: true });
+    }
+
+    try {
+        await batch.commit();
+    } catch(err) {
+        console.error("Error saving results or mistakes", err);
     }
   };
 
-  // تأكد من أن السؤال الحالي يُسحب من القائمة المعروضة حالياً (ليتوافق مع التبويبات)
   const currentQObj = displayQuestions[currentQIndex];
-  if (!currentQObj) return null; // في حالة التبديل بين التبويبات
+  if (!currentQObj) return null; 
 
   const hasPassage = currentQObj?.blockText && currentQObj.blockText.trim().length > 0;
 
@@ -1201,7 +1449,8 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   if (isSubmitted && !isReviewMode) {
      const endTime = new Date(exam.endTime).getTime();
      const now = Date.now();
-     const canReview = now > endTime;
+     // السماح بالمراجعة فوراً لامتحان بنك الأخطاء
+     const canReview = exam.id === 'custom_mistakes_exam' ? true : now > endTime;
      
      // حسابات النتيجة المحدثة
      const totalQs = flatQuestions.length;
@@ -1227,7 +1476,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
          else branchStats[b].wrong++;
      });
 
-     // تهيئة وقت البدء للعرض بشكل احترافي
      const startD = new Date(startTime);
      const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
      const months = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
@@ -1236,15 +1484,12 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
      return (
         <div className="fixed inset-0 z-[60] bg-slate-50 overflow-y-auto p-4 font-['Cairo']" dir="rtl">
             <div className="max-w-4xl mx-auto bg-white rounded-3xl shadow-xl p-6 mt-6 border border-slate-200">
-                {/* Header Logo/Title */}
                 <div className="text-center mb-8 flex flex-col items-center justify-center">
                     <ModernLogo />
                     <h2 className="text-2xl font-bold text-blue-900 mt-2">نتيجة الامتحان</h2>
                 </div>
 
-                {/* Grid 3x2 للمربعات الملونة الرئيسية */}
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8 text-center">
-                    {/* الصف الأول */}
                     <div className="bg-slate-50 rounded-2xl p-4 shadow-sm border border-slate-100 flex flex-col items-center justify-center">
                         <span className="text-slate-500 text-sm font-bold mb-2">عدد الأسئلة</span>
                         <span className="text-4xl font-black text-slate-800">{totalQs}</span>
@@ -1258,7 +1503,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                         <span className="text-4xl font-black text-cyan-800">{solvedQs}</span>
                     </div>
 
-                    {/* الصف الثاني */}
                     <div className="bg-orange-100 rounded-2xl p-4 shadow-sm border border-orange-200 flex flex-col items-center justify-center cursor-pointer hover:bg-orange-200 transition">
                         <span className="text-orange-700 text-sm font-bold mb-2 flex items-center gap-1"><MousePointerClick size={16}/> غير محلولة</span>
                         <span className="text-4xl font-black text-orange-800">{unsolvedQs}</span>
@@ -1273,7 +1517,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                     </div>
                 </div>
 
-                {/* تحليل الفروع */}
                 {Object.keys(branchStats).length > 1 && (
                     <div className="mb-8 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                         <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-blue-800"><BarChart3/> تحليل مستواك حسب فروع المادة</h3>
@@ -1305,7 +1548,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                     </div>
                 )}
 
-                {/* مربعات الوقت */}
                 <div className="grid md:grid-cols-2 gap-4 mb-8">
                     <div className="bg-slate-50 rounded-2xl p-6 text-center border border-slate-100 shadow-sm">
                         <p className="text-slate-500 text-sm font-bold mb-2">وقت البدء</p>
@@ -1317,7 +1559,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                     </div>
                 </div>
 
-                {/* أزرار الإجراءات */}
                 {!canReview && (
                     <div className="mb-6 bg-amber-50 text-amber-800 p-4 rounded-xl border border-amber-200 text-center">
                         <p className="font-bold flex items-center justify-center gap-2">
@@ -1376,7 +1617,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
             {!isReviewMode && <div className="bg-slate-700 px-4 py-1 rounded-full font-mono shadow-inner border border-slate-600">{Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</div>}
         </div>
 
-        {/* تبويبات الفروع في وضع المراجعة فقط */}
         {isReviewMode && uniqueBranches.length > 2 && (
             <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-hide">
                 {uniqueBranches.map((branch, i) => (
@@ -1410,7 +1650,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                       statusClass = 'bg-blue-100 text-blue-700 border border-blue-400 shadow-sm';
                   }
                   
-                  // حساب الرقم الفعلي للسؤال بالنسبة للأسئلة كلها (للعرض فقط)
                   const originalIndex = flatQuestions.findIndex(origQ => origQ.id === q.id) + 1;
 
                   return (
@@ -1726,14 +1965,12 @@ const AdminDashboard = ({ user }) => {
     }
   };
 
-  // WhatsApp Logic
   const sendWhatsAppToParent = (result) => {
       const student = activeUsersList.find(u => u.id === result.studentId);
       if (!student || !student.parentPhone) {
           return alert("لا يوجد رقم ولي أمر مسجل لهذا الطالب!");
       }
 
-      // Format phone number for WhatsApp (e.g., 010... -> 2010...)
       let phone = student.parentPhone.trim();
       if (phone.startsWith('0')) {
           phone = '20' + phone.substring(1);
@@ -1747,7 +1984,6 @@ const AdminDashboard = ({ user }) => {
       window.open(whatsappUrl, '_blank');
   };
 
-  // Student Comprehensive Profile Logic
   const openStudentProfile = async (student) => {
       setViewingStudentProfile(student);
       try {
@@ -1761,7 +1997,6 @@ const AdminDashboard = ({ user }) => {
       }
   };
 
-  // Update Exam Time
   const handleUpdateExamTime = async (e) => {
       e.preventDefault();
       if (!newEndTime) return;
@@ -1778,7 +2013,6 @@ const AdminDashboard = ({ user }) => {
       }
   };
 
-  // Create Smart HW
   const handleCreateSmartHw = async (e) => {
       e.preventDefault();
       if (!newSmartHw.title || !newSmartHw.answerKey || !newSmartHw.bookName) return alert("أكمل البيانات (الاسم، الإجابة، والكتاب)");
@@ -1786,7 +2020,6 @@ const AdminDashboard = ({ user }) => {
           ...newSmartHw,
           createdAt: serverTimestamp()
       });
-      // نحتفظ باسم الكتاب والمرحلة عشان يسهل إضافة الصفحات اللي بعدها
       setNewSmartHw(prev => ({ ...prev, title: '', answerKey: '' }));
       alert("تم إنشاء الواجب! يمكنك نسخ الرابط الآن.");
   };
@@ -1915,10 +2148,9 @@ const AdminDashboard = ({ user }) => {
     let currentBlock = { text: '', subQuestions: [] };
     let currentQ = null;
     let isReadingPassage = false;
-    let currentBranch = 'عام'; // الافتراضي
+    let currentBranch = 'عام'; 
 
     lines.forEach(line => {
-      // قراءة الفرع
       if (line.startsWith('#فرع:') || line.startsWith('#الفرع:')) {
           currentBranch = line.replace('#فرع:', '').replace('#الفرع:', '').trim();
           return;
@@ -1960,7 +2192,6 @@ const AdminDashboard = ({ user }) => {
         }
 
         if (!currentQ) {
-            // دمج الفرع مع السؤال
             currentQ = { id: Date.now() + Math.random(), text: optText, options: [], correctIdx: 0, branch: currentBranch };
         } else {
             if (isCorrect) {
@@ -2019,7 +2250,6 @@ const AdminDashboard = ({ user }) => {
       if(window.confirm("حذف هذه الحكمة؟")) await deleteDoc(doc(db, 'quotes', id));
   };
 
-  // تطبيق الفلترة على القوائم بناءً على اختيار الأدمن
   const filteredPendingUsers = pendingUsers.filter(u => adminGradeFilter === 'all' || u.grade === adminGradeFilter);
   const filteredActiveUsers = activeUsersList.filter(u => adminGradeFilter === 'all' || u.grade === adminGradeFilter);
   const filteredContentList = contentList.filter(c => adminGradeFilter === 'all' || c.grade === adminGradeFilter);
@@ -2057,7 +2287,6 @@ const AdminDashboard = ({ user }) => {
           <div className="fixed inset-0 z-[1000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-slate-50 rounded-3xl w-full max-w-6xl h-[90vh] shadow-2xl flex flex-col relative overflow-hidden border border-slate-300">
                   
-                  {/* Header */}
                   <div className="bg-white border-b border-slate-200 p-6 flex justify-between items-start flex-shrink-0">
                       <div className="flex gap-4 items-center">
                           <div className="w-16 h-16 bg-blue-100 text-blue-700 rounded-2xl flex items-center justify-center font-bold text-2xl shadow-inner">
@@ -2074,11 +2303,9 @@ const AdminDashboard = ({ user }) => {
                       <button onClick={() => setViewingStudentProfile(null)} className="bg-slate-100 p-2 rounded-full text-slate-500 hover:bg-red-100 hover:text-red-500 transition"><X size={24}/></button>
                   </div>
 
-                  {/* Content Grid */}
                   <div className="flex-1 overflow-y-auto p-6">
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                           
-                          {/* عمود 1: مشاهدات الفيديو */}
                           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col h-[500px]">
                               <h3 className="font-bold text-lg mb-4 text-blue-800 flex items-center gap-2 border-b pb-2"><PlayCircle/> سجل مشاهدات الفيديوهات</h3>
                               <div className="flex-1 overflow-y-auto space-y-3 pr-2">
@@ -2097,10 +2324,8 @@ const AdminDashboard = ({ user }) => {
                               </div>
                           </div>
 
-                          {/* عمود 2: الامتحانات والواجبات */}
                           <div className="flex flex-col gap-6 h-[500px]">
                               
-                              {/* الامتحانات */}
                               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex-1 flex flex-col overflow-hidden">
                                   <h3 className="font-bold text-lg mb-4 text-emerald-800 flex items-center gap-2 border-b pb-2"><ClipboardList/> نتائج الامتحانات</h3>
                                   <div className="flex-1 overflow-y-auto space-y-3 pr-2">
@@ -2119,7 +2344,6 @@ const AdminDashboard = ({ user }) => {
                                   </div>
                               </div>
 
-                              {/* واجبات QR */}
                               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex-1 flex flex-col overflow-hidden">
                                   <h3 className="font-bold text-lg mb-4 text-amber-800 flex items-center gap-2 border-b pb-2"><QrCode/> سجل واجبات (QR)</h3>
                                   <div className="flex-1 overflow-y-auto space-y-3 pr-2">
@@ -2177,7 +2401,6 @@ const AdminDashboard = ({ user }) => {
               <div className="glass-panel p-6 rounded-xl">
                   <h2 className="font-bold mb-4 font-arabic text-xl">قائمة الطلاب ({filteredActiveUsers.length})</h2>
                   
-                  {/* نافذة تعديل بيانات الطالب الشاملة */}
                   {editingUser && (
                       <div className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
                           <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
@@ -2300,12 +2523,10 @@ const AdminDashboard = ({ user }) => {
                       <h3 className="font-bold mb-4">الواجبات المضافة (مقسمة حسب المرحلة التي تم اختيارها من الأعلى)</h3>
                       <div className="space-y-6">
                           {(() => {
-                              // فلترة الواجبات حسب المرحلة المختارة للأدمن
                               const filteredHw = smartHomeworks.filter(hw => adminGradeFilter === 'all' || hw.grade === adminGradeFilter);
                               
                               if (filteredHw.length === 0) return <p className="text-slate-500">لا توجد واجبات في هذه المرحلة.</p>;
 
-                              // تجميع الواجبات حسب اسم الكتاب
                               const hwByBook = filteredHw.reduce((acc, hw) => {
                                   const book = hw.bookName || 'كتب غير مصنفة';
                                   if(!acc[book]) acc[book] = [];
@@ -2633,7 +2854,7 @@ const AdminDashboard = ({ user }) => {
 };
 
 // --- 4. حساب الطالب ---
-const StudentDashboard = ({ user, userData }) => {
+const StudentDashboard = ({ user, userData, installPrompt }) => {
   const [activeTab, setActiveTab] = useState('home');
   const [mobileMenu, setMobileMenu] = useState(false);
   const [content, setContent] = useState([]);
@@ -2644,14 +2865,20 @@ const StudentDashboard = ({ user, userData }) => {
   const [playingVideo, setPlayingVideo] = useState(null);
   const [playingHtml, setPlayingHtml] = useState(null);
   const [examResults, setExamResults] = useState([]);
-  const [hwResults, setHwResults] = useState([]); // سجل واجبات الطالب
+  const [hwResults, setHwResults] = useState([]); 
   const [reviewingExam, setReviewingExam] = useState(null);
   
+  // سجل أخطاء الطالب (Mistakes Bank)
+  const [mistakes, setMistakes] = useState([]);
+
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [hasNewNotif, setHasNewNotif] = useState(false);
 
   const [editFormData, setEditFormData] = useState({ name: '', phone: '', parentPhone: '', grade: '' });
+
+  // وضع التركيز (Focus Mode)
+  const [showFocusMode, setShowFocusMode] = useState(false);
 
   // Smart HW Logic
   const [scanningHwId, setScanningHwId] = useState(null);
@@ -2664,7 +2891,6 @@ const StudentDashboard = ({ user, userData }) => {
     const hwParam = urlParams.get('hw');
     if (hwParam) {
         setScanningHwId(hwParam);
-        // Remove param from URL without reloading
         window.history.replaceState({}, document.title, window.location.pathname);
     }
 
@@ -2689,11 +2915,15 @@ const StudentDashboard = ({ user, userData }) => {
     const unsubExams = onSnapshot(query(collection(db, 'exams'), where('grade', '==', userData.grade)), s => setExams(s.docs.map(d=>({id:d.id,...d.data()}))));
     const unsubResults = onSnapshot(query(collection(db, 'exam_results'), where('studentId', '==', user.uid)), s => setExamResults(s.docs.map(d=>({id:d.id,...d.data()}))));
     
-    // جلب نتائج الواجبات الذكية الخاصة بالطالب
     const unsubHwResults = onSnapshot(query(collection(db, 'homework_results'), where('studentId', '==', user.uid)), s => {
         const results = s.docs.map(d=>({id:d.id,...d.data()}));
         results.sort((a,b) => (b.submittedAt?.seconds || 0) - (a.submittedAt?.seconds || 0));
         setHwResults(results);
+    });
+
+    // جلب بنك الأخطاء للطالب
+    const unsubMistakes = onSnapshot(query(collection(db, 'student_mistakes'), where('userId', '==', user.uid), orderBy('timestamp', 'desc')), s => {
+        setMistakes(s.docs.map(d => ({id: d.id, ...d.data()})));
     });
 
     const unsubNotif = onSnapshot(query(collection(db, 'notifications'), where('grade', 'in', ['all', userData.grade]), orderBy('createdAt', 'desc'), limit(10)), s => {
@@ -2707,21 +2937,40 @@ const StudentDashboard = ({ user, userData }) => {
 
     setEditFormData({ name: userData.name, phone: userData.phone, parentPhone: userData.parentPhone, grade: userData.grade });
 
-    return () => { unsubContent(); unsubLive(); unsubExams(); unsubResults(); unsubHwResults(); unsubNotif(); };
+    return () => { unsubContent(); unsubLive(); unsubExams(); unsubResults(); unsubHwResults(); unsubMistakes(); unsubNotif(); };
   }, [userData, user]);
 
-  if (scanningHwId) return <SmartHomeworkScanner hwId={scanningHwId} user={user} onClose={() => setScanningHwId(null)} />;
+  // دالة لتوليد امتحان من بنك الأخطاء
+  const startMistakesExam = () => {
+      if (mistakes.length === 0) return alert("ليس لديك أي أخطاء مسجلة بعد! استمر في التميز 👏");
+      
+      // نختار عشوائياً حتى 20 سؤالاً من بنك الأخطاء لعدم إرهاق الطالب
+      const shuffledMistakes = [...mistakes].sort(() => 0.5 - Math.random()).slice(0, 20);
+      
+      const generatedExam = {
+          id: 'custom_mistakes_exam', // ID مميز حتى لا يتعارض مع الامتحانات الأساسية
+          title: 'امتحان نقاط الضعف (بنك الأخطاء) 🏦',
+          duration: shuffledMistakes.length * 2, // دقيقتين لكل سؤال
+          questions: [
+              {
+                  text: 'أجب عن هذه الأسئلة التي أخطأت بها سابقاً:',
+                  subQuestions: shuffledMistakes.map(m => m.question)
+              }
+          ]
+      };
+      setActiveExam(generatedExam);
+  };
 
-  if(activeLiveView) return <LiveSessionView session={activeLiveView} user={user} onClose={() => setActiveLiveView(null)} />;
-  
+  if (scanningHwId) return <SmartHomeworkScanner hwId={scanningHwId} user={user} onClose={() => setScanningHwId(null)} />;
+  if (activeLiveView) return <LiveSessionView session={activeLiveView} user={user} onClose={() => setActiveLiveView(null)} />;
   if (activeExam) return <ExamRunner exam={activeExam} user={user} onClose={() => setActiveExam(null)} />;
+  if (showFocusMode) return <PomodoroFocusMode onClose={() => setShowFocusMode(false)} />;
   
   if (reviewingExam) {
       const result = examResults.find(r => r.examId === reviewingExam.id);
       return <ExamRunner exam={reviewingExam} user={user} onClose={() => setReviewingExam(null)} isReviewMode={true} existingResult={result} />;
   }
 
-  // --- منطق الحظر ---
   const isBannedAll = userData?.status === 'banned_all';
   const isBannedExam = userData?.status === 'banned_exam' || userData?.status === 'banned_cheating'; 
   const isBannedContent = userData?.status === 'banned_content';
@@ -2839,6 +3088,8 @@ const StudentDashboard = ({ user, userData }) => {
                 <div onClick={() => setActiveTab('exams')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><ClipboardList/> الامتحانات</div>
                 <div onClick={() => setActiveTab('interactive_exams')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='interactive_exams'?'bg-emerald-100 text-emerald-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-emerald-600'}`}><Sparkles/> امتحان تفاعلي</div>
                 <div onClick={() => setActiveTab('smart_hw_results')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='smart_hw_results'?'bg-blue-100 text-blue-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-blue-600'}`}><QrCode/> سجل الواجبات (QR)</div>
+                {/* --- زر بنك الأخطاء الجديد --- */}
+                <div onClick={() => setActiveTab('mistakes_bank')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='mistakes_bank'?'bg-red-100 text-red-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-red-600'}`}><BrainCircuit/> بنك الأخطاء</div>
               </>
           )}
           
@@ -2850,7 +3101,20 @@ const StudentDashboard = ({ user, userData }) => {
       <main className="p-4 md:p-10 relative z-10 min-h-screen md:pr-72 w-full transition-all">
         <div className="md:hidden flex justify-between items-center mb-6 glass-panel p-4 rounded-2xl shadow-sm"><h1 className="font-bold text-lg text-slate-800">منصة النحاس</h1><button onClick={() => setMobileMenu(true)} className="p-2 bg-slate-100 rounded-lg"><Menu /></button></div>
         
-        <div className="flex justify-end mb-6 relative">
+        <div className="flex justify-between items-center mb-6 relative">
+            <div className="flex gap-2">
+                {/* --- زر تثبيت التطبيق PWA --- */}
+                {installPrompt && (
+                    <button onClick={installPrompt} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full font-bold shadow-lg shadow-green-500/30 transition flex items-center gap-2">
+                        <DownloadCloud size={18}/> تثبيت التطبيق
+                    </button>
+                )}
+                {/* --- زر وضع التركيز (Pomodoro) --- */}
+                <button onClick={() => setShowFocusMode(true)} className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-full font-bold shadow-lg transition flex items-center gap-2">
+                    <Headphones size={18}/> وضع التركيز
+                </button>
+            </div>
+
             <button onClick={() => {requestNotificationPermission(); setShowNotifications(!showNotifications); setHasNewNotif(false);}} className="relative p-2 glass-panel rounded-full shadow-sm hover:bg-white transition">
                 <Bell className="text-slate-600"/>
                 {hasNewNotif && <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>}
@@ -2916,6 +3180,57 @@ const StudentDashboard = ({ user, userData }) => {
                     </motion.div>
                 </div>
                 <Leaderboard />
+            </div>
+        )}
+
+        {/* --- واجهة بنك الأخطاء --- */}
+        {activeTab === 'mistakes_bank' && !isBannedExam && (
+            <div className="glass-panel p-8 rounded-2xl">
+                <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 border-b border-slate-200 pb-6">
+                    <div>
+                        <h2 className="text-3xl font-bold font-arabic text-red-700 flex items-center gap-3">
+                            <BrainCircuit size={32} className="text-red-500" /> بنك أخطاء الطالب 🏦
+                        </h2>
+                        <p className="text-slate-500 mt-2 text-lg">كل سؤال أخطأت فيه سيتم تسجيله هنا لتتمكن من مراجعته والتدرب عليه.</p>
+                    </div>
+                    <button 
+                        onClick={startMistakesExam} 
+                        className="bg-red-600 text-white px-8 py-4 rounded-xl font-bold shadow-xl shadow-red-500/30 hover:bg-red-700 transition flex items-center gap-2 transform hover:scale-105"
+                    >
+                        <Target size={20}/> توليد امتحان من أخطائي
+                    </button>
+                </div>
+
+                {mistakes.length === 0 ? (
+                    <div className="text-center py-16 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                        <Trophy size={64} className="mx-auto text-amber-400 mb-4 opacity-80" />
+                        <h3 className="text-2xl font-bold text-slate-700">ممتاز جداً يا بطل! 👏</h3>
+                        <p className="text-slate-500 mt-2">بنك الأخطاء الخاص بك فارغ تماماً. استمر على هذا المستوى.</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 gap-6">
+                        <div className="bg-red-50 text-red-700 p-4 rounded-xl border border-red-200 font-bold flex items-center gap-2">
+                            <AlertOctagon /> لديك {mistakes.length} سؤال في بنك الأخطاء. يجب مراجعتها جيداً قبل الامتحان النهائي!
+                        </div>
+                        {mistakes.map(m => (
+                            <div key={m.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:border-red-300 transition relative overflow-hidden">
+                                <div className="absolute top-0 right-0 bg-slate-800 text-white text-xs px-3 py-1 rounded-bl-lg font-bold">من امتحان: {m.examTitle}</div>
+                                <h3 className="text-xl font-bold text-slate-800 mt-4 mb-4 leading-relaxed font-sans">{m.question.text}</h3>
+                                
+                                <div className="grid md:grid-cols-2 gap-4">
+                                    <div className="bg-red-50 p-4 rounded-xl border border-red-100">
+                                        <p className="text-xs text-red-500 font-bold mb-1">إجابتك الخاطئة كانت:</p>
+                                        <p className="font-bold text-slate-800">{m.question.studentAnswerText || 'غير معروف'}</p>
+                                    </div>
+                                    <div className="bg-green-50 p-4 rounded-xl border border-green-100">
+                                        <p className="text-xs text-green-600 font-bold mb-1">الإجابة الصحيحة هي:</p>
+                                        <p className="font-bold text-green-800">{m.question.correctAnswerText || 'غير معروف'}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
         )}
         
@@ -3117,7 +3432,7 @@ const StudentDashboard = ({ user, userData }) => {
 };
 
 // --- 5. الصفحة الرئيسية العامة (Landing) ---
-const LandingPage = ({ onAuthClick }) => {
+const LandingPage = ({ onAuthClick, installPrompt }) => {
   const [publicContent, setPublicContent] = useState([]);
   const [playingVideo, setPlayingVideo] = useState(null); 
   const [playingHtml, setPlayingHtml] = useState(null);
@@ -3134,6 +3449,11 @@ const LandingPage = ({ onAuthClick }) => {
       <nav className="relative z-10 flex justify-between items-center p-6 max-w-7xl mx-auto glass-panel mt-4 rounded-full mx-4 shadow-lg">
         <div className="flex items-center gap-2"><ModernLogo /><span className="text-2xl font-bold font-arabic text-amber-800">منصة النحاس</span></div>
         <div className="flex gap-4 items-center">
+          {installPrompt && (
+              <button onClick={installPrompt} className="hidden md:flex bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full font-bold shadow-lg shadow-green-500/30 transition items-center gap-2">
+                  <DownloadCloud size={18}/> تثبيت التطبيق
+              </button>
+          )}
           <button onClick={openFacebook} className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition shadow-lg hover:shadow-blue-500/50"><Facebook size={20}/></button>
           <button onClick={onAuthClick} className="bg-slate-900 text-white px-6 py-2 rounded-full font-bold shadow-lg hover:shadow-slate-500/50 transition transform hover:-translate-y-0.5">دخول الطالب</button>
         </div>
@@ -3143,6 +3463,14 @@ const LandingPage = ({ onAuthClick }) => {
         <p className="text-xl text-slate-600 mb-8 max-w-2xl mx-auto">أقوى منصة تعليمية للمرحلة الإعدادية والثانوية.</p>
         <button onClick={onAuthClick} className="bg-amber-600 text-white px-10 py-4 rounded-2xl text-xl font-bold shadow-xl hover:bg-amber-700 transition transform hover:-translate-y-1">اشترك الآن 🚀</button>
         
+        {installPrompt && (
+            <div className="md:hidden mt-6">
+                <button onClick={installPrompt} className="bg-green-600 text-white px-8 py-3 rounded-full font-bold shadow-lg flex items-center gap-2 mx-auto">
+                    <DownloadCloud size={18}/> تثبيت المنصة كتطبيق على هاتفك
+                </button>
+            </div>
+        )}
+
         <div className="my-12">
             <WisdomBox />
         </div>
@@ -3247,13 +3575,37 @@ const AuthPage = ({ onBack }) => {
   );
 };
 
-// --- التطبيق الرئيسي ---
+// --- التطبيق الرئيسي المحدث ---
 export default function App() {
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(true);
   const [viewMode, setViewMode] = useState('landing');
+  
+  // PWA Logic (Progressive Web App)
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+
+  useEffect(() => {
+      // الاستماع لحدث تثبيت التطبيق
+      const handleBeforeInstallPrompt = (e) => {
+          e.preventDefault();
+          setDeferredPrompt(e);
+      };
+      
+      window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstallClick = async () => {
+      if (deferredPrompt) {
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          if (outcome === 'accepted') {
+              setDeferredPrompt(null);
+          }
+      }
+  };
 
   useEffect(() => {
     if (!auth) return;
@@ -3283,9 +3635,9 @@ export default function App() {
     <AnimatePresence mode='wait'>
       <DesignSystemLoader />
       {!user ? (
-        viewMode === 'landing' ? <LandingPage key="landing" onAuthClick={() => setViewMode('auth')} /> : <AuthPage key="auth" onBack={() => setViewMode('landing')} />
+        viewMode === 'landing' ? <LandingPage key="landing" onAuthClick={() => setViewMode('auth')} installPrompt={deferredPrompt ? handleInstallClick : null} /> : <AuthPage key="auth" onBack={() => setViewMode('landing')} />
       ) : (
-        user.email === 'mido16280@gmail.com' ? <AdminDashboard key="admin" user={user} /> : <StudentDashboard key="student" user={user} userData={userData} />
+        user.email === 'mido16280@gmail.com' ? <AdminDashboard key="admin" user={user} /> : <StudentDashboard key="student" user={user} userData={userData} installPrompt={deferredPrompt ? handleInstallClick : null} />
       )}
     </AnimatePresence>
   );
