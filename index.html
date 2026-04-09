@@ -4,7 +4,29 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- لون المتصفح من فوق على الموبايل -->
+    <meta name="theme-color" content="#d97706" />
+    
     <title>منصة النحاس التعليمية</title>
+
+    <!-- ربط ملف الـ Manifest (هنا شلنا الـ PUBLIC_URL عشان يشتغل مع Vite صح) -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- تسجيل الـ Service Worker -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(registration => {
+              console.log('SW registered: ', registration);
+            })
+            .catch(registrationError => {
+              console.log('SW registration failed: ', registrationError);
+            });
+        });
+      }
+    </script>
     
     <!-- 1. استدعاء مكتبة التصميم Tailwind مباشرة -->
     <script src="https://cdn.tailwindcss.com"></script>
