@@ -1689,6 +1689,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     </div>
   );
 };
+
 const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
     const [homeworkData, setHomeworkData] = useState(null);
     const [imageSrc, setImageSrc] = useState(null);
