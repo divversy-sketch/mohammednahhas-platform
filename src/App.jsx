@@ -17,7 +17,7 @@ import {
   Reply, Unlock, Layout, Settings, Trophy, Megaphone, Bell, Download, XCircle, 
   Calendar, Clock, FileWarning, Settings as GearIcon, Star, Bot, Power, Upload,
   Users, PenTool, Code, Sparkles, Lamp, Ban, Shield, RefreshCw, Link as LinkIcon, History, Camera, QrCode, FileCheck, MousePointerClick, BarChart3, Layers,
-  BrainCircuit, Headphones, DownloadCloud, PenLine, Play, Pause, SkipForward // إضافات جديدة
+  BrainCircuit, Headphones, DownloadCloud, PenLine, Play, Pause, SkipForward
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -51,7 +51,6 @@ try {
  * =================================================================
  */
 
-// تحديث دالة الوقت لتكون أكثر دقة ووضوحاً
 const formatWatchTime = (totalSeconds) => {
     if (!totalSeconds || totalSeconds < 0) return 'أقل من ثانية';
     const h = Math.floor(totalSeconds / 3600);
@@ -111,8 +110,8 @@ const generatePDF = (type, data) => {
     if (data.questions && data.answers) {
         answersTable = `
         <div style="margin-top: 30px; page-break-before: always;">
-            <h3 style="background: #eee; padding: 10px; border-right: 5px solid #d97706;">تفاصيل الإجابات</h3>
-            <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 15px;">
+            <h3 style="background: #eee; padding: 10px; border-right: 5px solid #d97706; font-family: 'Cairo', sans-serif;">تفاصيل الإجابات</h3>
+            <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 15px; font-family: 'Cairo', sans-serif;">
                 <thead>
                     <tr style="background-color: #f3f4f6; color: #333;">
                         <th style="border: 1px solid #ddd; padding: 10px; width: 5%;">#</th>
@@ -135,7 +134,7 @@ const generatePDF = (type, data) => {
                         return `
                         <tr style="background-color: ${isCorrect ? '#f0fdf4' : '#fef2f2'};">
                             <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${i + 1}</td>
-                            <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">${q.text}</td>
+                            <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">${q.text.replace(/\|/g, '<br>')}</td>
                             <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold; color: #0284c7;">${branchName}</td>
                             <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">${studentAnsText}</td>
                             <td style="border: 1px solid #ddd; padding: 8px; color: green;">${correctAnsText}</td>
@@ -165,7 +164,7 @@ const generatePDF = (type, data) => {
         </div>
         
         <div style="background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
-            <table style="width: 100%; font-size: 18px;">
+            <table style="width: 100%; font-size: 18px; font-family: 'Cairo', sans-serif;">
                 <tr>
                     <td style="padding: 10px; font-weight: bold; width: 20%;">اسم الطالب:</td>
                     <td style="padding: 10px;">${data.studentName}</td>
@@ -279,7 +278,6 @@ const DesignSystemLoader = () => {
 
   return (
     <style>{`
-      /* تحسين أداء السكرول ومنع اللاج */
       html, body {
           font-family: 'Cairo', sans-serif; 
           background-color: #f8fafc; 
@@ -292,7 +290,6 @@ const DesignSystemLoader = () => {
       ::-webkit-scrollbar-track { background: #f1f1f1; }
       ::-webkit-scrollbar-thumb { background: linear-gradient(to bottom, #d97706, #b45309); border-radius: 4px; }
       
-      /* Glassmorphism Classes Optimized for Mobile */
       .glass-panel { 
           background: rgba(255, 255, 255, 0.9); 
           backdrop-filter: blur(8px); 
@@ -317,7 +314,6 @@ const DesignSystemLoader = () => {
           border-color: #fbbf24;
       }
 
-      /* Text Gradients */
       .text-gradient-gold {
           background: linear-gradient(45deg, #b45309, #d97706, #fbbf24, #d97706);
           -webkit-background-clip: text;
@@ -330,7 +326,6 @@ const DesignSystemLoader = () => {
           to { background-position: 200% center; }
       }
 
-      /* Background Animations (Hardware Accelerated) */
       @keyframes floatChar {
           0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
           50% { transform: translate3d(0, -30px, 0) rotate(10deg); }
@@ -349,7 +344,6 @@ const DesignSystemLoader = () => {
           will-change: transform, opacity;
       }
 
-      /* Dynamic Watermark Styles - Zero Lag */
       .watermark-text {
         position: absolute;
         pointer-events: none;
@@ -372,14 +366,6 @@ const DesignSystemLoader = () => {
         text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
         white-space: nowrap;
         animation: moveWatermark 25s linear infinite;
-      }
-      
-      @keyframes moveWatermark {
-        0% { top: 10%; left: 10%; transform: rotate(-5deg); }
-        25% { top: 80%; left: 50%; transform: rotate(5deg); }
-        50% { top: 30%; left: 80%; transform: rotate(-5deg); }
-        75% { top: 70%; left: 10%; transform: rotate(5deg); }
-        100% { top: 10%; left: 10%; transform: rotate(-5deg); }
       }
       
       .no-select { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
@@ -768,7 +754,6 @@ const LiveSessionView = ({ session, user, onClose }) => {
   );
 };
 
-// --- دفتر الملاحظات ومربع المشاهدة المحدث ---
 const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
   const videoId = getYouTubeID(video.url || video.file);
   const [showSettings, setShowSettings] = useState(false);
@@ -778,7 +763,6 @@ const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
   const videoRef = useRef(null);
   const finalUrl = video.url || video.file;
 
-  // جلب ملاحظات الطالب لهذا الفيديو المحدداً
   useEffect(() => {
       if(!user || !video.id) return;
       const q = query(collection(db, 'video_notes'), where('userId', '==', user.uid), where('videoId', '==', video.id), orderBy('timestamp', 'asc'));
@@ -788,7 +772,6 @@ const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
       return () => unsub();
   }, [user, video.id]);
 
-  // Tracking Video Views 
   useEffect(() => {
       if (!user || !video.id) return;
       
@@ -849,12 +832,9 @@ const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
       if(!currentNote.trim()) return;
 
       let currentTime = 0;
-      // جلب الوقت من الفيديو الأصلي إذا كان متاحاً
       if (videoRef.current) {
           currentTime = videoRef.current.currentTime;
       }
-      // ملاحظة: لو الفيديو يوتيوب داخل iframe لا يمكننا قراءة الوقت الحالي بدقة بدون YT API الكاملة
-      // لذا سنسجل الملاحظة بوقت 0 في حالة اليوتيوب كإجراء احتياطي.
 
       await addDoc(collection(db, 'video_notes'), {
           userId: user.uid,
@@ -894,7 +874,6 @@ const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
   return (
     <div className="fixed inset-0 z-[60] bg-black flex flex-col md:flex-row items-center justify-center p-0 md:p-4 font-['Cairo']" dir="rtl">
       
-      {/* لوحة الملاحظات الجانبية */}
       <AnimatePresence>
           {showNotes && (
               <motion.div 
@@ -949,7 +928,6 @@ const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
       <div className={`w-full h-full md:max-w-7xl bg-black ${showNotes ? 'md:rounded-l-2xl' : 'rounded-xl'} overflow-hidden relative shadow-2xl border border-gray-800 flex flex-col justify-center flex-1 transition-all duration-300`}>
         <div className="absolute top-4 right-4 z-50 flex gap-4">
             
-            {/* زر فتح دفتر الملاحظات */}
             <button 
                 onClick={() => setShowNotes(!showNotes)} 
                 className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold backdrop-blur-md transition shadow-lg ${showNotes ? 'bg-blue-600 text-white' : 'bg-black/50 text-white hover:bg-black/80 border border-white/20'}`}
@@ -1005,9 +983,8 @@ const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
   );
 };
 
-// --- وضع التركيز (Pomodoro Focus Mode) ---
 const PomodoroFocusMode = ({ onClose }) => {
-    const [timeLeft, setTimeLeft] = useState(25 * 60); // 25 minutes default
+    const [timeLeft, setTimeLeft] = useState(25 * 60);
     const [isActive, setIsActive] = useState(false);
     const [isBreak, setIsBreak] = useState(false);
     const [tasks, setTasks] = useState([]);
@@ -1019,7 +996,6 @@ const PomodoroFocusMode = ({ onClose }) => {
         if (isActive && timeLeft > 0) {
             interval = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
         } else if (timeLeft === 0) {
-            // Switch mode
             const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
             audio.play();
             if (isBreak) {
@@ -1069,7 +1045,6 @@ const PomodoroFocusMode = ({ onClose }) => {
             </div>
 
             <div className="flex-1 flex flex-col lg:flex-row p-6 gap-8 overflow-y-auto">
-                {/* جزء العداد */}
                 <div className="flex-1 flex flex-col items-center justify-center bg-slate-800/50 rounded-3xl p-8 border border-slate-700 relative overflow-hidden">
                     <div className="absolute top-6 left-6 flex gap-2">
                         <button onClick={() => { setIsBreak(false); setTimeLeft(25 * 60); setIsActive(false); }} className={`px-4 py-1 rounded-full text-sm font-bold transition ${!isBreak ? 'bg-amber-500 text-slate-900' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>مذاكرة (25)</button>
@@ -1091,7 +1066,6 @@ const PomodoroFocusMode = ({ onClose }) => {
                     <p className="mt-8 text-slate-400 flex items-center gap-2"><Headphones size={16}/> موسيقى Lo-Fi للتركيز تعمل تلقائياً أثناء جلسة المذاكرة</p>
                 </div>
 
-                {/* جزء المهام */}
                 <div className="w-full lg:w-96 flex flex-col gap-4">
                     <div className="bg-slate-800 rounded-3xl p-6 border border-slate-700 flex-1 flex flex-col">
                         <h3 className="text-xl font-bold mb-4 text-white flex items-center gap-2"><CheckCircle className="text-amber-400"/> مهام الجلسة</h3>
@@ -1120,12 +1094,10 @@ const InteractiveViewer = ({ content, user, onClose }) => {
     const handleContextMenu = (e) => e.preventDefault();
     const [iframeSrc, setIframeSrc] = useState('');
     
-    // الخدعة السحرية لحل مشكلة حظر جوجل كروم لملفات HTML
     useEffect(() => {
         let activeBlobUrl = null;
         
         if (content.url && content.url.startsWith('data:')) {
-            // تحويل الملف من Data URL المحظور إلى Blob URL الآمن جداً
             fetch(content.url)
                 .then(res => res.blob())
                 .then(blob => {
@@ -1137,12 +1109,10 @@ const InteractiveViewer = ({ content, user, onClose }) => {
                     setIframeSrc(content.url);
                 });
         } else {
-            // لو كان رابط خارجي عادي بنسيبه زي ما هو
             setIframeSrc(content.url);
         }
 
         return () => {
-            // تنظيف الذاكرة عند إغلاق الملف
             if (activeBlobUrl) {
                 URL.revokeObjectURL(activeBlobUrl);
             }
@@ -1219,7 +1189,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const [wmPositions, setWmPositions] = useState([]);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
 
-  // حالة لتبويبات الفروع في وضع المراجعة
   const [activeBranchTab, setActiveBranchTab] = useState('الكل');
 
   const shuffleArray = (array) => {
@@ -1248,7 +1217,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
             }
 
             subQs.forEach((q) => {
-                // دمج اسم الفرع مع السؤال، ولو مش موجود نخليه "عام"
                 flat.push({ ...q, blockText: block.text, branch: q.branch || 'عام' });
             });
         });
@@ -1256,16 +1224,13 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     return flat;
   }, [exam.questions, isReviewMode, existingResult]);
 
-  // استخراج أسماء الفروع الفريدة لاستخدامها في التبويبات والإحصائيات
   const uniqueBranches = useMemo(() => ['الكل', ...new Set(flatQuestions.map(q => q.branch))], [flatQuestions]);
 
-  // تصفية الأسئلة بناءً على التبويب المختار (في وضع المراجعة فقط)
   const displayQuestions = useMemo(() => {
       if (!isReviewMode || activeBranchTab === 'الكل') return flatQuestions;
       return flatQuestions.filter(q => q.branch === activeBranchTab);
   }, [flatQuestions, isReviewMode, activeBranchTab]);
 
-  // عند تغيير التبويب، نرجع للسؤال الأول في هذه القائمة
   useEffect(() => {
       if (isReviewMode) setCurrentQIndex(0);
   }, [activeBranchTab, isReviewMode]);
@@ -1286,7 +1251,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     return () => clearInterval(interval);
   }, [isReviewMode]);
 
-  // تحديث جذري لنظام الحماية
   const stateRefs = useRef({ isSubmitted, showSubmitConfirm, isCheating });
   useEffect(() => {
       stateRefs.current = { isSubmitted, showSubmitConfirm, isCheating };
@@ -1394,7 +1358,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     setScore(finalScore);
     setIsSubmitted(true);
 
-    // --- ميزة بنك الأخطاء الجديدة: تسجيل الأسئلة الخاطئة ---
     const batch = writeBatch(db);
     flatQuestions.forEach(q => {
         const studentAns = answers[q.id];
@@ -1449,10 +1412,8 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   if (isSubmitted && !isReviewMode) {
      const endTime = new Date(exam.endTime).getTime();
      const now = Date.now();
-     // السماح بالمراجعة فوراً لامتحان بنك الأخطاء
      const canReview = exam.id === 'custom_mistakes_exam' ? true : now > endTime;
      
-     // حسابات النتيجة المحدثة
      const totalQs = flatQuestions.length;
      const solvedQs = Object.keys(answers).length;
      const unsolvedQs = totalQs - solvedQs;
@@ -1461,7 +1422,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
      const percentage = totalQs > 0 ? Math.round((score / totalQs) * 100) : 0;
      const timeTakenInSeconds = Math.round((Date.now() - startTime) / 1000);
      
-     // حساب الإحصائيات لكل فرع
      const branchStats = {};
      flatQuestions.forEach(q => {
          const b = q.branch;
@@ -1667,7 +1627,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
             <div className="flex-1 w-full bg-gradient-to-b from-blue-50 to-indigo-50 p-6 md:p-10 overflow-y-auto border-l border-blue-200 shadow-inner">
               <h3 className="font-bold text-blue-900 mb-6 flex items-center gap-2 text-xl border-b border-blue-200 pb-2 font-sans"><FileText size={24}/> نص المراجعة / القراءة:</h3>
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-blue-100">
-                  <p className="whitespace-pre-line leading-10 text-lg md:text-xl font-bold text-slate-800 font-arabic">{currentQObj.blockText}</p>
+                  <p className="whitespace-pre-line leading-10 text-lg md:text-xl font-bold text-slate-800 font-sans">{currentQObj.blockText}</p>
               </div>
             </div>
           )}
@@ -1683,8 +1643,15 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
               {!isReviewMode && <button onClick={() => { setFlagged({...flagged, [currentQObj.id]: !flagged[currentQObj.id]}) }} className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-bold transition shadow-sm ${flagged[currentQObj.id] ? 'bg-amber-100 text-amber-700 border border-amber-300' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}><Flag size={16} /> مراجعة لاحقاً</button>}
             </div>
             
-            <div className="bg-slate-50 p-6 md:p-8 rounded-2xl border border-slate-200 mb-8 shadow-inner">
-              <h3 className="text-2xl md:text-4xl font-bold text-slate-900 leading-relaxed font-sans drop-shadow-sm">{currentQObj.text}</h3>
+            <div className="bg-slate-50 p-6 md:p-8 rounded-2xl border border-slate-200 mb-8 shadow-inner text-center">
+              <h3 className="text-2xl md:text-3xl font-bold text-slate-900 leading-loose font-sans drop-shadow-sm">
+                  {currentQObj.text.split('|').map((part, i) => (
+                      <React.Fragment key={i}>
+                          {part.trim()}
+                          {i !== currentQObj.text.split('|').length - 1 && <br />}
+                      </React.Fragment>
+                  ))}
+              </h3>
             </div>
 
             <div className="space-y-4">
@@ -1722,7 +1689,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   );
 };
 
-// --- الكاميرا والذكاء الاصطناعي لتصحيح الواجب الورقي ---
 const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
     const [homeworkData, setHomeworkData] = useState(null);
     const [imageSrc, setImageSrc] = useState(null);
@@ -1730,7 +1696,6 @@ const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
     const [result, setResult] = useState(null);
     const fileInputRef = useRef(null);
 
-    // Get Homework Data from DB
     useEffect(() => {
         const fetchHw = async () => {
             const docRef = doc(db, 'smart_homeworks', hwId);
@@ -1762,11 +1727,9 @@ const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
         
         try {
             const base64Data = imageSrc.split(',')[1];
-            // تحذير للأدمن: لتشغيل هذه الميزة فعلياً، يجب وضع مفتاح Gemini API هنا
             const apiKey = "AIzaSyAkxZD3GCtHK1_9DgsdCOPr69M1nOV13Hw"; 
             
             if(!apiKey) {
-                // محاكاة للنتيجة في حالة عدم وضع مفتاح حقيقي
                 setTimeout(async () => {
                     const dummyResult = { score: Math.floor(Math.random() * 10), total: 10, feedback: "تم استلام الواجب (محاكاة)." };
                     await saveResult(dummyResult);
@@ -1794,7 +1757,6 @@ const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
             const data = await response.json();
             const textResult = data.candidates?.[0]?.content?.parts?.[0]?.text;
             
-            // Clean markdown JSON if present
             const cleanJson = textResult.replace(/```json/g, '').replace(/```/g, '');
             const parsedResult = JSON.parse(cleanJson);
             
@@ -1879,10 +1841,9 @@ const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
     );
 };
 
-// --- لوحة تحكم الأدمن ---
 const AdminDashboard = ({ user }) => {
   const [activeTab, setActiveTab] = useState('users'); 
-  const [adminGradeFilter, setAdminGradeFilter] = useState('all'); // فلتر المرحلة الدراسية
+  const [adminGradeFilter, setAdminGradeFilter] = useState('all'); 
   const [pendingUsers, setPendingUsers] = useState([]);
   const [activeUsersList, setActiveUsersList] = useState([]);
   const [contentList, setContentList] = useState([]);
@@ -1909,15 +1870,12 @@ const AdminDashboard = ({ user }) => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   
-  // Tracking Logic
   const [viewingStudentProfile, setViewingStudentProfile] = useState(null);
   const [studentHistoryData, setStudentHistoryData] = useState([]);
 
-  // Time Edit Logic
   const [editingExamTime, setEditingExamTime] = useState(null);
   const [newEndTime, setNewEndTime] = useState('');
 
-  // Smart Homework Logic (Admin)
   const [smartHomeworks, setSmartHomeworks] = useState([]);
   const [newSmartHw, setNewSmartHw] = useState({ title: '', answerKey: '', grade: '3sec', bookName: '' });
   const [hwResults, setHwResults] = useState([]);
@@ -1933,7 +1891,6 @@ const AdminDashboard = ({ user }) => {
   useEffect(() => { const u = onSnapshot(collection(db, 'auto_replies'), s => setAutoReplies(s.docs.map(d => ({id: d.id, ...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(collection(db, 'quotes'), s => setQuotesList(s.docs.map(d => ({id: d.id, ...d.data()})))); return u; }, []);
   
-  // Fetch Smart HWs
   useEffect(() => { const u = onSnapshot(collection(db, 'smart_homeworks'), s => setSmartHomeworks(s.docs.map(d => ({id: d.id, ...d.data()})))); return u; }, []);
   useEffect(() => { const u = onSnapshot(query(collection(db, 'homework_results'), orderBy('submittedAt', 'desc')), s => setHwResults(s.docs.map(d => ({id: d.id, ...d.data()})))); return u; }, []);
 
@@ -2260,7 +2217,6 @@ const AdminDashboard = ({ user }) => {
     <div className="min-h-screen bg-slate-100 font-['Cairo'] relative" dir="rtl">
       <FloatingArabicBackground />
 
-      {/* نافذة تمديد وقت الامتحان */}
       {editingExamTime && (
           <div className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl relative">
@@ -2282,7 +2238,6 @@ const AdminDashboard = ({ user }) => {
           </div>
       )}
 
-      {/* النافذة الشاملة لملف الطالب */}
       {viewingStudentProfile && (
           <div className="fixed inset-0 z-[1000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-slate-50 rounded-3xl w-full max-w-6xl h-[90vh] shadow-2xl flex flex-col relative overflow-hidden border border-slate-300">
@@ -2614,21 +2569,43 @@ const AdminDashboard = ({ user }) => {
                            {(() => {
                                const examData = examsList.find(e => e.id === viewingResult.examId);
                                if(!examData) return <p>بيانات الامتحان محذوفة</p>;
+                               
                                const questions = getQuestionsForExam(examData);
-                               return questions.map((q, idx) => (
-                                   <div key={idx} className="bg-white p-4 rounded border relative">
-                                           {q.branch && q.branch !== 'عام' && <span className="absolute top-2 left-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">{q.branch}</span>}
-                                           <p className="font-bold mb-2 text-xl text-blue-900 font-sans pr-10">{q.text}</p>
-                                           <div className="grid grid-cols-2 gap-2 text-sm">
-                                               {q.options.map((opt, oIdx) => {
-                                                   const isCorrect = oIdx === q.correctIdx;
-                                                   const isSelected = viewingResult.answers[q.id] === oIdx;
-                                                   let style = "bg-gray-50 text-gray-500";
-                                                   if (isCorrect) style = "bg-green-100 text-green-800 border-green-500 border font-bold text-lg";
-                                                   if (isSelected && !isCorrect) style = "bg-red-100 text-red-800 border-red-500 border font-bold text-lg";
-                                                   return <div key={oIdx} className={`p-2 rounded font-sans font-bold ${style}`}>{opt}</div>
-                                               })}
-                                           </div>
+                               
+                               const groupedQuestions = questions.reduce((acc, q) => {
+                                   const b = q.branch || 'عام';
+                                   if(!acc[b]) acc[b] = [];
+                                   acc[b].push(q);
+                                   return acc;
+                               }, {});
+
+                               return Object.entries(groupedQuestions).map(([branch, qs]) => (
+                                   <div key={branch} className="mb-6">
+                                       <h4 className="font-bold text-xl text-amber-700 bg-amber-100 p-2 rounded-lg mb-4">{branch}</h4>
+                                       <div className="space-y-4">
+                                           {qs.map((q, idx) => (
+                                               <div key={idx} className="bg-white p-4 rounded border relative">
+                                                   <p className="font-bold mb-2 text-xl text-blue-900 font-sans pr-10">
+                                                       {q.text.split('|').map((part, i) => (
+                                                           <React.Fragment key={i}>
+                                                               {part.trim()}
+                                                               {i !== q.text.split('|').length - 1 && <br />}
+                                                           </React.Fragment>
+                                                       ))}
+                                                   </p>
+                                                   <div className="grid grid-cols-2 gap-2 text-sm">
+                                                       {q.options.map((opt, oIdx) => {
+                                                           const isCorrect = oIdx === q.correctIdx;
+                                                           const isSelected = viewingResult.answers[q.id] === oIdx;
+                                                           let style = "bg-gray-50 text-gray-500";
+                                                           if (isCorrect) style = "bg-green-100 text-green-800 border-green-500 border font-bold text-lg";
+                                                           if (isSelected && !isCorrect) style = "bg-red-100 text-red-800 border-red-500 border font-bold text-lg";
+                                                           return <div key={oIdx} className={`p-2 rounded font-sans font-bold ${style}`}>{opt}</div>
+                                                       })}
+                                                   </div>
+                                               </div>
+                                           ))}
+                                       </div>
                                    </div>
                                ));
                            })()}
@@ -2868,7 +2845,6 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   const [hwResults, setHwResults] = useState([]); 
   const [reviewingExam, setReviewingExam] = useState(null);
   
-  // سجل أخطاء الطالب (Mistakes Bank)
   const [mistakes, setMistakes] = useState([]);
 
   const [notifications, setNotifications] = useState([]);
@@ -2877,16 +2853,13 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
   const [editFormData, setEditFormData] = useState({ name: '', phone: '', parentPhone: '', grade: '' });
 
-  // وضع التركيز (Focus Mode)
   const [showFocusMode, setShowFocusMode] = useState(false);
 
-  // Smart HW Logic
   const [scanningHwId, setScanningHwId] = useState(null);
 
   useEffect(() => {
     if(!userData) return;
     
-    // Check URL for Smart HW QR Scan
     const urlParams = new URLSearchParams(window.location.search);
     const hwParam = urlParams.get('hw');
     if (hwParam) {
@@ -2921,7 +2894,6 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
         setHwResults(results);
     });
 
-    // جلب بنك الأخطاء للطالب
     const unsubMistakes = onSnapshot(query(collection(db, 'student_mistakes'), where('userId', '==', user.uid), orderBy('timestamp', 'desc')), s => {
         setMistakes(s.docs.map(d => ({id: d.id, ...d.data()})));
     });
@@ -2940,17 +2912,15 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
     return () => { unsubContent(); unsubLive(); unsubExams(); unsubResults(); unsubHwResults(); unsubMistakes(); unsubNotif(); };
   }, [userData, user]);
 
-  // دالة لتوليد امتحان من بنك الأخطاء
   const startMistakesExam = () => {
       if (mistakes.length === 0) return alert("ليس لديك أي أخطاء مسجلة بعد! استمر في التميز 👏");
       
-      // نختار عشوائياً حتى 20 سؤالاً من بنك الأخطاء لعدم إرهاق الطالب
       const shuffledMistakes = [...mistakes].sort(() => 0.5 - Math.random()).slice(0, 20);
       
       const generatedExam = {
-          id: 'custom_mistakes_exam', // ID مميز حتى لا يتعارض مع الامتحانات الأساسية
+          id: 'custom_mistakes_exam', 
           title: 'امتحان نقاط الضعف (بنك الأخطاء) 🏦',
-          duration: shuffledMistakes.length * 2, // دقيقتين لكل سؤال
+          duration: shuffledMistakes.length * 2, 
           questions: [
               {
                   text: 'أجب عن هذه الأسئلة التي أخطأت بها سابقاً:',
@@ -3088,7 +3058,6 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                 <div onClick={() => setActiveTab('exams')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><ClipboardList/> الامتحانات</div>
                 <div onClick={() => setActiveTab('interactive_exams')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='interactive_exams'?'bg-emerald-100 text-emerald-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-emerald-600'}`}><Sparkles/> امتحان تفاعلي</div>
                 <div onClick={() => setActiveTab('smart_hw_results')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='smart_hw_results'?'bg-blue-100 text-blue-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-blue-600'}`}><QrCode/> سجل الواجبات (QR)</div>
-                {/* --- زر بنك الأخطاء الجديد --- */}
                 <div onClick={() => setActiveTab('mistakes_bank')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='mistakes_bank'?'bg-red-100 text-red-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-red-600'}`}><BrainCircuit/> بنك الأخطاء</div>
               </>
           )}
@@ -3103,13 +3072,11 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
         
         <div className="flex justify-between items-center mb-6 relative">
             <div className="flex gap-2">
-                {/* --- زر تثبيت التطبيق PWA --- */}
                 {installPrompt && (
                     <button onClick={installPrompt} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full font-bold shadow-lg shadow-green-500/30 transition flex items-center gap-2">
                         <DownloadCloud size={18}/> تثبيت التطبيق
                     </button>
                 )}
-                {/* --- زر وضع التركيز (Pomodoro) --- */}
                 <button onClick={() => setShowFocusMode(true)} className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-full font-bold shadow-lg transition flex items-center gap-2">
                     <Headphones size={18}/> وضع التركيز
                 </button>
@@ -3183,7 +3150,6 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
             </div>
         )}
 
-        {/* --- واجهة بنك الأخطاء --- */}
         {activeTab === 'mistakes_bank' && !isBannedExam && (
             <div className="glass-panel p-8 rounded-2xl">
                 <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 border-b border-slate-200 pb-6">
@@ -3353,7 +3319,6 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                 ) : (
                     <div className="space-y-6">
                         {(() => {
-                            // تجميع واجبات الطالب حسب اسم الكتاب
                             const hwByBook = hwResults.reduce((acc, hw) => {
                                 const book = hw.bookName || 'كتب غير مصنفة';
                                 if(!acc[book]) acc[book] = [];
@@ -3431,7 +3396,6 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   );
 };
 
-// --- 5. الصفحة الرئيسية العامة (Landing) ---
 const LandingPage = ({ onAuthClick, installPrompt }) => {
   const [publicContent, setPublicContent] = useState([]);
   const [playingVideo, setPlayingVideo] = useState(null); 
@@ -3506,7 +3470,6 @@ const LandingPage = ({ onAuthClick, installPrompt }) => {
   );
 };
 
-// صفحة الدخول والتسجيل
 const AuthPage = ({ onBack }) => {
   const [isRegister, setIsRegister] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -3515,7 +3478,6 @@ const AuthPage = ({ onBack }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    // التحقق من صحة الأرقام
     const egyptPhoneRegex = /^01[0125][0-9]{8}$/;
     if (isRegister) {
         if (!egyptPhoneRegex.test(formData.phone)) return alert("رقم الطالب غير صحيح! يجب أن يكون 11 رقم ويبدأ بـ 010, 011, 012, أو 015");
@@ -3575,7 +3537,6 @@ const AuthPage = ({ onBack }) => {
   );
 };
 
-// --- التطبيق الرئيسي المحدث ---
 export default function App() {
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);
@@ -3583,11 +3544,9 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [viewMode, setViewMode] = useState('landing');
   
-  // PWA Logic (Progressive Web App)
   const [deferredPrompt, setDeferredPrompt] = useState(null);
 
   useEffect(() => {
-      // الاستماع لحدث تثبيت التطبيق
       const handleBeforeInstallPrompt = (e) => {
           e.preventDefault();
           setDeferredPrompt(e);
