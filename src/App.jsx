@@ -1178,13 +1178,14 @@ const InteractiveViewer = ({ content, user, onClose }) => {
 };
 
 const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult = null }) => {
-  const [activeView, setActiveView] = useState('dashboard'); // 'dashboard' or 'questions'
+  // 'questions' أثناء الحل، و 'dashboard' بعد التسليم
+  const [activeView, setActiveView] = useState(isReviewMode || existingResult ? 'dashboard' : 'questions'); 
   const [currentQIndex, setCurrentQIndex] = useState(0);
   const [answers, setAnswers] = useState(existingResult?.answers || {});
   const [flagged, setFlagged] = useState({});
   const [timeLeft, setTimeLeft] = useState(exam.duration * 60);
   const [isCheating, setIsCheating] = useState(false);
-  const [isSubmitted, setIsSubmitted] = useState(isReviewMode);
+  const [isSubmitted, setIsSubmitted] = useState(isReviewMode || existingResult !== null);
   const [score, setScore] = useState(existingResult?.score || 0);
   const [startTime] = useState(Date.now()); 
   const [wmPositions, setWmPositions] = useState([]);
@@ -1219,18 +1220,15 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
   const uniqueBranches = useMemo(() => ['الكل', ...new Set(flatQuestions.map(q => q.branch))], [flatQuestions]);
 
+  // أثناء الحل تظهر كل الأسئلة، بعد التسليم يتم الفلترة حسب الفرع لو الطالب اختار فرع معين
   const displayQuestions = useMemo(() => {
-      if (!isReviewMode || activeBranchTab === 'الكل') return flatQuestions;
+      if (!isSubmitted || activeBranchTab === 'الكل') return flatQuestions;
       return flatQuestions.filter(q => q.branch === activeBranchTab);
-  }, [flatQuestions, isReviewMode, activeBranchTab]);
+  }, [flatQuestions, isSubmitted, activeBranchTab]);
 
   useEffect(() => {
-      if (isReviewMode) setCurrentQIndex(0);
-  }, [activeBranchTab, isReviewMode]);
-
-  useEffect(() => {
-      if (isSubmitted) setActiveView('dashboard');
-  }, [isSubmitted]);
+      if (isSubmitted) setCurrentQIndex(0);
+  }, [activeBranchTab, isSubmitted]);
 
   if (flatQuestions.length === 0) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-white font-['Cairo']">عفواً، لا توجد أسئلة.<button onClick={onClose} className="ml-4 bg-gray-200 px-4 py-2 rounded">خروج</button></div>;
 
@@ -1252,7 +1250,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   handleCheatingRef.current = async () => {
       const { isSubmitted, isCheating } = stateRefs.current;
       if(isReviewMode || isSubmitted || isCheating) return;
-      setIsCheating(true); setIsSubmitted(true);
+      setIsCheating(true); setIsSubmitted(true); setActiveView('dashboard');
       const timeTaken = Math.round((Date.now() - startTime) / 1000);
       if (exam.attemptId) {
           await setDoc(doc(db, 'exam_results', exam.attemptId), { 
@@ -1271,16 +1269,19 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
           }
       };
       window.addEventListener('beforeunload', handleBeforeUnload);
+      
       const handleAntiCheat = () => { 
           const { showSubmitConfirm, isSubmitted } = stateRefs.current;
           if (!showSubmitConfirm && !isSubmitted) handleCheatingRef.current();
       };
       const handleVisibilityChange = () => { if (document.hidden) handleAntiCheat(); };
       const blockContextMenu = (e) => e.preventDefault();
+
       document.addEventListener("visibilitychange", handleVisibilityChange);
       window.addEventListener("blur", handleAntiCheat);
       window.addEventListener("pagehide", handleAntiCheat);
       document.addEventListener('contextmenu', blockContextMenu); 
+      
       return () => {
           window.removeEventListener('beforeunload', handleBeforeUnload);
           document.removeEventListener("visibilitychange", handleVisibilityChange);
@@ -1319,6 +1320,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     const timeTaken = Math.round((Date.now() - startTime) / 1000);
     setScore(finalScore);
     setIsSubmitted(true);
+    setActiveView('dashboard'); // التحول للوحة المظلمة بعد التسليم
 
     const batch = writeBatch(db);
     flatQuestions.forEach(q => {
@@ -1347,12 +1349,13 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   };
 
   const currentQObj = displayQuestions[currentQIndex];
-  if (!currentQObj) return null; 
+  if (!currentQObj && activeView === 'questions') return null; 
+
   const hasPassage = currentQObj?.blockText && currentQObj.blockText.trim().length > 0;
 
   if (isCheating) return <div className="fixed inset-0 z-[60] bg-red-900 flex items-center justify-center text-white text-center font-['Cairo']"><div><AlertOctagon size={80} className="mx-auto mb-4"/><h1>تم رصد محاولة غش!</h1><p className="text-red-200 mt-2">خرجت من الامتحان. تم رصد درجتك (صفر) وحظرك من الامتحانات القادمة.</p><button onClick={() => window.location.reload()} className="mt-4 bg-white text-red-900 px-6 py-2 rounded-full font-bold">العودة للرئيسية</button></div></div>;
 
-  // الحسابات الخاصة بلوحة التحكم (سواء أثناء الحل أو بعد التسليم)
+  // الحسابات الخاصة بلوحة التحكم (تظهر فقط بعد التسليم)
   const totalQs = flatQuestions.length;
   const solvedQs = Object.keys(answers).length;
   const unsolvedQs = totalQs - solvedQs;
@@ -1363,140 +1366,116 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const branchStats = {};
   flatQuestions.forEach(q => {
       const b = q.branch;
-      if (!branchStats[b]) branchStats[b] = { total: 0, solved: 0, correct: 0, wrong: 0, unsolved: 0 };
+      if (!branchStats[b]) branchStats[b] = { total: 0, correct: 0, wrong: 0, unsolved: 0 };
       branchStats[b].total++;
       const isSelected = answers[q.id] !== undefined;
       const isCorrect = answers[q.id] === q.correctIdx;
-      if (isSelected) branchStats[b].solved++;
       if (!isSelected) branchStats[b].unsolved++;
       else if (isCorrect) branchStats[b].correct++;
       else branchStats[b].wrong++;
   });
 
-  // ==========================================
-  // الشاشة الأولى: لوحة التحكم (Dashboard)
-  // ==========================================
-  if (activeView === 'dashboard') {
-     const canReview = isSubmitted && (exam.id === 'custom_mistakes_exam' || Date.now() > new Date(exam.endTime).getTime());
+  const canReview = exam.id === 'custom_mistakes_exam' || Date.now() > new Date(exam.endTime).getTime();
 
+  // ==========================================
+  // الشاشة الأولى: لوحة النتيجة المظلمة (Dashboard)
+  // ==========================================
+  if (activeView === 'dashboard' && isSubmitted) {
      return (
-        <div className="fixed inset-0 z-[60] bg-[#0f172a] overflow-y-auto p-4 font-['Cairo'] text-slate-200" dir="rtl">
+        <div className="fixed inset-0 z-[60] bg-[#0f172a] overflow-y-auto p-4 md:p-8 font-['Cairo'] text-slate-200" dir="rtl">
             <div className="max-w-6xl mx-auto mt-6">
                 
-                {/* الجزء العلوي (عنوان الامتحان وزر العودة/الاستكمال) */}
-                <div className="flex flex-col md:flex-row justify-between items-center mb-8 border-b border-slate-700 pb-4 gap-4">
+                <div className="flex flex-col md:flex-row justify-between items-center mb-10 border-b border-slate-700 pb-4 gap-4">
                     <div className="text-center md:text-right">
-                        <h2 className="text-2xl font-bold text-white mb-1">{exam.title}</h2>
-                        {!isSubmitted && <p className="text-amber-400 font-bold">⏳ الوقت المتبقي: {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</p>}
+                        <h2 className="text-3xl font-black text-white mb-2">{exam.title}</h2>
+                        <p className="text-lg text-slate-400">الطالب: {user.displayName}</p>
                     </div>
-                    {isSubmitted ? (
-                        <div className="text-center md:text-left">
-                            <h3 className="text-xl font-bold text-teal-400">نتيجة الامتحان</h3>
-                            <p className="text-sm text-slate-400">الطالب: {user.displayName}</p>
-                        </div>
-                    ) : (
-                        <button onClick={() => setActiveView('questions')} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold shadow-lg hover:bg-blue-700 transition flex items-center gap-2">
-                            استكمال الامتحان <Play size={18}/>
+                    <div className="flex items-center gap-3">
+                        <button onClick={() => generatePDF('student', {studentName: user.displayName, score, total: flatQuestions.length, status: 'completed', examTitle: exam.title, questions: flatQuestions, answers: answers })} className="w-12 h-12 bg-blue-600 rounded-full text-white flex items-center justify-center shadow-lg hover:bg-blue-700 transition" title="تحميل التقرير PDF">
+                            <FileText size={20}/>
                         </button>
-                    )}
-                </div>
-
-                {/* المربعات الإحصائية (مطابقة للصورة) */}
-                <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-8">
-                    <div className="bg-[#1e293b] p-4 rounded-xl text-center border-t-2 border-slate-600 shadow-lg">
-                        <p className="text-slate-400 text-xs mb-2 font-bold">عدد الأسئلة</p>
-                        <p className="text-4xl font-black text-white">{totalQs}</p>
-                    </div>
-                    {isSubmitted ? (
-                        <div className="bg-[#1e293b] p-4 rounded-xl text-center border-t-2 border-slate-600 shadow-lg">
-                            <p className="text-slate-400 text-xs mb-2 font-bold">النتيجة</p>
-                            <p className="text-4xl font-black text-white">{percentage}%</p>
-                        </div>
-                    ) : (
-                        <div className="bg-[#1e293b] p-4 rounded-xl text-center border-t-2 border-slate-600 shadow-lg cursor-pointer hover:bg-slate-700 transition" onClick={() => {setActiveBranchTab('الكل'); setActiveView('questions');}}>
-                            <p className="text-slate-400 text-xs mb-2 font-bold">عرض الكل</p>
-                            <p className="text-4xl font-black text-blue-400">{solvedQs}/{totalQs}</p>
-                        </div>
-                    )}
-                    
-                    <div className="bg-[#0e7490] p-4 rounded-xl text-center shadow-lg">
-                        <p className="text-cyan-100 text-xs mb-2 flex items-center justify-center gap-1 font-bold"><MousePointerClick size={14}/> الأسئلة المحلولة</p>
-                        <p className="text-4xl font-black text-white">{solvedQs}</p>
-                    </div>
-                    
-                    {isSubmitted ? (
-                        <>
-                            <div className="bg-[#831843] p-4 rounded-xl text-center shadow-lg">
-                                <p className="text-pink-100 text-xs mb-2 flex items-center justify-center gap-1 font-bold"><MousePointerClick size={14}/> الأسئلة الخاطئة</p>
-                                <p className="text-4xl font-black text-pink-50">{wrongQs}</p>
-                            </div>
-                            <div className="bg-[#115e59] p-4 rounded-xl text-center shadow-lg">
-                                <p className="text-teal-100 text-xs mb-2 flex items-center justify-center gap-1 font-bold"><MousePointerClick size={14}/> الأسئلة الصحيحة</p>
-                                <p className="text-4xl font-black text-teal-50">{correctQs}</p>
-                            </div>
-                        </>
-                    ) : (
-                        <div className="bg-[#b45309] p-4 rounded-xl text-center shadow-lg col-span-2">
-                            <p className="text-amber-100 text-xs mb-2 flex items-center justify-center gap-1 font-bold"><Flag size={14}/> أسئلة محددة للمراجعة</p>
-                            <p className="text-4xl font-black text-amber-50">{Object.values(flagged).filter(v=>v).length}</p>
-                        </div>
-                    )}
-                    
-                    <div className="bg-[#78350f] p-4 rounded-xl text-center shadow-lg">
-                        <p className="text-amber-100 text-xs mb-2 flex items-center justify-center gap-1 font-bold"><MousePointerClick size={14}/> الغير محلولة</p>
-                        <p className="text-4xl font-black text-amber-50">{unsolvedQs}</p>
+                        <button onClick={onClose} className="bg-slate-700 text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-600 shadow-lg transition flex items-center gap-2">
+                            خروج <LogOut size={18}/>
+                        </button>
                     </div>
                 </div>
 
-                {/* كروت الفروع والتنقل */}
+                {/* الإحصائيات العلوية */}
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-10">
+                    <div className="bg-[#1e293b] p-6 rounded-2xl text-center border-t-4 border-slate-500 shadow-xl flex flex-col justify-center">
+                        <p className="text-slate-400 text-sm mb-3 font-bold">عدد الأسئلة</p>
+                        <p className="text-4xl md:text-5xl font-black text-white">{totalQs}</p>
+                    </div>
+                    <div className="bg-[#1e293b] p-6 rounded-2xl text-center border-t-4 border-slate-500 shadow-xl flex flex-col justify-center">
+                        <p className="text-slate-400 text-sm mb-3 font-bold">النتيجة</p>
+                        <p className="text-4xl md:text-5xl font-black text-white">{percentage}%</p>
+                    </div>
+                    <div className="bg-[#0e7490] p-6 rounded-2xl text-center shadow-xl flex flex-col justify-center">
+                        <p className="text-cyan-100 text-sm mb-3 flex items-center justify-center gap-2 font-bold"><CheckCircle size={16}/> المحلولة</p>
+                        <p className="text-4xl md:text-5xl font-black text-white">{solvedQs}</p>
+                    </div>
+                    <div className="bg-[#831843] p-6 rounded-2xl text-center shadow-xl flex flex-col justify-center">
+                        <p className="text-pink-100 text-sm mb-3 flex items-center justify-center gap-2 font-bold"><XCircle size={16}/> الخاطئة</p>
+                        <p className="text-4xl md:text-5xl font-black text-pink-50">{wrongQs}</p>
+                    </div>
+                    <div className="bg-[#115e59] p-6 rounded-2xl text-center shadow-xl flex flex-col justify-center">
+                        <p className="text-teal-100 text-sm mb-3 flex items-center justify-center gap-2 font-bold"><Check size={16}/> الصحيحة</p>
+                        <p className="text-4xl md:text-5xl font-black text-teal-50">{correctQs}</p>
+                    </div>
+                    <div className="bg-[#78350f] p-6 rounded-2xl text-center shadow-xl flex flex-col justify-center">
+                        <p className="text-amber-100 text-sm mb-3 flex items-center justify-center gap-2 font-bold"><AlertCircle size={16}/> لم تُحل</p>
+                        <p className="text-4xl md:text-5xl font-black text-amber-50">{unsolvedQs}</p>
+                    </div>
+                </div>
+
+                {/* ملخص الفروع */}
                 {Object.keys(branchStats).length > 0 && (
-                    <div className="mb-8">
-                        <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-teal-400"><Layers size={24}/> {isSubmitted ? 'تحليل مستواك حسب الفروع' : 'أقسام الامتحان (اضغط للدخول)'}</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="mb-10">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-2xl font-bold flex items-center gap-2 text-teal-400"><Layers size={28}/> ملخص الفروع</h3>
+                            {canReview && (
+                                <button onClick={() => { setActiveBranchTab('الكل'); setActiveView('questions'); }} className="text-teal-400 bg-teal-900/30 px-4 py-2 rounded-lg font-bold hover:bg-teal-900/50 transition text-sm flex items-center gap-2">
+                                    عرض كل الأسئلة <ClipboardList size={16}/>
+                                </button>
+                            )}
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                             {Object.entries(branchStats).map(([branch, stats], idx) => {
-                                const bPercent = isSubmitted 
-                                    ? Math.round((stats.correct / stats.total) * 100) 
-                                    : Math.round((stats.solved / stats.total) * 100);
-                                
-                                let message = "";
-                                if (isSubmitted) {
-                                    message = bPercent >= 90 ? `عاش يا بطل، مقفل ${branch} 🌟` : bPercent >= 70 ? `أداء محترم في ${branch} 👏` : "شد حيلك أكتر، تقدر تجيب أعلى 💪";
-                                } else {
-                                    message = bPercent === 100 ? "تم حل كل أسئلة القسم ✅" : "يوجد أسئلة متبقية ⏳";
-                                }
+                                const bPercent = Math.round((stats.correct / stats.total) * 100);
+                                let message = "شد حيلك أكتر، تقدر تجيب أعلى 💪";
+                                if (bPercent >= 90) message = `عاش يا بطل، مقفل ${branch} 🌟`;
+                                else if (bPercent >= 70) message = `أداء محترم في ${branch} 👏`;
 
                                 return (
                                     <div 
                                         key={idx} 
                                         onClick={() => {
-                                            if (!isSubmitted) {
+                                            if (canReview) {
                                                 setActiveBranchTab(branch);
                                                 setActiveView('questions');
+                                            } else {
+                                                alert("نموذج الإجابة سيتاح بعد انتهاء وقت الامتحان للجميع.");
                                             }
                                         }}
-                                        className={`bg-[#1e293b] p-6 rounded-xl border border-[#334155] shadow-md transition ${!isSubmitted ? 'cursor-pointer hover:border-teal-400 hover:-translate-y-1' : 'hover:border-[#475569]'}`}
+                                        className={`bg-[#1e293b] p-6 rounded-2xl border border-[#334155] shadow-lg transition group ${canReview ? 'cursor-pointer hover:border-teal-400 hover:-translate-y-1' : ''}`}
                                     >
-                                        <div className="flex justify-between items-center mb-4">
-                                            <span className={`text-3xl font-bold ${isSubmitted ? 'text-teal-400' : 'text-blue-400'}`}>{bPercent}%</span>
-                                            <span className="text-lg font-bold text-white">{branch}</span>
+                                        <div className="flex justify-between items-center mb-6">
+                                            <span className="text-4xl font-black text-teal-400">{bPercent}%</span>
+                                            <span className="text-xl font-bold text-white bg-slate-800 px-3 py-1 rounded-lg">{branch}</span>
                                         </div>
-                                        <p className="text-xs text-slate-400 text-left mb-2">{isSubmitted ? 'نسبة النجاح' : 'نسبة الحل'}</p>
-                                        <div className="w-full bg-[#0f172a] rounded-full h-1.5 mb-5 overflow-hidden">
-                                            <div className={`${isSubmitted ? 'bg-teal-400' : 'bg-blue-400'} h-1.5 rounded-full transition-all duration-1000`} style={{ width: `${bPercent}%` }}></div>
+                                        <p className="text-sm text-slate-400 text-left mb-2 font-bold">نسبة التقدم</p>
+                                        <div className="w-full bg-[#0f172a] rounded-full h-2.5 mb-6 overflow-hidden">
+                                            <div className="bg-teal-400 h-2.5 rounded-full transition-all duration-1000" style={{ width: `${bPercent}%` }}></div>
                                         </div>
-                                        <div className="text-xs mt-2">
-                                            {!isSubmitted ? (
-                                                <div className="flex justify-between text-slate-400 font-bold">
-                                                    <span>محلول: <span className="text-blue-400">{stats.solved}</span></span>
-                                                    <span>المجموع: {stats.total}</span>
-                                                </div>
-                                            ) : (
-                                                <>
-                                                    <p className="text-slate-500 mb-1">رسالة المنصة:</p>
-                                                    <p className="text-white font-bold">{message}</p>
-                                                </>
-                                            )}
+                                        <div className="text-sm mt-4 bg-[#0f172a] p-3 rounded-lg">
+                                            <p className="text-slate-500 mb-1 text-xs">رسالة المنصة:</p>
+                                            <p className="text-teal-100 font-bold">{message}</p>
                                         </div>
+                                        {canReview && (
+                                            <div className="mt-4 text-center opacity-0 group-hover:opacity-100 transition-opacity text-teal-400 text-xs font-bold flex items-center justify-center gap-1">
+                                                اضغط لمراجعة أخطاء {branch} <MousePointerClick size={12}/>
+                                            </div>
+                                        )}
                                     </div>
                                 )
                             })}
@@ -1504,47 +1483,23 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                     </div>
                 )}
 
-                {/* رسالة المراجعة والأزرار السفلية */}
-                {!canReview && isSubmitted && (
-                    <div className="mb-6 bg-amber-900/30 text-amber-400 p-4 rounded-xl border border-amber-900 text-center font-bold">
-                        نموذج الإجابة والمراجعة سيظهر تلقائياً بعد انتهاء وقت الامتحان للجميع.
+                {!canReview && (
+                    <div className="mt-8 bg-amber-900/30 text-amber-400 p-6 rounded-2xl border border-amber-900 text-center font-bold text-lg flex flex-col items-center gap-3">
+                        <Clock size={32}/>
+                        نموذج الإجابة والمراجعة سيظهر هنا تلقائياً بعد انتهاء وقت الامتحان للأغلبية.
                     </div>
                 )}
-                
-                <div className="flex flex-col md:flex-row justify-end gap-3 mt-8 border-t border-slate-700 pt-6">
-                    {!isSubmitted ? (
-                        <>
-                            <button onClick={confirmSubmit} className="bg-green-600 text-white px-8 py-3 rounded-lg font-bold shadow-lg hover:bg-green-700 transition flex items-center justify-center gap-2">
-                                <CheckCircle size={20}/> تسليم الامتحان نهائياً
-                            </button>
-                        </>
-                    ) : (
-                        <>
-                            {canReview && (
-                                <button onClick={() => setActiveView('questions')} className="bg-teal-600 text-white px-6 py-2 rounded-lg font-bold shadow-lg hover:bg-teal-700 transition flex items-center justify-center gap-2">
-                                    عرض الإجابات <ClipboardList size={18}/>
-                                </button>
-                            )}
-                            <button onClick={() => generatePDF('student', {studentName: user.displayName, score, total: flatQuestions.length, status: 'completed', examTitle: exam.title, questions: flatQuestions, answers: answers })} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 shadow-lg transition flex items-center justify-center gap-2">
-                                تحميل التقرير <Download size={18}/>
-                            </button>
-                            <button onClick={onClose} className="bg-slate-700 text-white px-6 py-2 rounded-lg font-bold hover:bg-slate-600 shadow-lg transition">
-                                العودة للرئيسية
-                            </button>
-                        </>
-                    )}
-                </div>
             </div>
         </div>
      );
   }
 
   // ==========================================
-  // الشاشة الثانية: شاشة الأسئلة والحل (أو المراجعة)
+  // الشاشة الثانية: شاشة حل الامتحان أو مراجعة الإجابات
   // ==========================================
   return (
     <div className="fixed inset-0 z-50 bg-slate-100 flex flex-col font-['Cairo'] no-select" dir="rtl">
-      {!isReviewMode && (
+      {!isSubmitted && (
         <div className="fixed inset-0 pointer-events-none z-[9999] overflow-hidden">
             {wmPositions.map((pos, i) => (
                 <div key={i} className="watermark-text" style={{ top: pos.top, left: pos.left }}>
@@ -1556,13 +1511,13 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
       
       {showSubmitConfirm && (
         <div className="fixed inset-0 z-[10000] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl text-center border-t-4 border-amber-500">
-                <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-4"/>
-                <h3 className="text-xl font-bold mb-2">هل أنت متأكد من التسليم؟</h3>
-                <p className="text-gray-600 mb-6">لن يمكنك تعديل الإجابات بعد ذلك.</p>
-                <div className="flex gap-3">
-                    <button onClick={() => handleSubmit(false)} className="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold hover:bg-green-700 shadow-md">نعم، سلم الامتحان</button>
-                    <button onClick={() => setShowSubmitConfirm(false)} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg font-bold hover:bg-gray-300 shadow-sm">تراجع</button>
+            <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center border-t-8 border-amber-500">
+                <AlertTriangle className="w-16 h-16 text-amber-500 mx-auto mb-4"/>
+                <h3 className="text-2xl font-bold mb-2 text-slate-800">هل أنت متأكد من التسليم؟</h3>
+                <p className="text-slate-500 mb-8 font-bold">لن يمكنك تعديل إجاباتك بعد ذلك، وسيتم نقلك للوحة النتيجة.</p>
+                <div className="flex gap-4">
+                    <button onClick={() => handleSubmit(false)} className="flex-1 bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 shadow-md transition">نعم، سلم الآن</button>
+                    <button onClick={() => setShowSubmitConfirm(false)} className="flex-1 bg-slate-200 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-300 shadow-sm transition">تراجع</button>
                 </div>
             </div>
         </div>
@@ -1571,20 +1526,21 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
       {/* الشريط العلوي */}
       <div className="bg-slate-900 text-white p-4 flex flex-col md:flex-row justify-between items-center shadow-md relative z-50 gap-4">
         <div className="flex items-center gap-4 w-full md:w-auto justify-between">
-            <button onClick={() => setActiveView('dashboard')} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-2 rounded-lg font-bold transition flex items-center gap-2 shadow-sm text-sm">
-                <Layout size={16}/> لوحة التحكم
-            </button>
-            <h2 className="font-bold text-lg font-sans text-amber-400 truncate hidden md:block">{exam.title} {isReviewMode ? '(مراجعة الإجابات)' : ''}</h2>
-            {!isReviewMode && <div className="bg-slate-700 px-4 py-1 rounded-full font-mono shadow-inner border border-slate-600 font-bold">{Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</div>}
+            {isSubmitted && (
+                <button onClick={() => setActiveView('dashboard')} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl font-bold transition flex items-center gap-2 shadow-sm text-sm">
+                    <Layout size={16}/> العودة للنتيجة
+                </button>
+            )}
+            <h2 className="font-bold text-lg font-sans text-amber-400 truncate hidden md:block">{exam.title} {isSubmitted ? '(مراجعة الإجابات)' : ''}</h2>
+            {!isSubmitted && <div className="bg-slate-800 px-6 py-2 rounded-full font-mono shadow-inner border border-slate-700 font-bold text-amber-400 text-lg flex items-center gap-2"><Timer size={18}/> {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</div>}
         </div>
 
-        {uniqueBranches.length > 2 && (
+        {isSubmitted && uniqueBranches.length > 2 && (
             <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-hide">
                 {uniqueBranches.map((branch, i) => (
                     <button 
-                        key={i} 
-                        onClick={() => setActiveBranchTab(branch)}
-                        className={`whitespace-nowrap px-4 py-1 rounded-full text-sm font-bold transition-colors ${activeBranchTab === branch ? 'bg-amber-500 text-slate-900 shadow-md' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                        key={i} onClick={() => setActiveBranchTab(branch)}
+                        className={`whitespace-nowrap px-5 py-2 rounded-full text-sm font-bold transition-colors ${activeBranchTab === branch ? 'bg-amber-500 text-slate-900 shadow-md' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
                     >
                         {branch}
                     </button>
@@ -1592,59 +1548,58 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
             </div>
         )}
 
-        {!isReviewMode ? (
-            <button onClick={confirmSubmit} className="bg-gradient-to-r from-green-500 to-green-600 px-6 py-2 rounded-lg font-bold shadow-lg hover:shadow-green-500/50 transition whitespace-nowrap">تسليم</button>
-        ) : (
-            <button onClick={() => setActiveView('dashboard')} className="bg-slate-700 px-6 py-2 rounded-lg font-bold hover:bg-slate-600 transition whitespace-nowrap">عودة للنتيجة</button>
+        {!isSubmitted && (
+            <button onClick={confirmSubmit} className="bg-gradient-to-r from-green-500 to-green-600 px-8 py-2.5 rounded-xl font-bold shadow-lg hover:shadow-green-500/50 transition whitespace-nowrap flex items-center gap-2">
+                <CheckCircle size={18}/> تسليم الامتحان
+            </button>
         )}
       </div>
 
       <div className="flex-1 flex overflow-hidden relative z-50">
-        <div className="w-16 md:w-24 bg-white border-l flex flex-col p-2 overflow-y-auto shadow-inner">
-          <div className="grid grid-cols-1 gap-2">
+        <div className="w-16 md:w-24 bg-white border-l flex flex-col p-2 overflow-y-auto shadow-inner scrollbar-hide">
+          <div className="grid grid-cols-1 gap-3">
               {displayQuestions.map((q, idx) => {
-                  let statusClass = 'bg-slate-100 text-slate-600 hover:bg-slate-200';
-                  if (isReviewMode) {
-                      if (answers[q.id] === q.correctIdx) statusClass = 'bg-green-100 text-green-700 border border-green-400 shadow-sm';
-                      else statusClass = 'bg-red-100 text-red-700 border border-red-400 shadow-sm';
+                  let statusClass = 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-2 border-transparent';
+                  if (isSubmitted) {
+                      if (answers[q.id] === q.correctIdx) statusClass = 'bg-green-100 text-green-700 border-green-500 shadow-sm';
+                      else if (answers[q.id] !== undefined) statusClass = 'bg-red-100 text-red-700 border-red-500 shadow-sm';
+                      else statusClass = 'bg-slate-100 text-slate-400 border-slate-300 border-dashed'; // لم يحل
                   } else if (answers[q.id] !== undefined) {
-                      statusClass = 'bg-blue-100 text-blue-700 border border-blue-400 shadow-sm';
+                      statusClass = 'bg-blue-100 text-blue-700 border-blue-400 shadow-sm';
                   }
                   
                   const originalIndex = flatQuestions.findIndex(origQ => origQ.id === q.id) + 1;
 
                   return (
-                    <button key={idx} onClick={() => setCurrentQIndex(idx)} className={`aspect-square rounded-lg font-bold text-sm transition-all ${currentQIndex === idx ? 'ring-2 ring-amber-500 shadow-md scale-105' : ''} ${statusClass}`}>
+                    <button key={idx} onClick={() => setCurrentQIndex(idx)} className={`aspect-square rounded-xl font-bold text-base transition-all relative ${currentQIndex === idx ? 'ring-4 ring-amber-500 ring-offset-2 scale-105 z-10' : ''} ${statusClass}`}>
                         {originalIndex}
-                        {flagged[q.id] && !isReviewMode && <div className="absolute top-0 right-0 w-3 h-3 bg-amber-500 rounded-full border-2 border-white shadow-sm"></div>}
+                        {flagged[q.id] && !isSubmitted && <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full border-2 border-white shadow-sm"></div>}
                     </button>
                   )
               })}
           </div>
         </div>
 
-        <div className={`flex-1 flex flex-col ${hasPassage ? 'md:flex-row' : 'items-center'} h-full overflow-hidden bg-slate-50 w-full`}>
+        <div className={`flex-1 flex flex-col ${hasPassage ? 'md:flex-row' : 'items-center'} h-full overflow-hidden bg-slate-100 w-full p-4 md:p-8 gap-6`}>
           {hasPassage && (
-            <div className="flex-1 w-full bg-gradient-to-b from-blue-50 to-indigo-50 p-6 md:p-10 overflow-y-auto border-l border-blue-200 shadow-inner">
-              <h3 className="font-bold text-blue-900 mb-6 flex items-center gap-2 text-xl border-b border-blue-200 pb-2 font-['Cairo']"><FileText size={24}/> نص المراجعة / القراءة:</h3>
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-blue-100">
-                  <p className="whitespace-pre-line leading-10 text-lg md:text-xl font-bold text-slate-800 font-['Cairo']">{currentQObj.blockText}</p>
-              </div>
+            <div className="flex-1 w-full bg-white p-6 md:p-10 overflow-y-auto rounded-3xl shadow-sm border border-slate-200">
+              <h3 className="font-bold text-blue-900 mb-6 flex items-center gap-2 text-xl border-b border-blue-100 pb-4 font-['Cairo']"><FileText size={24}/> نص القراءة:</h3>
+              <p className="whitespace-pre-line leading-loose text-lg md:text-xl font-bold text-slate-700 font-['Cairo']">{currentQObj.blockText}</p>
             </div>
           )}
           
-          <div className={`${hasPassage ? 'flex-1' : 'w-full max-w-4xl mx-auto'} bg-white p-6 md:p-10 overflow-y-auto flex flex-col shadow-lg m-4 rounded-3xl h-fit max-h-[95%] border border-slate-100 relative`}>
-            <div className="flex justify-between items-center mb-8 border-b pb-4">
+          <div className={`${hasPassage ? 'flex-1' : 'w-full max-w-4xl mx-auto'} bg-white p-6 md:p-10 overflow-y-auto flex flex-col shadow-xl rounded-3xl h-full border border-slate-200 relative`}>
+            <div className="flex justify-between items-center mb-8 border-b border-slate-100 pb-6">
               <div className="flex items-center gap-3">
-                  <span className="bg-slate-800 text-white px-4 py-1.5 rounded-full text-sm font-bold shadow-md font-['Cairo']">سؤال {flatQuestions.findIndex(origQ => origQ.id === currentQObj.id) + 1}</span>
+                  <span className="bg-slate-900 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-md font-['Cairo']">سؤال {flatQuestions.findIndex(origQ => origQ.id === currentQObj.id) + 1}</span>
                   {currentQObj.branch && currentQObj.branch !== 'عام' && (
-                      <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-bold border border-blue-200 flex items-center gap-1"><Layers size={14}/> {currentQObj.branch}</span>
+                      <span className="bg-blue-50 text-blue-700 px-4 py-2 rounded-xl text-sm font-bold border border-blue-100 flex items-center gap-2"><Layers size={16}/> {currentQObj.branch}</span>
                   )}
               </div>
-              {!isReviewMode && <button onClick={() => { setFlagged({...flagged, [currentQObj.id]: !flagged[currentQObj.id]}) }} className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-bold transition shadow-sm ${flagged[currentQObj.id] ? 'bg-amber-100 text-amber-700 border border-amber-300' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}><Flag size={16} /> مراجعة لاحقاً</button>}
+              {!isSubmitted && <button onClick={() => { setFlagged({...flagged, [currentQObj.id]: !flagged[currentQObj.id]}) }} className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold transition shadow-sm ${flagged[currentQObj.id] ? 'bg-amber-100 text-amber-700 border border-amber-300' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200'}`}><Flag size={16} /> {flagged[currentQObj.id] ? 'محدد للمراجعة' : 'تحديد لمراجعته لاحقاً'}</button>}
             </div>
             
-            <div className="bg-slate-50 p-6 md:p-8 rounded-2xl border border-slate-200 mb-8 shadow-inner text-center">
+            <div className="mb-10 text-right">
               <h3 className="text-2xl md:text-3xl font-bold text-slate-900 leading-loose font-['Cairo'] drop-shadow-sm">
                   {currentQObj.text.split('|').map((part, i) => (
                       <React.Fragment key={i}>
@@ -1657,31 +1612,35 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
             <div className="space-y-4">
               {currentQObj.options.map((opt, idx) => {
-                  let optionClass = 'border-slate-200 hover:bg-slate-50';
+                  let optionClass = 'border-slate-200 hover:bg-slate-50 bg-white text-slate-700';
                   const isSelected = answers[currentQObj.id] === idx;
                   
-                  if (isReviewMode) {
-                      if (idx === currentQObj.correctIdx) optionClass = 'border-green-500 bg-green-50 text-green-900 shadow-sm'; 
-                      else if (isSelected) optionClass = 'border-red-500 bg-red-50 text-red-900 shadow-sm'; 
+                  if (isSubmitted) {
+                      if (idx === currentQObj.correctIdx) optionClass = 'border-green-500 bg-green-50 text-green-900 shadow-md ring-2 ring-green-200'; 
+                      else if (isSelected) optionClass = 'border-red-500 bg-red-50 text-red-900 shadow-md'; 
+                      else optionClass = 'border-slate-200 bg-slate-50 opacity-50'; // تبهيت الإجابات الخاطئة التي لم يخترها
                   } else {
-                      if (isSelected) optionClass = 'border-amber-500 bg-amber-50 text-amber-900 shadow-md transform scale-[1.01]';
+                      if (isSelected) optionClass = 'border-amber-500 bg-amber-50 text-amber-900 shadow-md transform scale-[1.02] ring-2 ring-amber-200';
                   }
 
                   return (
-                    <div key={idx} onClick={() => handleAnswer(currentQObj.id, idx)} className={`p-4 md:p-6 rounded-2xl border-2 cursor-pointer transition-all flex items-center gap-4 ${optionClass}`}>
-                      <div className={`w-6 h-6 md:w-8 md:h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${isSelected || (isReviewMode && idx === currentQObj.correctIdx) ? 'border-transparent bg-current' : 'border-slate-300'}`}>
+                    <div key={idx} onClick={() => handleAnswer(currentQObj.id, idx)} className={`p-5 rounded-2xl border-2 cursor-pointer transition-all duration-200 flex items-center gap-4 ${optionClass}`}>
+                      <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${isSelected || (isSubmitted && idx === currentQObj.correctIdx) ? 'border-transparent bg-current' : 'border-slate-300'}`}>
+                          {(isSubmitted && idx === currentQObj.correctIdx) && <Check size={16} className="text-white"/>}
+                          {(isSubmitted && isSelected && idx !== currentQObj.correctIdx) && <X size={16} className="text-white"/>}
                       </div>
-                      <span className="font-['Cairo'] text-lg md:text-2xl font-bold">{opt}</span>
-                      {isReviewMode && idx === currentQObj.correctIdx && <CheckCircle className="text-green-600 mr-auto w-8 h-8"/>}
-                      {isReviewMode && isSelected && idx !== currentQObj.correctIdx && <XCircle className="text-red-600 mr-auto w-8 h-8"/>}
+                      <span className="font-['Cairo'] text-xl font-bold leading-relaxed">{opt}</span>
+                      
+                      {isSubmitted && idx === currentQObj.correctIdx && <span className="mr-auto text-green-600 bg-green-100 px-3 py-1 rounded-lg text-xs font-bold">الإجابة الصحيحة</span>}
+                      {isSubmitted && isSelected && idx !== currentQObj.correctIdx && <span className="mr-auto text-red-600 bg-red-100 px-3 py-1 rounded-lg text-xs font-bold">إجابتك (خطأ)</span>}
                     </div>
                   )
               })}
             </div>
 
-            <div className="mt-12 flex justify-between">
-              <button disabled={currentQIndex === 0} onClick={() => setCurrentQIndex(p => p - 1)} className="px-8 py-4 rounded-xl bg-slate-200 text-slate-600 font-bold disabled:opacity-50 hover:bg-slate-300 transition shadow-sm font-['Cairo']">السابق</button>
-              <button disabled={currentQIndex === displayQuestions.length - 1} onClick={() => setCurrentQIndex(p => p + 1)} className="px-8 py-4 rounded-xl bg-slate-900 text-white font-bold disabled:opacity-50 hover:bg-slate-800 transition shadow-sm font-['Cairo']">التالي</button>
+            <div className="mt-auto pt-10 flex justify-between">
+              <button disabled={currentQIndex === 0} onClick={() => setCurrentQIndex(p => p - 1)} className="px-8 py-4 rounded-xl bg-slate-200 text-slate-700 font-bold disabled:opacity-50 hover:bg-slate-300 transition shadow-sm font-['Cairo'] flex items-center gap-2"><ChevronRight size={20}/> السابق</button>
+              <button disabled={currentQIndex === displayQuestions.length - 1} onClick={() => setCurrentQIndex(p => p + 1)} className="px-8 py-4 rounded-xl bg-slate-900 text-white font-bold disabled:opacity-50 hover:bg-slate-800 transition shadow-lg font-['Cairo'] flex items-center gap-2">التالي <ChevronRight size={20} className="rotate-180"/></button>
             </div>
           </div>
         </div>
