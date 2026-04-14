@@ -2965,89 +2965,430 @@ const AdminDashboard = ({ user }) => {
   );
 };
 
+const StudentDashboard = ({ user, userData, installPrompt }) => {
+  const [activeTab, setActiveTab] = useState('home');
+  const [mobileMenu, setMobileMenu] = useState(false);
+  const [content, setContent] = useState([]);
+  const [liveSessions, setLiveSessions] = useState([]); 
+  const [activeLiveView, setActiveLiveView] = useState(null); 
+  const [exams, setExams] = useState([]);
+  const [activeExam, setActiveExam] = useState(null);
+  const [playingVideo, setPlayingVideo] = useState(null);
+  const [playingHtml, setPlayingHtml] = useState(null);
+  const [examResults, setExamResults] = useState([]);
+  const [hwResults, setHwResults] = useState([]); 
+  const [reviewingExam, setReviewingExam] = useState(null);
+  const [mistakes, setMistakes] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [hasNewNotif, setHasNewNotif] = useState(false);
+  const [editFormData, setEditFormData] = useState({ name: '', phone: '', parentPhone: '', grade: '' });
+  const [showFocusMode, setShowFocusMode] = useState(false);
+  const [scanningHwId, setScanningHwId] = useState(null);
+
+  useEffect(() => {
+    if(!userData) return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const hwParam = urlParams.get('hw');
+    if (hwParam) { setScanningHwId(hwParam); window.history.replaceState({}, document.title, window.location.pathname); }
+
+    const unsubContent = onSnapshot(query(collection(db, 'content'), where('grade', '==', userData.grade)), s => {
+        const allContent = s.docs.map(d=>({id:d.id,...d.data()}));
+        const visibleContent = allContent.filter(c => { if (!c.allowedEmails || c.allowedEmails.length === 0) return true; return c.allowedEmails.includes(user.email); });
+        setContent(visibleContent);
+    });
+
+    const unsubLive = onSnapshot(query(collection(db, 'live_sessions'), where('status', '==', 'active'), where('grade', '==', userData.grade)), s => {
+        const activeSessions = s.docs.map(d=>({id:d.id, ...d.data()}));
+        const visibleSessions = activeSessions.filter(ls => { if (!ls.allowedEmails || ls.allowedEmails.length === 0) return true; return ls.allowedEmails.includes(user.email); });
+        setLiveSessions(visibleSessions);
+    });
+
+    const unsubExams = onSnapshot(query(collection(db, 'exams'), where('grade', '==', userData.grade)), s => setExams(s.docs.map(d=>({id:d.id,...d.data()}))));
+    const unsubResults = onSnapshot(query(collection(db, 'exam_results'), where('studentId', '==', user.uid)), s => setExamResults(s.docs.map(d=>({id:d.id,...d.data()}))));
+    const unsubHwResults = onSnapshot(query(collection(db, 'homework_results'), where('studentId', '==', user.uid)), s => {
+        const results = s.docs.map(d=>({id:d.id,...d.data()})); results.sort((a,b) => (b.submittedAt?.seconds || 0) - (a.submittedAt?.seconds || 0)); setHwResults(results);
+    });
+    const unsubMistakes = onSnapshot(query(collection(db, 'student_mistakes'), where('userId', '==', user.uid), orderBy('timestamp', 'desc')), s => { setMistakes(s.docs.map(d => ({id: d.id, ...d.data()}))); });
+    const unsubNotif = onSnapshot(query(collection(db, 'notifications'), where('grade', 'in', ['all', userData.grade]), orderBy('createdAt', 'desc'), limit(10)), s => {
+        const newNotifs = s.docs.map(d => d.data()); setNotifications(newNotifs);
+        if(newNotifs.length > 0) { setHasNewNotif(true); if(newNotifs[0].text) sendSystemNotification("تنبيه جديد 🔔", newNotifs[0].text); }
+    });
+
+    setEditFormData({ name: userData.name, phone: userData.phone, parentPhone: userData.parentPhone, grade: userData.grade });
+
+    return () => { unsubContent(); unsubLive(); unsubExams(); unsubResults(); unsubHwResults(); unsubMistakes(); unsubNotif(); };
+  }, [userData, user]);
+
+  const startMistakesExam = () => {
+      if (mistakes.length === 0) return alert("ليس لديك أي أخطاء مسجلة بعد! استمر في التميز 👏");
+      const shuffledMistakes = [...mistakes].sort(() => 0.5 - Math.random()).slice(0, 20);
+      const generatedExam = {
+          id: 'custom_mistakes_exam', title: 'امتحان نقاط الضعف (بنك الأخطاء) 🏦', duration: shuffledMistakes.length * 2, 
+          questions: [ { text: 'أجب عن هذه الأسئلة التي أخطأت بها سابقاً:', subQuestions: shuffledMistakes.map(m => m.question) } ]
+      };
+      setActiveExam(generatedExam);
+  };
+
+  if (scanningHwId) return <SmartHomeworkScanner hwId={scanningHwId} user={user} onClose={() => setScanningHwId(null)} />;
+  if (activeLiveView) return <LiveSessionView session={activeLiveView} user={user} onClose={() => setActiveLiveView(null)} />;
+  if (activeExam) return <ExamRunner exam={activeExam} user={user} onClose={() => setActiveExam(null)} />;
+  if (showFocusMode) return <PomodoroFocusMode onClose={() => setShowFocusMode(false)} />;
+  if (reviewingExam) {
+      const result = examResults.find(r => r.examId === reviewingExam.id);
+      return <ExamRunner exam={reviewingExam} user={user} onClose={() => setReviewingExam(null)} isReviewMode={true} existingResult={result} />;
+  }
+
+  const isBannedAll = userData?.status === 'banned_all';
+  const isBannedExam = userData?.status === 'banned_exam' || userData?.status === 'banned_cheating'; 
+  const isBannedContent = userData?.status === 'banned_content';
+
+  if(userData?.status === 'pending') return <div className="h-screen flex items-center justify-center bg-amber-50 text-center p-4"><div className="bg-white p-8 rounded-2xl shadow-xl"><h2 className="text-2xl font-bold mb-2">طلبك قيد المراجعة ⏳</h2><button onClick={()=>signOut(auth)} className="mt-4 text-red-500 underline">خروج</button></div></div>;
+  if(userData?.status === 'rejected') return <div className="h-screen flex items-center justify-center bg-red-50"><div className="text-red-600 font-bold">تم رفض طلبك</div><button onClick={()=>signOut(auth)} className="ml-4 bg-white px-4 py-1 rounded">خروج</button></div>;
+  if (isBannedAll) return (
+      <div className="h-screen flex flex-col items-center justify-center bg-red-50 text-center p-6"><Ban size={80} className="text-red-600 mb-4" /><h2 className="text-3xl font-bold text-red-800 mb-2 font-arabic">تم حظر حسابك</h2><p className="text-red-600 mb-6 font-bold">يرجى التواصل مع الإدارة أو المستر لمعرفة السبب.</p><button onClick={()=>signOut(auth)} className="bg-white text-red-600 px-6 py-2 rounded-full font-bold shadow-md hover:bg-red-100">تسجيل الخروج</button></div>
+  );
+
+  const videos = content.filter(c => c.type === 'video');
+  const filesAndLinks = content.filter(c => c.type === 'file' || c.type === 'link');
+  const htmls = content.filter(c => c.type === 'html');
+  const interactiveExams = content.filter(c => c.type === 'interactive_exam');
+
+  const handleJoinLive = (session) => {
+      if (session.passcode) { const code = prompt("أدخل الكود السري الخاص بالبث المباشر:"); if (code !== session.passcode) { return alert("عفواً، الكود غير صحيح!"); } }
+      setActiveLiveView(session);
+  };
+
+  const startExamWithCode = async (exam) => {
+    if (isBannedExam) return alert("أنت محظور من دخول الامتحانات.");
+    const previousResult = examResults.find(r => r.examId === exam.id);
+    if (previousResult) {
+        if (previousResult.status === 'completed') { alert(`أنت امتحنت الامتحان ده قبل كده وجبت ${previousResult.score}.`); } 
+        else if (previousResult.status === 'in_progress' || previousResult.status === 'cheated') { alert("لقد بدأت هذا الامتحان بالفعل وتم احتسابه عليك. لا يمكن الإعادة."); }
+        return;
+    }
+    const now = new Date(); const start = new Date(exam.startTime); const end = new Date(exam.endTime);
+    if (now < start) return alert(`الامتحان لم يبدأ بعد. موعد البدء: ${start.toLocaleString('ar-EG')}`);
+    if (now > end) return alert("عفواً، انتهى وقت الامتحان.");
+    const code = prompt("أدخل كود الامتحان:");
+    if (code === exam.accessCode) {
+        try {
+            const attemptRef = await addDoc(collection(db, 'exam_results'), { examId: exam.id, studentId: user.uid, studentName: user.displayName, score: 0, total: 0, status: 'in_progress', submittedAt: serverTimestamp() });
+            setActiveExam({ ...exam, attemptId: attemptRef.id });
+        } catch (error) { console.error("Error creating attempt record:", error); alert("حدث خطأ أثناء بدء الامتحان. حاول مرة أخرى."); }
+    } else { alert("كود خاطئ!"); }
+  };
+
+  const handleUpdateMyProfile = async (e) => {
+    e.preventDefault();
+    if (editFormData.grade !== userData.grade) {
+        await updateDoc(doc(db, 'users', user.uid), { phone: editFormData.phone, requestedGrade: editFormData.grade, gradeUpdateStatus: 'pending' });
+        alert("تم إرسال طلب تغيير الصف الدراسي إلى الإدارة للموافقة.");
+    } else { await updateDoc(doc(db, 'users', user.uid), { phone: editFormData.phone }); alert("تم تحديث بياناتك بنجاح!"); }
+  };
+
+  return (
+    <div className="bg-slate-50 relative font-['Cairo'] min-h-screen block" dir="rtl">
+      {playingVideo && <SecureVideoPlayer video={playingVideo} user={user} userName={userData.name} onClose={() => setPlayingVideo(null)} />}
+      {playingHtml && <InteractiveViewer content={playingHtml} user={userData} onClose={() => setPlayingHtml(null)} />}
+      <FloatingArabicBackground />
+      <ChatWidget user={user} />
+      
+      <aside className={`fixed top-0 bottom-0 right-0 z-40 bg-white/95 backdrop-blur-xl w-72 p-6 shadow-xl transition-transform duration-300 ${mobileMenu ? 'translate-x-0' : 'translate-x-full md:translate-x-0'} border-l border-slate-200 flex flex-col`}>
+        <div className="flex items-center gap-3 mb-10 px-2"><ModernLogo /><h1 className="text-2xl font-bold font-arabic text-amber-800">النحاس</h1><button onClick={() => setMobileMenu(false)} className="md:hidden mr-auto"><X /></button></div>
+        <div className="space-y-2 flex-1 overflow-y-auto pr-2">
+          <button onClick={() => {setActiveTab('home'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='home'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><User/> الرئيسية</button>
+          {!isBannedContent && (
+              <>
+                <div onClick={() => setActiveTab('videos')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='videos'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><PlayCircle/> المحاضرات</div>
+                <div onClick={() => setActiveTab('files')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='files'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><FileText/> الملفات و الروابط</div>
+                <div onClick={() => setActiveTab('htmls')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='htmls'?'bg-purple-100 text-purple-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-purple-600'}`}><Code/> محتوى تفاعلي</div>
+              </>
+          )}
+          {!isBannedExam && (
+              <>
+                <div onClick={() => setActiveTab('exams')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><ClipboardList/> الامتحانات</div>
+                <div onClick={() => setActiveTab('interactive_exams')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='interactive_exams'?'bg-emerald-100 text-emerald-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-emerald-600'}`}><Sparkles/> امتحان تفاعلي</div>
+                <div onClick={() => setActiveTab('smart_hw_results')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='smart_hw_results'?'bg-blue-100 text-blue-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-blue-600'}`}><QrCode/> سجل الواجبات (QR)</div>
+                <div onClick={() => setActiveTab('mistakes_bank')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='mistakes_bank'?'bg-red-100 text-red-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-red-600'}`}><BrainCircuit/> بنك الأخطاء</div>
+              </>
+          )}
+          <button onClick={() => {setActiveTab('settings'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='settings'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><Settings/> ملفي الشخصي</button>
+        </div>
+        <div className="mt-auto pt-6"><button onClick={() => signOut(auth)} className="flex items-center gap-3 text-red-500 font-bold hover:bg-red-50 w-full p-4 rounded-xl transition"><LogOut/> خروج</button></div>
+      </aside>
+
+      <main className="p-4 md:p-10 relative z-10 min-h-screen md:pr-72 w-full transition-all">
+        <div className="md:hidden flex justify-between items-center mb-6 glass-panel p-4 rounded-2xl shadow-sm"><h1 className="font-bold text-lg text-slate-800">منصة النحاس</h1><button onClick={() => setMobileMenu(true)} className="p-2 bg-slate-100 rounded-lg"><Menu /></button></div>
+        <div className="flex justify-between items-center mb-6 relative">
+            <div className="flex gap-2">
+                {installPrompt && ( <button onClick={installPrompt} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full font-bold shadow-lg shadow-green-500/30 transition flex items-center gap-2"><DownloadCloud size={18}/> تثبيت التطبيق</button> )}
+                <button onClick={() => setShowFocusMode(true)} className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-full font-bold shadow-lg transition flex items-center gap-2"><Headphones size={18}/> وضع التركيز</button>
+            </div>
+            <button onClick={() => {requestNotificationPermission(); setShowNotifications(!showNotifications); setHasNewNotif(false);}} className="relative p-2 glass-panel rounded-full shadow-sm hover:bg-white transition">
+                <Bell className="text-slate-600"/>{hasNewNotif && <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>}
+            </button>
+            {showNotifications && (
+                <div className="absolute top-12 left-0 w-80 glass-panel rounded-xl shadow-xl border border-white/50 p-4 z-50 max-h-96 overflow-y-auto">
+                    <h3 className="font-bold mb-3 text-sm text-slate-500">الإشعارات</h3>
+                    {notifications.length === 0 ? <p className="text-xs text-slate-400">لا توجد إشعارات جديدة</p> : (
+                        <div className="space-y-3">
+                            {notifications.map((n, i) => (
+                                <div key={i} className="text-sm bg-slate-50/50 p-2 rounded border-l-4 border-amber-500">{n.text}<div className="text-[10px] text-slate-400 mt-1">{n.createdAt?.toDate().toLocaleDateString()}</div></div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+
+        {activeTab === 'home' && (
+            <div className="space-y-8">
+                {liveSessions.map(ls => (
+                    <div key={ls.id} className="bg-gradient-to-r from-red-600 to-red-800 text-white p-4 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-lg border border-red-500/50 animate-pulse-slow">
+                        <div>
+                           <h3 className="font-bold font-arabic text-xl flex items-center gap-2"><Radio className="animate-pulse"/> بث مباشر الآن: {ls.title}</h3>
+                           {ls.passcode && <p className="text-xs text-red-200 mt-1">هذا البث محمي برقم سري</p>}
+                        </div>
+                        <button onClick={() => handleJoinLive(ls)} className="bg-white text-red-700 px-6 py-2 rounded-full font-bold shadow-md hover:bg-red-50 transition w-full md:w-auto">انضمام الآن</button>
+                    </div>
+                ))}
+                <WisdomBox />
+                <Announcements />
+                <h2 className="text-3xl font-bold text-slate-800 font-arabic">منور يا <span className="text-amber-600">{userData.name.split(' ')[0]}</span> 👋 <span className="text-sm font-normal text-slate-500 bg-slate-200 px-2 py-1 rounded-full font-sans">{getGradeLabel(userData.grade)}</span></h2>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedContent && setActiveTab('videos')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}>
+                        <h3 className="relative z-10 text-xl font-bold mb-2 text-blue-900 group-hover:text-blue-600 transition">المحاضرات</h3>
+                        <p className="relative z-10 text-3xl font-black text-blue-600">{videos.length}</p><PlayCircle className="absolute -bottom-6 -left-6 text-blue-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
+                    </motion.div>
+                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedContent && setActiveTab('files')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}>
+                        <h3 className="relative z-10 text-xl font-bold mb-2 text-amber-900 group-hover:text-amber-600 transition">الملفات</h3>
+                        <p className="relative z-10 text-3xl font-black text-amber-600">{filesAndLinks.length}</p><FileText className="absolute -bottom-6 -left-6 text-amber-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
+                    </motion.div>
+                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedContent && setActiveTab('htmls')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}>
+                        <h3 className="relative z-10 text-xl font-bold mb-2 text-purple-900 group-hover:text-purple-600 transition">تفاعلي</h3>
+                        <p className="relative z-10 text-3xl font-black text-purple-600">{htmls.length}</p><Code className="absolute -bottom-6 -left-6 text-purple-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
+                    </motion.div>
+                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedExam && setActiveTab('exams')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedExam ? 'opacity-50 grayscale' : ''}`}>
+                        <h3 className="relative z-10 text-xl font-bold mb-2 text-slate-900 group-hover:text-slate-600 transition">الامتحانات</h3>
+                        <p className="relative z-10 text-3xl font-black text-slate-600">{exams.length}</p><ClipboardList className="absolute -bottom-6 -left-6 text-slate-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
+                    </motion.div>
+                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedExam && setActiveTab('smart_hw_results')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedExam ? 'opacity-50 grayscale' : ''}`}>
+                        <h3 className="relative z-10 text-xl font-bold mb-2 text-blue-900 group-hover:text-blue-600 transition">واجبات (QR)</h3>
+                        <p className="relative z-10 text-3xl font-black text-blue-600">{hwResults.length}</p><QrCode className="absolute -bottom-6 -left-6 text-blue-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
+                    </motion.div>
+                </div>
+                <Leaderboard />
+            </div>
+        )}
+
+        {activeTab === 'mistakes_bank' && !isBannedExam && (
+            <div className="glass-panel p-8 rounded-2xl">
+                <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 border-b border-slate-200 pb-6">
+                    <div>
+                        <h2 className="text-3xl font-bold font-arabic text-red-700 flex items-center gap-3"><BrainCircuit size={32} className="text-red-500" /> بنك أخطاء الطالب 🏦</h2>
+                        <p className="text-slate-500 mt-2 text-lg">كل سؤال أخطأت فيه سيتم تسجيله هنا لتتمكن من مراجعته والتدرب عليه.</p>
+                    </div>
+                    <button onClick={startMistakesExam} className="bg-red-600 text-white px-8 py-4 rounded-xl font-bold shadow-xl shadow-red-500/30 hover:bg-red-700 transition flex items-center gap-2 transform hover:scale-105"><Target size={20}/> توليد امتحان من أخطائي</button>
+                </div>
+                {mistakes.length === 0 ? (
+                    <div className="text-center py-16 bg-white rounded-2xl border border-slate-100 shadow-sm"><Trophy size={64} className="mx-auto text-amber-400 mb-4 opacity-80" /><h3 className="text-2xl font-bold text-slate-700">ممتاز جداً يا بطل! 👏</h3><p className="text-slate-500 mt-2">بنك الأخطاء الخاص بك فارغ تماماً. استمر على هذا المستوى.</p></div>
+                ) : (
+                    <div className="grid grid-cols-1 gap-6">
+                        <div className="bg-red-50 text-red-700 p-4 rounded-xl border border-red-200 font-bold flex items-center gap-2">
+                            <AlertOctagon /> لديك {mistakes.length} سؤال في بنك الأخطاء. يجب مراجعتها جيداً قبل الامتحان النهائي!
+                        </div>
+                        {mistakes.map(m => (
+                            <div key={m.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:border-red-300 transition relative overflow-hidden">
+                                <div className="absolute top-0 right-0 bg-slate-800 text-white text-xs px-3 py-1 rounded-bl-lg font-bold">من امتحان: {m.examTitle}</div>
+                                <h3 className="text-xl font-bold text-slate-800 mt-4 mb-4 leading-relaxed font-sans">{m.question.text}</h3>
+                                <div className="grid md:grid-cols-2 gap-4">
+                                    <div className="bg-red-50 p-4 rounded-xl border border-red-100"><p className="text-xs text-red-500 font-bold mb-1">إجابتك الخاطئة كانت:</p><p className="font-bold text-slate-800">{m.question.studentAnswerText || 'غير معروف'}</p></div>
+                                    <div className="bg-green-50 p-4 rounded-xl border border-green-100"><p className="text-xs text-green-600 font-bold mb-1">الإجابة الصحيحة هي:</p><p className="font-bold text-green-800">{m.question.correctAnswerText || 'غير معروف'}</p></div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        )}
+        
+        {activeTab === 'videos' && !isBannedContent && <div className="grid grid-cols-1 md:grid-cols-3 gap-6">{videos.map(v => (<div key={v.id} className="glass-card rounded-xl overflow-hidden cursor-pointer" onClick={() => setPlayingVideo(v)}><div className="h-48 bg-gradient-to-br from-slate-800 to-black flex items-center justify-center relative group"><PlayCircle className="text-white w-16 h-16 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/><span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(v.grade)}</span></div><div className="p-4"><h3 className="font-bold text-lg text-slate-800">{v.title}</h3></div></div>))}</div>}
+        {activeTab === 'files' && !isBannedContent && (
+            <div className="glass-panel rounded-xl overflow-hidden">
+                {filesAndLinks.map(f => (
+                    <div key={f.id} className="p-4 flex justify-between items-center border-b last:border-0 hover:bg-white/50 transition">
+                        <div className="flex items-center gap-4">
+                            {f.type === 'link' ? (<div className="bg-blue-100 text-blue-600 p-3 rounded-lg font-bold text-xs shadow-sm flex items-center justify-center"><LinkIcon size={16}/></div>) : (<div className="bg-red-100 text-red-600 p-3 rounded-lg font-bold text-xs shadow-sm">PDF</div>)}
+                            <div><h4 className="font-bold text-lg text-slate-800">{f.title}</h4><span className="text-xs text-slate-500">{getGradeLabel(f.grade)}</span></div>
+                        </div>
+                        <a href={f.url} target="_blank" rel="noopener noreferrer" className={`px-4 py-2 rounded-lg font-bold transition shadow-sm ${f.type === 'link' ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' : 'bg-green-50 text-green-700 hover:bg-green-100'}`}>{f.type === 'link' ? 'فتح الرابط' : 'تحميل'}</a>
+                    </div>
+                ))}
+            </div>
+        )}
+        
+        {activeTab === 'htmls' && !isBannedContent && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {htmls.map(h => (
+                    <motion.div whileHover={{y:-5}} key={h.id} className="glass-card rounded-xl overflow-hidden cursor-pointer" onClick={() => setPlayingHtml(h)}>
+                        <div className="h-48 bg-gradient-to-br from-purple-600 to-indigo-900 flex items-center justify-center relative group"><Code className="text-white w-20 h-20 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/><span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(h.grade)}</span></div>
+                        <div className="p-4"><h3 className="font-bold text-lg text-slate-800">{h.title}</h3><button className="mt-2 w-full bg-purple-100 text-purple-700 font-bold py-2 rounded-lg hover:bg-purple-200 transition shadow-sm">تشغيل</button></div>
+                    </motion.div>
+                ))}
+            </div>
+        )}
+
+        {activeTab === 'interactive_exams' && !isBannedExam && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {interactiveExams.map(h => (
+                    <motion.div whileHover={{y:-5}} key={h.id} className="glass-card rounded-xl overflow-hidden cursor-pointer" onClick={() => setPlayingHtml(h)}>
+                        <div className="h-48 bg-gradient-to-br from-emerald-600 to-teal-900 flex items-center justify-center relative group"><Sparkles className="text-white w-20 h-20 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/><span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(h.grade)}</span></div>
+                        <div className="p-4"><h3 className="font-bold text-lg text-slate-800">{h.title}</h3><button className="mt-2 w-full bg-emerald-100 text-emerald-700 font-bold py-2 rounded-lg hover:bg-emerald-200 transition shadow-sm">بدء الامتحان</button></div>
+                    </motion.div>
+                ))}
+            </div>
+        )}
+        
+        {activeTab === 'exams' && !isBannedExam && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+             {exams.map(e => {
+                const prevResult = examResults.find(r => r.examId === e.id);
+                const isExamTimeOver = Date.now() > new Date(e.endTime).getTime();
+                
+                let statusText = null; let statusClass = "";
+                if (prevResult) {
+                    if (prevResult.status === 'completed') { statusText = `تم الحل: ${prevResult.score} درجة`; statusClass = "bg-green-500 text-white"; } 
+                    else if (prevResult.status === 'in_progress') { statusText = "قيد التنفيذ / انسحاب ⚠️"; statusClass = "bg-yellow-500 text-white"; } 
+                    else if (prevResult.status === 'cheated') { statusText = "تم الحظر (غش)"; statusClass = "bg-red-600 text-white"; }
+                }
+
+                return (
+                  <motion.div whileHover={{scale:1.01}} key={e.id} className="glass-card p-6 rounded-2xl relative overflow-hidden">
+                    {statusText && <div className={`absolute top-0 left-0 text-xs px-3 py-1 rounded-br-xl font-bold shadow-md ${statusClass}`}>{statusText}</div>}
+                    <h3 className="text-xl font-bold mb-2 text-slate-800">{e.title}</h3>
+                    <div className="flex justify-between text-sm text-slate-500 mb-4"><span>⏳ {e.duration} دقيقة</span><span>📝 {e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0)} سؤال</span></div>
+                    {prevResult && prevResult.status === 'completed' ? (
+                        <div className="flex gap-2">
+                             <button disabled className="flex-1 bg-slate-200 text-slate-500 py-3 rounded-xl font-bold cursor-not-allowed">تم الانتهاء</button>
+                             {isExamTimeOver ? (
+                                <button onClick={() => setReviewingExam(e)} className="flex-1 bg-blue-100 text-blue-700 py-3 rounded-xl font-bold hover:bg-blue-200 transition shadow-sm">عرض الأخطاء</button>
+                             ) : (
+                                <button disabled className="flex-1 bg-gray-100 text-gray-400 py-3 rounded-xl font-bold cursor-not-allowed text-xs">المراجعة بعد الوقت</button>
+                             )}
+                             <button onClick={() => generatePDF('student', {studentName: user.displayName, score: prevResult.score, total: e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0), status: prevResult.status, examTitle: e.title, questions: e.questions.flatMap(q => q.subQuestions), answers: prevResult.answers })} className="flex-1 bg-green-100 text-green-700 py-3 rounded-xl font-bold hover:bg-green-200 flex items-center justify-center gap-1 transition shadow-sm"><Download size={16}/> شهادة</button>
+                        </div>
+                    ) : prevResult ? (
+                        <div className="bg-red-50 text-red-600 p-3 rounded-xl font-bold text-center border border-red-200">لا يمكن إعادة الامتحان</div>
+                    ) : (
+                        <div className="space-y-2">
+                            <p className="text-xs text-slate-500">يبدأ: {new Date(e.startTime).toLocaleString('ar-EG')}</p>
+                            <button onClick={() => startExamWithCode(e)} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 flex items-center justify-center gap-2 shadow-lg hover:shadow-slate-500/30 transition"><Lock size={16}/> ابدأ الامتحان</button>
+                        </div>
+                    )}
+                  </motion.div>
+                )
+             })}
+          </div>
+        )}
+
+        {activeTab === 'smart_hw_results' && !isBannedExam && (
+            <div className="glass-panel p-6 rounded-xl">
+                <h2 className="text-2xl font-bold mb-6 font-arabic text-blue-800 flex items-center gap-2"><QrCode/> سجل الواجبات الذكية (QR)</h2>
+                {hwResults.length === 0 ? (
+                    <p className="text-slate-500 text-center py-10 bg-white rounded-xl border font-bold">لم تقم بتسليم أي واجب ذكي عبر الكاميرا حتى الآن.</p>
+                ) : (
+                    <div className="space-y-6">
+                        {(() => {
+                            const hwByBook = hwResults.reduce((acc, hw) => { const book = hw.bookName || 'كتب غير مصنفة'; if(!acc[book]) acc[book] = []; acc[book].push(hw); return acc; }, {});
+                            return Object.entries(hwByBook).map(([bookName, hws]) => (
+                                <div key={bookName} className="mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                    <h4 className="font-bold text-lg text-amber-700 bg-amber-100 p-2 rounded-lg mb-4 flex items-center gap-2 inline-flex"><BookOpen size={20}/> كتاب: {bookName}</h4>
+                                    <div className="space-y-3 pl-4 border-r-4 border-amber-300 pr-4">
+                                        {hws.map(hw => (
+                                            <div key={hw.id} className="bg-white border shadow-sm p-4 rounded-xl flex flex-col md:flex-row justify-between gap-4 hover:border-amber-400 transition">
+                                                <div className="flex-1">
+                                                    <p className="font-bold text-lg text-slate-800">{hw.homeworkTitle}</p>
+                                                    <p className="text-sm text-slate-500 mb-2 mt-1 bg-slate-50 p-2 rounded">تعليق المصحح: <span className="font-bold text-blue-600">{hw.feedback}</span></p>
+                                                </div>
+                                                <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                                                    <span className="text-xl font-black text-green-600 bg-green-50 px-4 py-2 rounded-lg border border-green-200">{hw.score} / {hw.total}</span>
+                                                    <span className="text-xs text-slate-400">{hw.submittedAt?.toDate().toLocaleDateString('ar-EG')}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ));
+                        })()}
+                    </div>
+                )}
+            </div>
+        )}
+
+        {activeTab === 'settings' && (
+              <div className="glass-panel p-8 rounded-xl max-w-2xl mx-auto">
+                <h2 className="text-2xl font-bold mb-6 flex items-center gap-2 font-arabic text-slate-800"><Settings className="text-slate-700"/> إعدادات الحساب</h2>
+                {userData.gradeUpdateStatus === 'pending' && (
+                    <div className="mb-4 bg-yellow-50 text-yellow-800 p-4 rounded-xl border border-yellow-200 flex items-center gap-2 font-bold"><RefreshCw className="animate-spin-slow" size={20} /> لقد قمت بطلب تغيير المرحلة إلى {getGradeLabel(userData.requestedGrade)}. الطلب قيد المراجعة.</div>
+                )}
+                <form onSubmit={handleUpdateMyProfile} className="space-y-4">
+                  <div><label className="block text-sm font-bold text-slate-700 mb-2">الاسم</label><input disabled className="w-full border p-3 rounded-xl bg-slate-100 text-slate-500 cursor-not-allowed" value={editFormData.name} /><p className="text-xs text-red-500 mt-1">لا يمكن تغيير الاسم (تواصل مع الإدارة).</p></div>
+                  <div><label className="block text-sm font-bold text-slate-700 mb-2">رقم الهاتف</label><input className="w-full border p-3 rounded-xl" value={editFormData.phone} onChange={e=>setEditFormData({...editFormData, phone:e.target.value})} /></div>
+                  <div><label className="block text-sm font-bold text-slate-700 mb-2">رقم ولي الأمر</label><input disabled className="w-full border p-3 rounded-xl bg-slate-100 text-slate-500 cursor-not-allowed" value={editFormData.parentPhone} /><p className="text-xs text-red-500 mt-1">لا يمكن تغيير رقم ولي الأمر.</p></div>
+                  <div><label className="block text-sm font-bold text-slate-700 mb-2">الصف الدراسي (يتطلب موافقة الأدمن)</label><select className="w-full border p-3 rounded-xl bg-white" value={editFormData.grade} onChange={e=>setEditFormData({...editFormData, grade:e.target.value})}><GradeOptions /></select></div>
+                  <button className="w-full bg-gradient-to-r from-amber-600 to-amber-700 text-white py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-amber-500/40 transition">حفظ التعديلات</button>
+                </form>
+              </div>
+        )}
+      </main>
+    </div>
+  );
+};
+
 const LandingPage = ({ onAuthClick, installPrompt }) => {
   const [publicContent, setPublicContent] = useState([]);
   const [playingVideo, setPlayingVideo] = useState(null); 
   const [playingHtml, setPlayingHtml] = useState(null);
   
-  useEffect(() => { 
-      const q = query(collection(db, 'content'), where('isPublic', '==', true));
-      const u = onSnapshot(q, s => setPublicContent(s.docs.map(d=>d.data()))); 
-      return u; 
-  }, []);
-
+  useEffect(() => { const u = onSnapshot(query(collection(db, 'content'), where('isPublic', '==', true)), s => setPublicContent(s.docs.map(d=>d.data()))); return u; }, []);
   const openFacebook = () => window.open("https://www.facebook.com/share/17aiUQWKf5/", "_blank");
 
   return (
     <div className="min-h-screen font-['Cairo'] relative" dir="rtl">
       {playingVideo && <SecureVideoPlayer video={playingVideo} user={null} userName="زائر" onClose={() => setPlayingVideo(null)} />}
       {playingHtml && <InteractiveViewer content={playingHtml} user={null} onClose={() => setPlayingHtml(null)} />}
-      
       <FloatingArabicBackground />
       <ChatWidget />
-      
       <nav className="relative z-10 flex justify-between items-center p-6 max-w-7xl mx-auto glass-panel mt-4 rounded-full mx-4 shadow-lg">
-        <div className="flex items-center gap-2">
-            <ModernLogo />
-            <span className="text-2xl font-bold font-arabic text-amber-800">منصة النحاس</span>
-        </div>
+        <div className="flex items-center gap-2"><ModernLogo /><span className="text-2xl font-bold font-arabic text-amber-800">منصة النحاس</span></div>
         <div className="flex gap-4 items-center">
-          {installPrompt && (
-              <button onClick={installPrompt} className="hidden md:flex bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full font-bold shadow-lg shadow-green-500/30 transition items-center gap-2">
-                  <DownloadCloud size={18}/> تثبيت التطبيق
-              </button>
-          )}
-          <button onClick={openFacebook} className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition shadow-lg hover:shadow-blue-500/50">
-              <Facebook size={20}/>
-          </button>
-          <button onClick={onAuthClick} className="bg-slate-900 text-white px-6 py-2 rounded-full font-bold shadow-lg hover:shadow-slate-500/50 transition transform hover:-translate-y-0.5">
-              دخول الطالب
-          </button>
+          {installPrompt && ( <button onClick={installPrompt} className="hidden md:flex bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full font-bold shadow-lg shadow-green-500/30 transition items-center gap-2"><DownloadCloud size={18}/> تثبيت التطبيق</button> )}
+          <button onClick={openFacebook} className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition shadow-lg hover:shadow-blue-500/50"><Facebook size={20}/></button>
+          <button onClick={onAuthClick} className="bg-slate-900 text-white px-6 py-2 rounded-full font-bold shadow-lg hover:shadow-slate-500/50 transition transform hover:-translate-y-0.5">دخول الطالب</button>
         </div>
       </nav>
-
       <main className="relative z-10 px-4 mt-10 max-w-7xl mx-auto text-center">
         <h1 className="text-5xl md:text-7xl font-black text-slate-900 mb-6">اللغة العربية <span className="text-amber-600">لعبتك</span></h1>
         <p className="text-xl text-slate-600 mb-8 max-w-2xl mx-auto">أقوى منصة تعليمية للمرحلة الإعدادية والثانوية.</p>
-        <button onClick={onAuthClick} className="bg-amber-600 text-white px-10 py-4 rounded-2xl text-xl font-bold shadow-xl hover:bg-amber-700 transition transform hover:-translate-y-1">
-            اشترك الآن 🚀
-        </button>
-        
-        {installPrompt && (
-            <div className="md:hidden mt-6">
-                <button onClick={installPrompt} className="bg-green-600 text-white px-8 py-3 rounded-full font-bold shadow-lg flex items-center gap-2 mx-auto">
-                    <DownloadCloud size={18}/> تثبيت المنصة كتطبيق على هاتفك
-                </button>
-            </div>
-        )}
-
-        <div className="my-12">
-            <WisdomBox />
-        </div>
-
+        <button onClick={onAuthClick} className="bg-amber-600 text-white px-10 py-4 rounded-2xl text-xl font-bold shadow-xl hover:bg-amber-700 transition transform hover:-translate-y-1">اشترك الآن 🚀</button>
+        {installPrompt && (<div className="md:hidden mt-6"><button onClick={installPrompt} className="bg-green-600 text-white px-8 py-3 rounded-full font-bold shadow-lg flex items-center gap-2 mx-auto"><DownloadCloud size={18}/> تثبيت المنصة كتطبيق على هاتفك</button></div>)}
+        <div className="my-12"><WisdomBox /></div>
         <div className="grid md:grid-cols-2 gap-8 mt-10 mb-20">
           <div className="bg-white/80 backdrop-blur p-6 rounded-3xl border border-white shadow-sm">
             <h3 className="text-2xl font-bold mb-4 flex items-center gap-2 text-blue-700"><Video /> فيديوهات مجانية</h3>
             <div className="space-y-4">
               {publicContent.filter(c => c.type === 'video').length > 0 ? publicContent.filter(c => c.type === 'video').map((v, i) => (
-                 <div key={i} className="flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm cursor-pointer hover:bg-gray-50" onClick={() => setPlayingVideo(v)}>
-                    <PlayCircle className="text-amber-500"/>
-                    <span className="font-bold">{v.title}</span>
-                    <span className="mr-auto text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">مشاهدة</span>
-                 </div>
+                 <div key={i} className="flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm cursor-pointer hover:bg-gray-50" onClick={() => setPlayingVideo(v)}><PlayCircle className="text-amber-500"/><span className="font-bold">{v.title}</span><span className="mr-auto text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">مشاهدة</span></div>
                )) : <p className="text-slate-500">مفيش فيديوهات عامة حالياً</p>}
             </div>
           </div>
-          
           <div className="bg-white/80 backdrop-blur p-6 rounded-3xl border border-white shadow-sm">
             <h3 className="text-2xl font-bold mb-4 flex items-center gap-2 text-purple-700"><Code /> تفاعلي عام</h3>
             <div className="space-y-4">
               {publicContent.filter(c => c.type === 'html').length > 0 ? publicContent.filter(c => c.type === 'html').map((h, i) => (
-                 <div key={i} className="flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm cursor-pointer hover:bg-gray-50" onClick={() => setPlayingHtml(h)}>
-                    <Code className="text-purple-500"/>
-                    <span className="font-bold">{h.title}</span>
-                    <span className="mr-auto text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">تشغيل</span>
-                 </div>
+                 <div key={i} className="flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm cursor-pointer hover:bg-gray-50" onClick={() => setPlayingHtml(h)}><Code className="text-purple-500"/><span className="font-bold">{h.title}</span><span className="mr-auto text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">تشغيل</span></div>
                )) : <p className="text-slate-500">مفيش محتوى تفاعلي عام حالياً</p>}
             </div>
           </div>
@@ -3060,36 +3401,24 @@ const LandingPage = ({ onAuthClick, installPrompt }) => {
 const AuthPage = ({ onBack }) => {
   const [isRegister, setIsRegister] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({ 
-      email: '', 
-      password: '', 
-      name: '', 
-      grade: '1sec', 
-      phone: '', 
-      parentPhone: '' 
-  });
+  const [formData, setFormData] = useState({ email: '', password: '', name: '', grade: '1sec', phone: '', parentPhone: '' });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    
     const egyptPhoneRegex = /^01[0125][0-9]{8}$/;
-    
     if (isRegister) {
         if (!egyptPhoneRegex.test(formData.phone)) {
             alert("رقم الطالب غير صحيح! يجب أن يكون 11 رقم ويبدأ بـ 010, 011, 012, أو 015");
-            setLoading(false);
-            return;
+            setLoading(false); return;
         }
         if (!egyptPhoneRegex.test(formData.parentPhone)) {
             alert("رقم ولي الأمر غير صحيح!");
-            setLoading(false);
-            return;
+            setLoading(false); return;
         }
         if (formData.phone === formData.parentPhone) {
             alert("عفواً، لا يمكن تكرار رقم الهاتف!");
-            setLoading(false);
-            return;
+            setLoading(false); return;
         }
     }
 
@@ -3097,96 +3426,40 @@ const AuthPage = ({ onBack }) => {
       if (isRegister) {
         const userCred = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
         await updateProfile(userCred.user, { displayName: formData.name });
-        await setDoc(doc(db, 'users', userCred.user.uid), { 
-            name: formData.name, 
-            email: formData.email, 
-            grade: formData.grade, 
-            phone: formData.phone, 
-            parentPhone: formData.parentPhone, 
-            role: 'student', 
-            status: 'pending', 
-            createdAt: new Date() 
-        });
+        await setDoc(doc(db, 'users', userCred.user.uid), { name: formData.name, email: formData.email, grade: formData.grade, phone: formData.phone, parentPhone: formData.parentPhone, role: 'student', status: 'pending', createdAt: new Date() });
         alert("تم إنشاء الحساب! انتظر تفعيل الأدمن.");
-      } else { 
-          await signInWithEmailAndPassword(auth, formData.email, formData.password); 
-      }
-    } catch (error) { 
-        alert("حدث خطأ: " + error.message); 
-    } finally { 
-        setLoading(false); 
-    }
+      } else { await signInWithEmailAndPassword(auth, formData.email, formData.password); }
+    } catch (error) { alert("حدث خطأ: " + error.message); } 
+    finally { setLoading(false); }
   };
 
   const handleForgotPassword = async () => {
     if(!formData.email) { alert("من فضلك اكتب الإيميل الأول."); return; }
-    try { 
-        await sendPasswordResetEmail(auth, formData.email); 
-        alert("تم إرسال رابط استعادة كلمة السر."); 
-    } catch (error) { 
-        alert("حدث خطأ: " + error.message); 
-    }
+    try { await sendPasswordResetEmail(auth, formData.email); alert("تم إرسال رابط استعادة كلمة السر."); } catch (error) { alert("حدث خطأ: " + error.message); }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-slate-900 font-['Cairo'] relative overflow-hidden" dir="rtl">
       <FloatingArabicBackground />
       <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white/90 backdrop-blur-xl rounded-3xl p-8 w-full max-w-md shadow-2xl relative z-10 my-10 overflow-y-auto max-h-[90vh] border border-white/50">
-        <button onClick={onBack} className="text-slate-500 hover:text-slate-800 text-sm mb-6 flex items-center gap-1 font-bold">
-            <ChevronRight size={18} /> العودة
-        </button>
+        <button onClick={onBack} className="text-slate-500 hover:text-slate-800 text-sm mb-6 flex items-center gap-1 font-bold"><ChevronRight size={18} /> العودة</button>
         <div className="flex justify-center mb-4"><ModernLogo /></div>
         <h2 className="text-3xl font-bold font-arabic text-slate-800 mb-2 text-center">{isRegister ? 'حساب جديد' : 'تسجيل دخول'}</h2>
-        
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 mt-6">
           {isRegister && (
             <>
-              <div className="relative">
-                  <User className="absolute top-3.5 right-4 text-slate-400" size={20} />
-                  <input required type="text" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="الاسم ثلاثي" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
-              </div>
-              <div className="relative">
-                  <Phone className="absolute top-3.5 right-4 text-slate-400" size={20} />
-                  <input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="رقم هاتفك" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
-              </div>
-              <div className="relative">
-                  <Phone className="absolute top-3.5 right-4 text-slate-400" size={20} />
-                  <input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="رقم ولي الأمر" value={formData.parentPhone} onChange={e => setFormData({...formData, parentPhone: e.target.value})} />
-              </div>
-              <div className="relative">
-                  <GraduationCap className="absolute top-3.5 right-4 text-slate-400" size={20} />
-                  <select className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 appearance-none focus:border-amber-500 outline-none transition" value={formData.grade} onChange={e => setFormData({...formData, grade: e.target.value})}>
-                      <GradeOptions />
-                  </select>
-              </div>
+              <div className="relative"><User className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="text" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="الاسم ثلاثي" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
+              <div className="relative"><Phone className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="رقم هاتفك" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} /></div>
+              <div className="relative"><Phone className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="رقم ولي الأمر" value={formData.parentPhone} onChange={e => setFormData({...formData, parentPhone: e.target.value})} /></div>
+              <div className="relative"><GraduationCap className="absolute top-3.5 right-4 text-slate-400" size={20} /><select className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 appearance-none focus:border-amber-500 outline-none transition" value={formData.grade} onChange={e => setFormData({...formData, grade: e.target.value})}><GradeOptions /></select></div>
             </>
           )}
-          
-          <div className="relative">
-              <Mail className="absolute top-3.5 right-4 text-slate-400" size={20} />
-              <input required type="email" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="البريد" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
-          </div>
-          <div className="relative">
-              <Lock className="absolute top-3.5 right-4 text-slate-400" size={20} />
-              <input required type="password" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="كلمة السر" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
-          </div>
-          
-          {!isRegister && (
-              <div className="text-left">
-                  <button type="button" onClick={handleForgotPassword} className="text-xs text-amber-600 font-bold hover:underline">
-                      نسيت كلمة السر؟
-                  </button>
-              </div>
-          )}
-          
-          <button disabled={loading} className="bg-gradient-to-r from-amber-600 to-amber-700 text-white py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-amber-500/50 transition mt-2 flex justify-center">
-              {loading ? <Loader2 className="animate-spin" /> : (isRegister ? 'تسجيل' : 'دخول')}
-          </button>
+          <div className="relative"><Mail className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="email" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="البريد" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></div>
+          <div className="relative"><Lock className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="password" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="كلمة السر" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} /></div>
+          {!isRegister && (<div className="text-left"><button type="button" onClick={handleForgotPassword} className="text-xs text-amber-600 font-bold hover:underline">نسيت كلمة السر؟</button></div>)}
+          <button disabled={loading} className="bg-gradient-to-r from-amber-600 to-amber-700 text-white py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-amber-500/50 transition mt-2 flex justify-center">{loading ? <Loader2 className="animate-spin" /> : (isRegister ? 'تسجيل' : 'دخول')}</button>
         </form>
-        
-        <button onClick={() => setIsRegister(!isRegister)} className="mt-6 text-amber-800 font-bold hover:underline w-full text-center block text-sm">
-            {isRegister ? 'تسجيل الدخول' : 'حساب جديد'}
-        </button>
+        <button onClick={() => setIsRegister(!isRegister)} className="mt-6 text-amber-800 font-bold hover:underline w-full text-center block text-sm">{isRegister ? 'تسجيل الدخول' : 'حساب جديد'}</button>
       </motion.div>
       <ChatWidget />
     </div>
@@ -3199,26 +3472,16 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(true);
   const [viewMode, setViewMode] = useState('landing');
-  
   const [deferredPrompt, setDeferredPrompt] = useState(null);
 
   useEffect(() => {
-      const handleBeforeInstallPrompt = (e) => { 
-          e.preventDefault(); 
-          setDeferredPrompt(e); 
-      };
+      const handleBeforeInstallPrompt = (e) => { e.preventDefault(); setDeferredPrompt(e); };
       window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
 
   const handleInstallClick = async () => {
-      if (deferredPrompt) { 
-          deferredPrompt.prompt(); 
-          const { outcome } = await deferredPrompt.userChoice; 
-          if (outcome === 'accepted') { 
-              setDeferredPrompt(null); 
-          } 
-      }
+      if (deferredPrompt) { deferredPrompt.prompt(); const { outcome } = await deferredPrompt.userChoice; if (outcome === 'accepted') { setDeferredPrompt(null); } }
   };
 
   useEffect(() => {
@@ -3229,27 +3492,16 @@ export default function App() {
       if (u) {
         setLoading(true);
         const unsubUser = onSnapshot(doc(db, 'users', u.uid), (docSnap) => {
-          if (docSnap.exists()) { 
-              setUserData(docSnap.data()); 
-          }
+          if (docSnap.exists()) { setUserData(docSnap.data()); }
           setLoading(false);
         });
         return () => unsubUser();
-      } else { 
-          setUserData(null); 
-          setLoading(false); 
-      }
+      } else { setUserData(null); setLoading(false); }
     });
     return () => unsubAuth();
   }, []);
 
-  if (authLoading || (user && loading)) {
-      return (
-          <div className="h-screen flex items-center justify-center bg-slate-50">
-              <Loader2 className="animate-spin text-amber-600 w-12 h-12"/>
-          </div>
-      );
-  }
+  if (authLoading || (user && loading)) return <div className="h-screen flex items-center justify-center bg-slate-50"><Loader2 className="animate-spin text-amber-600 w-12 h-12"/></div>;
 
   return (
     <AnimatePresence mode='wait'>
