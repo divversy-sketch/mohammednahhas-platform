@@ -17,7 +17,7 @@ import {
   Reply, Unlock, Layout, Settings, Trophy, Megaphone, Bell, Download, XCircle, 
   Calendar, Clock, FileWarning, Settings as GearIcon, Star, Bot, Power, Upload,
   Users, PenTool, Code, Sparkles, Lamp, Ban, Shield, RefreshCw, Link as LinkIcon, History, Camera, QrCode, FileCheck, MousePointerClick, BarChart3, Layers,
-  BrainCircuit, Headphones, DownloadCloud, PenLine, Play, Pause, SkipForward
+  BrainCircuit, Headphones, DownloadCloud, PenLine, Play, Pause, SkipForward, Target, AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
