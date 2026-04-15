@@ -16,8 +16,10 @@ import {
   ExternalLink, ClipboardList, Timer, AlertOctagon, Flag, Save, HelpCircle, 
   Reply, Unlock, Layout, Settings, Trophy, Megaphone, Bell, Download, XCircle, 
   Calendar, Clock, FileWarning, Settings as GearIcon, Star, Bot, Power, Upload,
-  Users, PenTool, Code, Sparkles, Lamp, Ban, Shield, RefreshCw, Link as LinkIcon, History, Camera, QrCode, FileCheck, MousePointerClick, BarChart3, Layers,
-  BrainCircuit, Headphones, DownloadCloud, PenLine, Play, Pause, SkipForward, Target, AlertCircle
+  Users, PenTool, Code, Sparkles, Lamp, Ban, Shield, RefreshCw, Link as LinkIcon, 
+  History, Camera, QrCode, FileCheck, MousePointerClick, BarChart3, Layers,
+  BrainCircuit, Headphones, DownloadCloud, PenLine, Play, Pause, SkipForward, 
+  Target, AlertCircle, Crown, CreditCard, Key
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -45,12 +47,10 @@ const formatWatchTime = (totalSeconds) => {
     const h = Math.floor(totalSeconds / 3600);
     const m = Math.floor((totalSeconds % 3600) / 60);
     const s = totalSeconds % 60;
-    
     let res = [];
     if (h > 0) res.push(`${h} ساعة`);
     if (m > 0) res.push(`${m} دقيقة`);
     if (s > 0 || res.length === 0) res.push(`${s} ثانية`);
-    
     return res.join(' و ');
 };
 
@@ -66,14 +66,9 @@ const requestNotificationPermission = () => {
 const sendSystemNotification = (title, body) => {
   if (Notification.permission === "granted") {
     try {
-      new Notification(title, {
-        body: body,
-        icon: "https://cdn-icons-png.flaticon.com/512/3449/3449750.png",
-        vibrate: [200, 100, 200]
-      });
+      new Notification(title, { body: body, icon: "https://cdn-icons-png.flaticon.com/512/3449/3449750.png", vibrate: [200, 100, 200] });
       const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-      audio.volume = 0.5;
-      audio.play().catch(e => {});
+      audio.volume = 0.5; audio.play().catch(e => {});
     } catch (e) { console.error("Notification Error:", e); }
   }
 };
@@ -86,15 +81,10 @@ const getYouTubeID = (url) => {
 };
 
 const generatePDF = (type, data) => {
-    if (!window.html2pdf) {
-        alert("جاري تحميل نظام الطباعة... يرجى الانتظار ثوانٍ والمحاولة مرة أخرى.");
-        return;
-    }
-
+    if (!window.html2pdf) return alert("جاري تحميل نظام الطباعة... يرجى الانتظار ثوانٍ والمحاولة مرة أخرى.");
     const percentage = data.total > 0 ? Math.round((data.score / data.total) * 100) : 0;
     const date = new Date().toLocaleDateString('ar-EG');
     const element = document.createElement('div');
-    
     let answersTable = '';
     if (data.questions && data.answers) {
         answersTable = `
@@ -119,7 +109,6 @@ const generatePDF = (type, data) => {
                         const studentAnsText = studentAnsIdx !== undefined ? q.options[studentAnsIdx] : 'لم يجب';
                         const correctAnsText = q.options[correctAnsIdx];
                         const branchName = q.branch || 'عام';
-                        
                         return `
                         <tr style="background-color: ${isCorrect ? '#f0fdf4' : '#fef2f2'};">
                             <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${i + 1}</td>
@@ -127,114 +116,47 @@ const generatePDF = (type, data) => {
                             <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold; color: #0284c7;">${branchName}</td>
                             <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">${studentAnsText}</td>
                             <td style="border: 1px solid #ddd; padding: 8px; color: green;">${correctAnsText}</td>
-                            <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">
-                                ${isCorrect ? '<span style="color:green">✔ صحيح</span>' : '<span style="color:red">✘ خطأ</span>'}
-                            </td>
-                        </tr>
-                        `;
+                            <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${isCorrect ? '<span style="color:green">✔ صحيح</span>' : '<span style="color:red">✘ خطأ</span>'}</td>
+                        </tr>`;
                     }).join('')}
                 </tbody>
             </table>
-        </div>
-        `;
+        </div>`;
     }
 
     const header = `
       <div style="padding: 40px; font-family: 'Cairo', sans-serif; direction: rtl; color: #333;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #d97706; padding-bottom: 20px; margin-bottom: 30px;">
-            <div style="text-align: right;">
-                <h1 style="margin: 0; color: #d97706; font-size: 28px;">منصة النحاس التعليمية</h1>
-                <p style="margin: 5px 0 0; color: #666;">للغة العربية - أ/ محمد النحاس</p>
-            </div>
-            <div style="text-align: left;">
-                <p style="margin: 0; font-weight: bold;">تقرير نتيجة امتحان</p>
-                <p style="margin: 5px 0 0; color: #666;">${date}</p>
-            </div>
+            <div style="text-align: right;"><h1 style="margin: 0; color: #d97706; font-size: 28px;">منصة النحاس التعليمية</h1><p style="margin: 5px 0 0; color: #666;">للغة العربية - أ/ محمد النحاس</p></div>
+            <div style="text-align: left;"><p style="margin: 0; font-weight: bold;">تقرير نتيجة امتحان</p><p style="margin: 5px 0 0; color: #666;">${date}</p></div>
         </div>
-        
         <div style="background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
             <table style="width: 100%; font-size: 18px; font-family: 'Cairo', sans-serif;">
-                <tr>
-                    <td style="padding: 10px; font-weight: bold; width: 20%;">اسم الطالب:</td>
-                    <td style="padding: 10px;">${data.studentName}</td>
-                    <td style="padding: 10px; font-weight: bold; width: 20%;">الامتحان:</td>
-                    <td style="padding: 10px;">${data.examTitle || 'اختبار عام'}</td>
-                </tr>
-                <tr>
-                    <td style="padding: 10px; font-weight: bold; vertical-align: middle;">الدرجة:</td>
-                    <td style="padding: 10px;">
-                        <div style="
-                            display: inline-block;
-                            border: 3px solid #d97706;
-                            border-radius: 8px;
-                            padding: 5px 20px;
-                            font-weight: bold;
-                            color: #d97706;
-                            direction: ltr;
-                            font-family: sans-serif;
-                            font-size: 20px;
-                            background: #fffbeb;
-                        ">
-                            ${data.score} / ${data.total}
-                        </div>
-                    </td>
-                    <td style="padding: 10px; font-weight: bold; vertical-align: middle;">النسبة:</td>
-                    <td style="padding: 10px; font-size: 20px; font-weight: bold;">${percentage}%</td>
-                </tr>
-                <tr>
-                    <td style="padding: 10px; font-weight: bold;">الحالة:</td>
-                    <td style="padding: 10px;" colspan="3">
-                        <span style="background: ${data.status === 'cheated' ? '#fee2e2' : '#dcfce7'}; color: ${data.status === 'cheated' ? '#991b1b' : '#166534'}; padding: 5px 15px; border-radius: 20px; font-size: 14px;">
-                            ${data.status === 'cheated' ? 'تم إلغاؤه (غش)' : percentage >= 50 ? 'ناجح' : 'راسب'}
-                        </span>
-                    </td>
-                </tr>
+                <tr><td style="padding: 10px; font-weight: bold; width: 20%;">اسم الطالب:</td><td style="padding: 10px;">${data.studentName}</td><td style="padding: 10px; font-weight: bold; width: 20%;">الامتحان:</td><td style="padding: 10px;">${data.examTitle || 'اختبار عام'}</td></tr>
+                <tr><td style="padding: 10px; font-weight: bold; vertical-align: middle;">الدرجة:</td><td style="padding: 10px;"><div style="display: inline-block; border: 3px solid #d97706; border-radius: 8px; padding: 5px 20px; font-weight: bold; color: #d97706; direction: ltr; font-family: sans-serif; font-size: 20px; background: #fffbeb;">${data.score} / ${data.total}</div></td><td style="padding: 10px; font-weight: bold; vertical-align: middle;">النسبة:</td><td style="padding: 10px; font-size: 20px; font-weight: bold;">${percentage}%</td></tr>
+                <tr><td style="padding: 10px; font-weight: bold;">الحالة:</td><td style="padding: 10px;" colspan="3"><span style="background: ${data.status === 'cheated' ? '#fee2e2' : '#dcfce7'}; color: ${data.status === 'cheated' ? '#991b1b' : '#166534'}; padding: 5px 15px; border-radius: 20px; font-size: 14px;">${data.status === 'cheated' ? 'تم إلغاؤه (غش)' : percentage >= 50 ? 'ناجح' : 'راسب'}</span></td></tr>
             </table>
         </div>
-        
         ${answersTable}
-
-        <div style="margin-top: 50px; text-align: center; border-top: 1px solid #eee; padding-top: 20px;">
-             <p style="font-size: 14px; color: #999;">تم استخراج هذا التقرير آلياً من منصة النحاس التعليمية</p>
-        </div>
-      </div>
-    `;
-
+        <div style="margin-top: 50px; text-align: center; border-top: 1px solid #eee; padding-top: 20px;"><p style="font-size: 14px; color: #999;">تم استخراج هذا التقرير آلياً من منصة النحاس التعليمية</p></div>
+      </div>`;
     element.innerHTML = header;
-    
-    const opt = { 
-        margin: 0.5, 
-        filename: `تقرير_${data.studentName}_${date}.pdf`, 
-        image: { type: 'jpeg', quality: 0.98 }, 
-        html2canvas: { scale: 2, useCORS: true, logging: false }, 
-        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } 
-    };
-    
+    const opt = { margin: 0.5, filename: `تقرير_${data.studentName}_${date}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true, logging: false }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
     window.html2pdf().set(opt).from(element).save();
 };
 
 const DesignSystemLoader = () => {
   useEffect(() => {
     if (!document.getElementById('tailwind-script')) {
-      const script = document.createElement('script');
-      script.id = 'tailwind-script';
-      script.src = "https://cdn.tailwindcss.com";
+      const script = document.createElement('script'); script.id = 'tailwind-script'; script.src = "https://cdn.tailwindcss.com";
       script.onload = () => {
         if(window.tailwind) {
             window.tailwind.config = {
               theme: {
                 extend: {
-                  fontFamily: { 
-                      sans: ['Cairo', 'sans-serif'],
-                      arabic: ['Aref Ruqaa', 'serif'],
-                  },
-                  colors: { 
-                      amber: { 50: '#fffbeb', 100: '#fef3c7', 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 700: '#b45309', 900: '#78350f' },
-                      royal: { 900: '#0f172a', 800: '#1e293b' }
-                  },
-                  backgroundImage: {
-                      'arabesque': "url('https://www.transparenttextures.com/patterns/arabesque.png')",
-                  }
+                  fontFamily: { sans: ['Cairo', 'sans-serif'], arabic: ['Aref Ruqaa', 'serif'] },
+                  colors: { amber: { 50: '#fffbeb', 100: '#fef3c7', 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 700: '#b45309', 900: '#78350f' }, royal: { 900: '#0f172a', 800: '#1e293b' } },
+                  backgroundImage: { 'arabesque': "url('https://www.transparenttextures.com/patterns/arabesque.png')" }
                 }
               }
             }
@@ -242,121 +164,31 @@ const DesignSystemLoader = () => {
       };
       document.head.appendChild(script);
     }
-    
     if (!document.getElementById('cairo-font')) {
-      const link = document.createElement('link');
-      link.id = 'cairo-font';
-      link.rel = 'stylesheet';
-      link.href = "https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Aref+Ruqaa:wght@400;700&display=swap";
-      document.head.appendChild(link);
+      const link = document.createElement('link'); link.id = 'cairo-font'; link.rel = 'stylesheet'; link.href = "https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Aref+Ruqaa:wght@400;700&display=swap"; document.head.appendChild(link);
     }
-    
     if (!document.getElementById('html2pdf-script')) {
-        const script = document.createElement('script');
-        script.id = 'html2pdf-script';
-        script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
-        document.head.appendChild(script);
+        const script = document.createElement('script'); script.id = 'html2pdf-script'; script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"; document.head.appendChild(script);
     }
   }, []);
 
   return (
     <style>{`
-      html, body {
-          font-family: 'Cairo', sans-serif; 
-          background-color: #f8fafc; 
-          direction: rtl; 
-          -webkit-font-smoothing: antialiased;
-          scroll-behavior: smooth;
-      }
-      
-      ::-webkit-scrollbar { width: 8px; }
-      ::-webkit-scrollbar-track { background: #f1f1f1; }
-      ::-webkit-scrollbar-thumb { background: linear-gradient(to bottom, #d97706, #b45309); border-radius: 4px; }
-      
-      .glass-panel { 
-          background: rgba(255, 255, 255, 0.9); 
-          backdrop-filter: blur(8px); 
-          -webkit-backdrop-filter: blur(8px);
-          border: 1px solid rgba(255, 255, 255, 0.4); 
-          box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-      }
-      
-      .glass-card {
-          background: rgba(255, 255, 255, 0.85);
-          backdrop-filter: blur(6px);
-          -webkit-backdrop-filter: blur(6px);
-          border: 1px solid rgba(255, 255, 255, 0.4);
-          box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-          transition: transform 0.2s ease, box-shadow 0.2s ease;
-          will-change: transform;
-      }
-      
-      .glass-card:hover {
-          transform: translateY(-5px);
-          box-shadow: 0 10px 25px rgba(217, 119, 6, 0.15);
-          border-color: #fbbf24;
-      }
-
-      .text-gradient-gold {
-          background: linear-gradient(45deg, #b45309, #d97706, #fbbf24, #d97706);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-size: 200% auto;
-          animation: shine 3s linear infinite;
-      }
-
-      @keyframes shine {
-          to { background-position: 200% center; }
-      }
-
-      @keyframes floatChar {
-          0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
-          50% { transform: translate3d(0, -30px, 0) rotate(10deg); }
-      }
-      .floating-char {
-          animation: floatChar ease-in-out infinite;
-          will-change: transform;
-      }
-
-      @keyframes pulseSlow {
-          0%, 100% { transform: scale3d(1, 1, 1); opacity: 0.2; }
-          50% { transform: scale3d(1.1, 1.1, 1); opacity: 0.4; }
-      }
-      .animate-pulse-slow {
-          animation: pulseSlow 8s ease-in-out infinite;
-          will-change: transform, opacity;
-      }
-
-      .watermark-text {
-        position: absolute;
-        pointer-events: none;
-        z-index: 9999;
-        color: rgba(0, 0, 0, 0.08);
-        font-weight: 900;
-        font-size: 1.5rem;
-        transform: rotate(-30deg);
-        white-space: nowrap;
-        text-shadow: 0 0 2px rgba(255,255,255,0.5);
-      }
-      
-      .watermark-video {
-        position: absolute;
-        pointer-events: none;
-        z-index: 9999;
-        color: rgba(255, 255, 255, 0.4); 
-        font-weight: 900;
-        font-size: 1.5rem;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
-        white-space: nowrap;
-        animation: moveWatermark 25s linear infinite;
-      }
-      
-      .no-select { 
-          -webkit-user-select: none; 
-          -moz-user-select: none; 
-          -ms-user-select: none; 
-          user-select: none; 
-      }
+      html, body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; direction: rtl; -webkit-font-smoothing: antialiased; scroll-behavior: smooth; }
+      ::-webkit-scrollbar { width: 8px; } ::-webkit-scrollbar-track { background: #f1f1f1; } ::-webkit-scrollbar-thumb { background: linear-gradient(to bottom, #d97706, #b45309); border-radius: 4px; }
+      .glass-panel { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.4); box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+      .glass-card { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(6px); border: 1px solid rgba(255, 255, 255, 0.4); box-shadow: 0 4px 10px rgba(0,0,0,0.05); transition: transform 0.2s ease, box-shadow 0.2s ease; will-change: transform; }
+      .glass-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(217, 119, 6, 0.15); border-color: #fbbf24; }
+      .text-gradient-gold { background: linear-gradient(45deg, #b45309, #d97706, #fbbf24, #d97706); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-size: 200% auto; animation: shine 3s linear infinite; }
+      @keyframes shine { to { background-position: 200% center; } }
+      @keyframes floatChar { 0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); } 50% { transform: translate3d(0, -30px, 0) rotate(10deg); } }
+      .floating-char { animation: floatChar ease-in-out infinite; will-change: transform; }
+      @keyframes pulseSlow { 0%, 100% { transform: scale3d(1, 1, 1); opacity: 0.2; } 50% { transform: scale3d(1.1, 1.1, 1); opacity: 0.4; } }
+      .animate-pulse-slow { animation: pulseSlow 8s ease-in-out infinite; will-change: transform, opacity; }
+      .watermark-text { position: absolute; pointer-events: none; z-index: 9999; color: rgba(0, 0, 0, 0.08); font-weight: 900; font-size: 1.5rem; transform: rotate(-30deg); white-space: nowrap; text-shadow: 0 0 2px rgba(255,255,255,0.5); }
+      .watermark-video { position: absolute; pointer-events: none; z-index: 9999; color: rgba(255, 255, 255, 0.4); font-weight: 900; font-size: 1.5rem; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); white-space: nowrap; animation: moveWatermark 25s linear infinite; }
+      @keyframes moveWatermark { 0% { top: 10%; left: 10%; transform: rotate(-5deg); } 25% { top: 80%; left: 50%; transform: rotate(5deg); } 50% { top: 30%; left: 80%; transform: rotate(-5deg); } 75% { top: 70%; left: 10%; transform: rotate(5deg); } 100% { top: 10%; left: 10%; transform: rotate(-5deg); } }
+      .no-select { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
     `}</style>
   );
 };
@@ -377,27 +209,14 @@ const GradeOptions = () => (
 );
 
 const getGradeLabel = (g) => {
-    const map = { 
-        '1prep': 'أولى إعدادي', '2prep': 'تانية إعدادي', '3prep': 'تالتة إعدادي', 
-        '1sec': 'أولى ثانوي', '2sec': 'تانية ثانوي', '3sec': 'تالتة ثانوي' 
-    };
+    const map = { '1prep': 'أولى إعدادي', '2prep': 'تانية إعدادي', '3prep': 'تالتة إعدادي', '1sec': 'أولى ثانوي', '2sec': 'تانية ثانوي', '3sec': 'تالتة ثانوي' };
     return map[g] || g;
 };
 
 const ModernLogo = () => (
   <div className="relative w-20 h-20 drop-shadow-2xl cursor-pointer hover:scale-105 hover:rotate-6 transition-transform">
       <svg width="80" height="80" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-            <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#fbbf24" />
-                <stop offset="50%" stopColor="#d97706" />
-                <stop offset="100%" stopColor="#78350f" />
-            </linearGradient>
-            <filter id="glow">
-                <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
-                <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
-            </filter>
-        </defs>
+        <defs><linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#fbbf24" /><stop offset="50%" stopColor="#d97706" /><stop offset="100%" stopColor="#78350f" /></linearGradient><filter id="glow"><feGaussianBlur stdDeviation="2.5" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
         <path d="M100 20C55.8 20 20 55.8 20 100s35.8 80 80 80 80-35.8 80-80-35.8-80-80-80zm0 150c-38.6 0-70-31.4-70-70s31.4-70 70-70 70 31.4 70 70-31.4 70-70 70z" fill="url(#logoGrad)" opacity="0.2" />
         <path d="M160 80 V 130 A 60 60 0 0 1 40 130 V 110" stroke="url(#logoGrad)" strokeWidth="22" strokeLinecap="round" strokeLinejoin="round" fill="none" filter="url(#glow)" />
         <rect x="85" y="40" width="30" height="30" rx="4" fill="url(#logoGrad)" transform="rotate(45 100 55)" />
@@ -409,19 +228,7 @@ const FloatingArabicBackground = React.memo(() => (
   <div className="fixed inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 0, background: 'radial-gradient(circle at center, #fdfbf7 0%, #e2e8f0 100%)' }}>
     <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: `url("https://www.transparenttextures.com/patterns/arabesque.png")` }} />
     {['أ', 'ب', 'ج', 'د', 'هـ', 'و', 'ز', 'ح', 'ط', 'ي', 'ض', 'ع'].map((char, i) => (
-        <div
-            key={i}
-            className="absolute text-amber-500/15 font-arabic font-bold select-none floating-char"
-            style={{ 
-                left: `${(i * 8.5) % 90 + 5}vw`, 
-                top: `${(i * 13) % 90 + 5}vh`,
-                fontSize: `${(i % 3) + 3}rem`,
-                animationDelay: `${i * 0.5}s`,
-                animationDuration: `${15 + (i % 5)}s`
-            }}
-        >
-            {char}
-        </div>
+        <div key={i} className="absolute text-amber-500/15 font-arabic font-bold select-none floating-char" style={{ left: `${(i * 8.5) % 90 + 5}vw`, top: `${(i * 13) % 90 + 5}vh`, fontSize: `${(i % 3) + 3}rem`, animationDelay: `${i * 0.5}s`, animationDuration: `${15 + (i % 5)}s` }}>{char}</div>
     ))}
     <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-amber-400/10 rounded-full blur-xl animate-pulse-slow" />
     <div className="absolute bottom-1/3 right-1/4 w-96 h-96 bg-blue-400/10 rounded-full blur-xl animate-pulse-slow" style={{ animationDelay: '2s' }} />
@@ -431,29 +238,15 @@ const FloatingArabicBackground = React.memo(() => (
 const WisdomBox = () => {
   const [idx, setIdx] = useState(0);
   const [quotes, setQuotes] = useState([
-    { text: "النجاح مش صدفة، النجاح عزيمة وإصرار", source: "تحفيز" }, 
-    { text: "ذاكر صح، مش تذاكر كتير.. ركز يا بطل", source: "نصيحة" }, 
-    { text: "حلمك يستاهل تعبك، متوقفش", source: "تحفيز" }, 
-    { text: "وَمَا نَيْلُ الْمَطَالِبِ بِالتَّمَنِّي ... وَلَكِنْ تُؤْخَذُ الدُّنْيَا غِلَابَا", source: "شعر" }
+    { text: "النجاح مش صدفة، النجاح عزيمة وإصرار", source: "تحفيز" }, { text: "ذاكر صح، مش تذاكر كتير.. ركز يا بطل", source: "نصيحة" }, { text: "حلمك يستاهل تعبك، متوقفش", source: "تحفيز" }, { text: "وَمَا نَيْلُ الْمَطَالِبِ بِالتَّمَنِّي ... وَلَكِنْ تُؤْخَذُ الدُّنْيَا غِلَابَا", source: "شعر" }
   ]);
-
   useEffect(() => {
       const q = query(collection(db, 'quotes'), orderBy('createdAt', 'desc'));
-      const unsub = onSnapshot(q, (snap) => {
-          if (!snap.empty) {
-              setQuotes(snap.docs.map(d => d.data()));
-          }
-      });
+      const unsub = onSnapshot(q, (snap) => { if (!snap.empty) setQuotes(snap.docs.map(d => d.data())); });
       return () => unsub();
   }, []);
-
-  useEffect(() => { 
-      const t = setInterval(() => setIdx(i => (i+1)%quotes.length), 6000); 
-      return () => clearInterval(t); 
-  }, [quotes]);
-  
+  useEffect(() => { const t = setInterval(() => setIdx(i => (i+1)%quotes.length), 6000); return () => clearInterval(t); }, [quotes]);
   if (quotes.length === 0) return null;
-
   return (
     <div className="relative bg-gradient-to-r from-amber-600 to-amber-800 text-white p-8 rounded-2xl shadow-xl mb-8 overflow-hidden z-20 border-2 border-amber-400/30">
       <div className="absolute top-0 right-0 p-4 opacity-10"><Feather size={100} /></div>
@@ -472,9 +265,7 @@ const Announcements = () => {
         const q = query(collection(db, 'announcements'), orderBy('createdAt', 'desc'));
         return onSnapshot(q, snap => setAnnouncements(snap.docs.map(d => ({id: d.id, ...d.data()}))));
     }, []);
-
     if(announcements.length === 0) return null;
-
     return (
         <div className="bg-gradient-to-r from-blue-900 to-slate-900 text-white p-4 rounded-xl shadow-lg mb-6 relative overflow-hidden z-20 border border-blue-700/50">
             <div className="absolute top-0 right-0 p-4 opacity-10"><Megaphone size={60}/></div>
@@ -482,8 +273,7 @@ const Announcements = () => {
             <div className="relative z-10 space-y-2">
                 {announcements.map((a, i) => (
                     <div key={i} className="text-sm border-b border-blue-800 last:border-0 pb-1 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
-                        {a.text}
+                        <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>{a.text}
                     </div>
                 ))}
             </div>
@@ -494,11 +284,8 @@ const Announcements = () => {
 const Leaderboard = () => {
     const [topStudents, setTopStudents] = useState([]);
     const [config, setConfig] = useState({ show: true });
-
     useEffect(() => {
-        const unsubConfig = onSnapshot(doc(db, 'settings', 'config'), (snap) => {
-            if(snap.exists()) setConfig(snap.data());
-        });
+        const unsubConfig = onSnapshot(doc(db, 'settings', 'config'), (snap) => { if(snap.exists()) setConfig(snap.data()); });
         const unsub = onSnapshot(query(collection(db, 'exam_results')), (snap) => {
             const scores = {};
             snap.docs.forEach(doc => {
@@ -508,26 +295,18 @@ const Leaderboard = () => {
                     scores[data.studentName] += parseInt(data.score);
                 }
             });
-            const sorted = Object.entries(scores)
-                .map(([name, score]) => ({ name, score }))
-                .sort((a, b) => b.score - a.score)
-                .slice(0, 5); 
+            const sorted = Object.entries(scores).map(([name, score]) => ({ name, score })).sort((a, b) => b.score - a.score).slice(0, 5); 
             setTopStudents(sorted);
         });
         return () => { unsub(); unsubConfig(); };
     }, []);
-
     if(!config.show) return null;
-
     return (
         <div className="glass-panel p-6 rounded-2xl mb-6">
             <h3 className="text-xl font-bold font-arabic mb-4 flex items-center gap-2 text-amber-700"><Trophy className="text-amber-500 fill-amber-500" /> لوحة الشرف (الأوائل)</h3>
             <div className="space-y-3">
                 {topStudents.length === 0 ? <p className="text-slate-400 text-sm">لسه مفيش حد امتحن..</p> : topStudents.map((s, i) => (
-                    <div 
-                        key={i} 
-                        className={`flex justify-between items-center p-3 rounded-lg border-b-2 ${i===0 ? 'bg-gradient-to-r from-yellow-50 to-white border-yellow-400' : 'bg-white border-slate-100'}`}
-                    >
+                    <div key={i} className={`flex justify-between items-center p-3 rounded-lg border-b-2 ${i===0 ? 'bg-gradient-to-r from-yellow-50 to-white border-yellow-400' : 'bg-white border-slate-100'}`}>
                         <div className="flex items-center gap-3">
                             <div className={`font-bold w-8 h-8 rounded-full flex items-center justify-center text-sm shadow-md ${i===0?'bg-yellow-400 text-white':i===1?'bg-gray-300 text-gray-700':i===2?'bg-orange-300 text-white':'bg-slate-100 text-slate-500'}`}>
                                 {i < 3 ? <Star size={14} fill="currentColor" /> : i+1}
@@ -590,11 +369,9 @@ const ChatWidget = ({ user }) => {
       if (isContactAdminMode) {
            botResponse = "تم استلام رسالتك! المستر أو الأدمن هيشوفها ويرد عليك في أقرب وقت. ✅";
            await addDoc(collection(db, 'messages'), {
-             text: userMsg.text, 
-             sender: user ? user.email : sessionId, 
+             text: userMsg.text, sender: user ? user.email : sessionId, 
              senderName: user ? user.displayName : 'زائر (' + sessionId.substr(0,4) + ')', 
-             createdAt: serverTimestamp(), 
-             read: false
+             createdAt: serverTimestamp(), read: false
            });
            setIsContactAdminMode(false);
       } 
@@ -602,15 +379,9 @@ const ChatWidget = ({ user }) => {
           let matchedRule = null;
           for (const rule of autoReplies) {
               const keywords = rule.keywords.split(',').map(k => k.trim().toLowerCase());
-              if (keywords.some(k => lowerText.includes(k) && k.length > 0)) {
-                  matchedRule = rule;
-                  break; 
-              }
+              if (keywords.some(k => lowerText.includes(k) && k.length > 0)) { matchedRule = rule; break; }
           }
-
-          if (matchedRule) {
-              botResponse = matchedRule.response;
-          } 
+          if (matchedRule) botResponse = matchedRule.response;
           else if (lowerText.includes("ادمن") || lowerText.includes("مستر") || lowerText.includes("تواصل")) {
                botResponse = "اكتب رسالتك للمستر وهيتم الرد عليك هنا 👇";
                setIsContactAdminMode(true);
@@ -618,7 +389,6 @@ const ChatWidget = ({ user }) => {
                botResponse = "ممكن تختار:\n1. تفاصيل الحجز (اسأل عن الحجز)\n2. رقم الواتس (اسأل عن الرقم)\n3. التواصل مع الادمن";
           }
       }
-
       if(botResponse) setMessages(prev => [...prev, { id: Date.now()+1, text: botResponse, sender: 'bot', createdAt: { seconds: Date.now() / 1000 } }]);
     }, 500);
   };
@@ -682,9 +452,7 @@ const LiveSessionView = ({ session, user, onClose }) => {
   const sendChat = async (e) => {
     e.preventDefault();
     if(!msgInput.trim()) return;
-    await addDoc(collection(db, `live_sessions/${session.id}/chat`), {
-      text: msgInput, user: user.displayName || 'طالب', createdAt: serverTimestamp()
-    });
+    await addDoc(collection(db, `live_sessions/${session.id}/chat`), { text: msgInput, user: user.displayName || 'طالب', createdAt: serverTimestamp() });
     setMsgInput("");
   };
 
@@ -695,10 +463,7 @@ const LiveSessionView = ({ session, user, onClose }) => {
     <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col md:flex-row font-['Cairo']" dir="rtl">
       <div className="flex-1 flex flex-col">
         <div className="bg-gradient-to-r from-red-600 to-red-800 p-3 text-white flex justify-between items-center shadow-lg">
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 bg-white rounded-full animate-pulse shadow-[0_0_10px_white]"></span>
-            <h2 className="font-bold">بث مباشر: {session.title}</h2>
-          </div>
+          <div className="flex items-center gap-2"><span className="w-3 h-3 bg-white rounded-full animate-pulse shadow-[0_0_10px_white]"></span><h2 className="font-bold">بث مباشر: {session.title}</h2></div>
           <button onClick={onClose} className="text-sm bg-black/30 hover:bg-black/50 px-3 py-1 rounded transition">العودة للمنصة</button>
         </div>
         <div className="flex-1 bg-black relative flex items-center justify-center overflow-hidden">
@@ -707,20 +472,8 @@ const LiveSessionView = ({ session, user, onClose }) => {
             <iframe width="100%" height="100%" src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&controls=1&rel=0&modestbranding=1&playsinline=1`} title="Live" frameBorder="0" allowFullScreen style={{ WebkitTransform: 'translateZ(0)' }}></iframe>
           ) : (
             <div className="w-full h-full relative">
-              <iframe 
-                width="100%" 
-                height="100%" 
-                src={session.liveUrl} 
-                title="Live Meeting" 
-                frameBorder="0" 
-                allow="camera; microphone; display-capture; autoplay; clipboard-write; fullscreen" 
-                allowFullScreen
-                className="relative z-10"
-                style={{ WebkitTransform: 'translateZ(0)' }}
-              ></iframe>
-              <a href={session.liveUrl} target="_blank" rel="noopener noreferrer" className="absolute top-4 left-4 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-full text-xs font-bold backdrop-blur-md border border-white/20 transition flex items-center gap-2 z-50 shadow-lg">
-                  <ExternalLink size={14}/> للموبايل (لو البث مش شغال)
-              </a>
+              <iframe width="100%" height="100%" src={session.liveUrl} title="Live Meeting" frameBorder="0" allow="camera; microphone; display-capture; autoplay; clipboard-write; fullscreen" allowFullScreen className="relative z-10" style={{ WebkitTransform: 'translateZ(0)' }}></iframe>
+              <a href={session.liveUrl} target="_blank" rel="noopener noreferrer" className="absolute top-4 left-4 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-full text-xs font-bold backdrop-blur-md border border-white/20 transition flex items-center gap-2 z-50 shadow-lg"><ExternalLink size={14}/> للموبايل (لو البث مش شغال)</a>
             </div>
           )}
         </div>
@@ -729,10 +482,7 @@ const LiveSessionView = ({ session, user, onClose }) => {
         <div className="p-3 border-b bg-slate-50 font-bold text-slate-700">المحادثة المباشرة</div>
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
           {messages.map((m, i) => (
-            <div key={i} className="text-sm bg-slate-50 p-2 rounded">
-              <span className="font-bold text-amber-700">{m.user}: </span>
-              <span className="text-slate-800">{m.text}</span>
-            </div>
+            <div key={i} className="text-sm bg-slate-50 p-2 rounded"><span className="font-bold text-amber-700">{m.user}: </span><span className="text-slate-800">{m.text}</span></div>
           ))}
           <div ref={chatRef} />
         </div>
@@ -757,144 +507,68 @@ const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
   useEffect(() => {
       if(!user || !video.id) return;
       const q = query(collection(db, 'video_notes'), where('userId', '==', user.uid), where('videoId', '==', video.id), orderBy('timestamp', 'asc'));
-      const unsub = onSnapshot(q, (snap) => {
-          setNotes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      });
+      const unsub = onSnapshot(q, (snap) => { setNotes(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
       return () => unsub();
   }, [user, video.id]);
 
   useEffect(() => {
       if (!user || !video.id) return;
-      
       const viewId = `${user.uid}_${video.id}`;
       const viewRef = doc(db, 'video_views', viewId);
-      
-      let timerInterval;
-      let localSeconds = 0;
-      let lastSyncedSeconds = 0;
+      let timerInterval; let localSeconds = 0; let lastSyncedSeconds = 0;
 
       const syncToDatabase = async (secondsToAdd) => {
-          try {
-              await setDoc(viewRef, {
-                  userId: user.uid,
-                  userName: userName,
-                  videoId: video.id,
-                  videoTitle: video.title,
-                  viewedAt: serverTimestamp(), 
-                  watchedSeconds: increment(secondsToAdd)
-              }, { merge: true }); 
-          } catch (e) {
-              console.error("Sync error:", e);
-          }
+          try { await setDoc(viewRef, { userId: user.uid, userName: userName, videoId: video.id, videoTitle: video.title, viewedAt: serverTimestamp(), watchedSeconds: increment(secondsToAdd) }, { merge: true }); } catch (e) { console.error("Sync error:", e); }
       };
-
       syncToDatabase(0);
 
       timerInterval = setInterval(() => {
           let isPlaying = true;
-          
-          if (!videoId && videoRef.current) {
-              isPlaying = !videoRef.current.paused && !videoRef.current.ended;
-          }
-
+          if (!videoId && videoRef.current) isPlaying = !videoRef.current.paused && !videoRef.current.ended;
           if (!document.hidden && isPlaying) {
               localSeconds += 1;
-              if (localSeconds - lastSyncedSeconds >= 15) {
-                  syncToDatabase(localSeconds - lastSyncedSeconds);
-                  lastSyncedSeconds = localSeconds;
-              }
+              if (localSeconds - lastSyncedSeconds >= 15) { syncToDatabase(localSeconds - lastSyncedSeconds); lastSyncedSeconds = localSeconds; }
           }
       }, 1000);
-
-      return () => {
-          clearInterval(timerInterval);
-          const remaining = localSeconds - lastSyncedSeconds;
-          if (remaining > 0) syncToDatabase(remaining);
-      };
+      return () => { clearInterval(timerInterval); const remaining = localSeconds - lastSyncedSeconds; if (remaining > 0) syncToDatabase(remaining); };
   }, [user, video.id, video.title, userName, videoId]);
 
-  const changeSpeed = (rate) => {
-    if(videoRef.current) videoRef.current.playbackRate = rate;
-    setShowSettings(false);
-  };
+  const changeSpeed = (rate) => { if(videoRef.current) videoRef.current.playbackRate = rate; setShowSettings(false); };
 
   const handleAddNote = async (e) => {
       e.preventDefault();
       if(!currentNote.trim()) return;
-
       let currentTime = 0;
-      if (videoRef.current) {
-          currentTime = videoRef.current.currentTime;
-      }
-
-      await addDoc(collection(db, 'video_notes'), {
-          userId: user.uid,
-          videoId: video.id,
-          text: currentNote,
-          timestamp: currentTime,
-          createdAt: serverTimestamp()
-      });
+      if (videoRef.current) currentTime = videoRef.current.currentTime;
+      await addDoc(collection(db, 'video_notes'), { userId: user.uid, videoId: video.id, text: currentNote, timestamp: currentTime, createdAt: serverTimestamp() });
       setCurrentNote("");
   };
 
   const handleJumpToTime = (time) => {
-      if(videoRef.current) {
-          videoRef.current.currentTime = time;
-          videoRef.current.play();
-      } else if(videoId) {
-          alert("عفواً، ميزة القفز للوقت المحدد تعمل مع الفيديوهات المرفوعة على المنصة فقط وليس يوتيوب.");
-      }
+      if(videoRef.current) { videoRef.current.currentTime = time; videoRef.current.play(); } else if(videoId) { alert("عفواً، ميزة القفز للوقت المحدد تعمل مع الفيديوهات المرفوعة على المنصة فقط وليس يوتيوب."); }
   };
 
-  const deleteNote = async (noteId) => {
-      if(window.confirm("حذف هذه الملاحظة؟")) {
-          await deleteDoc(doc(db, 'video_notes', noteId));
-      }
-  };
-
-  const formatMinSec = (seconds) => {
-      const m = Math.floor(seconds / 60);
-      const s = Math.floor(seconds % 60);
-      return `${m}:${s.toString().padStart(2, '0')}`;
-  };
-
-  const youtubeEmbedUrl = videoId 
-    ? `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1&showinfo=0&iv_load_policy=3&loop=1&playlist=${videoId}&playsinline=1` 
-    : '';
+  const deleteNote = async (noteId) => { if(window.confirm("حذف هذه الملاحظة؟")) await deleteDoc(doc(db, 'video_notes', noteId)); };
+  const formatMinSec = (seconds) => { const m = Math.floor(seconds / 60); const s = Math.floor(seconds % 60); return `${m}:${s.toString().padStart(2, '0')}`; };
+  const youtubeEmbedUrl = videoId ? `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1&showinfo=0&iv_load_policy=3&loop=1&playlist=${videoId}&playsinline=1` : '';
 
   return (
     <div className="fixed inset-0 z-[60] bg-black flex flex-col md:flex-row items-center justify-center p-0 md:p-4 font-['Cairo']" dir="rtl">
-      
       <AnimatePresence>
           {showNotes && (
-              <motion.div 
-                  initial={{ opacity: 0, x: 300 }} 
-                  animate={{ opacity: 1, x: 0 }} 
-                  exit={{ opacity: 0, x: 300 }} 
-                  className="w-full md:w-80 h-1/2 md:h-full bg-white rounded-t-2xl md:rounded-l-none md:rounded-r-2xl flex flex-col shadow-2xl relative z-[70] overflow-hidden"
-              >
+              <motion.div initial={{ opacity: 0, x: 300 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 300 }} className="w-full md:w-80 h-1/2 md:h-full bg-white rounded-t-2xl md:rounded-l-none md:rounded-r-2xl flex flex-col shadow-2xl relative z-[70] overflow-hidden">
                   <div className="p-4 bg-blue-600 text-white font-bold flex justify-between items-center shadow-md">
                       <div className="flex items-center gap-2"><PenLine size={20}/> دفتر الملاحظات</div>
                       <button onClick={() => setShowNotes(false)} className="hover:bg-blue-700 p-1 rounded"><X size={20}/></button>
                   </div>
-                  
                   <div className="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-3">
                       {notes.length === 0 ? (
-                          <div className="text-center text-slate-400 mt-10">
-                              <PenLine size={40} className="mx-auto mb-2 opacity-50"/>
-                              <p>لم تضف أي ملاحظات بعد.</p>
-                              <p className="text-xs mt-1">الملاحظات بتتربط بوقت الفيديو عشان ترجعلها بسرعة.</p>
-                          </div>
+                          <div className="text-center text-slate-400 mt-10"><PenLine size={40} className="mx-auto mb-2 opacity-50"/><p>لم تضف أي ملاحظات بعد.</p><p className="text-xs mt-1">الملاحظات بتتربط بوقت الفيديو عشان ترجعلها بسرعة.</p></div>
                       ) : (
                           notes.map(note => (
                               <div key={note.id} className="bg-white p-3 rounded-xl shadow-sm border border-slate-200 group">
                                   <div className="flex justify-between items-start mb-2">
-                                      <button 
-                                          onClick={() => handleJumpToTime(note.timestamp)} 
-                                          className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold hover:bg-blue-200 transition flex items-center gap-1"
-                                      >
-                                          <Play size={10} fill="currentColor"/> الدقيقة {formatMinSec(note.timestamp)}
-                                      </button>
+                                      <button onClick={() => handleJumpToTime(note.timestamp)} className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold hover:bg-blue-200 transition flex items-center gap-1"><Play size={10} fill="currentColor"/> الدقيقة {formatMinSec(note.timestamp)}</button>
                                       <button onClick={() => deleteNote(note.id)} className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition"><Trash2 size={14}/></button>
                                   </div>
                                   <p className="text-sm text-slate-700 font-bold whitespace-pre-wrap">{note.text}</p>
@@ -902,14 +576,8 @@ const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
                           ))
                       )}
                   </div>
-
                   <form onSubmit={handleAddNote} className="p-4 bg-white border-t border-slate-200 flex flex-col gap-2">
-                      <textarea 
-                          className="w-full border-2 border-slate-200 rounded-xl p-2 text-sm focus:border-blue-500 outline-none transition resize-none h-20" 
-                          placeholder="اكتب ملاحظتك هنا (سيتم حفظها بوقت الفيديو الحالي)..."
-                          value={currentNote}
-                          onChange={e => setCurrentNote(e.target.value)}
-                      />
+                      <textarea className="w-full border-2 border-slate-200 rounded-xl p-2 text-sm focus:border-blue-500 outline-none transition resize-none h-20" placeholder="اكتب ملاحظتك هنا (سيتم حفظها بوقت الفيديو الحالي)..." value={currentNote} onChange={e => setCurrentNote(e.target.value)} />
                       <button type="submit" className="w-full bg-blue-600 text-white font-bold py-2 rounded-xl shadow-md hover:bg-blue-700 transition">إضافة الملاحظة</button>
                   </form>
               </motion.div>
@@ -918,22 +586,15 @@ const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
 
       <div className={`w-full h-full md:max-w-7xl bg-black ${showNotes ? 'md:rounded-l-2xl' : 'rounded-xl'} overflow-hidden relative shadow-2xl border border-gray-800 flex flex-col justify-center flex-1 transition-all duration-300`}>
         <div className="absolute top-4 right-4 z-50 flex gap-4">
-            
-            <button 
-                onClick={() => setShowNotes(!showNotes)} 
-                className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold backdrop-blur-md transition shadow-lg ${showNotes ? 'bg-blue-600 text-white' : 'bg-black/50 text-white hover:bg-black/80 border border-white/20'}`}
-            >
+            <button onClick={() => setShowNotes(!showNotes)} className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold backdrop-blur-md transition shadow-lg ${showNotes ? 'bg-blue-600 text-white' : 'bg-black/50 text-white hover:bg-black/80 border border-white/20'}`}>
                 <PenLine size={18}/> <span className="hidden md:inline">ملاحظاتي</span>
             </button>
-
             <div className="relative">
                 <button onClick={() => setShowSettings(!showSettings)} className="bg-black/50 hover:bg-black/80 text-white p-2 rounded-full backdrop-blur-sm transition border border-white/20"><GearIcon size={24}/></button>
                 {showSettings && (
                     <div className="absolute top-12 left-0 bg-white text-black rounded-lg shadow-xl py-2 w-40 z-50 text-sm font-bold">
                         <div className="px-4 py-2 border-b text-gray-400 text-xs">سرعة التشغيل</div>
-                        {[0.5, 1, 1.25, 1.5, 2].map(rate => (
-                            <button key={rate} onClick={() => changeSpeed(rate)} className="block w-full text-right px-4 py-2 hover:bg-gray-100">{rate}x</button>
-                        ))}
+                        {[0.5, 1, 1.25, 1.5, 2].map(rate => ( <button key={rate} onClick={() => changeSpeed(rate)} className="block w-full text-right px-4 py-2 hover:bg-gray-100">{rate}x</button> ))}
                     </div>
                 )}
             </div>
@@ -941,32 +602,11 @@ const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
         </div>
 
         <div className="w-full relative flex items-center justify-center bg-black overflow-hidden" style={{ height: showNotes ? '50vh' : '100%', md: { height: '100%' } }}>
-          <div className="watermark-video">
-             {userName} - {video.grade} — منصة النحاس
-          </div>
-          
+          <div className="watermark-video">{userName} - {video.grade} — منصة النحاس</div>
           {videoId ? (
-            <iframe 
-              className="w-full h-full" 
-              src={youtubeEmbedUrl} 
-              title="Video" 
-              frameBorder="0" 
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-              allowFullScreen
-            ></iframe>
+            <iframe className="w-full h-full" src={youtubeEmbedUrl} title="Video" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
           ) : (
-             <video 
-                ref={videoRef} 
-                controls 
-                controlsList="nodownload" 
-                className="w-full h-full object-contain relative z-40" 
-                src={finalUrl}
-                playsInline
-                preload="auto"
-                disablePictureInPicture
-             >
-                المتصفح لا يدعم هذا الفيديو.
-             </video>
+             <video ref={videoRef} controls controlsList="nodownload" className="w-full h-full object-contain relative z-40" src={finalUrl} playsInline preload="auto" disablePictureInPicture>المتصفح لا يدعم هذا الفيديو.</video>
           )}
         </div>
       </div>
@@ -984,44 +624,23 @@ const PomodoroFocusMode = ({ onClose }) => {
 
     useEffect(() => {
         let interval = null;
-        if (isActive && timeLeft > 0) {
-            interval = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
-        } else if (timeLeft === 0) {
-            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-            audio.play();
-            if (isBreak) {
-                setIsBreak(false);
-                setTimeLeft(25 * 60);
-                setIsActive(false);
-            } else {
-                setIsBreak(true);
-                setTimeLeft(5 * 60);
-                setIsActive(false);
-            }
+        if (isActive && timeLeft > 0) { interval = setInterval(() => setTimeLeft(prev => prev - 1), 1000); } 
+        else if (timeLeft === 0) {
+            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); audio.play();
+            if (isBreak) { setIsBreak(false); setTimeLeft(25 * 60); setIsActive(false); } 
+            else { setIsBreak(true); setTimeLeft(5 * 60); setIsActive(false); }
         }
         return () => clearInterval(interval);
     }, [isActive, timeLeft, isBreak]);
 
     const toggleTimer = () => {
         setIsActive(!isActive);
-        if(!isActive && audioRef.current && !isBreak) {
-            audioRef.current.play().catch(e => console.log("Audio play blocked"));
-        } else if(isActive && audioRef.current) {
-            audioRef.current.pause();
-        }
+        if(!isActive && audioRef.current && !isBreak) { audioRef.current.play().catch(e => console.log("Audio play blocked")); } 
+        else if(isActive && audioRef.current) { audioRef.current.pause(); }
     };
 
-    const addTask = (e) => {
-        e.preventDefault();
-        if(newTask.trim()) {
-            setTasks([...tasks, { id: Date.now(), text: newTask, done: false }]);
-            setNewTask("");
-        }
-    };
-
-    const toggleTask = (id) => {
-        setTasks(tasks.map(t => t.id === id ? { ...t, done: !t.done } : t));
-    };
+    const addTask = (e) => { e.preventDefault(); if(newTask.trim()) { setTasks([...tasks, { id: Date.now(), text: newTask, done: false }]); setNewTask(""); } };
+    const toggleTask = (id) => { setTasks(tasks.map(t => t.id === id ? { ...t, done: !t.done } : t)); };
 
     const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
     const s = (timeLeft % 60).toString().padStart(2, '0');
@@ -1029,34 +648,25 @@ const PomodoroFocusMode = ({ onClose }) => {
     return (
         <div className="fixed inset-0 z-[100] bg-slate-900 text-white flex flex-col font-['Cairo']" dir="rtl">
             <audio ref={audioRef} loop src="https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3" />
-            
             <div className="flex justify-between items-center p-6 border-b border-slate-800">
                 <div className="flex items-center gap-2 text-2xl font-bold text-amber-400"><Headphones/> وضع التركيز (Pomodoro)</div>
                 <button onClick={onClose} className="bg-slate-800 hover:bg-slate-700 p-2 rounded-full transition"><X size={24}/></button>
             </div>
-
             <div className="flex-1 flex flex-col lg:flex-row p-6 gap-8 overflow-y-auto">
                 <div className="flex-1 flex flex-col items-center justify-center bg-slate-800/50 rounded-3xl p-8 border border-slate-700 relative overflow-hidden">
                     <div className="absolute top-6 left-6 flex gap-2">
                         <button onClick={() => { setIsBreak(false); setTimeLeft(25 * 60); setIsActive(false); }} className={`px-4 py-1 rounded-full text-sm font-bold transition ${!isBreak ? 'bg-amber-500 text-slate-900' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>مذاكرة (25)</button>
                         <button onClick={() => { setIsBreak(true); setTimeLeft(5 * 60); setIsActive(false); }} className={`px-4 py-1 rounded-full text-sm font-bold transition ${isBreak ? 'bg-green-500 text-slate-900' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>راحة (5)</button>
                     </div>
-
-                    <div className={`text-9xl font-black font-sans my-12 drop-shadow-2xl tracking-widest ${isBreak ? 'text-green-400' : 'text-amber-400'}`}>
-                        {m}:{s}
-                    </div>
-
+                    <div className={`text-9xl font-black font-sans my-12 drop-shadow-2xl tracking-widest ${isBreak ? 'text-green-400' : 'text-amber-400'}`}>{m}:{s}</div>
                     <div className="flex items-center gap-6">
                         <button onClick={toggleTimer} className={`w-24 h-24 rounded-full flex items-center justify-center shadow-xl transition-transform hover:scale-105 ${isActive ? 'bg-red-500 text-white shadow-red-500/50' : 'bg-white text-slate-900 shadow-white/20'}`}>
                             {isActive ? <Pause size={40} fill="currentColor"/> : <Play size={40} fill="currentColor" className="ml-2"/>}
                         </button>
-                        <button onClick={() => setTimeLeft(isBreak ? 5*60 : 25*60)} className="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center hover:bg-slate-600 transition text-slate-300">
-                            <RefreshCw size={24}/>
-                        </button>
+                        <button onClick={() => setTimeLeft(isBreak ? 5*60 : 25*60)} className="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center hover:bg-slate-600 transition text-slate-300"><RefreshCw size={24}/></button>
                     </div>
                     <p className="mt-8 text-slate-400 flex items-center gap-2"><Headphones size={16}/> موسيقى Lo-Fi للتركيز تعمل تلقائياً أثناء جلسة المذاكرة</p>
                 </div>
-
                 <div className="w-full lg:w-96 flex flex-col gap-4">
                     <div className="bg-slate-800 rounded-3xl p-6 border border-slate-700 flex-1 flex flex-col">
                         <h3 className="text-xl font-bold mb-4 text-white flex items-center gap-2"><CheckCircle className="text-amber-400"/> مهام الجلسة</h3>
@@ -1084,60 +694,21 @@ const PomodoroFocusMode = ({ onClose }) => {
 const InteractiveViewer = ({ content, user, onClose }) => {
     const handleContextMenu = (e) => e.preventDefault();
     const [iframeSrc, setIframeSrc] = useState('');
-    
     useEffect(() => {
         let activeBlobUrl = null;
-        
         if (content.url && content.url.startsWith('data:')) {
-            fetch(content.url)
-                .then(res => res.blob())
-                .then(blob => {
-                    activeBlobUrl = URL.createObjectURL(blob);
-                    setIframeSrc(activeBlobUrl);
-                })
-                .catch(err => {
-                    console.error("Error creating blob:", err);
-                    setIframeSrc(content.url);
-                });
-        } else {
-            setIframeSrc(content.url);
-        }
-
-        return () => {
-            if (activeBlobUrl) {
-                URL.revokeObjectURL(activeBlobUrl);
-            }
-        };
+            fetch(content.url).then(res => res.blob()).then(blob => { activeBlobUrl = URL.createObjectURL(blob); setIframeSrc(activeBlobUrl); }).catch(err => { console.error("Error creating blob:", err); setIframeSrc(content.url); });
+        } else { setIframeSrc(content.url); }
+        return () => { if (activeBlobUrl) { URL.revokeObjectURL(activeBlobUrl); } };
     }, [content.url]);
-    
     useEffect(() => {
-        const handleKeyDown = (e) => {
-            if (e.key === 'PrintScreen') {
-                alert('غير مسموح بأخذ لقطات شاشة! المحتوى محمي.');
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText('Screenshots are disabled');
-                }
-            }
-        };
-        
+        const handleKeyDown = (e) => { if (e.key === 'PrintScreen') { alert('غير مسموح بأخذ لقطات شاشة! المحتوى محمي.'); if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText('Screenshots are disabled'); } } };
         const handleCopy = (e) => { e.preventDefault(); alert("النسخ غير مسموح!"); };
-        
-        window.addEventListener('keydown', handleKeyDown);
-        document.addEventListener('copy', handleCopy);
-        document.addEventListener('cut', handleCopy);
-        
-        return () => {
-            window.removeEventListener('keydown', handleKeyDown);
-            document.removeEventListener('copy', handleCopy);
-            document.removeEventListener('cut', handleCopy);
-        };
+        window.addEventListener('keydown', handleKeyDown); document.addEventListener('copy', handleCopy); document.addEventListener('cut', handleCopy);
+        return () => { window.removeEventListener('keydown', handleKeyDown); document.removeEventListener('copy', handleCopy); document.removeEventListener('cut', handleCopy); };
     }, []);
-
     return (
-        <div 
-            className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center p-4 select-none" 
-            onContextMenu={handleContextMenu}
-        >
+        <div className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center p-4 select-none" onContextMenu={handleContextMenu}>
             <div className="w-full h-full max-w-7xl bg-white rounded-xl overflow-hidden relative shadow-2xl border border-gray-800 flex flex-col">
                 <div className="bg-slate-900 p-3 flex justify-between items-center text-white border-b border-gray-700 select-none">
                    <div className="flex items-center gap-4">
@@ -1147,21 +718,9 @@ const InteractiveViewer = ({ content, user, onClose }) => {
                    <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white px-4 py-1 rounded font-bold transition">خروج</button>
                 </div>
                 <div className="flex-1 bg-white relative overflow-hidden">
-                   {user && (
-                       <div className="watermark-video" style={{ pointerEvents: 'none', zIndex: 9999 }}>
-                           {user.name} - {user.grade} — منصة النحاس — أ/ محمد النحاس
-                       </div>
-                   )}
-                   
+                   {user && (<div className="watermark-video" style={{ pointerEvents: 'none', zIndex: 9999 }}>{user.name} - {user.grade} — منصة النحاس — أ/ محمد النحاس</div>)}
                    <div className="absolute inset-0 z-[9998] pointer-events-none select-none"></div>
-
-                   <iframe 
-                     src={iframeSrc} 
-                     className="w-full h-full border-0 relative z-40 bg-white" 
-                     title={content.title}
-                     sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals"
-                     style={{ pointerEvents: 'auto', WebkitTransform: 'translateZ(0)' }}
-                   ></iframe>
+                   <iframe src={iframeSrc} className="w-full h-full border-0 relative z-40 bg-white" title={content.title} sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals" style={{ pointerEvents: 'auto', WebkitTransform: 'translateZ(0)' }}></iframe>
                 </div>
             </div>
         </div>
@@ -1180,15 +739,11 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const [startTime] = useState(Date.now()); 
   const [wmPositions, setWmPositions] = useState([]);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
-
   const [activeBranchTab, setActiveBranchTab] = useState('الكل');
 
   const shuffleArray = (array) => {
     const arr = [...array];
-    for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
+    for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
     return arr;
   };
 
@@ -1200,9 +755,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
         processedBlocks.forEach((block) => {
             let subQs = [...block.subQuestions];
             if (!isReviewMode && !existingResult) subQs = shuffleArray(subQs);
-            subQs.forEach((q) => {
-                flat.push({ ...q, blockText: block.text, branch: q.branch || 'عام' });
-            });
+            subQs.forEach((q) => { flat.push({ ...q, blockText: block.text, branch: q.branch || 'عام' }); });
         });
     }
     return flat;
@@ -1215,9 +768,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
       return flatQuestions.filter(q => q.branch === activeBranchTab);
   }, [flatQuestions, isSubmitted, activeBranchTab]);
 
-  useEffect(() => {
-      if (isSubmitted) setCurrentQIndex(0);
-  }, [activeBranchTab, isSubmitted]);
+  useEffect(() => { if (isSubmitted) setCurrentQIndex(0); }, [activeBranchTab, isSubmitted]);
 
   if (flatQuestions.length === 0) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-white font-['Cairo']">عفواً، لا توجد أسئلة.<button onClick={onClose} className="ml-4 bg-gray-200 px-4 py-2 rounded">خروج</button></div>;
 
@@ -1672,6 +1223,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     </div>
   );
 };
+
 const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
     const [homeworkData, setHomeworkData] = useState(null);
     const [imageSrc, setImageSrc] = useState(null);
@@ -1779,7 +1331,7 @@ const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
                 <button onClick={onClose} className="bg-red-600 px-4 py-1 rounded text-sm font-bold">إلغاء</button>
             </div>
             
-            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center overflow-y-auto">
                 {!imageSrc ? (
                     <div className="space-y-6">
                         <div className="w-32 h-32 bg-slate-800 rounded-full flex items-center justify-center mx-auto border-4 border-blue-500 border-dashed">
@@ -1831,12 +1383,12 @@ const AdminDashboard = ({ user }) => {
   const [activeUsersList, setActiveUsersList] = useState([]);
   const [contentList, setContentList] = useState([]);
   const [messagesList, setMessagesList] = useState([]); 
-  const [newContent, setNewContent] = useState({ title: '', url: '', type: 'video', isPublic: false, grade: '3sec', allowedEmails: '' });
+  const [newContent, setNewContent] = useState({ title: '', url: '', type: 'video', isPublic: false, grade: '3sec', allowedEmails: '', isPremium: false });
   const [liveData, setLiveData] = useState({ title: '', liveUrl: '', grade: '3sec', passcode: '', allowedEmails: '' });
   const [activeLiveSessions, setActiveLiveSessions] = useState([]);
   const [editingUser, setEditingUser] = useState(null);
   const [replyTexts, setReplyTexts] = useState({});
-  const [examBuilder, setExamBuilder] = useState({ title: '', grade: '3sec', duration: 60, startTime: '', endTime: '', questions: [], accessCode: '' });
+  const [examBuilder, setExamBuilder] = useState({ title: '', grade: '3sec', duration: 60, startTime: '', endTime: '', questions: [], accessCode: '', isPremium: false });
   const [bulkText, setBulkText] = useState('');
   const [examsList, setExamsList] = useState([]);
   const [examResults, setExamResults] = useState([]); 
@@ -1862,6 +1414,11 @@ const AdminDashboard = ({ user }) => {
   const [smartHomeworks, setSmartHomeworks] = useState([]);
   const [newSmartHw, setNewSmartHw] = useState({ title: '', answerKey: '', grade: '3sec', bookName: '' });
   const [hwResults, setHwResults] = useState([]);
+
+  // أكواد الاشتراك
+  const [subscriptionCodes, setSubscriptionCodes] = useState([]);
+  const [codeGenCount, setCodeGenCount] = useState(10);
+  const [codeGenDays, setCodeGenDays] = useState(30);
 
   useEffect(() => {
       const q = query(collection(db, 'users'), where('status','==','pending'));
@@ -1932,6 +1489,12 @@ const AdminDashboard = ({ user }) => {
       return u;
   }, []);
 
+  useEffect(() => {
+      const q = query(collection(db, 'subscription_codes'), orderBy('createdAt', 'desc'));
+      const u = onSnapshot(q, s => setSubscriptionCodes(s.docs.map(d => ({id: d.id, ...d.data()}))));
+      return u;
+  }, []);
+
   const handleApprove = async (id) => {
     await updateDoc(doc(db,'users',id), {status:'active'});
     sendSystemNotification("مبروك! 🎉", "تم تفعيل حسابك بنجاح.");
@@ -1943,6 +1506,47 @@ const AdminDashboard = ({ user }) => {
   
   const handleChangeUserStatus = async (id, newStatus) => {
       await updateDoc(doc(db,'users',id), {status: newStatus});
+  };
+
+  const handleToggleSubscription = async (user) => {
+      const isCurrentlyPremium = user.subscriptionStatus === 'premium';
+      if (isCurrentlyPremium) {
+          if(window.confirm("تحويل الطالب لباقة مجانية؟")) {
+              await updateDoc(doc(db, 'users', user.id), { subscriptionStatus: 'free', subscriptionExpiry: null });
+          }
+      } else {
+          const days = prompt("كم يوم تريد تفعيل الباقة لهذا الطالب؟", "30");
+          if (days && !isNaN(days)) {
+              const expiryDate = new Date();
+              expiryDate.setDate(expiryDate.getDate() + parseInt(days));
+              await updateDoc(doc(db, 'users', user.id), { subscriptionStatus: 'premium', subscriptionExpiry: expiryDate });
+              alert(`تم تفعيل الطالب لمدة ${days} يوم.`);
+          }
+      }
+  };
+
+  const generateSubscriptionCodes = async () => {
+      if(!codeGenCount || !codeGenDays) return;
+      if(window.confirm(`هل أنت متأكد من توليد ${codeGenCount} كود جديد لمدة ${codeGenDays} يوم؟`)) {
+          const batch = writeBatch(db);
+          for(let i=0; i<codeGenCount; i++) {
+              const codeString = 'NAHAS-' + Math.random().toString(36).substring(2,8).toUpperCase();
+              const newDocRef = doc(collection(db, 'subscription_codes'));
+              batch.set(newDocRef, {
+                  code: codeString,
+                  days: parseInt(codeGenDays),
+                  used: false,
+                  usedBy: null,
+                  createdAt: serverTimestamp()
+              });
+          }
+          await batch.commit();
+          alert("تم توليد الأكواد بنجاح!");
+      }
+  };
+
+  const handleDeleteCode = async (id) => {
+      if(window.confirm("حذف هذا الكود؟")) await deleteDoc(doc(db, 'subscription_codes', id));
   };
 
   const handleDeleteUser = async (id) => { if(window.confirm("حذف نهائي؟")) await deleteDoc(doc(db,'users',id)); };
@@ -1964,19 +1568,11 @@ const AdminDashboard = ({ user }) => {
 
   const sendWhatsAppToParent = (result) => {
       const student = activeUsersList.find(u => u.id === result.studentId);
-      if (!student || !student.parentPhone) {
-          return alert("لا يوجد رقم ولي أمر مسجل لهذا الطالب!");
-      }
-
+      if (!student || !student.parentPhone) return alert("لا يوجد رقم ولي أمر مسجل لهذا الطالب!");
       let phone = student.parentPhone.trim();
-      if (phone.startsWith('0')) {
-          phone = '20' + phone.substring(1);
-      }
-
+      if (phone.startsWith('0')) phone = '20' + phone.substring(1);
       const examName = examsList.find(e => e.id === result.examId)?.title || 'اختبار';
-      
-      const message = `مرحباً ولي أمر الطالب/ة: *${result.studentName}* 🎓\n\nنحيط سيادتكم علماً بنتيجة امتحان: *${examName}*\nالدرجة التي حصل عليها: *${result.score}* من *${result.total}* 📊\n\nمع خالص تحيات إدارة منصة النحاس.`;
-      
+      const message = `مرحباً ولي أمر الطالب/ة: *${result.studentName}* 🎓\n\nنحيط سيادتكم علماً بنتيجة امتحان: *${examName}*\nالدرجة التي حصل عليها: *${result.score}* من *${result.total}* 📊\n\nمع خالص تحيات إدارة منصة النحاس - أ/ محمد النحاس.`;
       const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
       window.open(whatsappUrl, '_blank');
   };
@@ -1989,34 +1585,24 @@ const AdminDashboard = ({ user }) => {
           const history = snap.docs.map(d => d.data());
           history.sort((a, b) => (b.viewedAt?.seconds || 0) - (a.viewedAt?.seconds || 0));
           setStudentHistoryData(history);
-      } catch (error) {
-          console.error("Error fetching history:", error);
-      }
+      } catch (error) { console.error("Error fetching history:", error); }
   };
 
   const handleUpdateExamTime = async (e) => {
       e.preventDefault();
       if (!newEndTime) return;
       try {
-          await updateDoc(doc(db, 'exams', editingExamTime.id), {
-              endTime: newEndTime
-          });
+          await updateDoc(doc(db, 'exams', editingExamTime.id), { endTime: newEndTime });
           alert("تم تمديد وقت الامتحان بنجاح!");
           setEditingExamTime(null);
           setNewEndTime('');
-      } catch (error) {
-          console.error("Error updating exam time:", error);
-          alert("حدث خطأ أثناء تعديل الوقت.");
-      }
+      } catch (error) { console.error("Error updating exam time:", error); alert("حدث خطأ أثناء تعديل الوقت."); }
   };
 
   const handleCreateSmartHw = async (e) => {
       e.preventDefault();
       if (!newSmartHw.title || !newSmartHw.answerKey || !newSmartHw.bookName) return alert("أكمل البيانات (الاسم، الإجابة، والكتاب)");
-      await addDoc(collection(db, 'smart_homeworks'), {
-          ...newSmartHw,
-          createdAt: serverTimestamp()
-      });
+      await addDoc(collection(db, 'smart_homeworks'), { ...newSmartHw, createdAt: serverTimestamp() });
       setNewSmartHw(prev => ({ ...prev, title: '', answerKey: '' }));
       alert("تم إنشاء الواجب! يمكنك نسخ الرابط الآن.");
   };
@@ -2032,11 +1618,7 @@ const AdminDashboard = ({ user }) => {
   const handleAddAnnouncement = async () => {
       if(!newAnnouncement.trim()) return;
       await addDoc(collection(db, 'announcements'), { text: newAnnouncement, createdAt: serverTimestamp() });
-      await addDoc(collection(db, 'notifications'), {
-        text: `تنبيه هام: ${newAnnouncement}`,
-        grade: 'all',
-        createdAt: serverTimestamp()
-      });
+      await addDoc(collection(db, 'notifications'), { text: `تنبيه هام: ${newAnnouncement}`, grade: 'all', createdAt: serverTimestamp() });
       setNewAnnouncement("");
       alert("تم نشر الإعلان");
   };
@@ -2045,10 +1627,7 @@ const AdminDashboard = ({ user }) => {
       e.preventDefault(); 
       if(!editingUser) return; 
       await updateDoc(doc(db, 'users', editingUser.id), { 
-          name: editingUser.name, 
-          phone: editingUser.phone, 
-          parentPhone: editingUser.parentPhone, 
-          grade: editingUser.grade 
+          name: editingUser.name, phone: editingUser.phone, parentPhone: editingUser.parentPhone, grade: editingUser.grade 
       }); 
       setEditingUser(null); 
   };
@@ -2059,19 +1638,12 @@ const AdminDashboard = ({ user }) => {
   
   const approveGrade = async (user) => {
       if (!user.requestedGrade) return;
-      await updateDoc(doc(db, 'users', user.id), {
-          grade: user.requestedGrade,
-          requestedGrade: null,
-          gradeUpdateStatus: null
-      });
+      await updateDoc(doc(db, 'users', user.id), { grade: user.requestedGrade, requestedGrade: null, gradeUpdateStatus: null });
       alert(`تم تغيير مرحلة الطالب ${user.name} بنجاح.`);
   };
 
   const rejectGrade = async (user) => {
-      await updateDoc(doc(db, 'users', user.id), {
-          requestedGrade: null,
-          gradeUpdateStatus: null
-      });
+      await updateDoc(doc(db, 'users', user.id), { requestedGrade: null, gradeUpdateStatus: null });
       alert(`تم رفض طلب تغيير المرحلة للطالب ${user.name}.`);
   };
 
@@ -2120,7 +1692,7 @@ const AdminDashboard = ({ user }) => {
       } 
       
       alert("تم النشر!"); 
-      setNewContent({ title: '', url: '', type: 'video', isPublic: false, grade: '3sec', allowedEmails: '' });
+      setNewContent({ title: '', url: '', type: 'video', isPublic: false, grade: '3sec', allowedEmails: '', isPremium: false });
   }; 
   
   const handleDeleteContent = async (id) => { 
@@ -2131,10 +1703,7 @@ const AdminDashboard = ({ user }) => {
       if(!liveData.liveUrl) return alert("الرابط مطلوب!"); 
       const allowedEmailsArray = liveData.allowedEmails ? liveData.allowedEmails.split(',').map(email => email.trim()) : [];
       await addDoc(collection(db, 'live_sessions'), { 
-          ...liveData, 
-          allowedEmails: allowedEmailsArray,
-          status: 'active', 
-          createdAt: serverTimestamp() 
+          ...liveData, allowedEmails: allowedEmailsArray, status: 'active', createdAt: serverTimestamp() 
       }); 
       if (allowedEmailsArray.length === 0) {
           await addDoc(collection(db, 'notifications'), { text: `🔴 بث مباشر الآن: ${liveData.title}`, grade: liveData.grade, createdAt: serverTimestamp() }); 
@@ -2156,61 +1725,29 @@ const AdminDashboard = ({ user }) => {
     if (!examBuilder.startTime || !examBuilder.endTime) return alert("يرجى تحديد وقت البدء والانتهاء");
 
     const lines = bulkText.split('\n').map(l => l.trim());
-    const blocks = [];
-    let currentBlock = { text: '', subQuestions: [] };
-    let currentQ = null;
-    let isReadingPassage = false;
-    let currentBranch = 'عام'; 
+    const blocks = []; let currentBlock = { text: '', subQuestions: [] }; let currentQ = null; let isReadingPassage = false; let currentBranch = 'عام'; 
 
     lines.forEach(line => {
-      if (line.startsWith('#فرع:') || line.startsWith('#الفرع:')) {
-          currentBranch = line.replace('#فرع:', '').replace('#الفرع:', '').trim();
-          return;
-      }
-
+      if (line.startsWith('#فرع:') || line.startsWith('#الفرع:')) { currentBranch = line.replace('#فرع:', '').replace('#الفرع:', '').trim(); return; }
       if (line === 'بداية القطعة') { 
           if (currentQ) { currentBlock.subQuestions.push(currentQ); currentQ = null; }
           if (currentBlock.subQuestions.length > 0) { blocks.push(currentBlock); } 
-          currentBlock = { text: '', subQuestions: [] }; 
-          isReadingPassage = true; 
-          return; 
+          currentBlock = { text: '', subQuestions: [] }; isReadingPassage = true; return; 
       }
       if (line === 'نهاية القطعة') { isReadingPassage = false; return; }
       if (line === 'حذف القطعة') { 
           if(currentQ) { currentBlock.subQuestions.push(currentQ); currentQ = null; } 
           if (currentBlock.subQuestions.length > 0) { blocks.push(currentBlock); }
-          currentBlock = { text: '', subQuestions: [] }; 
-          return; 
+          currentBlock = { text: '', subQuestions: [] }; return; 
       }
 
-      if (isReadingPassage) { 
-          if(line !== '') currentBlock.text += line + '\n'; 
-      } 
+      if (isReadingPassage) { if(line !== '') currentBlock.text += line + '\n'; } 
       else {
-        if (line === '') {
-            if (currentQ && currentQ.options.length > 0) {
-                currentBlock.subQuestions.push(currentQ);
-                currentQ = null;
-            }
-            return;
-        }
-
-        const isCorrect = line.startsWith('*');
-        const optText = isCorrect ? line.substring(1).trim() : line.trim();
-
-        if (currentQ && currentQ.options.length >= 4 && !isCorrect) {
-            currentBlock.subQuestions.push(currentQ);
-            currentQ = null;
-        }
-
-        if (!currentQ) {
-            currentQ = { id: Date.now() + Math.random(), text: optText, options: [], correctIdx: 0, branch: currentBranch };
-        } else {
-            if (isCorrect) {
-                currentQ.correctIdx = currentQ.options.length;
-            }
-            currentQ.options.push(optText);
-        }
+        if (line === '') { if (currentQ && currentQ.options.length > 0) { currentBlock.subQuestions.push(currentQ); currentQ = null; } return; }
+        const isCorrect = line.startsWith('*'); const optText = isCorrect ? line.substring(1).trim() : line.trim();
+        if (currentQ && currentQ.options.length >= 4 && !isCorrect) { currentBlock.subQuestions.push(currentQ); currentQ = null; }
+        if (!currentQ) { currentQ = { id: Date.now() + Math.random(), text: optText, options: [], correctIdx: 0, branch: currentBranch }; } 
+        else { if (isCorrect) { currentQ.correctIdx = currentQ.options.length; } currentQ.options.push(optText); }
       }
     });
     
@@ -2223,6 +1760,7 @@ const AdminDashboard = ({ user }) => {
     await addDoc(collection(db, 'exams'), { 
         title: examBuilder.title, grade: examBuilder.grade, duration: examBuilder.duration, 
         startTime: examBuilder.startTime, endTime: examBuilder.endTime, accessCode: examBuilder.accessCode, 
+        isPremium: examBuilder.isPremium,
         questions: finalBlocks, createdAt: serverTimestamp() 
     });
     
@@ -2242,23 +1780,14 @@ const AdminDashboard = ({ user }) => {
       setNewAutoReply({ keywords: '', response: '', isActive: true });
   };
   
-  const toggleAutoReply = async (id, currentStatus) => {
-      await updateDoc(doc(db, 'auto_replies', id), { isActive: !currentStatus });
-  };
-  
-  const deleteAutoReply = async (id) => {
-      if(window.confirm("حذف هذا الرد؟")) await deleteDoc(doc(db, 'auto_replies', id));
-  };
-
+  const toggleAutoReply = async (id, currentStatus) => { await updateDoc(doc(db, 'auto_replies', id), { isActive: !currentStatus }); };
+  const deleteAutoReply = async (id) => { if(window.confirm("حذف هذا الرد؟")) await deleteDoc(doc(db, 'auto_replies', id)); };
   const handleAddQuote = async () => {
       if(!newQuote.text || !newQuote.source) return alert("أكمل البيانات");
       await addDoc(collection(db, 'quotes'), { ...newQuote, createdAt: serverTimestamp() });
       setNewQuote({ text: '', source: '' });
   };
-  
-  const deleteQuote = async (id) => {
-      if(window.confirm("حذف هذه الحكمة؟")) await deleteDoc(doc(db, 'quotes', id));
-  };
+  const deleteQuote = async (id) => { if(window.confirm("حذف هذه الحكمة؟")) await deleteDoc(doc(db, 'quotes', id)); };
 
   const filteredPendingUsers = pendingUsers.filter(u => adminGradeFilter === 'all' || u.grade === adminGradeFilter);
   const filteredActiveUsers = activeUsersList.filter(u => adminGradeFilter === 'all' || u.grade === adminGradeFilter);
@@ -2267,7 +1796,7 @@ const AdminDashboard = ({ user }) => {
   const filteredLiveSessions = activeLiveSessions.filter(ls => adminGradeFilter === 'all' || ls.grade === adminGradeFilter);
 
   return (
-    <div className="min-h-screen bg-slate-100 font-['Cairo'] relative" dir="rtl">
+    <div className="min-h-screen bg-slate-100 font-['Cairo'] relative overflow-x-hidden" dir="rtl">
       <FloatingArabicBackground />
 
       {editingExamTime && (
@@ -2278,13 +1807,7 @@ const AdminDashboard = ({ user }) => {
                   <p className="text-sm text-slate-600 mb-6 font-bold">{editingExamTime.title}</p>
                   <form onSubmit={handleUpdateExamTime}>
                       <label className="block text-sm font-bold mb-2 text-slate-800">تاريخ ووقت الانتهاء الجديد:</label>
-                      <input 
-                          type="datetime-local" 
-                          className="w-full border-2 border-blue-200 p-3 rounded-xl mb-6 bg-blue-50 focus:border-blue-500 outline-none transition" 
-                          value={newEndTime} 
-                          onChange={(e) => setNewEndTime(e.target.value)} 
-                          required
-                      />
+                      <input type="datetime-local" className="w-full border-2 border-blue-200 p-3 rounded-xl mb-6 bg-blue-50 focus:border-blue-500 outline-none transition" value={newEndTime} onChange={(e) => setNewEndTime(e.target.value)} required />
                       <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg hover:shadow-blue-500/50">حفظ التعديل</button>
                   </form>
               </div>
@@ -2294,14 +1817,17 @@ const AdminDashboard = ({ user }) => {
       {viewingStudentProfile && (
           <div className="fixed inset-0 z-[1000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-slate-50 rounded-3xl w-full max-w-6xl h-[90vh] shadow-2xl flex flex-col relative overflow-hidden border border-slate-300">
-                  
                   <div className="bg-white border-b border-slate-200 p-6 flex justify-between items-start flex-shrink-0">
                       <div className="flex gap-4 items-center">
                           <div className="w-16 h-16 bg-blue-100 text-blue-700 rounded-2xl flex items-center justify-center font-bold text-2xl shadow-inner">
                               {viewingStudentProfile.name.charAt(0)}
                           </div>
                           <div>
-                              <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">{viewingStudentProfile.name} <span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600">{getGradeLabel(viewingStudentProfile.grade)}</span></h2>
+                              <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                                  {viewingStudentProfile.name} 
+                                  <span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600">{getGradeLabel(viewingStudentProfile.grade)}</span>
+                                  {viewingStudentProfile.subscriptionStatus === 'premium' && <span className="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded-full font-bold flex items-center gap-1"><Crown size={12}/> VIP</span>}
+                              </h2>
                               <div className="flex gap-4 mt-2 text-sm text-slate-500 font-bold">
                                   <span className="flex items-center gap-1"><Phone size={14}/> {viewingStudentProfile.phone}</span>
                                   <span className="flex items-center gap-1 text-amber-600"><Users size={14}/> ولي الأمر: {viewingStudentProfile.parentPhone}</span>
@@ -2313,7 +1839,6 @@ const AdminDashboard = ({ user }) => {
 
                   <div className="flex-1 overflow-y-auto p-6">
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                          
                           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col h-[500px]">
                               <h3 className="font-bold text-lg mb-4 text-blue-800 flex items-center gap-2 border-b pb-2"><PlayCircle/> سجل مشاهدات الفيديوهات</h3>
                               <div className="flex-1 overflow-y-auto space-y-3 pr-2">
@@ -2323,17 +1848,13 @@ const AdminDashboard = ({ user }) => {
                                               <p className="font-bold text-slate-800">{v.videoTitle}</p>
                                               <p className="text-xs text-slate-400 mt-1">آخر فتح: {v.viewedAt?.toDate().toLocaleString('ar-EG')}</p>
                                           </div>
-                                          <div className="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg text-xs font-bold text-center">
-                                              شاهد لمدة<br/>
-                                              <span className="text-sm">{formatWatchTime(v.watchedSeconds)}</span>
-                                          </div>
+                                          <div className="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg text-xs font-bold text-center">شاهد لمدة<br/><span className="text-sm">{formatWatchTime(v.watchedSeconds)}</span></div>
                                       </div>
                                   ))}
                               </div>
                           </div>
 
                           <div className="flex flex-col gap-6 h-[500px]">
-                              
                               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex-1 flex flex-col overflow-hidden">
                                   <h3 className="font-bold text-lg mb-4 text-emerald-800 flex items-center gap-2 border-b pb-2"><ClipboardList/> نتائج الامتحانات</h3>
                                   <div className="flex-1 overflow-y-auto space-y-3 pr-2">
@@ -2343,9 +1864,7 @@ const AdminDashboard = ({ user }) => {
                                           return sExams.map(ex => (
                                               <div key={ex.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
                                                   <p className="font-bold text-slate-700 text-sm">{examsList.find(e => e.id === ex.examId)?.title || 'امتحان محذوف'}</p>
-                                                  <span className={`px-3 py-1 rounded-lg text-sm font-bold ${ex.status === 'cheated' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-700'}`}>
-                                                      {ex.status === 'cheated' ? 'غش 🚫' : `${ex.score}/${ex.total}`}
-                                                  </span>
+                                                  <span className={`px-3 py-1 rounded-lg text-sm font-bold ${ex.status === 'cheated' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-700'}`}>{ex.status === 'cheated' ? 'غش 🚫' : `${ex.score}/${ex.total}`}</span>
                                               </div>
                                           ))
                                       })()}
@@ -2370,7 +1889,6 @@ const AdminDashboard = ({ user }) => {
                                       })()}
                                   </div>
                               </div>
-
                           </div>
                       </div>
                   </div>
@@ -2381,11 +1899,7 @@ const AdminDashboard = ({ user }) => {
       <header className="flex justify-between items-center mb-8 glass-panel p-4 rounded-xl relative z-10 m-4">
         <div className="flex items-center gap-2"><ShieldAlert className="text-amber-600"/> <h1 className="text-2xl font-bold font-arabic text-slate-800">لوحة تحكم النحاس (الأدمن)</h1></div>
         <div className="flex gap-4 items-center">
-            <select 
-                className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg font-bold shadow-sm cursor-pointer"
-                value={adminGradeFilter}
-                onChange={(e) => setAdminGradeFilter(e.target.value)}
-            >
+            <select className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg font-bold shadow-sm cursor-pointer hidden md:block" value={adminGradeFilter} onChange={(e) => setAdminGradeFilter(e.target.value)}>
                 <option value="all">كل المراحل الدراسية</option>
                 <GradeOptions />
             </select>
@@ -2393,37 +1907,28 @@ const AdminDashboard = ({ user }) => {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-6 relative z-10">
-        <div className="glass-panel p-4 rounded-xl h-fit space-y-2">
-          {['users', 'all_users', 'exams', 'results', 'smart_hw', 'live', 'content', 'messages', 'auto_reply', 'quotes', 'settings'].map(tab => (
-            <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 transition-all ${activeTab===tab?'bg-amber-100 text-amber-700 shadow-sm border-r-4 border-amber-500':'hover:bg-slate-50 text-slate-600'}`}>
-              {tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : 'الإعدادات'}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-4 md:p-6 relative z-10">
+        <div className="glass-panel p-4 rounded-xl h-fit space-y-2 flex md:flex-col overflow-x-auto md:overflow-x-visible whitespace-nowrap scrollbar-hide">
+          {['users', 'all_users', 'subscriptions', 'exams', 'results', 'smart_hw', 'live', 'content', 'messages', 'auto_reply', 'quotes', 'settings'].map(tab => (
+            <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 transition-all ${activeTab===tab?'bg-amber-100 text-amber-700 shadow-sm border-b-4 md:border-b-0 md:border-r-4 border-amber-500':'hover:bg-slate-50 text-slate-600'}`}>
+              {tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : 'الإعدادات'}
             </button>
           ))}
         </div>
 
-        <div className="md:col-span-3">
-          {activeTab === 'users' && (
-              <div className="glass-panel p-6 rounded-xl">
-                  <h2 className="font-bold mb-4 font-arabic text-xl">طلبات الانضمام</h2>
-                  {filteredPendingUsers.map(u=>(
-                      <div key={u.id} className="border p-4 mb-2 rounded-lg flex justify-between bg-white/50 backdrop-blur-sm">
-                          <div>
-                              <p className="font-bold">{u.name}</p>
-                              <p className="text-sm">{u.grade}</p>
-                          </div>
-                          <div className="flex gap-2">
-                              <button onClick={()=>handleApprove(u.id)} className="bg-green-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-green-500/50 transition"><Check/></button>
-                              <button onClick={()=>handleReject(u.id)} className="bg-red-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-red-500/50 transition"><X/></button>
-                          </div>
-                      </div>
-                  ))}
-              </div>
-          )}
+        <div className="md:col-span-3 w-full overflow-hidden">
+          {activeTab === 'users' && <div className="glass-panel p-4 md:p-6 rounded-xl"><h2 className="font-bold mb-4 font-arabic text-xl">طلبات الانضمام</h2>{filteredPendingUsers.map(u=><div key={u.id} className="border p-4 mb-2 rounded-lg flex flex-col md:flex-row gap-3 justify-between bg-white/50 backdrop-blur-sm"><div><p className="font-bold">{u.name}</p><p className="text-sm">{u.grade}</p></div><div className="flex gap-2"><button onClick={()=>handleApprove(u.id)} className="bg-green-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-green-500/50 transition flex-1"><Check className="mx-auto"/></button><button onClick={()=>handleReject(u.id)} className="bg-red-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-red-500/50 transition flex-1"><X className="mx-auto"/></button></div></div>)}</div>}
 
           {activeTab === 'all_users' && (
-              <div className="glass-panel p-6 rounded-xl">
-                  <h2 className="font-bold mb-4 font-arabic text-xl">قائمة الطلاب ({filteredActiveUsers.length})</h2>
+              <div className="glass-panel p-4 md:p-6 rounded-xl">
+                  <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
+                      <h2 className="font-bold font-arabic text-xl">قائمة الطلاب ({filteredActiveUsers.length})</h2>
+                      <div className="md:hidden">
+                          <select className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg font-bold shadow-sm w-full" value={adminGradeFilter} onChange={(e) => setAdminGradeFilter(e.target.value)}>
+                              <option value="all">كل المراحل</option><GradeOptions />
+                          </select>
+                      </div>
+                  </div>
                   
                   {editingUser && (
                       <div className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -2431,24 +1936,10 @@ const AdminDashboard = ({ user }) => {
                               <button onClick={() => setEditingUser(null)} className="absolute top-4 left-4 text-slate-400 hover:text-red-500"><X size={24}/></button>
                               <h3 className="text-xl font-bold mb-6 text-blue-800 flex items-center gap-2 border-b pb-2"><Edit size={24}/> تعديل بيانات الطالب</h3>
                               <form onSubmit={handleUpdateUser} className="space-y-4">
-                                  <div>
-                                      <label className="block text-sm font-bold mb-1 text-slate-700">اسم الطالب</label>
-                                      <input className="w-full border-2 border-blue-100 p-3 rounded-xl bg-blue-50 focus:border-blue-500 outline-none transition" value={editingUser.name || ''} onChange={e=>setEditingUser({...editingUser, name:e.target.value})} required/>
-                                  </div>
-                                  <div>
-                                      <label className="block text-sm font-bold mb-1 text-slate-700">رقم هاتف الطالب</label>
-                                      <input type="tel" className="w-full border-2 border-blue-100 p-3 rounded-xl bg-blue-50 focus:border-blue-500 outline-none transition" value={editingUser.phone || ''} onChange={e=>setEditingUser({...editingUser, phone:e.target.value})} required/>
-                                  </div>
-                                  <div>
-                                      <label className="block text-sm font-bold mb-1 text-slate-700">رقم هاتف ولي الأمر</label>
-                                      <input type="tel" className="w-full border-2 border-blue-100 p-3 rounded-xl bg-blue-50 focus:border-blue-500 outline-none transition" value={editingUser.parentPhone || ''} onChange={e=>setEditingUser({...editingUser, parentPhone:e.target.value})} required/>
-                                  </div>
-                                  <div>
-                                      <label className="block text-sm font-bold mb-1 text-slate-700">المرحلة الدراسية</label>
-                                      <select className="w-full border-2 border-blue-100 p-3 rounded-xl bg-white focus:border-blue-500 outline-none transition" value={editingUser.grade || '1sec'} onChange={e=>setEditingUser({...editingUser, grade:e.target.value})}>
-                                          <GradeOptions />
-                                      </select>
-                                  </div>
+                                  <div><label className="block text-sm font-bold mb-1 text-slate-700">اسم الطالب</label><input className="w-full border-2 border-blue-100 p-3 rounded-xl bg-blue-50 focus:border-blue-500 outline-none transition" value={editingUser.name || ''} onChange={e=>setEditingUser({...editingUser, name:e.target.value})} required/></div>
+                                  <div><label className="block text-sm font-bold mb-1 text-slate-700">رقم هاتف الطالب</label><input type="tel" className="w-full border-2 border-blue-100 p-3 rounded-xl bg-blue-50 focus:border-blue-500 outline-none transition" value={editingUser.phone || ''} onChange={e=>setEditingUser({...editingUser, phone:e.target.value})} required/></div>
+                                  <div><label className="block text-sm font-bold mb-1 text-slate-700">رقم هاتف ولي الأمر</label><input type="tel" className="w-full border-2 border-blue-100 p-3 rounded-xl bg-blue-50 focus:border-blue-500 outline-none transition" value={editingUser.parentPhone || ''} onChange={e=>setEditingUser({...editingUser, parentPhone:e.target.value})} required/></div>
+                                  <div><label className="block text-sm font-bold mb-1 text-slate-700">المرحلة الدراسية</label><select className="w-full border-2 border-blue-100 p-3 rounded-xl bg-white focus:border-blue-500 outline-none transition" value={editingUser.grade || '1sec'} onChange={e=>setEditingUser({...editingUser, grade:e.target.value})}><GradeOptions /></select></div>
                                   <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg hover:shadow-blue-500/50 mt-2">حفظ التعديلات</button>
                               </form>
                           </div>
@@ -2458,60 +1949,49 @@ const AdminDashboard = ({ user }) => {
                   <div className="grid gap-4">
                       {filteredActiveUsers.map(u=>(
                           <div key={u.id} className={`p-4 rounded-xl border flex flex-col justify-between gap-4 transition-all hover:shadow-lg ${u.status.startsWith('banned') ? 'bg-red-50 border-red-200' : 'bg-white/50 border-slate-100'}`}>
-                              <div className="flex flex-col md:flex-row justify-between w-full">
+                              <div className="flex flex-col lg:flex-row justify-between w-full gap-4">
                                   <div className="flex-1">
-                                      <div className="flex items-center gap-2 mb-1">
+                                      <div className="flex flex-wrap items-center gap-2 mb-2">
                                           <p className="font-bold text-lg text-slate-800">{u.name}</p>
                                           <span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600">{getGradeLabel(u.grade)}</span>
+                                          {u.subscriptionStatus === 'premium' ? (
+                                              <span className="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded-full font-bold flex items-center gap-1"><Crown size={12}/> VIP</span>
+                                          ) : (
+                                              <span className="bg-slate-100 text-slate-500 text-xs px-2 py-1 rounded-full font-bold">مجاني</span>
+                                          )}
                                           {u.status.startsWith('banned') && <span className="text-xs bg-red-600 text-white px-2 py-1 rounded-full font-bold">محظور</span>}
                                       </div>
                                       <div className="text-sm text-slate-500 space-y-1">
-                                          <p className="flex items-center gap-2"><Mail size={14}/> {u.email}</p>
                                           <p className="flex items-center gap-2"><Phone size={14} className="text-blue-600"/> الطالب: {u.phone}</p>
                                           <p className="flex items-center gap-2 font-bold text-amber-700"><Users size={14}/> ولي الأمر: {u.parentPhone}</p>
+                                          {u.subscriptionStatus === 'premium' && u.subscriptionExpiry && (
+                                              <p className="flex items-center gap-2 text-green-600 font-bold"><Clock size={14}/> ينتهي اشتراكه: {u.subscriptionExpiry.toDate().toLocaleDateString('ar-EG')}</p>
+                                          )}
                                       </div>
                                   </div>
                                   
-                                  <div className="flex flex-col gap-2 w-full md:w-auto mt-4 md:mt-0">
-                                      <div className="flex gap-2">
-                                          {u.status.startsWith('banned') && (
-                                              <button 
-                                                  onClick={() => handleChangeUserStatus(u.id, 'active')}
-                                                  className="bg-green-100 text-green-700 px-3 py-1 rounded-lg text-xs font-bold hover:bg-green-200 flex items-center gap-1"
-                                              >
-                                                  <Unlock size={14} /> فك الحظر
-                                              </button>
-                                          )}
-                                          <select 
-                                              className="text-xs border p-2 rounded-lg bg-white"
-                                              value={u.status}
-                                              onChange={(e) => handleChangeUserStatus(u.id, e.target.value)}
-                                          >
-                                              <option value="active">نشط (Active)</option>
-                                              <option value="banned_all">حظر شامل (Full Ban)</option>
-                                              <option value="banned_exam">حظر امتحانات (Exam Ban)</option>
-                                              <option value="banned_content">حظر محتوى (Content Ban)</option>
+                                  <div className="flex flex-col gap-2 w-full lg:w-auto">
+                                      <div className="flex flex-wrap gap-2">
+                                          <button onClick={() => handleToggleSubscription(u)} className={`flex-1 lg:flex-none px-3 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 shadow-sm ${u.subscriptionStatus === 'premium' ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'}`}>
+                                              <Crown size={14}/> {u.subscriptionStatus === 'premium' ? 'إلغاء الباقة' : 'تفعيل باقة VIP'}
+                                          </button>
+                                          <select className="flex-1 lg:flex-none text-xs border p-2 rounded-lg bg-white font-bold" value={u.status} onChange={(e) => handleChangeUserStatus(u.id, e.target.value)}>
+                                              <option value="active">نشط</option><option value="banned_all">حظر شامل</option><option value="banned_exam">حظر امتحانات</option><option value="banned_content">حظر محتوى</option>
                                           </select>
                                       </div>
-                                      <div className="flex gap-2 justify-end">
-                                          <button onClick={()=>openStudentProfile(u)} className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-bold shadow-md flex items-center gap-2" title="ملف الطالب الشامل"><FileCheck size={16}/> ملف الطالب</button>
-                                          <button onClick={()=>setEditingUser(u)} className="bg-blue-100 text-blue-600 p-2 rounded-lg hover:bg-blue-200" title="تعديل"><Edit size={16}/></button>
-                                          <button onClick={()=>handleSendResetPassword(u.email)} className="bg-amber-100 text-amber-600 p-2 rounded-lg hover:bg-amber-200" title="تغيير كلمة السر"><KeyRound size={16}/></button>
-                                          <button onClick={()=>handleDeleteUser(u.id)} className="bg-red-100 text-red-600 p-2 rounded-lg hover:bg-red-200" title="حذف"><Trash2 size={16}/></button>
+                                      <div className="flex gap-2 justify-end mt-2">
+                                          <button onClick={()=>openStudentProfile(u)} className="flex-1 lg:flex-none bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-bold shadow-md flex items-center justify-center gap-2"><FileCheck size={16}/> ملف الطالب</button>
+                                          <button onClick={()=>setEditingUser(u)} className="bg-blue-100 text-blue-600 p-2 rounded-lg hover:bg-blue-200"><Edit size={16}/></button>
+                                          <button onClick={()=>handleSendResetPassword(u.email)} className="bg-amber-100 text-amber-600 p-2 rounded-lg hover:bg-amber-200"><KeyRound size={16}/></button>
+                                          <button onClick={()=>handleDeleteUser(u.id)} className="bg-red-100 text-red-600 p-2 rounded-lg hover:bg-red-200"><Trash2 size={16}/></button>
                                       </div>
                                   </div>
                               </div>
 
                               {u.gradeUpdateStatus === 'pending' && (
-                                  <div className="w-full bg-yellow-50 border border-yellow-200 p-3 rounded-lg flex justify-between items-center">
-                                      <div className="flex items-center gap-2 text-yellow-800 text-sm font-bold">
-                                          <RefreshCw size={16} className="animate-spin-slow" />
-                                          يريد التحويل إلى: <span className="bg-white px-2 rounded border">{getGradeLabel(u.requestedGrade)}</span>
-                                      </div>
-                                      <div className="flex gap-2">
-                                          <button onClick={() => approveGrade(u)} className="bg-green-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-green-700">موافقة</button>
-                                          <button onClick={() => rejectGrade(u)} className="bg-red-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-red-700">رفض</button>
-                                      </div>
+                                  <div className="w-full bg-yellow-50 border border-yellow-200 p-3 rounded-lg flex flex-col md:flex-row justify-between items-center gap-3 mt-2">
+                                      <div className="flex items-center gap-2 text-yellow-800 text-sm font-bold"><RefreshCw size={16} className="animate-spin-slow" /> يريد التحويل إلى: <span className="bg-white px-2 rounded border">{getGradeLabel(u.requestedGrade)}</span></div>
+                                      <div className="flex gap-2 w-full md:w-auto"><button onClick={() => approveGrade(u)} className="flex-1 bg-green-600 text-white px-3 py-2 rounded text-xs font-bold hover:bg-green-700">موافقة</button><button onClick={() => rejectGrade(u)} className="flex-1 bg-red-600 text-white px-3 py-2 rounded text-xs font-bold hover:bg-red-700">رفض</button></div>
                                   </div>
                               )}
                           </div>
@@ -2520,22 +2000,67 @@ const AdminDashboard = ({ user }) => {
               </div>
           )}
 
+          {activeTab === 'subscriptions' && (
+              <div className="space-y-6">
+                  <div className="glass-panel p-4 md:p-6 rounded-xl border-t-4 border-amber-500">
+                      <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-amber-700"><Key/> توليد أكواد اشتراكات (كروت شحن)</h2>
+                      <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 mb-6">
+                          <p className="text-sm text-amber-800 font-bold mb-4">هذه الأكواد يمكن طباعتها وبيعها للطلاب لتفعيل باقة VIP لديهم فوراً عند إدخال الكود.</p>
+                          <div className="flex flex-col md:flex-row gap-4">
+                              <div className="flex-1">
+                                  <label className="block text-xs font-bold text-slate-600 mb-1">عدد الأكواد المطلوبة</label>
+                                  <input type="number" className="w-full border p-3 rounded-lg" value={codeGenCount} onChange={e=>setCodeGenCount(e.target.value)} />
+                              </div>
+                              <div className="flex-1">
+                                  <label className="block text-xs font-bold text-slate-600 mb-1">مدة الاشتراك (بالأيام)</label>
+                                  <input type="number" className="w-full border p-3 rounded-lg" value={codeGenDays} onChange={e=>setCodeGenDays(e.target.value)} />
+                              </div>
+                              <div className="flex items-end">
+                                  <button onClick={generateSubscriptionCodes} className="w-full md:w-auto bg-amber-600 text-white px-8 py-3 rounded-lg font-bold shadow-lg hover:bg-amber-700 transition">توليد الأكواد</button>
+                              </div>
+                          </div>
+                      </div>
+                      
+                      <div className="overflow-x-auto">
+                          <table className="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm text-sm whitespace-nowrap">
+                              <thead className="bg-slate-800 text-white">
+                                  <tr>
+                                      <th className="p-3 text-right">الكود</th>
+                                      <th className="p-3 text-center">المدة</th>
+                                      <th className="p-3 text-center">الحالة</th>
+                                      <th className="p-3 text-right">استخدم بواسطة</th>
+                                      <th className="p-3 text-center">إجراء</th>
+                                  </tr>
+                              </thead>
+                              <tbody>
+                                  {subscriptionCodes.map((code, idx) => (
+                                      <tr key={code.id} className={`border-b ${code.used ? 'bg-red-50 opacity-60' : 'hover:bg-slate-50'}`}>
+                                          <td className="p-3 font-mono font-bold text-blue-700">{code.code}</td>
+                                          <td className="p-3 text-center font-bold">{code.days} يوم</td>
+                                          <td className="p-3 text-center">
+                                              {code.used ? <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">مُستخدم</span> : <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">جديد (صالح)</span>}
+                                          </td>
+                                          <td className="p-3 text-slate-600">{code.usedBy || '-'}</td>
+                                          <td className="p-3 text-center">
+                                              <button onClick={() => handleDeleteCode(code.id)} className="text-red-500 hover:bg-red-100 p-2 rounded"><Trash2 size={16}/></button>
+                                          </td>
+                                      </tr>
+                                  ))}
+                              </tbody>
+                          </table>
+                      </div>
+                  </div>
+              </div>
+          )}
+
           {activeTab === 'smart_hw' && (
               <div className="space-y-6">
-                  <div className="glass-panel p-6 rounded-xl">
+                  <div className="glass-panel p-4 md:p-6 rounded-xl">
                       <h2 className="text-xl font-bold mb-4 font-arabic text-blue-700 flex items-center gap-2"><QrCode/> إضافة واجب (للكتاب)</h2>
                       <form onSubmit={handleCreateSmartHw} className="grid gap-4">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div>
-                                  <label className="block text-xs font-bold mb-1 text-slate-500">المرحلة الدراسية</label>
-                                  <select className="border p-3 rounded w-full bg-white" value={newSmartHw.grade} onChange={e=>setNewSmartHw({...newSmartHw, grade:e.target.value})}>
-                                      <GradeOptions/>
-                                  </select>
-                              </div>
-                              <div>
-                                  <label className="block text-xs font-bold mb-1 text-slate-500">اسم الكتاب (سيتم تجميع الصفحات تحته)</label>
-                                  <input className="border p-3 rounded w-full" placeholder="مثال: كتاب النحو الجزء الأول" value={newSmartHw.bookName} onChange={e=>setNewSmartHw({...newSmartHw, bookName:e.target.value})} required/>
-                              </div>
+                              <div><label className="block text-xs font-bold mb-1 text-slate-500">المرحلة الدراسية</label><select className="border p-3 rounded w-full bg-white" value={newSmartHw.grade} onChange={e=>setNewSmartHw({...newSmartHw, grade:e.target.value})}><GradeOptions/></select></div>
+                              <div><label className="block text-xs font-bold mb-1 text-slate-500">اسم الكتاب</label><input className="border p-3 rounded w-full" placeholder="مثال: كتاب النحو الجزء الأول" value={newSmartHw.bookName} onChange={e=>setNewSmartHw({...newSmartHw, bookName:e.target.value})} required/></div>
                           </div>
                           <input className="border p-3 rounded" placeholder="اسم الواجب/رقم الصفحة (مثال: تدريبات صفحة 15)" value={newSmartHw.title} onChange={e=>setNewSmartHw({...newSmartHw, title:e.target.value})} required/>
                           <textarea className="border p-3 rounded h-24" placeholder="نموذج الإجابة (مثال: 1-أ, 2-ج, 3-د...)" value={newSmartHw.answerKey} onChange={e=>setNewSmartHw({...newSmartHw, answerKey:e.target.value})} required/>
@@ -2543,25 +2068,17 @@ const AdminDashboard = ({ user }) => {
                       </form>
                   </div>
                   
-                  <div className="glass-panel p-6 rounded-xl">
-                      <h3 className="font-bold mb-4">الواجبات المضافة (مقسمة حسب المرحلة التي تم اختيارها من الأعلى)</h3>
+                  <div className="glass-panel p-4 md:p-6 rounded-xl">
+                      <h3 className="font-bold mb-4">الواجبات المضافة</h3>
                       <div className="space-y-6">
                           {(() => {
                               const filteredHw = smartHomeworks.filter(hw => adminGradeFilter === 'all' || hw.grade === adminGradeFilter);
-                              
                               if (filteredHw.length === 0) return <p className="text-slate-500">لا توجد واجبات في هذه المرحلة.</p>;
-
-                              const hwByBook = filteredHw.reduce((acc, hw) => {
-                                  const book = hw.bookName || 'كتب غير مصنفة';
-                                  if(!acc[book]) acc[book] = [];
-                                  acc[book].push(hw);
-                                  return acc;
-                              }, {});
-
+                              const hwByBook = filteredHw.reduce((acc, hw) => { const book = hw.bookName || 'كتب غير مصنفة'; if(!acc[book]) acc[book] = []; acc[book].push(hw); return acc; }, {});
                               return Object.entries(hwByBook).map(([bookName, hws]) => (
-                                  <div key={bookName} className="mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                                      <h4 className="font-bold text-lg text-amber-700 bg-amber-100 p-2 rounded-lg mb-4 flex items-center gap-2 inline-flex"><BookOpen size={20}/> كتاب: {bookName}</h4>
-                                      <div className="space-y-3 pl-4 border-r-4 border-amber-300 pr-4">
+                                  <div key={bookName} className="mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200 overflow-x-auto">
+                                      <h4 className="font-bold text-lg text-amber-700 bg-amber-100 p-2 rounded-lg mb-4 flex items-center gap-2 w-max"><BookOpen size={20}/> كتاب: {bookName}</h4>
+                                      <div className="space-y-3 pl-4 border-r-4 border-amber-300 pr-4 w-max min-w-full">
                                           {hws.map(hw => {
                                               const hwLink = `${window.location.origin}/?hw=${hw.id}`;
                                               return (
@@ -2572,7 +2089,7 @@ const AdminDashboard = ({ user }) => {
                                                           <code className="bg-slate-100 p-2 rounded text-xs break-all border block select-all">{hwLink}</code>
                                                       </div>
                                                       <div className="flex gap-2 items-center flex-shrink-0">
-                                                          <button onClick={() => { navigator.clipboard.writeText(hwLink); alert("تم نسخ الرابط! اذهب لموقع QR Generator لتحويله."); }} className="bg-slate-800 text-white px-4 py-2 rounded-lg font-bold hover:bg-slate-700 text-sm h-fit shadow-md">نسخ الرابط</button>
+                                                          <button onClick={() => { navigator.clipboard.writeText(hwLink); alert("تم نسخ الرابط!"); }} className="bg-slate-800 text-white px-4 py-2 rounded-lg font-bold hover:bg-slate-700 text-sm h-fit shadow-md">نسخ الرابط</button>
                                                           <button onClick={async () => { if(window.confirm('هل أنت متأكد من حذف هذه الصفحة؟')) await deleteDoc(doc(db, 'smart_homeworks', hw.id)); }} className="text-red-500 bg-red-50 hover:bg-red-100 p-2 rounded-lg"><Trash2 size={18}/></button>
                                                       </div>
                                                   </div>
@@ -2585,22 +2102,23 @@ const AdminDashboard = ({ user }) => {
                       </div>
                   </div>
 
-                  <div className="glass-panel p-6 rounded-xl">
+                  <div className="glass-panel p-4 md:p-6 rounded-xl">
                       <h3 className="font-bold mb-4 text-green-700">نتائج تصحيح الذكاء الاصطناعي</h3>
-                      <div className="space-y-2">
-                          {hwResults.filter(res => adminGradeFilter === 'all' || res.grade === adminGradeFilter).map(res => (
-                              <div key={res.id} className="flex justify-between items-center border p-3 rounded hover:bg-slate-50 transition bg-white/50">
-                                  <div>
-                                      <p className="font-bold">{res.studentName} <span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600 mx-1">{getGradeLabel(res.grade)}</span></p>
-                                      <p className="text-slate-500 text-xs font-bold mt-1">الكتاب: {res.bookName} - {res.homeworkTitle}</p>
-                                      <p className="text-sm text-green-600 font-bold mt-1">الدرجة: {res.score}/{res.total}</p>
+                      <div className="space-y-2 overflow-x-auto">
+                          <div className="min-w-max">
+                              {hwResults.filter(res => adminGradeFilter === 'all' || res.grade === adminGradeFilter).map(res => (
+                                  <div key={res.id} className="flex justify-between items-center border p-3 rounded hover:bg-slate-50 transition bg-white/50 mb-2">
+                                      <div className="ml-4">
+                                          <p className="font-bold">{res.studentName} <span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600 mx-1">{getGradeLabel(res.grade)}</span></p>
+                                          <p className="text-slate-500 text-xs font-bold mt-1">الكتاب: {res.bookName} - {res.homeworkTitle}</p>
+                                          <p className="text-sm text-green-600 font-bold mt-1">الدرجة: {res.score}/{res.total}</p>
+                                      </div>
+                                      <div className="text-xs text-slate-500 bg-slate-100 p-2 rounded-lg text-center flex-shrink-0">
+                                          {res.submittedAt?.toDate().toLocaleDateString('ar-EG')}<br/>{res.submittedAt?.toDate().toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}
+                                      </div>
                                   </div>
-                                  <div className="text-xs text-slate-500 bg-slate-100 p-2 rounded-lg text-center">
-                                      {res.submittedAt?.toDate().toLocaleDateString('ar-EG')}<br/>
-                                      {res.submittedAt?.toDate().toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}
-                                  </div>
-                              </div>
-                          ))}
+                              ))}
+                          </div>
                       </div>
                   </div>
               </div>
@@ -2608,20 +2126,26 @@ const AdminDashboard = ({ user }) => {
 
           {activeTab === 'exams' && (
               <div className="space-y-8">
-                  <div className="glass-panel p-6 rounded-xl">
+                  <div className="glass-panel p-4 md:p-6 rounded-xl">
                       <h2 className="text-xl font-bold mb-6 border-b pb-2 font-arabic text-amber-700">إنشاء امتحان</h2>
-                      <div className="grid grid-cols-4 gap-4 mb-6">
-                          <input className="border p-2 rounded col-span-2" placeholder="العنوان" value={examBuilder.title} onChange={e=>setExamBuilder({...examBuilder, title:e.target.value})}/>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                          <input className="border p-2 rounded md:col-span-2" placeholder="العنوان" value={examBuilder.title} onChange={e=>setExamBuilder({...examBuilder, title:e.target.value})}/>
                           <input className="border p-2 rounded" placeholder="الكود" value={examBuilder.accessCode} onChange={e=>setExamBuilder({...examBuilder, accessCode:e.target.value})}/>
                           <input type="number" className="border p-2 rounded" placeholder="المدة (دقائق)" value={examBuilder.duration} onChange={e=>setExamBuilder({...examBuilder, duration:parseInt(e.target.value)})}/>
-                          <select className="border p-2 rounded col-span-4" value={examBuilder.grade} onChange={e=>setExamBuilder({...examBuilder, grade:e.target.value})}>
+                          
+                          <select className="border p-2 rounded md:col-span-2" value={examBuilder.grade} onChange={e=>setExamBuilder({...examBuilder, grade:e.target.value})}>
                               <GradeOptions/>
                           </select>
-                          <div className="col-span-2">
+                          <div className="md:col-span-2 flex items-center bg-amber-50 border border-amber-200 rounded p-2">
+                              <input type="checkbox" id="examVip" className="w-5 h-5 ml-2" checked={examBuilder.isPremium} onChange={e=>setExamBuilder({...examBuilder, isPremium: e.target.checked})} />
+                              <label htmlFor="examVip" className="font-bold text-amber-800 text-sm flex items-center gap-1 cursor-pointer"><Crown size={16}/> امتحان VIP (مغلق لغير المشتركين)</label>
+                          </div>
+
+                          <div className="md:col-span-2">
                               <label className="block text-xs font-bold mb-1">وقت البدء</label>
                               <input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, startTime:e.target.value})}/>
                           </div>
-                          <div className="col-span-2">
+                          <div className="md:col-span-2">
                               <label className="block text-xs font-bold mb-1">وقت الانتهاء</label>
                               <input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, endTime:e.target.value})}/>
                           </div>
@@ -2631,46 +2155,51 @@ const AdminDashboard = ({ user }) => {
                           <button onClick={parseExam} className="mt-4 w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-green-500/50 transition">نشر</button>
                       </div>
                   </div>
-                  <div className="glass-panel p-6 rounded-xl">
+                  <div className="glass-panel p-4 md:p-6 rounded-xl">
                       <h3 className="font-bold mb-4 font-arabic">الامتحانات الحالية</h3>
-                      {filteredExamsList.map(exam=>(
-                          <div key={exam.id} className="flex justify-between items-center border-b py-3 last:border-0 hover:bg-slate-50/50 px-2 rounded transition">
-                              <div>
-                                  <p className="font-bold">{exam.title}</p>
-                                  <p className="text-xs text-slate-500">من: {new Date(exam.startTime).toLocaleString('ar-EG')} | إلى: {new Date(exam.endTime).toLocaleString('ar-EG')}</p>
-                                  <p className="text-xs text-slate-400">كود: {exam.accessCode}</p>
-                              </div>
-                              <div className="flex gap-2">
-                                  <button onClick={() => { setEditingExamTime(exam); setNewEndTime(exam.endTime); }} className="text-blue-600 p-2 bg-blue-100 rounded-lg hover:bg-blue-200" title="تمديد الوقت"><Calendar size={18}/></button>
-                                  <button onClick={()=>handleDeleteExam(exam.id)} className="text-red-600 p-2 bg-red-100 rounded-lg hover:bg-red-200" title="حذف"><Trash2 size={18}/></button>
-                              </div>
+                      <div className="overflow-x-auto">
+                          <div className="min-w-[600px]">
+                              {filteredExamsList.map(exam=>(
+                                  <div key={exam.id} className="flex justify-between items-center border-b py-3 last:border-0 hover:bg-slate-50/50 px-2 rounded transition">
+                                      <div>
+                                          <p className="font-bold flex items-center gap-2">
+                                              {exam.title}
+                                              {exam.isPremium && <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1"><Crown size={10}/> VIP</span>}
+                                          </p>
+                                          <p className="text-xs text-slate-500">من: {new Date(exam.startTime).toLocaleString('ar-EG')} | إلى: {new Date(exam.endTime).toLocaleString('ar-EG')}</p>
+                                          <p className="text-xs text-slate-400">كود: {exam.accessCode}</p>
+                                      </div>
+                                      <div className="flex gap-2">
+                                          <button onClick={() => { setEditingExamTime(exam); setNewEndTime(exam.endTime); }} className="text-blue-600 p-2 bg-blue-100 rounded-lg hover:bg-blue-200" title="تمديد الوقت"><Calendar size={18}/></button>
+                                          <button onClick={()=>handleDeleteExam(exam.id)} className="text-red-600 p-2 bg-red-100 rounded-lg hover:bg-red-200" title="حذف"><Trash2 size={18}/></button>
+                                      </div>
+                                  </div>
+                              ))}
                           </div>
-                      ))}
+                      </div>
                   </div>
               </div>
           )}
 
           {activeTab === 'results' && (
-             <div className="glass-panel p-6 rounded-xl">
-               <div className="flex justify-between items-center mb-4">
+             <div className="glass-panel p-4 md:p-6 rounded-xl">
+               <div className="flex flex-col md:flex-row justify-between md:items-center mb-4 gap-4">
                  <h2 className="font-bold flex items-center gap-2 font-arabic text-xl"><Layout/> نتائج الامتحانات</h2>
                  {!viewingResult && examResults.length > 0 && (
-                     <button onClick={handleDeleteAllResults} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-red-700 transition shadow-lg">
-                         <Trash2 size={16}/> حذف جميع النتائج
-                     </button>
+                     <button onClick={handleDeleteAllResults} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-red-700 transition shadow-lg w-full md:w-auto justify-center"><Trash2 size={16}/> حذف جميع النتائج</button>
                  )}
                </div>
                {viewingResult ? (
                    <div className="bg-slate-50 p-4 rounded-xl border">
-                       <div className="flex justify-between mb-4">
-                           <button onClick={() => setViewingResult(null)} className="mb-4 text-sm text-slate-500 underline font-bold">العودة للقائمة</button>
+                       <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
+                           <button onClick={() => setViewingResult(null)} className="text-sm text-slate-500 underline font-bold text-right">العودة للقائمة</button>
                            {(() => {
                                const examData = examsList.find(e => e.id === viewingResult.examId);
                                const questions = getQuestionsForExam(examData);
                                return (
                                    <div className="flex gap-2">
-                                       <button onClick={() => sendWhatsAppToParent(viewingResult)} className="bg-green-500 text-white px-4 py-1 rounded text-sm flex items-center gap-2 font-bold hover:bg-green-600"><MessageCircle size={16}/> واتساب لولي الأمر</button>
-                                       <button onClick={() => generatePDF('admin', {...viewingResult, total: viewingResult.total || 0, examTitle: examData?.title, questions: questions, answers: viewingResult.answers })} className="bg-blue-600 text-white px-4 py-1 rounded text-sm flex items-center gap-2"><Download size={16}/> التقرير</button>
+                                       <button onClick={() => sendWhatsAppToParent(viewingResult)} className="flex-1 md:flex-none justify-center bg-green-500 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 font-bold hover:bg-green-600 shadow-sm"><MessageCircle size={16}/> واتساب لولي الأمر</button>
+                                       <button onClick={() => generatePDF('admin', {...viewingResult, total: viewingResult.total || 0, examTitle: examData?.title, questions: questions, answers: viewingResult.answers })} className="flex-1 md:flex-none justify-center bg-blue-600 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 shadow-sm"><Download size={16}/> التقرير</button>
                                    </div>
                                );
                            })()}
@@ -2680,38 +2209,25 @@ const AdminDashboard = ({ user }) => {
                            {(() => {
                                const examData = examsList.find(e => e.id === viewingResult.examId);
                                if(!examData) return <p>بيانات الامتحان محذوفة</p>;
-                               
                                const questions = getQuestionsForExam(examData);
-                               
-                               const groupedQuestions = questions.reduce((acc, q) => {
-                                   const b = q.branch || 'عام';
-                                   if(!acc[b]) acc[b] = [];
-                                   acc[b].push(q);
-                                   return acc;
-                               }, {});
-
+                               const groupedQuestions = questions.reduce((acc, q) => { const b = q.branch || 'عام'; if(!acc[b]) acc[b] = []; acc[b].push(q); return acc; }, {});
                                return Object.entries(groupedQuestions).map(([branch, qs]) => (
                                    <div key={branch} className="mb-6">
                                        <h4 className="font-bold text-xl text-amber-700 bg-amber-100 p-2 rounded-lg mb-4">{branch}</h4>
                                        <div className="space-y-4">
                                            {qs.map((q, idx) => (
                                                <div key={idx} className="bg-white p-4 rounded border relative">
-                                                   <p className="font-bold mb-2 text-xl text-blue-900 font-sans pr-10">
-                                                       {q.text.split('|').map((part, i) => (
-                                                           <React.Fragment key={i}>
-                                                               {part.trim()}
-                                                               {i !== q.text.split('|').length - 1 && <br />}
-                                                           </React.Fragment>
-                                                       ))}
+                                                   <p className="font-bold mb-2 text-lg md:text-xl text-blue-900 font-sans pr-10">
+                                                       {q.text.split('|').map((part, i) => (<React.Fragment key={i}>{part.trim()}{i !== q.text.split('|').length - 1 && <br />}</React.Fragment>))}
                                                    </p>
-                                                   <div className="grid grid-cols-2 gap-2 text-sm">
+                                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                                                        {q.options.map((opt, oIdx) => {
                                                            const isCorrect = oIdx === q.correctIdx;
                                                            const isSelected = viewingResult.answers[q.id] === oIdx;
                                                            let style = "bg-gray-50 text-gray-500";
-                                                           if (isCorrect) style = "bg-green-100 text-green-800 border-green-500 border font-bold text-lg";
-                                                           if (isSelected && !isCorrect) style = "bg-red-100 text-red-800 border-red-500 border font-bold text-lg";
-                                                           return <div key={oIdx} className={`p-2 rounded font-sans font-bold ${style}`}>{opt}</div>
+                                                           if (isCorrect) style = "bg-green-100 text-green-800 border-green-500 border font-bold md:text-lg";
+                                                           if (isSelected && !isCorrect) style = "bg-red-100 text-red-800 border-red-500 border font-bold md:text-lg";
+                                                           return <div key={oIdx} className={`p-3 rounded font-sans font-bold ${style}`}>{opt}</div>
                                                        })}
                                                    </div>
                                                </div>
@@ -2723,44 +2239,42 @@ const AdminDashboard = ({ user }) => {
                        </div>
                    </div>
                ) : (
-                   <div className="space-y-2">
-                       {examResults.map(res => (
-                           <div key={res.id} className="flex justify-between items-center border p-3 rounded hover:bg-slate-50 transition bg-white/50">
-                               <div><p className="font-bold">{res.studentName}</p><p className="text-xs text-slate-500">{res.status==='cheated'?'غش 🚫': res.status==='in_progress' ? 'قيد التنفيذ (لم يسلم) ⏳' : `درجة: ${res.score}/${res.total}`}</p></div>
-                               <div className="flex gap-2">
-                                  {res.status === 'completed' && <button onClick={()=>sendWhatsAppToParent(res)} className="bg-green-100 text-green-700 px-3 py-1 rounded text-xs font-bold flex items-center gap-1 hover:bg-green-200"><MessageCircle size={14}/> إرسال لولي الأمر</button>}
-                                  <button onClick={()=>setViewingResult(res)} className="bg-blue-100 text-blue-600 px-3 py-1 rounded text-xs">التفاصيل</button>
-                                  <button onClick={()=>handleDeleteResult(res.id)} className="bg-amber-100 text-amber-600 px-3 py-1 rounded text-xs">إعادة</button>
+                   <div className="overflow-x-auto">
+                       <div className="min-w-[600px] space-y-2">
+                           {examResults.map(res => (
+                               <div key={res.id} className="flex justify-between items-center border p-3 rounded hover:bg-slate-50 transition bg-white/50">
+                                   <div><p className="font-bold">{res.studentName}</p><p className="text-xs text-slate-500">{res.status==='cheated'?'غش 🚫': res.status==='in_progress' ? 'قيد التنفيذ (لم يسلم) ⏳' : `درجة: ${res.score}/${res.total}`}</p></div>
+                                   <div className="flex gap-2">
+                                      {res.status === 'completed' && <button onClick={()=>sendWhatsAppToParent(res)} className="bg-green-100 text-green-700 px-3 py-1 rounded text-xs font-bold flex items-center gap-1 hover:bg-green-200"><MessageCircle size={14}/><span className="hidden md:inline"> إرسال لولي الأمر</span></button>}
+                                      <button onClick={()=>setViewingResult(res)} className="bg-blue-100 text-blue-600 px-3 py-1 rounded text-xs font-bold">التفاصيل</button>
+                                      <button onClick={()=>handleDeleteResult(res.id)} className="bg-amber-100 text-amber-600 px-3 py-1 rounded text-xs font-bold">إعادة</button>
+                                   </div>
                                </div>
-                           </div>
-                       ))}
+                           ))}
+                       </div>
                    </div>
                )}
              </div>
           )}
 
           {activeTab === 'live' && (
-              <div className="glass-panel p-8 rounded-xl border-t-4 border-red-600">
+              <div className="glass-panel p-4 md:p-8 rounded-xl border-t-4 border-red-600">
                   <h2 className="text-2xl font-bold mb-6 flex items-center gap-2 text-red-600 font-arabic"><Radio size={32}/> البث المباشر</h2>
                   <div className="grid gap-4 mb-8">
-                      <input className="border p-3 rounded-xl" placeholder="العنوان" value={liveData.title} onChange={e=>setLiveData({...liveData, title:e.target.value})}/>
-                      <input className="border p-3 rounded-xl" placeholder="رابط البث (Zoom/YouTube/Meet)" value={liveData.liveUrl} onChange={e=>setLiveData({...liveData, liveUrl:e.target.value})}/>
-                      <input className="border p-3 rounded-xl" placeholder="الرقم السري (اختياري، اتركه فارغاً للدخول بدون كود)" value={liveData.passcode} onChange={e=>setLiveData({...liveData, passcode:e.target.value})}/>
-                      <input className="border p-3 rounded-xl" placeholder="إيميلات مخصصة (اختياري، افصل بفاصلة)" value={liveData.allowedEmails} onChange={e=>setLiveData({...liveData, allowedEmails:e.target.value})}/>
-                      <select className="border p-3 rounded-xl" value={liveData.grade} onChange={e=>setLiveData({...liveData, grade:e.target.value})}><GradeOptions/></select>
-                      <button onClick={startLiveStream} className="bg-red-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-red-500/30">بدء بث جديد</button>
+                      <input className="border p-3 rounded-xl w-full" placeholder="العنوان" value={liveData.title} onChange={e=>setLiveData({...liveData, title:e.target.value})}/>
+                      <input className="border p-3 rounded-xl w-full" placeholder="رابط البث (Zoom/YouTube/Meet)" value={liveData.liveUrl} onChange={e=>setLiveData({...liveData, liveUrl:e.target.value})}/>
+                      <input className="border p-3 rounded-xl w-full" placeholder="الرقم السري (اختياري، اتركه فارغاً للدخول بدون كود)" value={liveData.passcode} onChange={e=>setLiveData({...liveData, passcode:e.target.value})}/>
+                      <input className="border p-3 rounded-xl w-full" placeholder="إيميلات مخصصة (اختياري، افصل بفاصلة)" value={liveData.allowedEmails} onChange={e=>setLiveData({...liveData, allowedEmails:e.target.value})}/>
+                      <select className="border p-3 rounded-xl w-full" value={liveData.grade} onChange={e=>setLiveData({...liveData, grade:e.target.value})}><GradeOptions/></select>
+                      <button onClick={startLiveStream} className="bg-red-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-red-500/30 w-full md:w-auto">بدء بث جديد</button>
                   </div>
-                  
                   {filteredLiveSessions.length > 0 && (
                       <div className="mt-8 border-t pt-6">
                           <h3 className="font-bold mb-4">البث المباشر الحالي</h3>
                           <div className="space-y-3">
                               {filteredLiveSessions.map(session => (
-                                  <div key={session.id} className="p-4 bg-red-50 border border-red-200 rounded-xl flex justify-between items-center">
-                                      <div>
-                                          <p className="font-bold text-red-800">{session.title} <span className="text-xs bg-red-200 px-2 py-1 rounded-full text-red-700">{getGradeLabel(session.grade)}</span></p>
-                                          {session.passcode && <p className="text-xs text-red-600 mt-1">كود الدخول: {session.passcode}</p>}
-                                      </div>
+                                  <div key={session.id} className="p-4 bg-red-50 border border-red-200 rounded-xl flex flex-col md:flex-row gap-4 justify-between md:items-center">
+                                      <div><p className="font-bold text-red-800">{session.title} <span className="text-xs bg-red-200 px-2 py-1 rounded-full text-red-700">{getGradeLabel(session.grade)}</span></p>{session.passcode && <p className="text-xs text-red-600 mt-1">كود الدخول: {session.passcode}</p>}</div>
                                       <button onClick={() => stopLiveStream(session.id)} className="bg-slate-800 text-white px-4 py-2 rounded-lg font-bold hover:bg-slate-900 transition">إنهاء البث</button>
                                   </div>
                               ))}
@@ -2771,131 +2285,90 @@ const AdminDashboard = ({ user }) => {
           )}
 
           {activeTab === 'content' && (
-              <div className="glass-panel p-6 rounded-xl">
+              <div className="glass-panel p-4 md:p-6 rounded-xl">
                   <h2 className="font-bold mb-4 font-arabic text-xl">إضافة محتوى</h2>
                   <form onSubmit={handleAddContent} className="grid gap-4 mb-6">
-                      <input className="border p-3 rounded" placeholder="العنوان" value={newContent.title} onChange={e=>setNewContent({...newContent, title:e.target.value})}/>
-                      <input className="border p-3 rounded" placeholder="الرابط (يفضل Google Drive للملفات الكبيرة)" value={newContent.url} onChange={e=>setNewContent({...newContent, url:e.target.value})}/>
-                      
+                      <input className="border p-3 rounded w-full" placeholder="العنوان" value={newContent.title} onChange={e=>setNewContent({...newContent, title:e.target.value})}/>
+                      <input className="border p-3 rounded w-full" placeholder="الرابط (يفضل Google Drive للملفات الكبيرة)" value={newContent.url} onChange={e=>setNewContent({...newContent, url:e.target.value})}/>
                       <div className="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center hover:bg-slate-50 transition relative">
                           <input type="file" onChange={handleFileSelect} className="absolute inset-0 opacity-0 cursor-pointer" />
                           <div className="flex flex-col items-center gap-2 text-slate-500">
                               <Upload size={32} />
-                              <span className="text-sm font-bold">اضغط هنا لرفع ملف (الحد الأقصى 1 ميجا)</span>
-                              <span className="text-xs text-red-400">للملفات الأكبر، استخدم رابط خارجي</span>
+                              <span className="text-sm font-bold">اضغط هنا لرفع ملف (الحد الأقصى 1 ميجا)</span><span className="text-xs text-red-400">للملفات الأكبر، استخدم رابط خارجي</span>
                           </div>
                           {isUploading && (
                               <div className="absolute inset-0 bg-white/90 flex flex-col items-center justify-center rounded-xl z-10">
                                   <span className="text-sm font-bold text-amber-600 mb-1">جاري القراءة... {uploadProgress}%</span>
-                                  <div className="w-3/4 h-2 bg-slate-200 rounded-full overflow-hidden">
-                                      <div className="h-full bg-amber-500 transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
-                                  </div>
+                                  <div className="w-3/4 h-2 bg-slate-200 rounded-full overflow-hidden"><div className="h-full bg-amber-500 transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div></div>
                               </div>
                           )}
-                          {!isUploading && uploadProgress === 100 && (
-                              <div className="absolute inset-0 bg-white/90 flex items-center justify-center rounded-xl z-10">
-                                  <span className="text-green-600 font-bold flex items-center gap-1"><CheckCircle size={20}/> تم اختيار الملف</span>
-                              </div>
-                          )}
+                          {!isUploading && uploadProgress === 100 && (<div className="absolute inset-0 bg-white/90 flex items-center justify-center rounded-xl z-10"><span className="text-green-600 font-bold flex items-center gap-1"><CheckCircle size={20}/> تم اختيار الملف</span></div>)}
                       </div>
-
-                      <div className="flex gap-2">
+                      
+                      <div className="flex flex-col md:flex-row gap-2">
                           <select className="border p-3 rounded flex-1" value={newContent.type} onChange={e=>setNewContent({...newContent, type:e.target.value})}>
-                              <option value="video">فيديو مدمج</option>
-                              <option value="file">ملف (PDF)</option>
-                              <option value="html">ملف تفاعلي (HTML)</option>
-                              <option value="interactive_exam">امتحان تفاعلي (رابط/HTML)</option>
-                              <option value="link">رابط خارجي (Google Meet, Drive, etc)</option>
+                              <option value="video">فيديو مدمج</option><option value="file">ملف (PDF)</option><option value="html">ملف تفاعلي (HTML)</option><option value="interactive_exam">امتحان تفاعلي (رابط/HTML)</option><option value="link">رابط خارجي (Google Meet, Drive, etc)</option>
                           </select>
                           <select className="border p-3 rounded flex-1" value={newContent.grade} onChange={e=>setNewContent({...newContent, grade:e.target.value})}><GradeOptions/></select>
+                      </div>
+
+                      <div className="flex items-center bg-amber-50 border border-amber-200 rounded-lg p-3">
+                          <input type="checkbox" id="vipContent" className="w-5 h-5 ml-3" checked={newContent.isPremium} onChange={e=>setNewContent({...newContent, isPremium:e.target.checked})} />
+                          <label htmlFor="vipContent" className="font-bold text-amber-800 text-sm flex items-center gap-1 cursor-pointer"><Crown size={18}/> محتوى VIP (مغلق ومخصص للمشتركين فقط)</label>
                       </div>
                       
                       <div className="border p-3 rounded-lg bg-gray-50">
                           <label className="block text-sm font-bold text-gray-700 mb-1 flex items-center gap-2"><Lock size={14}/> تخصيص لطلاب محددين (اختياري)</label>
-                          <input 
-                            className="border p-2 rounded w-full text-sm" 
-                            placeholder="اكتب إيميلات الطلاب مفصولة بفاصلة (مثال: student1@gmail.com, student2@yahoo.com)" 
-                            value={newContent.allowedEmails} 
-                            onChange={e=>setNewContent({...newContent, allowedEmails:e.target.value})}
-                          />
-                          <p className="text-xs text-gray-500 mt-1">اتركه فارغاً لكي يظهر المحتوى لجميع طلاب الصف.</p>
+                          <input className="border p-2 rounded w-full text-sm" placeholder="اكتب إيميلات الطلاب مفصولة بفاصلة" value={newContent.allowedEmails} onChange={e=>setNewContent({...newContent, allowedEmails:e.target.value})} />
+                          <p className="text-xs text-gray-500 mt-1">اتركه فارغاً لكي يظهر المحتوى للجميع.</p>
                       </div>
-
-                      <div className="flex items-center gap-2">
-                          <input type="checkbox" checked={newContent.isPublic} onChange={e=>setNewContent({...newContent, isPublic:e.target.checked})}/> <label>عام (للصفحة الرئيسية)</label>
-                      </div>
-                      <button className="bg-amber-600 text-white p-3 rounded font-bold shadow-lg shadow-amber-500/30">نشر</button>
+                      
+                      <div className="flex items-center gap-2"><input type="checkbox" checked={newContent.isPublic} onChange={e=>setNewContent({...newContent, isPublic:e.target.checked})}/> <label>عام (يظهر للزوار في الصفحة الرئيسية)</label></div>
+                      <button className="bg-amber-600 text-white p-3 rounded font-bold shadow-lg shadow-amber-500/30 w-full md:w-auto">نشر</button>
                   </form>
-                  <div className="space-y-2">
-                      {filteredContentList.map(c=>(
-                          <div key={c.id} className="flex justify-between border-b p-2 items-center bg-white/50 rounded hover:bg-white transition">
-                              <div>
-                                  <span className="font-bold">{c.title}</span>
-                                  {c.allowedEmails && c.allowedEmails.length > 0 && <span className="mr-2 text-xs bg-red-100 text-red-600 px-2 py-1 rounded flex items-center gap-1 inline-flex"><Lock size={10}/> خاص</span>}
-                                  {c.type === 'interactive_exam' && <span className="mr-2 text-xs bg-emerald-100 text-emerald-600 px-2 py-1 rounded">امتحان تفاعلي</span>}
-                                  {c.type === 'html' && <span className="mr-2 text-xs bg-purple-100 text-purple-600 px-2 py-1 rounded">HTML</span>}
-                                  {c.type === 'link' && <span className="mr-2 text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded">رابط خارجي</span>}
+                  <div className="space-y-2 overflow-x-auto">
+                      <div className="min-w-[600px]">
+                          {filteredContentList.map(c=>(
+                              <div key={c.id} className="flex justify-between border-b p-3 items-center bg-white/50 rounded hover:bg-white transition mb-2">
+                                  <div className="flex items-center flex-wrap gap-2">
+                                      <span className="font-bold ml-2">{c.title}</span>
+                                      {c.isPremium && <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1"><Crown size={10}/> VIP</span>}
+                                      {c.allowedEmails && c.allowedEmails.length > 0 && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded flex items-center gap-1 inline-flex"><Lock size={10}/> خاص</span>}
+                                      {c.type === 'interactive_exam' && <span className="text-[10px] bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded">امتحان تفاعلي</span>}
+                                      {c.type === 'html' && <span className="text-[10px] bg-purple-100 text-purple-600 px-2 py-0.5 rounded">HTML</span>}
+                                      {c.type === 'link' && <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded">رابط خارجي</span>}
+                                  </div>
+                                  <div className="flex gap-2"><button onClick={() => handleDeleteContent(c.id)} className="text-red-500 hover:bg-red-50 p-2 rounded"><Trash2 size={18}/></button></div>
                               </div>
-                              <div className="flex gap-2">
-                                  <button onClick={() => handleDeleteContent(c.id)} className="text-red-500 hover:text-red-700"><Trash2 size={18}/></button>
-                              </div>
-                          </div>
-                      ))}
+                          ))}
+                      </div>
                   </div>
               </div>
           )}
 
-          {activeTab === 'messages' && (
-              <div className="glass-panel p-6 rounded-xl">
-                  <h2 className="font-bold mb-4 font-arabic text-xl">الرسائل</h2>
-                  {messagesList.map(m=>(
-                      <div key={m.id} className="border-b p-4 bg-slate-50 mb-3 rounded-lg relative">
-                          <button onClick={()=>handleDeleteMessage(m.id)} className="absolute top-2 left-2 text-red-400"><Trash2 size={16}/></button>
-                          <div className="mb-2">
-                              <p className="font-bold text-amber-800">{m.senderName} <span className="text-xs text-slate-500">({m.sender})</span></p>
-                              <p className="text-sm text-slate-400">{m.createdAt?.toDate?m.createdAt.toDate().toLocaleString():'الآن'}</p>
-                          </div>
-                          <p className="text-slate-800 bg-white p-3 rounded-lg border border-slate-200 mb-3">{m.text}</p>
-                          {m.adminReply ? (
-                              <div className="bg-green-50 p-3 rounded-lg border border-green-200 text-sm">
-                                  <span className="font-bold text-green-700">ردك: </span>{m.adminReply}
-                              </div>
-                          ) : (
-                              <div className="flex gap-2">
-                                  <input className="flex-1 border p-2 rounded text-sm" placeholder="اكتب ردك..." value={replyTexts[m.id]||""} onChange={e=>setReplyTexts({...replyTexts,[m.id]:e.target.value})}/>
-                                  <button onClick={()=>handleReplyMessage(m.id)} className="bg-blue-600 text-white px-3 py-1 rounded text-sm"><Reply size={14}/></button>
-                              </div>
-                          )}
-                      </div>
-                  ))}
-              </div>
-          )}
+          {activeTab === 'messages' && <div className="glass-panel p-4 md:p-6 rounded-xl"><h2 className="font-bold mb-4 font-arabic text-xl">الرسائل</h2>{messagesList.map(m=><div key={m.id} className="border-b p-4 bg-slate-50 mb-3 rounded-lg relative"><button onClick={()=>handleDeleteMessage(m.id)} className="absolute top-2 left-2 text-red-400 hover:bg-red-50 p-1 rounded"><Trash2 size={16}/></button><div className="mb-2"><p className="font-bold text-amber-800">{m.senderName} <span className="text-xs text-slate-500">({m.sender})</span></p><p className="text-sm text-slate-400">{m.createdAt?.toDate?m.createdAt.toDate().toLocaleString():'الآن'}</p></div><p className="text-slate-800 bg-white p-3 rounded-lg border border-slate-200 mb-3 text-sm md:text-base">{m.text}</p>{m.adminReply?<div className="bg-green-50 p-3 rounded-lg border border-green-200 text-sm"><span className="font-bold text-green-700">ردك: </span>{m.adminReply}</div>:<div className="flex flex-col md:flex-row gap-2"><input className="flex-1 border p-2 rounded text-sm w-full" placeholder="اكتب ردك..." value={replyTexts[m.id]||""} onChange={e=>setReplyTexts({...replyTexts,[m.id]:e.target.value})}/><button onClick={()=>handleReplyMessage(m.id)} className="bg-blue-600 text-white px-4 py-2 rounded text-sm w-full md:w-auto flex justify-center"><Reply size={16}/></button></div>}</div>)}</div>}
            
           {activeTab === 'auto_reply' && (
-              <div className="glass-panel p-6 rounded-xl">
+              <div className="glass-panel p-4 md:p-6 rounded-xl">
                   <h2 className="font-bold mb-4 flex items-center gap-2 font-arabic text-xl"><Bot /> إعدادات الرد الآلي</h2>
                   <div className="bg-slate-50 p-4 rounded-xl border mb-6">
                       <h3 className="font-bold mb-2 text-sm">إضافة قاعدة جديدة</h3>
                       <div className="grid gap-3">
-                          <input className="border p-2 rounded" placeholder="الكلمات المفتاحية (افصل بينها بفاصلة، مثال: سعر,حجز,مواعيد)" value={newAutoReply.keywords} onChange={e=>setNewAutoReply({...newAutoReply, keywords:e.target.value})} />
-                          <textarea className="border p-2 rounded h-20" placeholder="الرد الذي سيظهر للطالب..." value={newAutoReply.response} onChange={e=>setNewAutoReply({...newAutoReply, response:e.target.value})} />
-                          <button onClick={handleAddAutoReply} className="bg-amber-600 text-white py-2 rounded font-bold hover:bg-amber-700">إضافة القاعدة</button>
+                          <input className="border p-2 rounded w-full" placeholder="الكلمات المفتاحية (افصل بينها بفاصلة، مثال: سعر,حجز,مواعيد)" value={newAutoReply.keywords} onChange={e=>setNewAutoReply({...newAutoReply, keywords:e.target.value})} />
+                          <textarea className="border p-2 rounded h-20 w-full" placeholder="الرد الذي سيظهر للطالب..." value={newAutoReply.response} onChange={e=>setNewAutoReply({...newAutoReply, response:e.target.value})} />
+                          <button onClick={handleAddAutoReply} className="bg-amber-600 text-white py-2 rounded font-bold hover:bg-amber-700 w-full md:w-auto">إضافة القاعدة</button>
                       </div>
                   </div>
                   <div className="space-y-3">
                       {autoReplies.map(rule => (
-                          <div key={rule.id} className={`p-4 rounded-lg border flex justify-between items-center ${rule.isActive ? 'bg-white border-green-200' : 'bg-gray-50 border-gray-200 opacity-70'}`}>
+                          <div key={rule.id} className={`p-4 rounded-lg border flex flex-col md:flex-row justify-between md:items-center gap-4 ${rule.isActive ? 'bg-white border-green-200' : 'bg-gray-50 border-gray-200 opacity-70'}`}>
                               <div className="flex-1">
                                   <p className="font-bold text-sm text-slate-600 mb-1">الكلمات: <span className="text-blue-600">{rule.keywords}</span></p>
-                                  <p className="text-slate-800">{rule.response}</p>
+                                  <p className="text-slate-800 text-sm md:text-base">{rule.response}</p>
                               </div>
-                              <div className="flex items-center gap-2 mr-4">
-                                  <button onClick={() => toggleAutoReply(rule.id, rule.isActive)} className={`p-2 rounded-full ${rule.isActive ? 'bg-green-100 text-green-600' : 'bg-gray-200 text-gray-500'}`} title={rule.isActive ? "تعطيل" : "تنشيط"}>
-                                      <Power size={18} />
-                                  </button>
-                                  <button onClick={() => deleteAutoReply(rule.id)} className="p-2 rounded-full bg-red-100 text-red-600 hover:bg-red-200">
-                                      <Trash2 size={18} />
-                                  </button>
+                              <div className="flex items-center justify-end gap-2">
+                                  <button onClick={() => toggleAutoReply(rule.id, rule.isActive)} className={`p-2 rounded-full ${rule.isActive ? 'bg-green-100 text-green-600' : 'bg-gray-200 text-gray-500'}`} title={rule.isActive ? "تعطيل" : "تنشيط"}><Power size={18} /></button>
+                                  <button onClick={() => deleteAutoReply(rule.id)} className="p-2 rounded-full bg-red-100 text-red-600 hover:bg-red-200"><Trash2 size={18} /></button>
                               </div>
                           </div>
                       ))}
@@ -2904,26 +2377,21 @@ const AdminDashboard = ({ user }) => {
           )}
 
           {activeTab === 'quotes' && (
-              <div className="glass-panel p-6 rounded-xl">
+              <div className="glass-panel p-4 md:p-6 rounded-xl">
                   <h2 className="font-bold mb-4 flex items-center gap-2 font-arabic text-xl"><PenTool /> إدارة الحكم والأقوال</h2>
                   <div className="bg-slate-50 p-4 rounded-xl border mb-6">
                       <h3 className="font-bold mb-2 text-sm">إضافة حكمة جديدة</h3>
                       <div className="grid gap-3">
-                          <input className="border p-2 rounded" placeholder="نص الحكمة" value={newQuote.text} onChange={e=>setNewQuote({...newQuote, text:e.target.value})} />
-                          <input className="border p-2 rounded" placeholder="المصدر (مثال: تحفيز، شعر، حكمة)" value={newQuote.source} onChange={e=>setNewQuote({...newQuote, source:e.target.value})} />
-                          <button onClick={handleAddQuote} className="bg-amber-600 text-white py-2 rounded font-bold hover:bg-amber-700">إضافة</button>
+                          <input className="border p-2 rounded w-full" placeholder="نص الحكمة" value={newQuote.text} onChange={e=>setNewQuote({...newQuote, text:e.target.value})} />
+                          <input className="border p-2 rounded w-full" placeholder="المصدر (مثال: تحفيز، شعر، حكمة)" value={newQuote.source} onChange={e=>setNewQuote({...newQuote, source:e.target.value})} />
+                          <button onClick={handleAddQuote} className="bg-amber-600 text-white py-2 rounded font-bold hover:bg-amber-700 w-full md:w-auto">إضافة</button>
                       </div>
                   </div>
                   <div className="space-y-3">
                       {quotesList.map(q => (
-                          <div key={q.id} className="p-3 rounded-lg border bg-white flex justify-between items-center">
-                              <div>
-                                  <p className="font-bold text-slate-800">"{q.text}"</p>
-                                  <p className="text-xs text-slate-500">- {q.source}</p>
-                              </div>
-                              <button onClick={() => deleteQuote(q.id)} className="p-2 text-red-500 hover:bg-red-50 rounded">
-                                  <Trash2 size={18} />
-                              </button>
+                          <div key={q.id} className="p-3 rounded-lg border bg-white flex justify-between items-center gap-2">
+                              <div><p className="font-bold text-slate-800 text-sm md:text-base">"{q.text}"</p><p className="text-xs text-slate-500">- {q.source}</p></div>
+                              <button onClick={() => deleteQuote(q.id)} className="p-2 text-red-500 hover:bg-red-50 rounded"><Trash2 size={18} /></button>
                           </div>
                       ))}
                   </div>
@@ -2931,31 +2399,25 @@ const AdminDashboard = ({ user }) => {
           )}
 
           {activeTab === 'settings' && (
-              <div className="glass-panel p-6 rounded-xl space-y-6">
+              <div className="glass-panel p-4 md:p-6 rounded-xl space-y-6">
                   <h2 className="font-bold mb-4 font-arabic text-xl">إدارة الموقع</h2>
                   <div className="border p-4 rounded-xl">
                       <h3 className="font-bold mb-2 text-amber-600">شريط الإعلانات</h3>
-                      <div className="flex gap-2 mb-2">
-                          <input className="border p-2 flex-1 rounded" placeholder="نص الإعلان" value={newAnnouncement} onChange={e=>setNewAnnouncement(e.target.value)} />
-                          <button onClick={handleAddAnnouncement} className="bg-green-600 text-white px-4 rounded">نشر</button>
+                      <div className="flex flex-col md:flex-row gap-2 mb-4">
+                          <input className="border p-2 flex-1 rounded w-full" placeholder="نص الإعلان" value={newAnnouncement} onChange={e=>setNewAnnouncement(e.target.value)} />
+                          <button onClick={handleAddAnnouncement} className="bg-green-600 text-white px-6 py-2 rounded font-bold w-full md:w-auto">نشر</button>
                       </div>
-                      <div className="space-y-1">
+                      <div className="space-y-2">
                           {announcements.map(a => (
                               <div key={a.id} className="flex justify-between items-center bg-slate-50 p-2 rounded">
-                                  <span className="text-sm">{a.text}</span>
-                                  <button onClick={() => handleDeleteAnnouncement(a.id)} className="text-red-500 hover:text-red-700"><Trash2 size={14}/></button>
+                                  <span className="text-sm">{a.text}</span><button onClick={() => handleDeleteAnnouncement(a.id)} className="text-red-500 hover:bg-red-100 p-1 rounded"><Trash2 size={14}/></button>
                               </div>
                           ))}
                       </div>
                   </div>
-                  <div className="border p-4 rounded-xl flex justify-between items-center">
-                      <div>
-                          <h3 className="font-bold text-blue-600">لوحة الشرف (الأوائل)</h3>
-                          <p className="text-sm text-slate-500">إظهار أو إخفاء لوحة الأوائل في صفحة الطلاب</p>
-                      </div>
-                      <button onClick={toggleLeaderboard} className={`px-6 py-2 rounded-full font-bold ${showLeaderboard ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'}`}>
-                          {showLeaderboard ? 'ظاهرة' : 'مخفية'}
-                      </button>
+                  <div className="border p-4 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                      <div><h3 className="font-bold text-blue-600">لوحة الشرف (الأوائل)</h3><p className="text-sm text-slate-500">إظهار أو إخفاء لوحة الأوائل في صفحة الطلاب</p></div>
+                      <button onClick={toggleLeaderboard} className={`px-6 py-2 rounded-full font-bold w-full md:w-auto ${showLeaderboard ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'}`}>{showLeaderboard ? 'ظاهرة' : 'مخفية'}</button>
                   </div>
               </div>
           )}
@@ -2985,6 +2447,24 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   const [editFormData, setEditFormData] = useState({ name: '', phone: '', parentPhone: '', grade: '' });
   const [showFocusMode, setShowFocusMode] = useState(false);
   const [scanningHwId, setScanningHwId] = useState(null);
+  
+  const [subscriptionCodeInput, setSubscriptionCodeInput] = useState('');
+  const [isCharging, setIsCharging] = useState(false);
+
+  // تحديث حالة زر الرجوع للموبايل
+  useEffect(() => {
+      window.history.pushState({ tab: activeTab }, '');
+      const handlePopState = (e) => {
+          if (e.state && e.state.tab) {
+              setActiveTab(e.state.tab);
+              setMobileMenu(false);
+          } else {
+              setActiveTab('home');
+          }
+      };
+      window.addEventListener('popstate', handlePopState);
+      return () => window.removeEventListener('popstate', handlePopState);
+  }, [activeTab]);
 
   useEffect(() => {
     if(!userData) return;
@@ -3020,6 +2500,8 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
     return () => { unsubContent(); unsubLive(); unsubExams(); unsubResults(); unsubHwResults(); unsubMistakes(); unsubNotif(); };
   }, [userData, user]);
 
+  const isPremium = userData?.subscriptionStatus === 'premium' && (!userData.subscriptionExpiry || userData.subscriptionExpiry.toDate() > new Date());
+  
   const startMistakesExam = () => {
       if (mistakes.length === 0) return alert("ليس لديك أي أخطاء مسجلة بعد! استمر في التميز 👏");
       const shuffledMistakes = [...mistakes].sort(() => 0.5 - Math.random()).slice(0, 20);
@@ -3028,6 +2510,46 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
           questions: [ { text: 'أجب عن هذه الأسئلة التي أخطأت بها سابقاً:', subQuestions: shuffledMistakes.map(m => m.question) } ]
       };
       setActiveExam(generatedExam);
+  };
+
+  const handleChargeSubscriptionCode = async (e) => {
+      e.preventDefault();
+      if(!subscriptionCodeInput.trim()) return alert("أدخل الكود أولاً");
+      setIsCharging(true);
+      try {
+          const qStr = query(collection(db, 'subscription_codes'), where('code', '==', subscriptionCodeInput.trim()));
+          const snap = await getDocs(qStr);
+          if(snap.empty) { alert("الكود غير صحيح أو غير موجود."); setIsCharging(false); return; }
+          
+          const codeDoc = snap.docs[0];
+          const codeData = codeDoc.data();
+          if(codeData.used) { alert("عفواً، هذا الكود تم استخدامه من قبل."); setIsCharging(false); return; }
+
+          const days = codeData.days;
+          let newExpiry = new Date();
+          if(isPremium && userData.subscriptionExpiry) {
+              newExpiry = userData.subscriptionExpiry.toDate();
+          }
+          newExpiry.setDate(newExpiry.getDate() + days);
+
+          const batch = writeBatch(db);
+          batch.update(doc(db, 'users', user.uid), { subscriptionStatus: 'premium', subscriptionExpiry: newExpiry });
+          batch.update(doc(db, 'subscription_codes', codeDoc.id), { used: true, usedBy: user.displayName });
+          
+          await batch.commit();
+          alert(`تم شحن الكود بنجاح! تم تفعيل اشتراكك لمدة ${days} يوم.`);
+          setSubscriptionCodeInput('');
+      } catch (err) { console.error(err); alert("حدث خطأ أثناء الشحن"); }
+      setIsCharging(false);
+  };
+
+  const handlePremiumClick = (callback) => {
+      if(!isPremium) {
+          alert("عفواً يا بطل، هذا المحتوى مخصص للطلاب المشتركين في الباقة المدفوعة (VIP). يرجى شحن حسابك أو التواصل مع المستر لترقية حسابك!");
+          setActiveTab('subscription');
+      } else {
+          callback();
+      }
   };
 
   if (scanningHwId) return <SmartHomeworkScanner hwId={scanningHwId} user={user} onClose={() => setScanningHwId(null)} />;
@@ -3054,11 +2576,6 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   const htmls = content.filter(c => c.type === 'html');
   const interactiveExams = content.filter(c => c.type === 'interactive_exam');
 
-  const handleJoinLive = (session) => {
-      if (session.passcode) { const code = prompt("أدخل الكود السري الخاص بالبث المباشر:"); if (code !== session.passcode) { return alert("عفواً، الكود غير صحيح!"); } }
-      setActiveLiveView(session);
-  };
-
   const startExamWithCode = async (exam) => {
     if (isBannedExam) return alert("أنت محظور من دخول الامتحانات.");
     const previousResult = examResults.find(r => r.examId === exam.id);
@@ -3079,14 +2596,6 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
     } else { alert("كود خاطئ!"); }
   };
 
-  const handleUpdateMyProfile = async (e) => {
-    e.preventDefault();
-    if (editFormData.grade !== userData.grade) {
-        await updateDoc(doc(db, 'users', user.uid), { phone: editFormData.phone, requestedGrade: editFormData.grade, gradeUpdateStatus: 'pending' });
-        alert("تم إرسال طلب تغيير الصف الدراسي إلى الإدارة للموافقة.");
-    } else { await updateDoc(doc(db, 'users', user.uid), { phone: editFormData.phone }); alert("تم تحديث بياناتك بنجاح!"); }
-  };
-
   return (
     <div className="bg-slate-50 relative font-['Cairo'] min-h-screen block" dir="rtl">
       {playingVideo && <SecureVideoPlayer video={playingVideo} user={user} userName={userData.name} onClose={() => setPlayingVideo(null)} />}
@@ -3095,22 +2604,31 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
       <ChatWidget user={user} />
       
       <aside className={`fixed top-0 bottom-0 right-0 z-40 bg-white/95 backdrop-blur-xl w-72 p-6 shadow-xl transition-transform duration-300 ${mobileMenu ? 'translate-x-0' : 'translate-x-full md:translate-x-0'} border-l border-slate-200 flex flex-col`}>
-        <div className="flex items-center gap-3 mb-10 px-2"><ModernLogo /><h1 className="text-2xl font-bold font-arabic text-amber-800">النحاس</h1><button onClick={() => setMobileMenu(false)} className="md:hidden mr-auto"><X /></button></div>
+        <div className="flex items-center justify-between mb-10 px-2">
+            <div className="flex items-center gap-3">
+                <ModernLogo />
+                <h1 className="text-2xl font-bold font-arabic text-amber-800">النحاس</h1>
+            </div>
+            <button onClick={() => setMobileMenu(false)} className="md:hidden"><X /></button>
+        </div>
         <div className="space-y-2 flex-1 overflow-y-auto pr-2">
           <button onClick={() => {setActiveTab('home'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='home'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><User/> الرئيسية</button>
+          
+          <button onClick={() => {setActiveTab('subscription'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='subscription'?'bg-red-100 text-red-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-red-600'}`}><Crown/> الباقة والاشتراك</button>
+
           {!isBannedContent && (
               <>
-                <div onClick={() => setActiveTab('videos')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='videos'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><PlayCircle/> المحاضرات</div>
-                <div onClick={() => setActiveTab('files')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='files'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><FileText/> الملفات و الروابط</div>
-                <div onClick={() => setActiveTab('htmls')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='htmls'?'bg-purple-100 text-purple-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-purple-600'}`}><Code/> محتوى تفاعلي</div>
+                <div onClick={() => {setActiveTab('videos'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='videos'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><PlayCircle/> المحاضرات</div>
+                <div onClick={() => {setActiveTab('files'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='files'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><FileText/> الملفات و الروابط</div>
+                <div onClick={() => {setActiveTab('htmls'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='htmls'?'bg-purple-100 text-purple-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-purple-600'}`}><Code/> محتوى تفاعلي</div>
               </>
           )}
           {!isBannedExam && (
               <>
-                <div onClick={() => setActiveTab('exams')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><ClipboardList/> الامتحانات</div>
-                <div onClick={() => setActiveTab('interactive_exams')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='interactive_exams'?'bg-emerald-100 text-emerald-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-emerald-600'}`}><Sparkles/> امتحان تفاعلي</div>
-                <div onClick={() => setActiveTab('smart_hw_results')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='smart_hw_results'?'bg-blue-100 text-blue-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-blue-600'}`}><QrCode/> سجل الواجبات (QR)</div>
-                <div onClick={() => setActiveTab('mistakes_bank')} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='mistakes_bank'?'bg-red-100 text-red-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-red-600'}`}><BrainCircuit/> بنك الأخطاء</div>
+                <div onClick={() => {setActiveTab('exams'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><ClipboardList/> الامتحانات</div>
+                <div onClick={() => {setActiveTab('interactive_exams'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='interactive_exams'?'bg-emerald-100 text-emerald-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-emerald-600'}`}><Sparkles/> امتحان تفاعلي</div>
+                <div onClick={() => {setActiveTab('smart_hw_results'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='smart_hw_results'?'bg-blue-100 text-blue-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-blue-600'}`}><QrCode/> سجل الواجبات (QR)</div>
+                <div onClick={() => {setActiveTab('mistakes_bank'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='mistakes_bank'?'bg-red-100 text-red-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-red-600'}`}><BrainCircuit/> بنك الأخطاء</div>
               </>
           )}
           <button onClick={() => {setActiveTab('settings'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='settings'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><Settings/> ملفي الشخصي</button>
@@ -3122,12 +2640,15 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
         <div className="md:hidden flex justify-between items-center mb-6 glass-panel p-4 rounded-2xl shadow-sm"><h1 className="font-bold text-lg text-slate-800">منصة النحاس</h1><button onClick={() => setMobileMenu(true)} className="p-2 bg-slate-100 rounded-lg"><Menu /></button></div>
         <div className="flex justify-between items-center mb-6 relative">
             <div className="flex gap-2">
-                {installPrompt && ( <button onClick={installPrompt} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full font-bold shadow-lg shadow-green-500/30 transition flex items-center gap-2"><DownloadCloud size={18}/> تثبيت التطبيق</button> )}
-                <button onClick={() => setShowFocusMode(true)} className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-full font-bold shadow-lg transition flex items-center gap-2"><Headphones size={18}/> وضع التركيز</button>
+                {installPrompt && ( <button onClick={installPrompt} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full font-bold shadow-lg shadow-green-500/30 transition flex items-center gap-2"><DownloadCloud size={18}/><span className="hidden md:inline">تثبيت التطبيق</span></button> )}
+                <button onClick={() => setShowFocusMode(true)} className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-full font-bold shadow-lg transition flex items-center gap-2"><Headphones size={18}/><span className="hidden md:inline">التركيز</span></button>
             </div>
-            <button onClick={() => {requestNotificationPermission(); setShowNotifications(!showNotifications); setHasNewNotif(false);}} className="relative p-2 glass-panel rounded-full shadow-sm hover:bg-white transition">
-                <Bell className="text-slate-600"/>{hasNewNotif && <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>}
-            </button>
+            <div className="flex items-center gap-3">
+                {isPremium && <span className="hidden md:flex bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-bold items-center gap-1 border border-amber-200"><Crown size={14}/> VIP صالح حتى: {userData.subscriptionExpiry?.toDate().toLocaleDateString('ar-EG')}</span>}
+                <button onClick={() => {requestNotificationPermission(); setShowNotifications(!showNotifications); setHasNewNotif(false);}} className="relative p-2 glass-panel rounded-full shadow-sm hover:bg-white transition">
+                    <Bell className="text-slate-600"/>{hasNewNotif && <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>}
+                </button>
+            </div>
             {showNotifications && (
                 <div className="absolute top-12 left-0 w-80 glass-panel rounded-xl shadow-xl border border-white/50 p-4 z-50 max-h-96 overflow-y-auto">
                     <h3 className="font-bold mb-3 text-sm text-slate-500">الإشعارات</h3>
@@ -3155,7 +2676,15 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                 ))}
                 <WisdomBox />
                 <Announcements />
-                <h2 className="text-3xl font-bold text-slate-800 font-arabic">منور يا <span className="text-amber-600">{userData.name.split(' ')[0]}</span> 👋 <span className="text-sm font-normal text-slate-500 bg-slate-200 px-2 py-1 rounded-full font-sans">{getGradeLabel(userData.grade)}</span></h2>
+                <h2 className="text-3xl font-bold text-slate-800 font-arabic flex flex-wrap items-center gap-2">
+                    منور يا <span className="text-amber-600">{userData.name.split(' ')[0]}</span> 👋 
+                    <span className="text-sm font-normal text-slate-500 bg-slate-200 px-3 py-1 rounded-full font-sans">{getGradeLabel(userData.grade)}</span>
+                    {isPremium ? (
+                        <span className="bg-amber-100 text-amber-700 text-xs px-3 py-1 rounded-full font-bold flex items-center gap-1 shadow-sm"><Crown size={14}/> حساب VIP</span>
+                    ) : (
+                        <span className="bg-slate-200 text-slate-600 text-xs px-3 py-1 rounded-full font-bold flex items-center gap-1 cursor-pointer" onClick={()=>setActiveTab('subscription')}>مجاني (رقي حسابك)</span>
+                    )}
+                </h2>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
                     <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedContent && setActiveTab('videos')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}>
@@ -3183,27 +2712,72 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
             </div>
         )}
 
+        {activeTab === 'subscription' && (
+            <div className="glass-panel p-4 md:p-8 rounded-2xl max-w-4xl mx-auto">
+                <div className="text-center mb-8">
+                    <Crown size={64} className={`mx-auto mb-4 ${isPremium ? 'text-amber-500' : 'text-slate-300'}`} />
+                    <h2 className="text-3xl font-bold font-arabic text-slate-800 mb-2">حالة اشتراكك</h2>
+                    {isPremium ? (
+                        <p className="text-green-600 font-bold text-lg bg-green-50 inline-block px-4 py-2 rounded-full border border-green-200">أنت الآن على الباقة المدفوعة (VIP). صالحة حتى: {userData.subscriptionExpiry?.toDate().toLocaleDateString('ar-EG')}</p>
+                    ) : (
+                        <p className="text-slate-500 font-bold text-lg">حسابك الآن مجاني. اشحن لتتمكن من فتح كل الفيديوهات والامتحانات المغلقة.</p>
+                    )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border-t-4 border-amber-500">
+                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><Key className="text-amber-500"/> شحن بكود (كارت)</h3>
+                        <p className="text-slate-500 text-sm mb-6">إذا اشتريت كارت شحن أو حصلت على كود من السنتر، اكتبه هنا لتفعيل اشتراكك فوراً.</p>
+                        <form onSubmit={handleChargeSubscriptionCode} className="flex flex-col gap-3">
+                            <input 
+                                className="border-2 border-slate-200 p-4 rounded-xl text-center font-mono font-bold text-lg tracking-widest focus:border-amber-500 outline-none" 
+                                placeholder="مثال: NAHAS-XXXXXX"
+                                value={subscriptionCodeInput}
+                                onChange={e=>setSubscriptionCodeInput(e.target.value.toUpperCase())}
+                            />
+                            <button disabled={isCharging} className="bg-amber-600 text-white font-bold py-4 rounded-xl hover:bg-amber-700 shadow-lg flex justify-center items-center">
+                                {isCharging ? <Loader2 className="animate-spin" /> : 'اشحن الكود الآن'}
+                            </button>
+                        </form>
+                    </div>
+
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border-t-4 border-blue-500">
+                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><CreditCard className="text-blue-500"/> شحن فودافون كاش / إنستا باي</h3>
+                        <p className="text-slate-500 text-sm mb-4">للشحن اليدوي، قم بتحويل قيمة الاشتراك إلى أحد الأرقام التالية:</p>
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mb-4 text-center">
+                            <p className="font-bold text-lg text-blue-900 font-mono">010XXXXXXXX</p>
+                            <p className="text-xs text-slate-400 mt-1">(فودافون كاش - إنستا باي)</p>
+                        </div>
+                        <p className="text-sm font-bold text-slate-700 mb-4">بعد التحويل، أرسل صورة الوصل على الواتساب مع إيميلك ليتم التفعيل.</p>
+                        <button onClick={() => window.open("https://wa.me/201500076322", "_blank")} className="w-full bg-green-500 text-white font-bold py-4 rounded-xl hover:bg-green-600 shadow-lg flex items-center justify-center gap-2">
+                            <Phone size={20}/> إرسال الوصل واتساب
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
         {activeTab === 'mistakes_bank' && !isBannedExam && (
-            <div className="glass-panel p-8 rounded-2xl">
+            <div className="glass-panel p-4 md:p-8 rounded-2xl">
                 <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 border-b border-slate-200 pb-6">
                     <div>
-                        <h2 className="text-3xl font-bold font-arabic text-red-700 flex items-center gap-3"><BrainCircuit size={32} className="text-red-500" /> بنك أخطاء الطالب 🏦</h2>
-                        <p className="text-slate-500 mt-2 text-lg">كل سؤال أخطأت فيه سيتم تسجيله هنا لتتمكن من مراجعته والتدرب عليه.</p>
+                        <h2 className="text-2xl md:text-3xl font-bold font-arabic text-red-700 flex items-center gap-3"><BrainCircuit size={32} className="text-red-500" /> بنك أخطاء الطالب 🏦</h2>
+                        <p className="text-slate-500 mt-2 text-sm md:text-lg">كل سؤال أخطأت فيه سيتم تسجيله هنا لتتمكن من مراجعته والتدرب عليه.</p>
                     </div>
-                    <button onClick={startMistakesExam} className="bg-red-600 text-white px-8 py-4 rounded-xl font-bold shadow-xl shadow-red-500/30 hover:bg-red-700 transition flex items-center gap-2 transform hover:scale-105"><Target size={20}/> توليد امتحان من أخطائي</button>
+                    <button onClick={startMistakesExam} className="bg-red-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-bold shadow-xl shadow-red-500/30 hover:bg-red-700 transition flex items-center gap-2 transform hover:scale-105 w-full md:w-auto justify-center"><Target size={20}/> امتحان من أخطائي</button>
                 </div>
                 {mistakes.length === 0 ? (
                     <div className="text-center py-16 bg-white rounded-2xl border border-slate-100 shadow-sm"><Trophy size={64} className="mx-auto text-amber-400 mb-4 opacity-80" /><h3 className="text-2xl font-bold text-slate-700">ممتاز جداً يا بطل! 👏</h3><p className="text-slate-500 mt-2">بنك الأخطاء الخاص بك فارغ تماماً. استمر على هذا المستوى.</p></div>
                 ) : (
                     <div className="grid grid-cols-1 gap-6">
-                        <div className="bg-red-50 text-red-700 p-4 rounded-xl border border-red-200 font-bold flex items-center gap-2">
+                        <div className="bg-red-50 text-red-700 p-4 rounded-xl border border-red-200 font-bold flex items-center gap-2 text-sm md:text-base">
                             <AlertOctagon /> لديك {mistakes.length} سؤال في بنك الأخطاء. يجب مراجعتها جيداً قبل الامتحان النهائي!
                         </div>
                         {mistakes.map(m => (
-                            <div key={m.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:border-red-300 transition relative overflow-hidden">
+                            <div key={m.id} className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-200 hover:border-red-300 transition relative overflow-hidden">
                                 <div className="absolute top-0 right-0 bg-slate-800 text-white text-xs px-3 py-1 rounded-bl-lg font-bold">من امتحان: {m.examTitle}</div>
-                                <h3 className="text-xl font-bold text-slate-800 mt-4 mb-4 leading-relaxed font-sans">{m.question.text}</h3>
-                                <div className="grid md:grid-cols-2 gap-4">
+                                <h3 className="text-lg md:text-xl font-bold text-slate-800 mt-6 md:mt-4 mb-4 leading-relaxed font-sans">{m.question.text}</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="bg-red-50 p-4 rounded-xl border border-red-100"><p className="text-xs text-red-500 font-bold mb-1">إجابتك الخاطئة كانت:</p><p className="font-bold text-slate-800">{m.question.studentAnswerText || 'غير معروف'}</p></div>
                                     <div className="bg-green-50 p-4 rounded-xl border border-green-100"><p className="text-xs text-green-600 font-bold mb-1">الإجابة الصحيحة هي:</p><p className="font-bold text-green-800">{m.question.correctAnswerText || 'غير معروف'}</p></div>
                                 </div>
@@ -3214,38 +2788,70 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
             </div>
         )}
         
-        {activeTab === 'videos' && !isBannedContent && <div className="grid grid-cols-1 md:grid-cols-3 gap-6">{videos.map(v => (<div key={v.id} className="glass-card rounded-xl overflow-hidden cursor-pointer" onClick={() => setPlayingVideo(v)}><div className="h-48 bg-gradient-to-br from-slate-800 to-black flex items-center justify-center relative group"><PlayCircle className="text-white w-16 h-16 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/><span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(v.grade)}</span></div><div className="p-4"><h3 className="font-bold text-lg text-slate-800">{v.title}</h3></div></div>))}</div>}
+        {activeTab === 'videos' && !isBannedContent && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                {videos.map(v => (
+                    <div key={v.id} className="glass-card rounded-xl overflow-hidden cursor-pointer relative group" onClick={() => handlePremiumClick(() => setPlayingVideo(v))}>
+                        <div className="h-48 bg-gradient-to-br from-slate-800 to-black flex items-center justify-center relative">
+                            {v.isPremium && !isPremium ? <Lock className="text-slate-400 w-16 h-16 opacity-80" /> : <PlayCircle className="text-white w-16 h-16 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/>}
+                            <span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(v.grade)}</span>
+                            {v.isPremium && <span className="absolute top-2 right-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-full font-bold flex items-center gap-1 shadow-md"><Crown size={12}/> VIP</span>}
+                        </div>
+                        <div className="p-4"><h3 className={`font-bold text-lg ${v.isPremium && !isPremium ? 'text-slate-400' : 'text-slate-800'}`}>{v.title}</h3></div>
+                    </div>
+                ))}
+            </div>
+        )}
+
         {activeTab === 'files' && !isBannedContent && (
             <div className="glass-panel rounded-xl overflow-hidden">
                 {filesAndLinks.map(f => (
-                    <div key={f.id} className="p-4 flex justify-between items-center border-b last:border-0 hover:bg-white/50 transition">
+                    <div key={f.id} className="p-4 flex flex-col md:flex-row justify-between md:items-center border-b last:border-0 hover:bg-white/50 transition gap-4">
                         <div className="flex items-center gap-4">
                             {f.type === 'link' ? (<div className="bg-blue-100 text-blue-600 p-3 rounded-lg font-bold text-xs shadow-sm flex items-center justify-center"><LinkIcon size={16}/></div>) : (<div className="bg-red-100 text-red-600 p-3 rounded-lg font-bold text-xs shadow-sm">PDF</div>)}
-                            <div><h4 className="font-bold text-lg text-slate-800">{f.title}</h4><span className="text-xs text-slate-500">{getGradeLabel(f.grade)}</span></div>
+                            <div>
+                                <h4 className={`font-bold text-lg ${f.isPremium && !isPremium ? 'text-slate-400' : 'text-slate-800'} flex items-center gap-2`}>
+                                    {f.title}
+                                    {f.isPremium && <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1"><Crown size={10}/> VIP</span>}
+                                </h4>
+                                <span className="text-xs text-slate-500">{getGradeLabel(f.grade)}</span>
+                            </div>
                         </div>
-                        <a href={f.url} target="_blank" rel="noopener noreferrer" className={`px-4 py-2 rounded-lg font-bold transition shadow-sm ${f.type === 'link' ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' : 'bg-green-50 text-green-700 hover:bg-green-100'}`}>{f.type === 'link' ? 'فتح الرابط' : 'تحميل'}</a>
+                        {f.isPremium && !isPremium ? (
+                            <button onClick={()=>handlePremiumClick(()=>{})} className="px-4 py-2 rounded-lg font-bold transition shadow-sm bg-slate-100 text-slate-400 flex items-center justify-center gap-2"><Lock size={16}/> مقفل</button>
+                        ) : (
+                            <a href={f.url} target="_blank" rel="noopener noreferrer" className={`px-4 py-2 rounded-lg font-bold transition shadow-sm text-center ${f.type === 'link' ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' : 'bg-green-50 text-green-700 hover:bg-green-100'}`}>{f.type === 'link' ? 'فتح الرابط' : 'تحميل'}</a>
+                        )}
                     </div>
                 ))}
             </div>
         )}
         
         {activeTab === 'htmls' && !isBannedContent && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                 {htmls.map(h => (
-                    <motion.div whileHover={{y:-5}} key={h.id} className="glass-card rounded-xl overflow-hidden cursor-pointer" onClick={() => setPlayingHtml(h)}>
-                        <div className="h-48 bg-gradient-to-br from-purple-600 to-indigo-900 flex items-center justify-center relative group"><Code className="text-white w-20 h-20 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/><span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(h.grade)}</span></div>
-                        <div className="p-4"><h3 className="font-bold text-lg text-slate-800">{h.title}</h3><button className="mt-2 w-full bg-purple-100 text-purple-700 font-bold py-2 rounded-lg hover:bg-purple-200 transition shadow-sm">تشغيل</button></div>
+                    <motion.div whileHover={{y:-5}} key={h.id} className="glass-card rounded-xl overflow-hidden cursor-pointer relative" onClick={() => handlePremiumClick(() => setPlayingHtml(h))}>
+                        <div className="h-48 bg-gradient-to-br from-purple-600 to-indigo-900 flex items-center justify-center relative group">
+                            {h.isPremium && !isPremium ? <Lock className="text-slate-400 w-20 h-20 opacity-80" /> : <Code className="text-white w-20 h-20 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/>}
+                            <span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(h.grade)}</span>
+                            {h.isPremium && <span className="absolute top-2 right-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-full font-bold flex items-center gap-1 shadow-md"><Crown size={12}/> VIP</span>}
+                        </div>
+                        <div className="p-4"><h3 className={`font-bold text-lg ${h.isPremium && !isPremium ? 'text-slate-400' : 'text-slate-800'}`}>{h.title}</h3><button className={`mt-2 w-full font-bold py-2 rounded-lg transition shadow-sm ${h.isPremium && !isPremium ? 'bg-slate-100 text-slate-400' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'}`}>{h.isPremium && !isPremium ? 'مقفل' : 'تشغيل'}</button></div>
                     </motion.div>
                 ))}
             </div>
         )}
 
         {activeTab === 'interactive_exams' && !isBannedExam && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                 {interactiveExams.map(h => (
-                    <motion.div whileHover={{y:-5}} key={h.id} className="glass-card rounded-xl overflow-hidden cursor-pointer" onClick={() => setPlayingHtml(h)}>
-                        <div className="h-48 bg-gradient-to-br from-emerald-600 to-teal-900 flex items-center justify-center relative group"><Sparkles className="text-white w-20 h-20 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/><span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(h.grade)}</span></div>
-                        <div className="p-4"><h3 className="font-bold text-lg text-slate-800">{h.title}</h3><button className="mt-2 w-full bg-emerald-100 text-emerald-700 font-bold py-2 rounded-lg hover:bg-emerald-200 transition shadow-sm">بدء الامتحان</button></div>
+                    <motion.div whileHover={{y:-5}} key={h.id} className="glass-card rounded-xl overflow-hidden cursor-pointer relative" onClick={() => handlePremiumClick(() => setPlayingHtml(h))}>
+                        <div className="h-48 bg-gradient-to-br from-emerald-600 to-teal-900 flex items-center justify-center relative group">
+                            {h.isPremium && !isPremium ? <Lock className="text-slate-400 w-20 h-20 opacity-80" /> : <Sparkles className="text-white w-20 h-20 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/>}
+                            <span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(h.grade)}</span>
+                            {h.isPremium && <span className="absolute top-2 right-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-full font-bold flex items-center gap-1 shadow-md"><Crown size={12}/> VIP</span>}
+                        </div>
+                        <div className="p-4"><h3 className={`font-bold text-lg ${h.isPremium && !isPremium ? 'text-slate-400' : 'text-slate-800'}`}>{h.title}</h3><button className={`mt-2 w-full font-bold py-2 rounded-lg transition shadow-sm ${h.isPremium && !isPremium ? 'bg-slate-100 text-slate-400' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}>{h.isPremium && !isPremium ? 'مقفل' : 'بدء الامتحان'}</button></div>
                     </motion.div>
                 ))}
             </div>
@@ -3265,28 +2871,37 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                 }
 
                 return (
-                  <motion.div whileHover={{scale:1.01}} key={e.id} className="glass-card p-6 rounded-2xl relative overflow-hidden">
-                    {statusText && <div className={`absolute top-0 left-0 text-xs px-3 py-1 rounded-br-xl font-bold shadow-md ${statusClass}`}>{statusText}</div>}
-                    <h3 className="text-xl font-bold mb-2 text-slate-800">{e.title}</h3>
-                    <div className="flex justify-between text-sm text-slate-500 mb-4"><span>⏳ {e.duration} دقيقة</span><span>📝 {e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0)} سؤال</span></div>
-                    {prevResult && prevResult.status === 'completed' ? (
-                        <div className="flex gap-2">
-                             <button disabled className="flex-1 bg-slate-200 text-slate-500 py-3 rounded-xl font-bold cursor-not-allowed">تم الانتهاء</button>
-                             {isExamTimeOver ? (
-                                <button onClick={() => setReviewingExam(e)} className="flex-1 bg-blue-100 text-blue-700 py-3 rounded-xl font-bold hover:bg-blue-200 transition shadow-sm">عرض الأخطاء</button>
-                             ) : (
-                                <button disabled className="flex-1 bg-gray-100 text-gray-400 py-3 rounded-xl font-bold cursor-not-allowed text-xs">المراجعة بعد الوقت</button>
-                             )}
-                             <button onClick={() => generatePDF('student', {studentName: user.displayName, score: prevResult.score, total: e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0), status: prevResult.status, examTitle: e.title, questions: e.questions.flatMap(q => q.subQuestions), answers: prevResult.answers })} className="flex-1 bg-green-100 text-green-700 py-3 rounded-xl font-bold hover:bg-green-200 flex items-center justify-center gap-1 transition shadow-sm"><Download size={16}/> شهادة</button>
-                        </div>
-                    ) : prevResult ? (
-                        <div className="bg-red-50 text-red-600 p-3 rounded-xl font-bold text-center border border-red-200">لا يمكن إعادة الامتحان</div>
-                    ) : (
-                        <div className="space-y-2">
-                            <p className="text-xs text-slate-500">يبدأ: {new Date(e.startTime).toLocaleString('ar-EG')}</p>
-                            <button onClick={() => startExamWithCode(e)} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 flex items-center justify-center gap-2 shadow-lg hover:shadow-slate-500/30 transition"><Lock size={16}/> ابدأ الامتحان</button>
-                        </div>
-                    )}
+                  <motion.div whileHover={{scale:1.01}} key={e.id} className={`glass-card p-4 md:p-6 rounded-2xl relative overflow-hidden flex flex-col ${e.isPremium && !isPremium ? 'opacity-70' : ''}`}>
+                    {statusText && <div className={`absolute top-0 left-0 text-[10px] md:text-xs px-2 md:px-3 py-1 rounded-br-xl font-bold shadow-md ${statusClass}`}>{statusText}</div>}
+                    {e.isPremium && <div className="absolute top-2 right-2 bg-amber-100 text-amber-700 text-[10px] px-2 py-1 rounded-full font-bold flex items-center gap-1"><Crown size={12}/> VIP</div>}
+                    
+                    <h3 className={`text-lg md:text-xl font-bold mb-2 mt-4 md:mt-0 ${e.isPremium && !isPremium ? 'text-slate-400' : 'text-slate-800'}`}>{e.title}</h3>
+                    <div className="flex justify-between text-xs md:text-sm text-slate-500 mb-4"><span>⏳ {e.duration} دقيقة</span><span>📝 {e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0)} سؤال</span></div>
+                    
+                    <div className="mt-auto">
+                        {prevResult && prevResult.status === 'completed' ? (
+                            <div className="flex flex-col sm:flex-row gap-2">
+                                 <button disabled className="flex-1 bg-slate-200 text-slate-500 py-2 md:py-3 rounded-xl font-bold cursor-not-allowed text-xs md:text-sm">تم الانتهاء</button>
+                                 {isExamTimeOver ? (
+                                    <button onClick={() => setReviewingExam(e)} className="flex-1 bg-blue-100 text-blue-700 py-2 md:py-3 rounded-xl font-bold hover:bg-blue-200 transition shadow-sm text-xs md:text-sm">عرض الأخطاء</button>
+                                 ) : (
+                                    <button disabled className="flex-1 bg-gray-100 text-gray-400 py-2 md:py-3 rounded-xl font-bold cursor-not-allowed text-[10px] md:text-xs">المراجعة بعد الوقت</button>
+                                 )}
+                                 <button onClick={() => generatePDF('student', {studentName: user.displayName, score: prevResult.score, total: e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0), status: prevResult.status, examTitle: e.title, questions: e.questions.flatMap(q => q.subQuestions), answers: prevResult.answers })} className="flex-1 bg-green-100 text-green-700 py-2 md:py-3 rounded-xl font-bold hover:bg-green-200 flex items-center justify-center gap-1 transition shadow-sm text-xs md:text-sm"><Download size={14}/> شهادة</button>
+                            </div>
+                        ) : prevResult ? (
+                            <div className="bg-red-50 text-red-600 p-2 md:p-3 rounded-xl font-bold text-center border border-red-200 text-sm">لا يمكن إعادة الامتحان</div>
+                        ) : (
+                            <div className="space-y-2">
+                                <p className="text-xs text-slate-500">يبدأ: {new Date(e.startTime).toLocaleString('ar-EG')}</p>
+                                {e.isPremium && !isPremium ? (
+                                    <button onClick={()=>handlePremiumClick(()=>{})} className="w-full bg-slate-200 text-slate-500 py-3 rounded-xl font-bold flex items-center justify-center gap-2 cursor-not-allowed text-sm"><Lock size={16}/> امتحان مقفل (للمشتركين)</button>
+                                ) : (
+                                    <button onClick={() => startExamWithCode(e)} className="w-full bg-slate-900 text-white py-2 md:py-3 rounded-xl font-bold hover:bg-slate-800 flex items-center justify-center gap-2 shadow-lg hover:shadow-slate-500/30 transition text-sm"><Lock size={14}/> ابدأ الامتحان</button>
+                                )}
+                            </div>
+                        )}
+                    </div>
                   </motion.div>
                 )
              })}
@@ -3294,26 +2909,26 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
         )}
 
         {activeTab === 'smart_hw_results' && !isBannedExam && (
-            <div className="glass-panel p-6 rounded-xl">
-                <h2 className="text-2xl font-bold mb-6 font-arabic text-blue-800 flex items-center gap-2"><QrCode/> سجل الواجبات الذكية (QR)</h2>
+            <div className="glass-panel p-4 md:p-6 rounded-xl">
+                <h2 className="text-xl md:text-2xl font-bold mb-6 font-arabic text-blue-800 flex items-center gap-2"><QrCode/> سجل الواجبات الذكية (QR)</h2>
                 {hwResults.length === 0 ? (
-                    <p className="text-slate-500 text-center py-10 bg-white rounded-xl border font-bold">لم تقم بتسليم أي واجب ذكي عبر الكاميرا حتى الآن.</p>
+                    <p className="text-slate-500 text-center py-10 bg-white rounded-xl border font-bold text-sm md:text-base">لم تقم بتسليم أي واجب ذكي عبر الكاميرا حتى الآن.</p>
                 ) : (
                     <div className="space-y-6">
                         {(() => {
                             const hwByBook = hwResults.reduce((acc, hw) => { const book = hw.bookName || 'كتب غير مصنفة'; if(!acc[book]) acc[book] = []; acc[book].push(hw); return acc; }, {});
                             return Object.entries(hwByBook).map(([bookName, hws]) => (
-                                <div key={bookName} className="mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                                    <h4 className="font-bold text-lg text-amber-700 bg-amber-100 p-2 rounded-lg mb-4 flex items-center gap-2 inline-flex"><BookOpen size={20}/> كتاب: {bookName}</h4>
-                                    <div className="space-y-3 pl-4 border-r-4 border-amber-300 pr-4">
+                                <div key={bookName} className="mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200 overflow-x-auto">
+                                    <h4 className="font-bold text-base md:text-lg text-amber-700 bg-amber-100 p-2 rounded-lg mb-4 flex items-center gap-2 w-max"><BookOpen size={18}/> كتاب: {bookName}</h4>
+                                    <div className="space-y-3 pl-4 border-r-4 border-amber-300 pr-4 w-max min-w-full">
                                         {hws.map(hw => (
-                                            <div key={hw.id} className="bg-white border shadow-sm p-4 rounded-xl flex flex-col md:flex-row justify-between gap-4 hover:border-amber-400 transition">
+                                            <div key={hw.id} className="bg-white border shadow-sm p-4 rounded-xl flex flex-col md:flex-row justify-between md:items-center gap-4 hover:border-amber-400 transition">
                                                 <div className="flex-1">
-                                                    <p className="font-bold text-lg text-slate-800">{hw.homeworkTitle}</p>
-                                                    <p className="text-sm text-slate-500 mb-2 mt-1 bg-slate-50 p-2 rounded">تعليق المصحح: <span className="font-bold text-blue-600">{hw.feedback}</span></p>
+                                                    <p className="font-bold text-base md:text-lg text-slate-800">{hw.homeworkTitle}</p>
+                                                    <p className="text-xs md:text-sm text-slate-500 mb-2 mt-1 bg-slate-50 p-2 rounded text-wrap break-words whitespace-normal">تعليق المصحح: <span className="font-bold text-blue-600">{hw.feedback}</span></p>
                                                 </div>
-                                                <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                                                    <span className="text-xl font-black text-green-600 bg-green-50 px-4 py-2 rounded-lg border border-green-200">{hw.score} / {hw.total}</span>
+                                                <div className="flex flex-col md:items-end gap-2 flex-shrink-0 border-t md:border-t-0 pt-2 md:pt-0 mt-2 md:mt-0">
+                                                    <span className="text-lg md:text-xl font-black text-green-600 bg-green-50 px-4 py-2 rounded-lg border border-green-200 w-fit">{hw.score} / {hw.total}</span>
                                                     <span className="text-xs text-slate-400">{hw.submittedAt?.toDate().toLocaleDateString('ar-EG')}</span>
                                                 </div>
                                             </div>
@@ -3328,17 +2943,20 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
         )}
 
         {activeTab === 'settings' && (
-              <div className="glass-panel p-8 rounded-xl max-w-2xl mx-auto">
-                <h2 className="text-2xl font-bold mb-6 flex items-center gap-2 font-arabic text-slate-800"><Settings className="text-slate-700"/> إعدادات الحساب</h2>
+              <div className="glass-panel p-4 md:p-8 rounded-xl max-w-2xl mx-auto">
+                <h2 className="text-xl md:text-2xl font-bold mb-6 flex items-center gap-2 font-arabic text-slate-800"><Settings className="text-slate-700"/> إعدادات الحساب</h2>
                 {userData.gradeUpdateStatus === 'pending' && (
-                    <div className="mb-4 bg-yellow-50 text-yellow-800 p-4 rounded-xl border border-yellow-200 flex items-center gap-2 font-bold"><RefreshCw className="animate-spin-slow" size={20} /> لقد قمت بطلب تغيير المرحلة إلى {getGradeLabel(userData.requestedGrade)}. الطلب قيد المراجعة.</div>
+                    <div className="mb-4 bg-yellow-50 text-yellow-800 p-4 rounded-xl border border-yellow-200 flex flex-col md:flex-row items-center gap-2 font-bold text-center md:text-right text-sm">
+                        <RefreshCw className="animate-spin-slow" size={20} /> 
+                        لقد قمت بطلب تغيير المرحلة إلى {getGradeLabel(userData.requestedGrade)}. الطلب قيد المراجعة.
+                    </div>
                 )}
                 <form onSubmit={handleUpdateMyProfile} className="space-y-4">
                   <div><label className="block text-sm font-bold text-slate-700 mb-2">الاسم</label><input disabled className="w-full border p-3 rounded-xl bg-slate-100 text-slate-500 cursor-not-allowed" value={editFormData.name} /><p className="text-xs text-red-500 mt-1">لا يمكن تغيير الاسم (تواصل مع الإدارة).</p></div>
                   <div><label className="block text-sm font-bold text-slate-700 mb-2">رقم الهاتف</label><input className="w-full border p-3 rounded-xl" value={editFormData.phone} onChange={e=>setEditFormData({...editFormData, phone:e.target.value})} /></div>
                   <div><label className="block text-sm font-bold text-slate-700 mb-2">رقم ولي الأمر</label><input disabled className="w-full border p-3 rounded-xl bg-slate-100 text-slate-500 cursor-not-allowed" value={editFormData.parentPhone} /><p className="text-xs text-red-500 mt-1">لا يمكن تغيير رقم ولي الأمر.</p></div>
                   <div><label className="block text-sm font-bold text-slate-700 mb-2">الصف الدراسي (يتطلب موافقة الأدمن)</label><select className="w-full border p-3 rounded-xl bg-white" value={editFormData.grade} onChange={e=>setEditFormData({...editFormData, grade:e.target.value})}><GradeOptions /></select></div>
-                  <button className="w-full bg-gradient-to-r from-amber-600 to-amber-700 text-white py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-amber-500/40 transition">حفظ التعديلات</button>
+                  <button className="w-full bg-gradient-to-r from-amber-600 to-amber-700 text-white py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-amber-500/40 transition mt-4">حفظ التعديلات</button>
                 </form>
               </div>
         )}
@@ -3356,40 +2974,52 @@ const LandingPage = ({ onAuthClick, installPrompt }) => {
   const openFacebook = () => window.open("https://www.facebook.com/share/17aiUQWKf5/", "_blank");
 
   return (
-    <div className="min-h-screen font-['Cairo'] relative" dir="rtl">
+    <div className="min-h-screen font-['Cairo'] relative overflow-x-hidden" dir="rtl">
       {playingVideo && <SecureVideoPlayer video={playingVideo} user={null} userName="زائر" onClose={() => setPlayingVideo(null)} />}
       {playingHtml && <InteractiveViewer content={playingHtml} user={null} onClose={() => setPlayingHtml(null)} />}
       <FloatingArabicBackground />
       <ChatWidget />
-      <nav className="relative z-10 flex justify-between items-center p-6 max-w-7xl mx-auto glass-panel mt-4 rounded-full mx-4 shadow-lg">
-        <div className="flex items-center gap-2"><ModernLogo /><span className="text-2xl font-bold font-arabic text-amber-800">منصة النحاس</span></div>
-        <div className="flex gap-4 items-center">
-          {installPrompt && ( <button onClick={installPrompt} className="hidden md:flex bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full font-bold shadow-lg shadow-green-500/30 transition items-center gap-2"><DownloadCloud size={18}/> تثبيت التطبيق</button> )}
+      <nav className="relative z-10 flex justify-between items-center p-4 md:p-6 max-w-7xl mx-auto glass-panel mt-4 rounded-full mx-2 md:mx-4 shadow-lg">
+        <div className="flex items-center gap-2"><ModernLogo /><span className="text-xl md:text-2xl font-bold font-arabic text-amber-800 hidden md:block">منصة النحاس</span></div>
+        <div className="flex gap-2 md:gap-4 items-center">
+          {installPrompt && ( <button onClick={installPrompt} className="hidden md:flex bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full font-bold shadow-lg shadow-green-500/30 transition items-center gap-2"><DownloadCloud size={18}/> تثبيت</button> )}
           <button onClick={openFacebook} className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition shadow-lg hover:shadow-blue-500/50"><Facebook size={20}/></button>
-          <button onClick={onAuthClick} className="bg-slate-900 text-white px-6 py-2 rounded-full font-bold shadow-lg hover:shadow-slate-500/50 transition transform hover:-translate-y-0.5">دخول الطالب</button>
+          <button onClick={onAuthClick} className="bg-slate-900 text-white px-4 md:px-6 py-2 rounded-full font-bold shadow-lg hover:shadow-slate-500/50 transition transform hover:-translate-y-0.5 text-sm md:text-base">دخول الطالب</button>
         </div>
       </nav>
       <main className="relative z-10 px-4 mt-10 max-w-7xl mx-auto text-center">
-        <h1 className="text-5xl md:text-7xl font-black text-slate-900 mb-6">اللغة العربية <span className="text-amber-600">لعبتك</span></h1>
-        <p className="text-xl text-slate-600 mb-8 max-w-2xl mx-auto">أقوى منصة تعليمية للمرحلة الإعدادية والثانوية.</p>
-        <button onClick={onAuthClick} className="bg-amber-600 text-white px-10 py-4 rounded-2xl text-xl font-bold shadow-xl hover:bg-amber-700 transition transform hover:-translate-y-1">اشترك الآن 🚀</button>
-        {installPrompt && (<div className="md:hidden mt-6"><button onClick={installPrompt} className="bg-green-600 text-white px-8 py-3 rounded-full font-bold shadow-lg flex items-center gap-2 mx-auto"><DownloadCloud size={18}/> تثبيت المنصة كتطبيق على هاتفك</button></div>)}
-        <div className="my-12"><WisdomBox /></div>
-        <div className="grid md:grid-cols-2 gap-8 mt-10 mb-20">
-          <div className="bg-white/80 backdrop-blur p-6 rounded-3xl border border-white shadow-sm">
-            <h3 className="text-2xl font-bold mb-4 flex items-center gap-2 text-blue-700"><Video /> فيديوهات مجانية</h3>
+        <h1 className="text-4xl md:text-7xl font-black text-slate-900 mb-6 leading-tight">اللغة العربية <span className="text-amber-600">لعبتك</span></h1>
+        <p className="text-lg md:text-xl text-slate-600 mb-8 max-w-2xl mx-auto">أقوى منصة تعليمية للمرحلة الإعدادية والثانوية.</p>
+        <button onClick={onAuthClick} className="bg-amber-600 text-white px-8 md:px-10 py-3 md:py-4 rounded-2xl text-lg md:text-xl font-bold shadow-xl hover:bg-amber-700 transition transform hover:-translate-y-1">اشترك الآن 🚀</button>
+        {installPrompt && (<div className="md:hidden mt-6"><button onClick={installPrompt} className="bg-green-600 text-white px-6 py-3 rounded-full font-bold shadow-lg flex items-center gap-2 mx-auto text-sm"><DownloadCloud size={18}/> تثبيت المنصة على هاتفك</button></div>)}
+        <div className="my-12 px-2"><WisdomBox /></div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 mt-10 mb-20 px-2">
+          <div className="bg-white/80 backdrop-blur p-4 md:p-6 rounded-3xl border border-white shadow-sm overflow-hidden">
+            <h3 className="text-xl md:text-2xl font-bold mb-4 flex items-center gap-2 text-blue-700"><Video /> فيديوهات للجميع</h3>
             <div className="space-y-4">
               {publicContent.filter(c => c.type === 'video').length > 0 ? publicContent.filter(c => c.type === 'video').map((v, i) => (
-                 <div key={i} className="flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm cursor-pointer hover:bg-gray-50" onClick={() => setPlayingVideo(v)}><PlayCircle className="text-amber-500"/><span className="font-bold">{v.title}</span><span className="mr-auto text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">مشاهدة</span></div>
-               )) : <p className="text-slate-500">مفيش فيديوهات عامة حالياً</p>}
+                 <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl shadow-sm cursor-pointer hover:bg-gray-50" onClick={() => setPlayingVideo(v)}>
+                     <div className="flex items-center gap-3 overflow-hidden">
+                         <PlayCircle className="text-amber-500 shrink-0"/>
+                         <span className="font-bold truncate text-sm md:text-base">{v.title}</span>
+                     </div>
+                     <span className="text-[10px] md:text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded shrink-0">مشاهدة</span>
+                 </div>
+               )) : <p className="text-slate-500 text-sm">لا توجد فيديوهات عامة حالياً</p>}
             </div>
           </div>
-          <div className="bg-white/80 backdrop-blur p-6 rounded-3xl border border-white shadow-sm">
-            <h3 className="text-2xl font-bold mb-4 flex items-center gap-2 text-purple-700"><Code /> تفاعلي عام</h3>
+          <div className="bg-white/80 backdrop-blur p-4 md:p-6 rounded-3xl border border-white shadow-sm overflow-hidden">
+            <h3 className="text-xl md:text-2xl font-bold mb-4 flex items-center gap-2 text-purple-700"><Code /> تفاعلي للجميع</h3>
             <div className="space-y-4">
               {publicContent.filter(c => c.type === 'html').length > 0 ? publicContent.filter(c => c.type === 'html').map((h, i) => (
-                 <div key={i} className="flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm cursor-pointer hover:bg-gray-50" onClick={() => setPlayingHtml(h)}><Code className="text-purple-500"/><span className="font-bold">{h.title}</span><span className="mr-auto text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">تشغيل</span></div>
-               )) : <p className="text-slate-500">مفيش محتوى تفاعلي عام حالياً</p>}
+                 <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl shadow-sm cursor-pointer hover:bg-gray-50" onClick={() => setPlayingHtml(h)}>
+                     <div className="flex items-center gap-3 overflow-hidden">
+                         <Code className="text-purple-500 shrink-0"/>
+                         <span className="font-bold truncate text-sm md:text-base">{h.title}</span>
+                     </div>
+                     <span className="text-[10px] md:text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded shrink-0">تشغيل</span>
+                 </div>
+               )) : <p className="text-slate-500 text-sm">لا يوجد محتوى تفاعلي عام حالياً</p>}
             </div>
           </div>
         </div>
@@ -3426,7 +3056,11 @@ const AuthPage = ({ onBack }) => {
       if (isRegister) {
         const userCred = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
         await updateProfile(userCred.user, { displayName: formData.name });
-        await setDoc(doc(db, 'users', userCred.user.uid), { name: formData.name, email: formData.email, grade: formData.grade, phone: formData.phone, parentPhone: formData.parentPhone, role: 'student', status: 'pending', createdAt: new Date() });
+        await setDoc(doc(db, 'users', userCred.user.uid), { 
+            name: formData.name, email: formData.email, grade: formData.grade, phone: formData.phone, 
+            parentPhone: formData.parentPhone, role: 'student', status: 'pending', 
+            subscriptionStatus: 'free', subscriptionExpiry: null, createdAt: new Date() 
+        });
         alert("تم إنشاء الحساب! انتظر تفعيل الأدمن.");
       } else { await signInWithEmailAndPassword(auth, formData.email, formData.password); }
     } catch (error) { alert("حدث خطأ: " + error.message); } 
@@ -3441,25 +3075,25 @@ const AuthPage = ({ onBack }) => {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-slate-900 font-['Cairo'] relative overflow-hidden" dir="rtl">
       <FloatingArabicBackground />
-      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white/90 backdrop-blur-xl rounded-3xl p-8 w-full max-w-md shadow-2xl relative z-10 my-10 overflow-y-auto max-h-[90vh] border border-white/50">
-        <button onClick={onBack} className="text-slate-500 hover:text-slate-800 text-sm mb-6 flex items-center gap-1 font-bold"><ChevronRight size={18} /> العودة</button>
+      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white/90 backdrop-blur-xl rounded-3xl p-6 md:p-8 w-full max-w-md shadow-2xl relative z-10 my-10 overflow-y-auto max-h-[90vh] border border-white/50 scrollbar-hide">
+        <button onClick={onBack} className="text-slate-500 hover:text-slate-800 text-sm mb-4 md:mb-6 flex items-center gap-1 font-bold"><ChevronRight size={18} /> العودة</button>
         <div className="flex justify-center mb-4"><ModernLogo /></div>
-        <h2 className="text-3xl font-bold font-arabic text-slate-800 mb-2 text-center">{isRegister ? 'حساب جديد' : 'تسجيل دخول'}</h2>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4 mt-6">
+        <h2 className="text-2xl md:text-3xl font-bold font-arabic text-slate-800 mb-2 text-center">{isRegister ? 'حساب جديد' : 'تسجيل دخول'}</h2>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3 md:gap-4 mt-4 md:mt-6">
           {isRegister && (
             <>
-              <div className="relative"><User className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="text" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="الاسم ثلاثي" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
-              <div className="relative"><Phone className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="رقم هاتفك" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} /></div>
-              <div className="relative"><Phone className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="رقم ولي الأمر" value={formData.parentPhone} onChange={e => setFormData({...formData, parentPhone: e.target.value})} /></div>
-              <div className="relative"><GraduationCap className="absolute top-3.5 right-4 text-slate-400" size={20} /><select className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 appearance-none focus:border-amber-500 outline-none transition" value={formData.grade} onChange={e => setFormData({...formData, grade: e.target.value})}><GradeOptions /></select></div>
+              <div className="relative"><User className="absolute top-3.5 right-4 text-slate-400" size={18} /><input required type="text" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition text-sm md:text-base" placeholder="الاسم ثلاثي" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
+              <div className="relative"><Phone className="absolute top-3.5 right-4 text-slate-400" size={18} /><input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition text-sm md:text-base" placeholder="رقم هاتفك" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} /></div>
+              <div className="relative"><Phone className="absolute top-3.5 right-4 text-slate-400" size={18} /><input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition text-sm md:text-base" placeholder="رقم ولي الأمر" value={formData.parentPhone} onChange={e => setFormData({...formData, parentPhone: e.target.value})} /></div>
+              <div className="relative"><GraduationCap className="absolute top-3.5 right-4 text-slate-400" size={18} /><select className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 appearance-none focus:border-amber-500 outline-none transition text-sm md:text-base" value={formData.grade} onChange={e => setFormData({...formData, grade: e.target.value})}><GradeOptions /></select></div>
             </>
           )}
-          <div className="relative"><Mail className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="email" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="البريد" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></div>
-          <div className="relative"><Lock className="absolute top-3.5 right-4 text-slate-400" size={20} /><input required type="password" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition" placeholder="كلمة السر" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} /></div>
+          <div className="relative"><Mail className="absolute top-3.5 right-4 text-slate-400" size={18} /><input required type="email" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition text-sm md:text-base" placeholder="البريد" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></div>
+          <div className="relative"><Lock className="absolute top-3.5 right-4 text-slate-400" size={18} /><input required type="password" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition text-sm md:text-base" placeholder="كلمة السر" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} /></div>
           {!isRegister && (<div className="text-left"><button type="button" onClick={handleForgotPassword} className="text-xs text-amber-600 font-bold hover:underline">نسيت كلمة السر؟</button></div>)}
           <button disabled={loading} className="bg-gradient-to-r from-amber-600 to-amber-700 text-white py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-amber-500/50 transition mt-2 flex justify-center">{loading ? <Loader2 className="animate-spin" /> : (isRegister ? 'تسجيل' : 'دخول')}</button>
         </form>
-        <button onClick={() => setIsRegister(!isRegister)} className="mt-6 text-amber-800 font-bold hover:underline w-full text-center block text-sm">{isRegister ? 'تسجيل الدخول' : 'حساب جديد'}</button>
+        <button onClick={() => setIsRegister(!isRegister)} className="mt-4 md:mt-6 text-amber-800 font-bold hover:underline w-full text-center block text-sm">{isRegister ? 'تسجيل الدخول' : 'حساب جديد'}</button>
       </motion.div>
       <ChatWidget />
     </div>
