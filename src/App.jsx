@@ -1383,7 +1383,7 @@ const AdminDashboard = ({ user }) => {
   const [activeUsersList, setActiveUsersList] = useState([]);
   const [contentList, setContentList] = useState([]);
   const [messagesList, setMessagesList] = useState([]); 
-  const [newContent, setNewContent] = useState({ title: '', url: '', type: 'video', isPublic: false, grade: '3sec', allowedEmails: '', isPremium: false });
+  const [newContent, setNewContent] = useState({ title: '', url: '', type: 'video', videoSection: 'explanation', isPublic: false, grade: '3sec', allowedEmails: '', isPremium: false });
   const [liveData, setLiveData] = useState({ title: '', liveUrl: '', grade: '3sec', passcode: '', allowedEmails: '' });
   const [activeLiveSessions, setActiveLiveSessions] = useState([]);
   const [editingUser, setEditingUser] = useState(null);
@@ -1419,6 +1419,17 @@ const AdminDashboard = ({ user }) => {
   const [subscriptionCodes, setSubscriptionCodes] = useState([]);
   const [codeGenCount, setCodeGenCount] = useState(10);
   const [codeGenDays, setCodeGenDays] = useState(30);
+
+  // تحديث حالة زر الرجوع للموبايل للأدمن
+  useEffect(() => {
+      window.history.pushState({ tab: activeTab }, '');
+      const handlePopState = (e) => {
+          if (e.state && e.state.tab) { setActiveTab(e.state.tab); } 
+          else { setActiveTab('users'); }
+      };
+      window.addEventListener('popstate', handlePopState);
+      return () => window.removeEventListener('popstate', handlePopState);
+  }, [activeTab]);
 
   useEffect(() => {
       const q = query(collection(db, 'users'), where('status','==','pending'));
@@ -1692,7 +1703,7 @@ const AdminDashboard = ({ user }) => {
       } 
       
       alert("تم النشر!"); 
-      setNewContent({ title: '', url: '', type: 'video', isPublic: false, grade: '3sec', allowedEmails: '', isPremium: false });
+      setNewContent({ title: '', url: '', type: 'video', videoSection: 'explanation', isPublic: false, grade: '3sec', allowedEmails: '', isPremium: false });
   }; 
   
   const handleDeleteContent = async (id) => { 
@@ -1815,9 +1826,10 @@ const AdminDashboard = ({ user }) => {
       )}
 
       {viewingStudentProfile && (
-          <div className="fixed inset-0 z-[1000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-slate-50 rounded-3xl w-full max-w-6xl h-[90vh] shadow-2xl flex flex-col relative overflow-hidden border border-slate-300">
-                  <div className="bg-white border-b border-slate-200 p-6 flex justify-between items-start flex-shrink-0">
+          <div className="fixed inset-0 z-[1000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 md:p-8">
+              <div className="bg-slate-50 rounded-3xl w-full max-w-6xl h-full md:h-[90vh] shadow-2xl flex flex-col relative overflow-hidden border border-slate-300">
+                  <button onClick={() => setViewingStudentProfile(null)} className="absolute top-4 left-4 md:top-6 md:left-6 z-50 bg-red-100 p-2 md:p-3 rounded-full text-red-600 hover:bg-red-200 hover:text-red-700 transition shadow-md border border-red-200"><X size={24}/></button>
+                  <div className="bg-white border-b border-slate-200 p-6 pt-16 md:pt-6 flex justify-between items-start flex-shrink-0">
                       <div className="flex gap-4 items-center">
                           <div className="w-16 h-16 bg-blue-100 text-blue-700 rounded-2xl flex items-center justify-center font-bold text-2xl shadow-inner">
                               {viewingStudentProfile.name.charAt(0)}
@@ -1828,18 +1840,17 @@ const AdminDashboard = ({ user }) => {
                                   <span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600">{getGradeLabel(viewingStudentProfile.grade)}</span>
                                   {viewingStudentProfile.subscriptionStatus === 'premium' && <span className="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded-full font-bold flex items-center gap-1"><Crown size={12}/> VIP</span>}
                               </h2>
-                              <div className="flex gap-4 mt-2 text-sm text-slate-500 font-bold">
+                              <div className="flex flex-col md:flex-row gap-2 md:gap-4 mt-2 text-sm text-slate-500 font-bold">
                                   <span className="flex items-center gap-1"><Phone size={14}/> {viewingStudentProfile.phone}</span>
                                   <span className="flex items-center gap-1 text-amber-600"><Users size={14}/> ولي الأمر: {viewingStudentProfile.parentPhone}</span>
                               </div>
                           </div>
                       </div>
-                      <button onClick={() => setViewingStudentProfile(null)} className="bg-slate-100 p-2 rounded-full text-slate-500 hover:bg-red-100 hover:text-red-500 transition"><X size={24}/></button>
                   </div>
 
-                  <div className="flex-1 overflow-y-auto p-6">
+                  <div className="flex-1 overflow-y-auto p-4 md:p-6">
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col h-[500px]">
+                          <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col h-[500px]">
                               <h3 className="font-bold text-lg mb-4 text-blue-800 flex items-center gap-2 border-b pb-2"><PlayCircle/> سجل مشاهدات الفيديوهات</h3>
                               <div className="flex-1 overflow-y-auto space-y-3 pr-2">
                                   {studentHistoryData.length === 0 ? <p className="text-slate-400 text-center py-10">لم يفتح أي فيديو.</p> : studentHistoryData.map((v, i) => (
@@ -1855,7 +1866,7 @@ const AdminDashboard = ({ user }) => {
                           </div>
 
                           <div className="flex flex-col gap-6 h-[500px]">
-                              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex-1 flex flex-col overflow-hidden">
+                              <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-100 flex-1 flex flex-col overflow-hidden">
                                   <h3 className="font-bold text-lg mb-4 text-emerald-800 flex items-center gap-2 border-b pb-2"><ClipboardList/> نتائج الامتحانات</h3>
                                   <div className="flex-1 overflow-y-auto space-y-3 pr-2">
                                       {(() => {
@@ -1871,7 +1882,7 @@ const AdminDashboard = ({ user }) => {
                                   </div>
                               </div>
 
-                              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex-1 flex flex-col overflow-hidden">
+                              <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-100 flex-1 flex flex-col overflow-hidden">
                                   <h3 className="font-bold text-lg mb-4 text-amber-800 flex items-center gap-2 border-b pb-2"><QrCode/> سجل واجبات (QR)</h3>
                                   <div className="flex-1 overflow-y-auto space-y-3 pr-2">
                                       {(() => {
@@ -2309,6 +2320,13 @@ const AdminDashboard = ({ user }) => {
                           <select className="border p-3 rounded flex-1" value={newContent.type} onChange={e=>setNewContent({...newContent, type:e.target.value})}>
                               <option value="video">فيديو مدمج</option><option value="file">ملف (PDF)</option><option value="html">ملف تفاعلي (HTML)</option><option value="interactive_exam">امتحان تفاعلي (رابط/HTML)</option><option value="link">رابط خارجي (Google Meet, Drive, etc)</option>
                           </select>
+                          {newContent.type === 'video' && (
+                              <select className="border p-3 rounded flex-1" value={newContent.videoSection} onChange={e=>setNewContent({...newContent, videoSection:e.target.value})}>
+                                  <option value="explanation">شرح الدرس</option>
+                                  <option value="exercises">حل التدريبات</option>
+                                  <option value="reviews">مراجعة نهائية</option>
+                              </select>
+                          )}
                           <select className="border p-3 rounded flex-1" value={newContent.grade} onChange={e=>setNewContent({...newContent, grade:e.target.value})}><GradeOptions/></select>
                       </div>
 
@@ -2332,6 +2350,7 @@ const AdminDashboard = ({ user }) => {
                               <div key={c.id} className="flex justify-between border-b p-3 items-center bg-white/50 rounded hover:bg-white transition mb-2">
                                   <div className="flex items-center flex-wrap gap-2">
                                       <span className="font-bold ml-2">{c.title}</span>
+                                      {c.type === 'video' && <span className="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded font-bold">{c.videoSection === 'exercises' ? 'حل تدريبات' : c.videoSection === 'reviews' ? 'مراجعة' : 'شرح'}</span>}
                                       {c.isPremium && <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1"><Crown size={10}/> VIP</span>}
                                       {c.allowedEmails && c.allowedEmails.length > 0 && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded flex items-center gap-1 inline-flex"><Lock size={10}/> خاص</span>}
                                       {c.type === 'interactive_exam' && <span className="text-[10px] bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded">امتحان تفاعلي</span>}
@@ -2429,6 +2448,7 @@ const AdminDashboard = ({ user }) => {
 
 const StudentDashboard = ({ user, userData, installPrompt }) => {
   const [activeTab, setActiveTab] = useState('home');
+  const [videoSectionTab, setVideoSectionTab] = useState('explanation');
   const [mobileMenu, setMobileMenu] = useState(false);
   const [content, setContent] = useState([]);
   const [liveSessions, setLiveSessions] = useState([]); 
@@ -2451,7 +2471,6 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   const [subscriptionCodeInput, setSubscriptionCodeInput] = useState('');
   const [isCharging, setIsCharging] = useState(false);
 
-  // تحديث حالة زر الرجوع للموبايل
   useEffect(() => {
       window.history.pushState({ tab: activeTab }, '');
       const handlePopState = (e) => {
@@ -2789,17 +2808,29 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
         )}
         
         {activeTab === 'videos' && !isBannedContent && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                {videos.map(v => (
-                    <div key={v.id} className="glass-card rounded-xl overflow-hidden cursor-pointer relative group" onClick={() => handlePremiumClick(() => setPlayingVideo(v))}>
-                        <div className="h-48 bg-gradient-to-br from-slate-800 to-black flex items-center justify-center relative">
-                            {v.isPremium && !isPremium ? <Lock className="text-slate-400 w-16 h-16 opacity-80" /> : <PlayCircle className="text-white w-16 h-16 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/>}
-                            <span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(v.grade)}</span>
-                            {v.isPremium && <span className="absolute top-2 right-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-full font-bold flex items-center gap-1 shadow-md"><Crown size={12}/> VIP</span>}
+            <div className="space-y-6">
+                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide border-b border-slate-200">
+                    <button onClick={() => setVideoSectionTab('explanation')} className={`px-6 py-2 rounded-full font-bold whitespace-nowrap transition ${videoSectionTab === 'explanation' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 border'}`}>شرح الدروس</button>
+                    <button onClick={() => setVideoSectionTab('exercises')} className={`px-6 py-2 rounded-full font-bold whitespace-nowrap transition ${videoSectionTab === 'exercises' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 border'}`}>حل التدريبات</button>
+                    <button onClick={() => setVideoSectionTab('reviews')} className={`px-6 py-2 rounded-full font-bold whitespace-nowrap transition ${videoSectionTab === 'reviews' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 border'}`}>المراجعات النهائية</button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                    {videos.filter(v => (v.videoSection || 'explanation') === videoSectionTab).length === 0 ? (
+                         <div className="col-span-full text-center py-12 bg-white rounded-xl border border-slate-100 shadow-sm">
+                             <PlayCircle className="mx-auto text-slate-300 w-16 h-16 mb-4"/>
+                             <p className="text-slate-500 font-bold">لا توجد فيديوهات في هذا القسم حالياً.</p>
+                         </div>
+                    ) : videos.filter(v => (v.videoSection || 'explanation') === videoSectionTab).map(v => (
+                        <div key={v.id} className="glass-card rounded-xl overflow-hidden cursor-pointer relative group" onClick={() => handlePremiumClick(() => setPlayingVideo(v))}>
+                            <div className="h-48 bg-gradient-to-br from-slate-800 to-black flex items-center justify-center relative">
+                                {v.isPremium && !isPremium ? <Lock className="text-slate-400 w-16 h-16 opacity-80" /> : <PlayCircle className="text-white w-16 h-16 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/>}
+                                <span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(v.grade)}</span>
+                                {v.isPremium && <span className="absolute top-2 right-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-full font-bold flex items-center gap-1 shadow-md"><Crown size={12}/> VIP</span>}
+                            </div>
+                            <div className="p-4"><h3 className={`font-bold text-lg ${v.isPremium && !isPremium ? 'text-slate-400' : 'text-slate-800'}`}>{v.title}</h3></div>
                         </div>
-                        <div className="p-4"><h3 className={`font-bold text-lg ${v.isPremium && !isPremium ? 'text-slate-400' : 'text-slate-800'}`}>{v.title}</h3></div>
-                    </div>
-                ))}
+                    ))}
+                </div>
             </div>
         )}
 
