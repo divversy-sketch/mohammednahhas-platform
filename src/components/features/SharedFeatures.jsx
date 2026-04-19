@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { doc, setDoc, deleteDoc, collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, writeBatch, increment } from 'firebase/firestore';
+import { doc, setDoc, getDoc, deleteDoc, collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, writeBatch, increment } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { getYouTubeID, generatePDF, formatWatchTime } from '../../utils/helpers';
 import { 
@@ -47,7 +47,7 @@ export const Leaderboard = () => {
             const scores = {};
             snap.docs.forEach(doc => {
                 const data = doc.data();
-                if(data.score && data.status === 'completed') {
+                if(data.score && data.status === 'completed' && data.studentName) {
                     if(!scores[data.studentName]) scores[data.studentName] = 0;
                     scores[data.studentName] += parseInt(data.score);
                 }
@@ -101,14 +101,14 @@ export const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
       if (!user || !video.id) return;
       const viewId = `${user.uid}_${video.id}`;
       const viewRef = doc(db, 'video_views', viewId);
-      let timerInterval; let localSeconds = 0; let lastSyncedSeconds = 0;
+      let localSeconds = 0; let lastSyncedSeconds = 0;
 
       const syncToDatabase = async (secondsToAdd) => {
           try { await setDoc(viewRef, { userId: user.uid, userName: userName, videoId: video.id, videoTitle: video.title, viewedAt: serverTimestamp(), watchedSeconds: increment(secondsToAdd) }, { merge: true }); } catch (e) { console.error("Sync error:", e); }
       };
       syncToDatabase(0);
 
-      timerInterval = setInterval(() => {
+      const timerInterval = setInterval(() => {
           let isPlaying = true;
           if (!videoId && videoRef.current) isPlaying = !videoRef.current.paused && !videoRef.current.ended;
           if (!document.hidden && isPlaying) {
@@ -187,8 +187,8 @@ export const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
             <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white p-2 rounded-full shadow-lg"><X size={24}/></button>
         </div>
 
-        <div className="w-full relative flex items-center justify-center bg-black overflow-hidden" style={{ height: showNotes ? '50vh' : '100%' }}>
-          <div className="watermark-video">{userName} - {video.grade || 'منصة النحاس'}</div>
+        <div className="w-full h-full relative flex items-center justify-center bg-black overflow-hidden">
+          <div className="watermark-video">{userName} - منصة النحاس</div>
           {videoId ? (
             <iframe className="w-full h-full" src={youtubeEmbedUrl} title="Video" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
           ) : (
@@ -215,7 +215,7 @@ export const PomodoroFocusMode = ({ onClose }) => {
         let interval = null;
         if (isActive && timeLeft > 0) { interval = setInterval(() => setTimeLeft(prev => prev - 1), 1000); } 
         else if (timeLeft === 0) {
-            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); audio.play();
+            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); audio.play().catch(e=>{});
             if (isBreak) { setIsBreak(false); setTimeLeft(25 * 60); setIsActive(false); } 
             else { setIsBreak(true); setTimeLeft(5 * 60); setIsActive(false); }
         }
@@ -310,7 +310,7 @@ export const InteractiveViewer = ({ content, user, onClose }) => {
                    <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white px-4 py-1 rounded font-bold transition">خروج</button>
                 </div>
                 <div className="flex-1 bg-white relative overflow-hidden">
-                   {user && (<div className="watermark-video" style={{ pointerEvents: 'none', zIndex: 9999 }}>{user.name} - {user.grade} — منصة النحاس</div>)}
+                   {user && (<div className="watermark-video" style={{ pointerEvents: 'none', zIndex: 9999 }}>{user.name || user.displayName} — منصة النحاس</div>)}
                    <div className="absolute inset-0 z-[9998] pointer-events-none select-none"></div>
                    <iframe src={iframeSrc} className="w-full h-full border-0 relative z-40 bg-white" title={content.title} sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals" style={{ pointerEvents: 'auto', WebkitTransform: 'translateZ(0)' }}></iframe>
                 </div>
@@ -327,7 +327,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
   const [currentQIndex, setCurrentQIndex] = useState(0);
   const [answers, setAnswers] = useState(existingResult?.answers || {});
   const [flagged, setFlagged] = useState({});
-  const [timeLeft, setTimeLeft] = useState(exam.duration * 60);
+  const [timeLeft, setTimeLeft] = useState((exam.duration || 60) * 60);
   const [isCheating, setIsCheating] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(isReviewMode || existingResult !== null);
   const [score, setScore] = useState(existingResult?.score || 0);
@@ -344,17 +344,17 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
 
   const flatQuestions = useMemo(() => {
     const flat = [];
-    if (exam.questions) {
+    if (exam && exam.questions) {
         let processedBlocks = [...exam.questions];
         if (!isReviewMode && !existingResult) processedBlocks = shuffleArray(processedBlocks);
         processedBlocks.forEach((block) => {
-            let subQs = [...block.subQuestions];
+            let subQs = [...(block.subQuestions || [])];
             if (!isReviewMode && !existingResult) subQs = shuffleArray(subQs);
             subQs.forEach((q) => { flat.push({ ...q, blockText: block.text, branch: q.branch || 'عام' }); });
         });
     }
     return flat;
-  }, [exam.questions, isReviewMode, existingResult]);
+  }, [exam, isReviewMode, existingResult]);
 
   const uniqueBranches = useMemo(() => ['الكل', ...new Set(flatQuestions.map(q => q.branch))], [flatQuestions]);
 
@@ -364,8 +364,6 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
   }, [flatQuestions, isSubmitted, activeBranchTab]);
 
   useEffect(() => { if (isSubmitted) setCurrentQIndex(0); }, [activeBranchTab, isSubmitted]);
-
-  if (flatQuestions.length === 0) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-white font-['Cairo']">عفواً، لا توجد أسئلة.<button onClick={onClose} className="ml-4 bg-gray-200 px-4 py-2 rounded">خروج</button></div>;
 
   useEffect(() => {
     if (isReviewMode) return;
@@ -391,7 +389,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
           await setDoc(doc(db, 'exam_results', exam.attemptId), { 
               examId: exam.id, studentId: user.uid, studentName: user.displayName || user.name, 
               score: 0, total: flatQuestions.length, status: 'cheated', timeTaken: timeTaken, totalTime: exam.duration, submittedAt: serverTimestamp() 
-          });
+          }, {merge: true});
       }
       await updateDoc(doc(db, 'users', user.uid), { status: 'banned_exam' });
   };
@@ -494,7 +492,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
   
   const branchStats = {};
   flatQuestions.forEach(q => {
-      const b = q.branch;
+      const b = q.branch || 'عام';
       if (!branchStats[b]) branchStats[b] = { total: 0, solved: 0, correct: 0, wrong: 0, unsolved: 0 };
       branchStats[b].total++;
       const isSelected = answers[q.id] !== undefined;
@@ -505,7 +503,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
       else branchStats[b].wrong++;
   });
 
-  const canReview = exam.id === 'custom_mistakes_exam' || Date.now() > new Date(exam.endTime).getTime();
+  const canReview = exam.id === 'custom_mistakes_exam' || (exam.endTime && Date.now() > new Date(exam.endTime).getTime());
 
   if (activeView === 'dashboard') {
      return (
@@ -593,9 +591,9 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                             {Object.entries(branchStats).map(([branch, stats], idx) => {
-                                const bPercent = isSubmitted 
+                                const bPercent = stats.total > 0 ? (isSubmitted 
                                     ? Math.round((stats.correct / stats.total) * 100) 
-                                    : Math.round((stats.solved / stats.total) * 100);
+                                    : Math.round((stats.solved / stats.total) * 100)) : 0;
                                 
                                 let message = "";
                                 if (isSubmitted) {
@@ -669,7 +667,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
      );
   }
 
-  if (!currentQObj) return null;
+  if (!currentQObj) return <div className="fixed inset-0 z-50 bg-white flex items-center justify-center">جاري تحميل الأسئلة...</div>;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-100 flex flex-col font-['Cairo'] no-select" dir="rtl">
@@ -763,7 +761,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
             <div className="flex justify-between items-center mb-8 border-b border-slate-100 pb-6">
               <div className="flex items-center gap-3">
                   <span className="bg-slate-900 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-md font-['Cairo']">سؤال {flatQuestions.findIndex(origQ => origQ.id === currentQObj.id) + 1}</span>
-                  {currentQObj.branch && currentQObj.branch !== 'عام' && (
+                  {currentQObj.branch && (
                       <span className="bg-blue-50 text-blue-700 px-4 py-2 rounded-xl text-sm font-bold border border-blue-100 flex items-center gap-2"><Layers size={16}/> {currentQObj.branch}</span>
                   )}
               </div>
@@ -772,17 +770,17 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
             
             <div className="bg-slate-50 p-6 md:p-8 rounded-2xl border border-slate-200 mb-8 shadow-inner text-center">
               <h3 className="text-2xl md:text-3xl font-bold text-slate-900 leading-loose font-['Cairo'] drop-shadow-sm">
-                  {currentQObj.text.split('|').map((part, i) => (
+                  {(currentQObj.text || '').split('|').map((part, i, arr) => (
                       <React.Fragment key={i}>
                           {part.trim()}
-                          {i !== currentQObj.text.split('|').length - 1 && <br />}
+                          {i !== arr.length - 1 && <br />}
                       </React.Fragment>
                   ))}
               </h3>
             </div>
 
             <div className="space-y-4">
-              {currentQObj.options.map((opt, idx) => {
+              {(currentQObj.options || []).map((opt, idx) => {
                   let optionClass = 'border-slate-200 hover:bg-slate-50 bg-white text-slate-700';
                   const isSelected = answers[currentQObj.id] === idx;
                   
@@ -843,7 +841,7 @@ export const LiveSessionView = ({ session, user, onClose }) => {
     setMsgInput("");
   };
 
-  const isYouTube = (url) => url.includes("youtube") || url.includes("youtu.be");
+  const isYouTube = (url) => (url || '').includes("youtube") || (url || '').includes("youtu.be");
   const videoId = getYouTubeID(session.liveUrl);
 
   return (

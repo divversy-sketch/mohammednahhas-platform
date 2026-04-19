@@ -181,7 +181,15 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   if (showFocusMode) return <PomodoroFocusMode onClose={() => setShowFocusMode(false)} />;
   if (reviewingExam) {
       const result = examResults.find(r => r.examId === reviewingExam.id);
-      return <ExamRunner exam={reviewingExam} user={user} onClose={() => setReviewingExam(null)} isReviewMode={true} existingResult={result} />;
+      return (
+        <ExamRunner 
+          exam={reviewingExam} 
+          user={user} 
+          onClose={() => setReviewingExam(null)} 
+          isReviewMode={true} 
+          existingResult={result || null} 
+        />
+      );
   }
 
   const isBannedAll = userData?.status === 'banned_all';
