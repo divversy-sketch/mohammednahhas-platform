@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { signOut } from 'firebase/auth';
 import { 
-  doc, getDocs, collection, query, where, onSnapshot, orderBy, limit 
+  doc, getDocs, collection, query, where, onSnapshot, orderBy, limit,
+  updateDoc, writeBatch, addDoc, serverTimestamp
 } from 'firebase/firestore';
 import { auth, db } from '../config/firebase'; 
 import { getGradeLabel, GradeOptions } from '../components/common/GradeOptions';
-import { requestNotificationPermission, sendSystemNotification, formatWatchTime } from '../utils/helpers';
+import { requestNotificationPermission, sendSystemNotification, formatWatchTime, generatePDF } from '../utils/helpers';
 import FloatingArabicBackground from '../components/common/Background';
 import ModernLogo from '../components/common/ModernLogo';
 import WisdomBox from '../components/features/WisdomBox';
 import ChatWidget from '../components/features/ChatWidget';
 
-// استدعاء الشاشات المشتركة اللي عملناها
+// استدعاء الشاشات المشتركة
 import { 
   Announcements, Leaderboard, SecureVideoPlayer, PomodoroFocusMode, 
   InteractiveViewer, ExamRunner, SmartHomeworkScanner, LiveSessionView 
