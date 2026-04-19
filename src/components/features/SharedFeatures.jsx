@@ -6,13 +6,11 @@ import {
     AlertOctagon, AlertTriangle, Check, CheckCircle, ChevronRight, ClipboardList, Clock, 
     Code, Crown, ExternalLink, Flag, Settings as GearIcon, Headphones, Layers, Layout, 
     Loader2, Lock, LogOut, MousePointerClick, Pause, PenLine, Play, PlayCircle, PlusCircle, 
-    QrCode, Radio, RefreshCw, Send, Sparkles, Star, Timer, Trash2, Trophy, Video, X, XCircle, Camera, BookOpen, Megaphone
+    QrCode, Radio, RefreshCw, Send, Sparkles, Star, Timer, Trash2, Trophy, Video, X, XCircle, Camera, BookOpen, Megaphone, FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// ------------------------------------------------------------------
 // 1. الإعلانات (Announcements)
-// ------------------------------------------------------------------
 export const Announcements = () => {
     const [announcements, setAnnouncements] = useState([]);
     useEffect(() => {
@@ -35,9 +33,7 @@ export const Announcements = () => {
     );
 };
 
-// ------------------------------------------------------------------
 // 2. لوحة الشرف (Leaderboard)
-// ------------------------------------------------------------------
 export const Leaderboard = () => {
     const [topStudents, setTopStudents] = useState([]);
     const [config, setConfig] = useState({ show: true });
@@ -78,9 +74,7 @@ export const Leaderboard = () => {
     );
 };
 
-// ------------------------------------------------------------------
 // 3. مشغل الفيديو الآمن (SecureVideoPlayer)
-// ------------------------------------------------------------------
 export const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
   const videoId = getYouTubeID(video?.url || video?.file || '');
   const [showSettings, setShowSettings] = useState(false);
@@ -149,7 +143,7 @@ export const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
                   </div>
                   <div className="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-3">
                       {notes.length === 0 ? (
-                          <div className="text-center text-slate-400 mt-10"><PenLine size={40} className="mx-auto mb-2 opacity-50"/><p>لم تضف أي ملاحظات بعد.</p><p className="text-xs mt-1">الملاحظات بتتربط بوقت الفيديو عشان ترجعلها بسرعة.</p></div>
+                          <div className="text-center text-slate-400 mt-10"><PenLine size={40} className="mx-auto mb-2 opacity-50"/><p>لم تضف أي ملاحظات بعد.</p></div>
                       ) : (
                           notes.map(note => (
                               <div key={note.id} className="bg-white p-3 rounded-xl shadow-sm border border-slate-200 group">
@@ -163,7 +157,7 @@ export const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
                       )}
                   </div>
                   <form onSubmit={handleAddNote} className="p-4 bg-white border-t border-slate-200 flex flex-col gap-2">
-                      <textarea className="w-full border-2 border-slate-200 rounded-xl p-2 text-sm focus:border-blue-500 outline-none transition resize-none h-20" placeholder="اكتب ملاحظتك هنا (سيتم حفظها بوقت الفيديو الحالي)..." value={currentNote} onChange={e => setCurrentNote(e.target.value)} />
+                      <textarea className="w-full border-2 border-slate-200 rounded-xl p-2 text-sm focus:border-blue-500 outline-none transition resize-none h-20" placeholder="اكتب ملاحظتك هنا..." value={currentNote} onChange={e => setCurrentNote(e.target.value)} />
                       <button type="submit" className="w-full bg-blue-600 text-white font-bold py-2 rounded-xl shadow-md hover:bg-blue-700 transition">إضافة الملاحظة</button>
                   </form>
               </motion.div>
@@ -190,7 +184,7 @@ export const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
         <div className="w-full relative flex items-center justify-center bg-black overflow-hidden h-full">
           <div className="watermark-video">{userName || 'طالب'} - {video?.grade || 'منصة النحاس'}</div>
           {videoId ? (
-            <iframe className="w-full h-full" src={youtubeEmbedUrl} title="Video" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
+            <iframe className="w-full h-full" src={youtubeEmbedUrl} title="Video" frameBorder="0" allowFullScreen></iframe>
           ) : (
              <video ref={videoRef} controls controlsList="nodownload" className="w-full h-full object-contain relative z-40" src={finalUrl} playsInline preload="auto" disablePictureInPicture>المتصفح لا يدعم هذا الفيديو.</video>
           )}
@@ -200,9 +194,7 @@ export const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
   );
 };
 
-// ------------------------------------------------------------------
 // 4. وضع التركيز (PomodoroFocusMode)
-// ------------------------------------------------------------------
 export const PomodoroFocusMode = ({ onClose }) => {
     const [timeLeft, setTimeLeft] = useState(25 * 60);
     const [isActive, setIsActive] = useState(false);
@@ -238,7 +230,7 @@ export const PomodoroFocusMode = ({ onClose }) => {
         <div className="fixed inset-0 z-[100] bg-slate-900 text-white flex flex-col font-['Cairo']" dir="rtl">
             <audio ref={audioRef} loop src="https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3" />
             <div className="flex justify-between items-center p-6 border-b border-slate-800">
-                <div className="flex items-center gap-2 text-2xl font-bold text-amber-400"><Headphones/> وضع التركيز (Pomodoro)</div>
+                <div className="flex items-center gap-2 text-2xl font-bold text-amber-400"><Headphones/> وضع التركيز</div>
                 <button onClick={onClose} className="bg-slate-800 hover:bg-slate-700 p-2 rounded-full transition"><X size={24}/></button>
             </div>
             <div className="flex-1 flex flex-col lg:flex-row p-6 gap-8 overflow-y-auto">
@@ -254,13 +246,12 @@ export const PomodoroFocusMode = ({ onClose }) => {
                         </button>
                         <button onClick={() => setTimeLeft(isBreak ? 5*60 : 25*60)} className="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center hover:bg-slate-600 transition text-slate-300"><RefreshCw size={24}/></button>
                     </div>
-                    <p className="mt-8 text-slate-400 flex items-center gap-2"><Headphones size={16}/> موسيقى Lo-Fi للتركيز تعمل تلقائياً أثناء جلسة المذاكرة</p>
                 </div>
                 <div className="w-full lg:w-96 flex flex-col gap-4">
                     <div className="bg-slate-800 rounded-3xl p-6 border border-slate-700 flex-1 flex flex-col">
                         <h3 className="text-xl font-bold mb-4 text-white flex items-center gap-2"><CheckCircle className="text-amber-400"/> مهام الجلسة</h3>
                         <div className="flex-1 overflow-y-auto space-y-3 pr-2 mb-4">
-                            {tasks.length === 0 ? <p className="text-slate-500 text-center mt-10">أضف مهامك هنا لتركز عليها.</p> : tasks.map(t => (
+                            {tasks.map(t => (
                                 <div key={t.id} onClick={() => toggleTask(t.id)} className={`p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition ${t.done ? 'bg-slate-700/50 border-slate-600 text-slate-500 line-through' : 'bg-slate-700 border-slate-500 text-white'}`}>
                                     <div className={`w-5 h-5 rounded flex items-center justify-center border-2 ${t.done ? 'border-amber-500 bg-amber-500 text-slate-900' : 'border-slate-400'}`}>
                                         {t.done && <Check size={14} strokeWidth={4}/>}
@@ -280,9 +271,7 @@ export const PomodoroFocusMode = ({ onClose }) => {
     );
 };
 
-// ------------------------------------------------------------------
 // 5. المشغل التفاعلي (InteractiveViewer)
-// ------------------------------------------------------------------
 export const InteractiveViewer = ({ content, user, onClose }) => {
     const handleContextMenu = (e) => e.preventDefault();
     const [iframeSrc, setIframeSrc] = useState('');
@@ -305,12 +294,12 @@ export const InteractiveViewer = ({ content, user, onClose }) => {
                 <div className="bg-slate-900 p-3 flex justify-between items-center text-white border-b border-gray-700 select-none">
                    <div className="flex items-center gap-4">
                        <h3 className="font-bold flex items-center gap-2"><Code /> {content?.title || 'محتوى تفاعلي'}</h3>
-                       <span className="hidden md:block text-xs bg-amber-600 px-3 py-1 rounded-full text-white font-bold">منصة النحاس - أ/ محمد النحاس</span>
+                       <span className="hidden md:block text-xs bg-amber-600 px-3 py-1 rounded-full text-white font-bold">منصة النحاس</span>
                    </div>
                    <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white px-4 py-1 rounded font-bold transition">خروج</button>
                 </div>
                 <div className="flex-1 bg-white relative overflow-hidden">
-                   {user && (<div className="watermark-video" style={{ pointerEvents: 'none', zIndex: 9999 }}>{user.name || user.displayName || 'طالب'} - {user.grade || ''} — منصة النحاس — أ/ محمد النحاس</div>)}
+                   {user && (<div className="watermark-video" style={{ pointerEvents: 'none', zIndex: 9999 }}>{user.name || user.displayName || 'طالب'} — منصة النحاس</div>)}
                    <div className="absolute inset-0 z-[9998] pointer-events-none select-none"></div>
                    <iframe src={iframeSrc} className="w-full h-full border-0 relative z-40 bg-white" title={content?.title || ''} sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals" style={{ pointerEvents: 'auto', WebkitTransform: 'translateZ(0)' }}></iframe>
                 </div>
@@ -320,7 +309,7 @@ export const InteractiveViewer = ({ content, user, onClose }) => {
 };
 
 // ------------------------------------------------------------------
-// 6. مشغل الامتحان (ExamRunner) - النسخة المحمية بالكامل 100%
+// 6. مشغل الامتحان (ExamRunner) - تم إصلاح الشاشة البيضاء بالكامل
 // ------------------------------------------------------------------
 export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult = null }) => {
   const [activeView, setActiveView] = useState(isReviewMode || existingResult ? 'dashboard' : 'questions'); 
@@ -343,7 +332,6 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
     return arr;
   };
 
-  // حماية صارمة لمصفوفة الأسئلة
   const flatQuestions = useMemo(() => {
     const flat = [];
     if (exam && Array.isArray(exam.questions)) {
@@ -435,7 +423,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
     }
   }, [timeLeft, isSubmitted, isCheating, isReviewMode]);
 
-  // ---> الحماية الأساسية: إذا كان الامتحان بدون أسئلة لا ندخل في أخطاء <---
+  // ---> السر هنا: وضعنا شرط الخروج بعد كل الـ Hooks عشان الصفحة متضربش أبيض <---
   if (!flatQuestions || flatQuestions.length === 0) {
       return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-white font-['Cairo'] flex-col gap-4">
@@ -445,13 +433,18 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
       );
   }
 
+  if (isCheating) return <div className="fixed inset-0 z-[60] bg-red-900 flex items-center justify-center text-white text-center font-['Cairo']"><div><AlertOctagon size={80} className="mx-auto mb-4"/><h1>تم رصد محاولة غش!</h1><p className="text-red-200 mt-2">خرجت من الامتحان. تم رصد درجتك (صفر) وحظرك من الامتحانات القادمة.</p><button onClick={() => window.location.reload()} className="mt-4 bg-white text-red-900 px-6 py-2 rounded-full font-bold">العودة للرئيسية</button></div></div>;
+
   const handleAnswer = (qId, optionIdx) => { 
     if(!isReviewMode && !isSubmitted) setAnswers(prev => ({ ...prev, [qId]: optionIdx }));
   };
   
   const calculateScore = () => {
     let rawScore = 0;
-    flatQuestions.forEach(q => { if (answers[q.id] === q.correctIdx) rawScore++; });
+    flatQuestions.forEach(q => { 
+        const safeAnswers = answers || {};
+        if (safeAnswers[q.id] === q.correctIdx) rawScore++; 
+    });
     return rawScore;
   };
 
@@ -468,7 +461,8 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
 
     const batch = writeBatch(db);
     flatQuestions.forEach(q => {
-        const studentAns = answers[q.id];
+        const safeAnswers = answers || {};
+        const studentAns = safeAnswers[q.id];
         const isAnswered = studentAns !== undefined;
         const isCorrect = studentAns === q.correctIdx;
         
@@ -486,30 +480,28 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
         const attemptRef = doc(db, 'exam_results', exam.attemptId);
         batch.set(attemptRef, { 
             examId: exam.id, studentId: user?.uid, studentName: user?.displayName || user?.name || 'طالب', 
-            score: finalScore, total: totalQs, answers, status: 'completed', timeTaken: timeTaken, totalTime: exam.duration || 60, submittedAt: serverTimestamp() 
+            score: finalScore, total: totalQs, answers: answers || {}, status: 'completed', timeTaken: timeTaken, totalTime: exam.duration || 60, submittedAt: serverTimestamp() 
         }, { merge: true });
     }
     try { await batch.commit(); } catch(err) { console.error("Error saving results or mistakes", err); }
   };
 
   const currentQObj = displayQuestions[currentQIndex];
-  
-  if (isCheating) return <div className="fixed inset-0 z-[60] bg-red-900 flex items-center justify-center text-white text-center font-['Cairo']"><div><AlertOctagon size={80} className="mx-auto mb-4"/><h1>تم رصد محاولة غش!</h1><p className="text-red-200 mt-2">خرجت من الامتحان. تم رصد درجتك (صفر) وحظرك من الامتحانات القادمة.</p><button onClick={() => window.location.reload()} className="mt-4 bg-white text-red-900 px-6 py-2 rounded-full font-bold">العودة للرئيسية</button></div></div>;
-
   const totalQs = flatQuestions.length;
-  const solvedQs = Object.keys(answers).length;
+  const safeAnswersFinal = answers || {};
+  const solvedQs = Object.keys(safeAnswersFinal).length;
   const unsolvedQs = totalQs - solvedQs;
-  const correctQs = score;
+  const correctQs = score || 0;
   const wrongQs = solvedQs - correctQs;
-  const percentage = totalQs > 0 ? Math.round((score / totalQs) * 100) : 0;
+  const percentage = totalQs > 0 ? Math.round((correctQs / totalQs) * 100) : 0;
   
   const branchStats = {};
   flatQuestions.forEach(q => {
       const b = q.branch || 'عام';
       if (!branchStats[b]) branchStats[b] = { total: 0, solved: 0, correct: 0, wrong: 0, unsolved: 0 };
       branchStats[b].total++;
-      const isSelected = answers[q.id] !== undefined;
-      const isCorrect = answers[q.id] === q.correctIdx;
+      const isSelected = safeAnswersFinal[q.id] !== undefined;
+      const isCorrect = safeAnswersFinal[q.id] === q.correctIdx;
       if (isSelected) branchStats[b].solved++;
       if (!isSelected) branchStats[b].unsolved++;
       else if (isCorrect) branchStats[b].correct++;
@@ -534,7 +526,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
                     <div className="flex items-center gap-3">
                         {isSubmitted ? (
                             <>
-                                <button onClick={() => generatePDF('student', {studentName: user?.displayName || user?.name || 'طالب', score, total: flatQuestions.length, status: 'completed', examTitle: exam?.title, questions: flatQuestions, answers: answers })} className="w-12 h-12 bg-blue-600 rounded-full text-white flex items-center justify-center shadow-lg hover:bg-blue-700 transition" title="تحميل التقرير PDF">
+                                <button onClick={() => generatePDF('student', {studentName: user?.displayName || user?.name || 'طالب', score: correctQs, total: flatQuestions.length, status: 'completed', examTitle: exam?.title, questions: flatQuestions, answers: safeAnswersFinal })} className="w-12 h-12 bg-blue-600 rounded-full text-white flex items-center justify-center shadow-lg hover:bg-blue-700 transition" title="تحميل التقرير PDF">
                                     <FileText size={20}/>
                                 </button>
                                 <button onClick={onClose} className="bg-slate-700 text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-600 shadow-lg transition flex items-center gap-2">
@@ -745,10 +737,10 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
               {displayQuestions.map((q, idx) => {
                   let statusClass = 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-2 border-transparent';
                   if (isSubmitted) {
-                      if (answers[q.id] === q.correctIdx) statusClass = 'bg-green-100 text-green-700 border-green-500 shadow-sm';
-                      else if (answers[q.id] !== undefined) statusClass = 'bg-red-100 text-red-700 border-red-500 shadow-sm';
+                      if (safeAnswersFinal[q.id] === q.correctIdx) statusClass = 'bg-green-100 text-green-700 border-green-500 shadow-sm';
+                      else if (safeAnswersFinal[q.id] !== undefined) statusClass = 'bg-red-100 text-red-700 border-red-500 shadow-sm';
                       else statusClass = 'bg-slate-100 text-slate-400 border-slate-300 border-dashed'; 
-                  } else if (answers[q.id] !== undefined) {
+                  } else if (safeAnswersFinal[q.id] !== undefined) {
                       statusClass = 'bg-blue-100 text-blue-700 border-blue-400 shadow-sm';
                   }
                   const originalIndex = flatQuestions.findIndex(origQ => origQ.id === q.id) + 1;
@@ -795,7 +787,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
             <div className="space-y-4">
               {(currentQObj.options || []).map((opt, idx) => {
                   let optionClass = 'border-slate-200 hover:bg-slate-50 bg-white text-slate-700';
-                  const isSelected = answers[currentQObj.id] === idx;
+                  const isSelected = safeAnswersFinal[currentQObj.id] === idx;
                   
                   if (isSubmitted) {
                       if (idx === currentQObj.correctIdx) optionClass = 'border-green-500 bg-green-50 text-green-900 shadow-md ring-2 ring-green-200'; 
@@ -830,9 +822,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
   );
 };
 
-// ------------------------------------------------------------------
 // 7. البث المباشر (LiveSessionView)
-// ------------------------------------------------------------------
 export const LiveSessionView = ({ session, user, onClose }) => {
   const [messages, setMessages] = useState([]);
   const [msgInput, setMsgInput] = useState("");
@@ -894,9 +884,7 @@ export const LiveSessionView = ({ session, user, onClose }) => {
   );
 };
 
-// ------------------------------------------------------------------
 // 8. الواجب الذكي QR (SmartHomeworkScanner)
-// ------------------------------------------------------------------
 export const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
     const [homeworkData, setHomeworkData] = useState(null);
     const [imageSrc, setImageSrc] = useState(null);
