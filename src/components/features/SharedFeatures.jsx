@@ -1,8 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { 
-  doc, setDoc, getDoc, getDocs, collection, addDoc, query, where, 
-  onSnapshot, updateDoc, deleteDoc, orderBy, serverTimestamp, writeBatch, increment 
-} from 'firebase/firestore';
+import { doc, setDoc, getDoc, deleteDoc, collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, writeBatch, increment, updateDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { getYouTubeID, generatePDF, formatWatchTime } from '../../utils/helpers';
 import { 
@@ -50,7 +47,7 @@ export const Leaderboard = () => {
             const scores = {};
             snap.docs.forEach(doc => {
                 const data = doc.data();
-                if(data.score && data.status === 'completed') {
+                if(data.score && data.status === 'completed' && data.studentName) {
                     if(!scores[data.studentName]) scores[data.studentName] = 0;
                     scores[data.studentName] += parseInt(data.score);
                 }
@@ -85,29 +82,29 @@ export const Leaderboard = () => {
 // 3. مشغل الفيديو الآمن (SecureVideoPlayer)
 // ------------------------------------------------------------------
 export const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
-  const videoId = getYouTubeID(video.url || video.file);
+  const videoId = getYouTubeID(video?.url || video?.file || '');
   const [showSettings, setShowSettings] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   const [notes, setNotes] = useState([]);
   const [currentNote, setCurrentNote] = useState("");
   const videoRef = useRef(null);
-  const finalUrl = video.url || video.file;
+  const finalUrl = video?.url || video?.file || '';
 
   useEffect(() => {
-      if(!user || !video.id) return;
+      if(!user || !video?.id) return;
       const q = query(collection(db, 'video_notes'), where('userId', '==', user.uid), where('videoId', '==', video.id), orderBy('timestamp', 'asc'));
       const unsub = onSnapshot(q, (snap) => { setNotes(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
       return () => unsub();
-  }, [user, video.id]);
+  }, [user, video]);
 
   useEffect(() => {
-      if (!user || !video.id) return;
+      if (!user || !video?.id) return;
       const viewId = `${user.uid}_${video.id}`;
       const viewRef = doc(db, 'video_views', viewId);
       let timerInterval; let localSeconds = 0; let lastSyncedSeconds = 0;
 
       const syncToDatabase = async (secondsToAdd) => {
-          try { await setDoc(viewRef, { userId: user.uid, userName: userName, videoId: video.id, videoTitle: video.title, viewedAt: serverTimestamp(), watchedSeconds: increment(secondsToAdd) }, { merge: true }); } catch (e) { console.error("Sync error:", e); }
+          try { await setDoc(viewRef, { userId: user.uid, userName: userName || 'طالب', videoId: video.id, videoTitle: video.title || 'فيديو', viewedAt: serverTimestamp(), watchedSeconds: increment(secondsToAdd) }, { merge: true }); } catch (e) { console.error("Sync error:", e); }
       };
       syncToDatabase(0);
 
@@ -120,13 +117,13 @@ export const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
           }
       }, 1000);
       return () => { clearInterval(timerInterval); const remaining = localSeconds - lastSyncedSeconds; if (remaining > 0) syncToDatabase(remaining); };
-  }, [user, video.id, video.title, userName, videoId]);
+  }, [user, video, userName, videoId]);
 
   const changeSpeed = (rate) => { if(videoRef.current) videoRef.current.playbackRate = rate; setShowSettings(false); };
 
   const handleAddNote = async (e) => {
       e.preventDefault();
-      if(!currentNote.trim()) return;
+      if(!currentNote.trim() || !video?.id) return;
       let currentTime = 0;
       if (videoRef.current) currentTime = videoRef.current.currentTime;
       await addDoc(collection(db, 'video_notes'), { userId: user.uid, videoId: video.id, text: currentNote, timestamp: currentTime, createdAt: serverTimestamp() });
@@ -190,8 +187,8 @@ export const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
             <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white p-2 rounded-full shadow-lg"><X size={24}/></button>
         </div>
 
-        <div className={`w-full relative flex items-center justify-center bg-black overflow-hidden ${showNotes ? 'h-[50vh] md:h-full' : 'h-full'}`}>
-          <div className="watermark-video">{userName} - {video.grade} — منصة النحاس</div>
+        <div className="w-full relative flex items-center justify-center bg-black overflow-hidden h-full">
+          <div className="watermark-video">{userName || 'طالب'} - {video?.grade || 'منصة النحاس'}</div>
           {videoId ? (
             <iframe className="w-full h-full" src={youtubeEmbedUrl} title="Video" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
           ) : (
@@ -218,7 +215,7 @@ export const PomodoroFocusMode = ({ onClose }) => {
         let interval = null;
         if (isActive && timeLeft > 0) { interval = setInterval(() => setTimeLeft(prev => prev - 1), 1000); } 
         else if (timeLeft === 0) {
-            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); audio.play();
+            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); audio.play().catch(e=>{});
             if (isBreak) { setIsBreak(false); setTimeLeft(25 * 60); setIsActive(false); } 
             else { setIsBreak(true); setTimeLeft(5 * 60); setIsActive(false); }
         }
@@ -227,7 +224,7 @@ export const PomodoroFocusMode = ({ onClose }) => {
 
     const toggleTimer = () => {
         setIsActive(!isActive);
-        if(!isActive && audioRef.current && !isBreak) { audioRef.current.play().catch(e => console.log("Audio play blocked")); } 
+        if(!isActive && audioRef.current && !isBreak) { audioRef.current.play().catch(e => {}); } 
         else if(isActive && audioRef.current) { audioRef.current.pause(); }
     };
 
@@ -291,11 +288,11 @@ export const InteractiveViewer = ({ content, user, onClose }) => {
     const [iframeSrc, setIframeSrc] = useState('');
     useEffect(() => {
         let activeBlobUrl = null;
-        if (content.url && content.url.startsWith('data:')) {
+        if (content?.url && content.url.startsWith('data:')) {
             fetch(content.url).then(res => res.blob()).then(blob => { activeBlobUrl = URL.createObjectURL(blob); setIframeSrc(activeBlobUrl); }).catch(err => { console.error("Error creating blob:", err); setIframeSrc(content.url); });
-        } else { setIframeSrc(content.url); }
+        } else { setIframeSrc(content?.url || ''); }
         return () => { if (activeBlobUrl) { URL.revokeObjectURL(activeBlobUrl); } };
-    }, [content.url]);
+    }, [content]);
     useEffect(() => {
         const handleKeyDown = (e) => { if (e.key === 'PrintScreen') { alert('غير مسموح بأخذ لقطات شاشة! المحتوى محمي.'); if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText('Screenshots are disabled'); } } };
         const handleCopy = (e) => { e.preventDefault(); alert("النسخ غير مسموح!"); };
@@ -307,15 +304,15 @@ export const InteractiveViewer = ({ content, user, onClose }) => {
             <div className="w-full h-full max-w-7xl bg-white rounded-xl overflow-hidden relative shadow-2xl border border-gray-800 flex flex-col">
                 <div className="bg-slate-900 p-3 flex justify-between items-center text-white border-b border-gray-700 select-none">
                    <div className="flex items-center gap-4">
-                       <h3 className="font-bold flex items-center gap-2"><Code /> {content.title}</h3>
+                       <h3 className="font-bold flex items-center gap-2"><Code /> {content?.title || 'محتوى تفاعلي'}</h3>
                        <span className="hidden md:block text-xs bg-amber-600 px-3 py-1 rounded-full text-white font-bold">منصة النحاس - أ/ محمد النحاس</span>
                    </div>
                    <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white px-4 py-1 rounded font-bold transition">خروج</button>
                 </div>
                 <div className="flex-1 bg-white relative overflow-hidden">
-                   {user && (<div className="watermark-video" style={{ pointerEvents: 'none', zIndex: 9999 }}>{user.name} - {user.grade} — منصة النحاس — أ/ محمد النحاس</div>)}
+                   {user && (<div className="watermark-video" style={{ pointerEvents: 'none', zIndex: 9999 }}>{user.name || user.displayName || 'طالب'} - {user.grade || ''} — منصة النحاس — أ/ محمد النحاس</div>)}
                    <div className="absolute inset-0 z-[9998] pointer-events-none select-none"></div>
-                   <iframe src={iframeSrc} className="w-full h-full border-0 relative z-40 bg-white" title={content.title} sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals" style={{ pointerEvents: 'auto', WebkitTransform: 'translateZ(0)' }}></iframe>
+                   <iframe src={iframeSrc} className="w-full h-full border-0 relative z-40 bg-white" title={content?.title || ''} sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals" style={{ pointerEvents: 'auto', WebkitTransform: 'translateZ(0)' }}></iframe>
                 </div>
             </div>
         </div>
@@ -323,14 +320,14 @@ export const InteractiveViewer = ({ content, user, onClose }) => {
 };
 
 // ------------------------------------------------------------------
-// 6. مشغل الامتحان (ExamRunner)
+// 6. مشغل الامتحان (ExamRunner) - النسخة المحمية بالكامل 100%
 // ------------------------------------------------------------------
 export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult = null }) => {
   const [activeView, setActiveView] = useState(isReviewMode || existingResult ? 'dashboard' : 'questions'); 
   const [currentQIndex, setCurrentQIndex] = useState(0);
   const [answers, setAnswers] = useState(existingResult?.answers || {});
   const [flagged, setFlagged] = useState({});
-  const [timeLeft, setTimeLeft] = useState(exam.duration * 60);
+  const [timeLeft, setTimeLeft] = useState((exam?.duration || 60) * 60);
   const [isCheating, setIsCheating] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(isReviewMode || existingResult !== null);
   const [score, setScore] = useState(existingResult?.score || 0);
@@ -340,30 +337,34 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
   const [activeBranchTab, setActiveBranchTab] = useState('الكل');
 
   const shuffleArray = (array) => {
+    if (!Array.isArray(array)) return [];
     const arr = [...array];
     for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
     return arr;
   };
 
+  // حماية صارمة لمصفوفة الأسئلة
   const flatQuestions = useMemo(() => {
     const flat = [];
-    if (exam.questions) {
+    if (exam && Array.isArray(exam.questions)) {
         let processedBlocks = [...exam.questions];
         if (!isReviewMode && !existingResult) processedBlocks = shuffleArray(processedBlocks);
         processedBlocks.forEach((block) => {
-            let subQs = [...block.subQuestions];
+            let subQs = Array.isArray(block?.subQuestions) ? [...block.subQuestions] : [];
             if (!isReviewMode && !existingResult) subQs = shuffleArray(subQs);
-            subQs.forEach((q) => { flat.push({ ...q, blockText: block.text, branch: q.branch || 'عام' }); });
+            subQs.forEach((q) => { 
+                if (q) flat.push({ ...q, blockText: block?.text || '', branch: q.branch || 'عام' }); 
+            });
         });
     }
     return flat;
-  }, [exam.questions, isReviewMode, existingResult]);
+  }, [exam, isReviewMode, existingResult]);
 
-  const uniqueBranches = useMemo(() => ['الكل', ...new Set(flatQuestions.map(q => q.branch))], [flatQuestions]);
+  const uniqueBranches = useMemo(() => ['الكل', ...new Set(flatQuestions.map(q => q.branch || 'عام'))], [flatQuestions]);
 
   const displayQuestions = useMemo(() => {
       if (!isSubmitted || activeBranchTab === 'الكل') return flatQuestions;
-      return flatQuestions.filter(q => q.branch === activeBranchTab);
+      return flatQuestions.filter(q => (q.branch || 'عام') === activeBranchTab);
   }, [flatQuestions, isSubmitted, activeBranchTab]);
 
   useEffect(() => { if (isSubmitted) setCurrentQIndex(0); }, [activeBranchTab, isSubmitted]);
@@ -371,8 +372,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
   useEffect(() => {
     if (isReviewMode) return;
     const updatePositions = () => {
-        const newPos = [...Array(6)].map(() => ({ top: Math.floor(Math.random() * 90) + '%', left: Math.floor(Math.random() * 90) + '%' }));
-        setWmPositions(newPos);
+        setWmPositions([...Array(6)].map(() => ({ top: Math.floor(Math.random() * 90) + '%', left: Math.floor(Math.random() * 90) + '%' })));
     };
     updatePositions();
     const interval = setInterval(updatePositions, 6000); 
@@ -388,13 +388,13 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
       if(isReviewMode || isSubmitted || isCheating) return;
       setIsCheating(true); setIsSubmitted(true); setActiveView('dashboard');
       const timeTaken = Math.round((Date.now() - startTime) / 1000);
-      if (exam.attemptId) {
+      if (exam?.attemptId) {
           await setDoc(doc(db, 'exam_results', exam.attemptId), { 
-              examId: exam.id, studentId: user.uid, studentName: user.displayName, 
-              score: 0, total: flatQuestions.length, status: 'cheated', timeTaken: timeTaken, totalTime: exam.duration, submittedAt: serverTimestamp() 
-          });
+              examId: exam.id, studentId: user?.uid, studentName: user?.displayName || user?.name || 'طالب', 
+              score: 0, total: flatQuestions.length, status: 'cheated', timeTaken: timeTaken, totalTime: exam?.duration || 60, submittedAt: serverTimestamp() 
+          }, { merge: true });
       }
-      await updateDoc(doc(db, 'users', user.uid), { status: 'banned_exam' });
+      if (user?.uid) await updateDoc(doc(db, 'users', user.uid), { status: 'banned_exam' });
   };
 
   useEffect(() => {
@@ -435,8 +435,15 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
     }
   }, [timeLeft, isSubmitted, isCheating, isReviewMode]);
 
-  // هنا أصلحنا الخطأ بوضع الشرط بعد جميع الـ Hooks!
-  if (flatQuestions.length === 0) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-white font-['Cairo']">عفواً، لا توجد أسئلة.<button onClick={onClose} className="ml-4 bg-gray-200 px-4 py-2 rounded">خروج</button></div>;
+  // ---> الحماية الأساسية: إذا كان الامتحان بدون أسئلة لا ندخل في أخطاء <---
+  if (!flatQuestions || flatQuestions.length === 0) {
+      return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-white font-['Cairo'] flex-col gap-4">
+              <h2 className="text-xl font-bold text-slate-700">عفواً، لا توجد أسئلة مسجلة في هذا الامتحان.</h2>
+              <button onClick={onClose} className="bg-amber-600 text-white px-6 py-2 rounded-lg font-bold shadow-md hover:bg-amber-700">خروج</button>
+          </div>
+      );
+  }
 
   const handleAnswer = (qId, optionIdx) => { 
     if(!isReviewMode && !isSubmitted) setAnswers(prev => ({ ...prev, [qId]: optionIdx }));
@@ -465,21 +472,21 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
         const isAnswered = studentAns !== undefined;
         const isCorrect = studentAns === q.correctIdx;
         
-        if (isAnswered && !isCorrect) {
+        if (isAnswered && !isCorrect && user?.uid) {
             const mistakeRef = doc(collection(db, 'student_mistakes'));
             batch.set(mistakeRef, {
-                userId: user.uid, examTitle: exam.title,
+                userId: user.uid, examTitle: exam?.title || 'امتحان',
                 question: { ...q, studentAnswerText: q.options[studentAns], correctAnswerText: q.options[q.correctIdx] },
                 timestamp: serverTimestamp()
             });
         }
     });
 
-    if (exam.attemptId && exam.id !== 'custom_mistakes_exam') {
+    if (exam?.attemptId && exam?.id !== 'custom_mistakes_exam') {
         const attemptRef = doc(db, 'exam_results', exam.attemptId);
         batch.set(attemptRef, { 
-            examId: exam.id, studentId: user.uid, studentName: user.displayName, 
-            score: finalScore, total: totalQs, answers, status: 'completed', timeTaken: timeTaken, totalTime: exam.duration, submittedAt: serverTimestamp() 
+            examId: exam.id, studentId: user?.uid, studentName: user?.displayName || user?.name || 'طالب', 
+            score: finalScore, total: totalQs, answers, status: 'completed', timeTaken: timeTaken, totalTime: exam.duration || 60, submittedAt: serverTimestamp() 
         }, { merge: true });
     }
     try { await batch.commit(); } catch(err) { console.error("Error saving results or mistakes", err); }
@@ -498,7 +505,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
   
   const branchStats = {};
   flatQuestions.forEach(q => {
-      const b = q.branch;
+      const b = q.branch || 'عام';
       if (!branchStats[b]) branchStats[b] = { total: 0, solved: 0, correct: 0, wrong: 0, unsolved: 0 };
       branchStats[b].total++;
       const isSelected = answers[q.id] !== undefined;
@@ -509,7 +516,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
       else branchStats[b].wrong++;
   });
 
-  const canReview = exam.id === 'custom_mistakes_exam' || Date.now() > new Date(exam.endTime).getTime();
+  const canReview = exam?.id === 'custom_mistakes_exam' || (exam?.endTime && Date.now() > new Date(exam.endTime).getTime());
 
   if (activeView === 'dashboard') {
      return (
@@ -517,9 +524,9 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
             <div className="max-w-6xl mx-auto mt-6">
                 <div className="flex flex-col md:flex-row justify-between items-center mb-10 border-b border-slate-700 pb-4 gap-4">
                     <div className="text-center md:text-right">
-                        <h2 className="text-3xl font-black text-white mb-2">{exam.title}</h2>
+                        <h2 className="text-3xl font-black text-white mb-2">{exam?.title || 'الامتحان'}</h2>
                         {isSubmitted ? (
-                            <p className="text-lg text-slate-400">الطالب: {user.displayName}</p>
+                            <p className="text-lg text-slate-400">الطالب: {user?.displayName || user?.name || 'طالب'}</p>
                         ) : (
                             <p className="text-amber-400 font-bold">⏳ الوقت المتبقي: {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</p>
                         )}
@@ -527,7 +534,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
                     <div className="flex items-center gap-3">
                         {isSubmitted ? (
                             <>
-                                <button onClick={() => generatePDF('student', {studentName: user.displayName, score, total: flatQuestions.length, status: 'completed', examTitle: exam.title, questions: flatQuestions, answers: answers })} className="w-12 h-12 bg-blue-600 rounded-full text-white flex items-center justify-center shadow-lg hover:bg-blue-700 transition" title="تحميل التقرير PDF">
+                                <button onClick={() => generatePDF('student', {studentName: user?.displayName || user?.name || 'طالب', score, total: flatQuestions.length, status: 'completed', examTitle: exam?.title, questions: flatQuestions, answers: answers })} className="w-12 h-12 bg-blue-600 rounded-full text-white flex items-center justify-center shadow-lg hover:bg-blue-700 transition" title="تحميل التقرير PDF">
                                     <FileText size={20}/>
                                 </button>
                                 <button onClick={onClose} className="bg-slate-700 text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-600 shadow-lg transition flex items-center gap-2">
@@ -597,9 +604,9 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                             {Object.entries(branchStats).map(([branch, stats], idx) => {
-                                const bPercent = isSubmitted 
+                                const bPercent = stats.total > 0 ? (isSubmitted 
                                     ? Math.round((stats.correct / stats.total) * 100) 
-                                    : Math.round((stats.solved / stats.total) * 100);
+                                    : Math.round((stats.solved / stats.total) * 100)) : 0;
                                 
                                 let message = "";
                                 if (isSubmitted) {
@@ -681,7 +688,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
         <div className="fixed inset-0 pointer-events-none z-[9999] overflow-hidden">
             {wmPositions.map((pos, i) => (
                 <div key={i} className="watermark-text" style={{ top: pos.top, left: pos.left }}>
-                    {user.displayName} - {user.email}
+                    {user?.displayName || user?.name || 'طالب'} - {user?.email || ''}
                 </div>
             ))}
         </div>
@@ -708,7 +715,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
                     <Layout size={16}/> العودة للنتيجة
                 </button>
             )}
-            <h2 className="font-bold text-lg font-sans text-amber-400 truncate hidden md:block">{exam.title} {isSubmitted ? '(مراجعة الإجابات)' : ''}</h2>
+            <h2 className="font-bold text-lg font-sans text-amber-400 truncate hidden md:block">{exam?.title || ''} {isSubmitted ? '(مراجعة الإجابات)' : ''}</h2>
             {!isSubmitted && <div className="bg-slate-800 px-6 py-2 rounded-full font-mono shadow-inner border border-slate-700 font-bold text-amber-400 text-lg flex items-center gap-2"><Timer size={18}/> {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</div>}
         </div>
 
@@ -776,17 +783,17 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
             
             <div className="bg-slate-50 p-6 md:p-8 rounded-2xl border border-slate-200 mb-8 shadow-inner text-center">
               <h3 className="text-2xl md:text-3xl font-bold text-slate-900 leading-loose font-['Cairo'] drop-shadow-sm">
-                  {currentQObj.text.split('|').map((part, i) => (
+                  {(currentQObj.text || '').split('|').map((part, i, arr) => (
                       <React.Fragment key={i}>
                           {part.trim()}
-                          {i !== currentQObj.text.split('|').length - 1 && <br />}
+                          {i !== arr.length - 1 && <br />}
                       </React.Fragment>
                   ))}
               </h3>
             </div>
 
             <div className="space-y-4">
-              {currentQObj.options.map((opt, idx) => {
+              {(currentQObj.options || []).map((opt, idx) => {
                   let optionClass = 'border-slate-200 hover:bg-slate-50 bg-white text-slate-700';
                   const isSelected = answers[currentQObj.id] === idx;
                   
@@ -832,39 +839,40 @@ export const LiveSessionView = ({ session, user, onClose }) => {
   const chatRef = useRef(null);
 
   useEffect(() => {
+    if (!session?.id) return;
     const q = query(collection(db, `live_sessions/${session.id}/chat`), orderBy('createdAt', 'asc'));
     const unsub = onSnapshot(q, (snap) => {
       setMessages(snap.docs.map(d => d.data()));
       chatRef.current?.scrollIntoView({ behavior: "smooth" });
     });
     return () => unsub();
-  }, [session.id]);
+  }, [session]);
 
   const sendChat = async (e) => {
     e.preventDefault();
-    if(!msgInput.trim()) return;
-    await addDoc(collection(db, `live_sessions/${session.id}/chat`), { text: msgInput, user: user.displayName || 'طالب', createdAt: serverTimestamp() });
+    if(!msgInput.trim() || !session?.id) return;
+    await addDoc(collection(db, `live_sessions/${session.id}/chat`), { text: msgInput, user: user?.displayName || user?.name || 'طالب', createdAt: serverTimestamp() });
     setMsgInput("");
   };
 
-  const isYouTube = (url) => url.includes("youtube") || url.includes("youtu.be");
-  const videoId = getYouTubeID(session.liveUrl);
+  const isYouTube = (url) => (url || '').includes("youtube") || (url || '').includes("youtu.be");
+  const videoId = getYouTubeID(session?.liveUrl || '');
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col md:flex-row font-['Cairo']" dir="rtl">
       <div className="flex-1 flex flex-col">
         <div className="bg-gradient-to-r from-red-600 to-red-800 p-3 text-white flex justify-between items-center shadow-lg">
-          <div className="flex items-center gap-2"><span className="w-3 h-3 bg-white rounded-full animate-pulse shadow-[0_0_10px_white]"></span><h2 className="font-bold">بث مباشر: {session.title}</h2></div>
+          <div className="flex items-center gap-2"><span className="w-3 h-3 bg-white rounded-full animate-pulse shadow-[0_0_10px_white]"></span><h2 className="font-bold">بث مباشر: {session?.title || ''}</h2></div>
           <button onClick={onClose} className="text-sm bg-black/30 hover:bg-black/50 px-3 py-1 rounded transition">العودة للمنصة</button>
         </div>
         <div className="flex-1 bg-black relative flex items-center justify-center overflow-hidden">
-          <div className="watermark-video z-50">{user?.displayName || 'طالب'}</div>
-          {isYouTube ? (
+          <div className="watermark-video z-50">{user?.displayName || user?.name || 'طالب'}</div>
+          {isYouTube(session?.liveUrl) ? (
             <iframe width="100%" height="100%" src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&controls=1&rel=0&modestbranding=1&playsinline=1`} title="Live" frameBorder="0" allowFullScreen style={{ WebkitTransform: 'translateZ(0)' }}></iframe>
           ) : (
             <div className="w-full h-full relative">
-              <iframe width="100%" height="100%" src={session.liveUrl} title="Live Meeting" frameBorder="0" allow="camera; microphone; display-capture; autoplay; clipboard-write; fullscreen" allowFullScreen className="relative z-10" style={{ WebkitTransform: 'translateZ(0)' }}></iframe>
-              <a href={session.liveUrl} target="_blank" rel="noopener noreferrer" className="absolute top-4 left-4 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-full text-xs font-bold backdrop-blur-md border border-white/20 transition flex items-center gap-2 z-50 shadow-lg"><ExternalLink size={14}/> للموبايل (لو البث مش شغال)</a>
+              <iframe width="100%" height="100%" src={session?.liveUrl || ''} title="Live Meeting" frameBorder="0" allow="camera; microphone; display-capture; autoplay; clipboard-write; fullscreen" allowFullScreen className="relative z-10" style={{ WebkitTransform: 'translateZ(0)' }}></iframe>
+              <a href={session?.liveUrl || '#'} target="_blank" rel="noopener noreferrer" className="absolute top-4 left-4 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-full text-xs font-bold backdrop-blur-md border border-white/20 transition flex items-center gap-2 z-50 shadow-lg"><ExternalLink size={14}/> للموبايل (لو البث مش شغال)</a>
             </div>
           )}
         </div>
@@ -907,7 +915,7 @@ export const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
                 onClose();
             }
         };
-        fetchHw();
+        if (hwId) fetchHw();
     }, [hwId, onClose]);
 
     const handleImageCapture = (e) => {
@@ -971,8 +979,8 @@ export const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
 
     const saveResult = async (aiResult) => {
         const finalData = {
-            studentId: user.uid,
-            studentName: user.displayName,
+            studentId: user?.uid,
+            studentName: user?.displayName || user?.name || 'طالب',
             homeworkId: homeworkData.id,
             homeworkTitle: homeworkData.title,
             bookName: homeworkData.bookName || 'عام',
