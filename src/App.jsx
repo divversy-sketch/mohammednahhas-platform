@@ -24,13 +24,13 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDE7PASs4dt2aD912Jerm7260142Hee4W0",
-  authDomain: "exam-f6804.firebaseapp.com",
-  projectId: "exam-f6804",
-  storageBucket: "exam-f6804.firebasestorage.app",
-  messagingSenderId: "1029912301794",
-  appId: "1:1029912301794:web:57673ad6f7331136e80ebb",
-  measurementId: "G-PCEZQ7H2EV"
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.REACT_APP_FIREBASE_APP_ID,
+  measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID
 };
 
 let app, auth, db;
@@ -1262,7 +1262,7 @@ const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
         
         try {
             const base64Data = imageSrc.split(',')[1];
-            const apiKey = "AIzaSyAkxZD3GCtHK1_9DgsdCOPr69M1nOV13Hw"; 
+            const apiKey = process.env.REACT_APP_GEMINI_API_KEY; 
             
             if(!apiKey) {
                 setTimeout(async () => {
