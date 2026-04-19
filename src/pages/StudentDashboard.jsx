@@ -179,17 +179,9 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   if (activeLiveView) return <LiveSessionView session={activeLiveView} user={user} onClose={() => setActiveLiveView(null)} />;
   if (activeExam) return <ExamRunner exam={activeExam} user={user} onClose={() => setActiveExam(null)} />;
   if (showFocusMode) return <PomodoroFocusMode onClose={() => setShowFocusMode(false)} />;
-  if (reviewingExam) {
+if (reviewingExam) {
       const result = examResults.find(r => r.examId === reviewingExam.id);
-      return (
-        <ExamRunner 
-          exam={reviewingExam} 
-          user={user} 
-          onClose={() => setReviewingExam(null)} 
-          isReviewMode={true} 
-          existingResult={result || null} 
-        />
-      );
+      return <ExamRunner exam={reviewingExam} user={user} onClose={() => setReviewingExam(null)} isReviewMode={true} existingResult={result || null} />;
   }
 
   const isBannedAll = userData?.status === 'banned_all';

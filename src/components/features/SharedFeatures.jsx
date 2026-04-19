@@ -101,14 +101,14 @@ export const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
       if (!user || !video.id) return;
       const viewId = `${user.uid}_${video.id}`;
       const viewRef = doc(db, 'video_views', viewId);
-      let localSeconds = 0; let lastSyncedSeconds = 0;
+      let timerInterval; let localSeconds = 0; let lastSyncedSeconds = 0;
 
       const syncToDatabase = async (secondsToAdd) => {
           try { await setDoc(viewRef, { userId: user.uid, userName: userName, videoId: video.id, videoTitle: video.title, viewedAt: serverTimestamp(), watchedSeconds: increment(secondsToAdd) }, { merge: true }); } catch (e) { console.error("Sync error:", e); }
       };
       syncToDatabase(0);
 
-      const timerInterval = setInterval(() => {
+      timerInterval = setInterval(() => {
           let isPlaying = true;
           if (!videoId && videoRef.current) isPlaying = !videoRef.current.paused && !videoRef.current.ended;
           if (!document.hidden && isPlaying) {
@@ -187,8 +187,8 @@ export const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
             <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white p-2 rounded-full shadow-lg"><X size={24}/></button>
         </div>
 
-        <div className="w-full h-full relative flex items-center justify-center bg-black overflow-hidden">
-          <div className="watermark-video">{userName} - منصة النحاس</div>
+        <div className="w-full relative flex items-center justify-center bg-black overflow-hidden" style={{ height: showNotes ? '50vh' : '100%' }}>
+          <div className="watermark-video">{userName} - {video.grade || 'منصة النحاس'}</div>
           {videoId ? (
             <iframe className="w-full h-full" src={youtubeEmbedUrl} title="Video" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
           ) : (
@@ -320,14 +320,14 @@ export const InteractiveViewer = ({ content, user, onClose }) => {
 };
 
 // ------------------------------------------------------------------
-// 6. مشغل الامتحان (ExamRunner)
+// 6. مشغل الامتحان والمراجعة (ExamRunner)
 // ------------------------------------------------------------------
 export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult = null }) => {
   const [activeView, setActiveView] = useState(isReviewMode || existingResult ? 'dashboard' : 'questions'); 
   const [currentQIndex, setCurrentQIndex] = useState(0);
   const [answers, setAnswers] = useState(existingResult?.answers || {});
   const [flagged, setFlagged] = useState({});
-  const [timeLeft, setTimeLeft] = useState((exam.duration || 60) * 60);
+  const [timeLeft, setTimeLeft] = useState((exam?.duration || 60) * 60);
   const [isCheating, setIsCheating] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(isReviewMode || existingResult !== null);
   const [score, setScore] = useState(existingResult?.score || 0);
@@ -387,7 +387,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
       const timeTaken = Math.round((Date.now() - startTime) / 1000);
       if (exam.attemptId) {
           await setDoc(doc(db, 'exam_results', exam.attemptId), { 
-              examId: exam.id, studentId: user.uid, studentName: user.displayName || user.name, 
+              examId: exam.id, studentId: user.uid, studentName: user.displayName || user.name || 'طالب', 
               score: 0, total: flatQuestions.length, status: 'cheated', timeTaken: timeTaken, totalTime: exam.duration, submittedAt: serverTimestamp() 
           }, {merge: true});
       }
@@ -432,6 +432,24 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
     }
   }, [timeLeft, isSubmitted, isCheating, isReviewMode]);
 
+  // --- التحقق من خلو الامتحان من الأسئلة (يجب أن يكون بعد كل الهوكس) ---
+  if (flatQuestions.length === 0) {
+      return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-white font-['Cairo'] flex-col gap-4">
+              <h2 className="text-xl font-bold text-slate-700">عفواً، لا توجد أسئلة مسجلة في هذا الامتحان.</h2>
+              <button onClick={onClose} className="bg-amber-600 text-white px-6 py-2 rounded-lg font-bold shadow-md hover:bg-amber-700">خروج</button>
+          </div>
+      );
+  }
+
+  if (isCheating) {
+      return (
+          <div className="fixed inset-0 z-[60] bg-red-900 flex items-center justify-center text-white text-center font-['Cairo']">
+              <div><AlertOctagon size={80} className="mx-auto mb-4"/><h1>تم رصد محاولة غش!</h1><p className="text-red-200 mt-2">خرجت من الامتحان. تم رصد درجتك (صفر) وحظرك من الامتحانات القادمة.</p><button onClick={() => window.location.reload()} className="mt-4 bg-white text-red-900 px-6 py-2 rounded-full font-bold">العودة للرئيسية</button></div>
+          </div>
+      );
+  }
+
   const handleAnswer = (qId, optionIdx) => { 
     if(!isReviewMode && !isSubmitted) setAnswers(prev => ({ ...prev, [qId]: optionIdx }));
   };
@@ -472,16 +490,12 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
     if (exam.attemptId && exam.id !== 'custom_mistakes_exam') {
         const attemptRef = doc(db, 'exam_results', exam.attemptId);
         batch.set(attemptRef, { 
-            examId: exam.id, studentId: user.uid, studentName: user.displayName || user.name, 
+            examId: exam.id, studentId: user.uid, studentName: user.displayName || user.name || 'طالب', 
             score: finalScore, total: totalQs, answers, status: 'completed', timeTaken: timeTaken, totalTime: exam.duration, submittedAt: serverTimestamp() 
         }, { merge: true });
     }
     try { await batch.commit(); } catch(err) { console.error("Error saving results or mistakes", err); }
   };
-
-  const currentQObj = displayQuestions[currentQIndex];
-  
-  if (isCheating) return <div className="fixed inset-0 z-[60] bg-red-900 flex items-center justify-center text-white text-center font-['Cairo']"><div><AlertOctagon size={80} className="mx-auto mb-4"/><h1>تم رصد محاولة غش!</h1><p className="text-red-200 mt-2">خرجت من الامتحان. تم رصد درجتك (صفر) وحظرك من الامتحانات القادمة.</p><button onClick={() => window.location.reload()} className="mt-4 bg-white text-red-900 px-6 py-2 rounded-full font-bold">العودة للرئيسية</button></div></div>;
 
   const totalQs = flatQuestions.length;
   const solvedQs = Object.keys(answers).length;
@@ -503,7 +517,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
       else branchStats[b].wrong++;
   });
 
-  const canReview = exam.id === 'custom_mistakes_exam' || (exam.endTime && Date.now() > new Date(exam.endTime).getTime());
+  const canReview = exam?.id === 'custom_mistakes_exam' || (exam?.endTime && Date.now() > new Date(exam.endTime).getTime());
 
   if (activeView === 'dashboard') {
      return (
@@ -511,9 +525,9 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
             <div className="max-w-6xl mx-auto mt-6">
                 <div className="flex flex-col md:flex-row justify-between items-center mb-10 border-b border-slate-700 pb-4 gap-4">
                     <div className="text-center md:text-right">
-                        <h2 className="text-3xl font-black text-white mb-2">{exam.title}</h2>
+                        <h2 className="text-3xl font-black text-white mb-2">{exam?.title || 'مراجعة الامتحان'}</h2>
                         {isSubmitted ? (
-                            <p className="text-lg text-slate-400">الطالب: {user.displayName || user.name}</p>
+                            <p className="text-lg text-slate-400">الطالب: {user?.displayName || user?.name || 'طالب'}</p>
                         ) : (
                             <p className="text-amber-400 font-bold">⏳ الوقت المتبقي: {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</p>
                         )}
@@ -521,7 +535,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
                     <div className="flex items-center gap-3">
                         {isSubmitted ? (
                             <>
-                                <button onClick={() => generatePDF('student', {studentName: user.displayName || user.name, score, total: flatQuestions.length, status: 'completed', examTitle: exam.title, questions: flatQuestions, answers: answers })} className="w-12 h-12 bg-blue-600 rounded-full text-white flex items-center justify-center shadow-lg hover:bg-blue-700 transition" title="تحميل التقرير PDF">
+                                <button onClick={() => generatePDF('student', {studentName: user?.displayName || user?.name || 'طالب', score, total: flatQuestions.length, status: 'completed', examTitle: exam?.title, questions: flatQuestions, answers: answers })} className="w-12 h-12 bg-blue-600 rounded-full text-white flex items-center justify-center shadow-lg hover:bg-blue-700 transition" title="تحميل التقرير PDF">
                                     <FileText size={20}/>
                                 </button>
                                 <button onClick={onClose} className="bg-slate-700 text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-600 shadow-lg transition flex items-center gap-2">
@@ -667,7 +681,8 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
      );
   }
 
-  if (!currentQObj) return <div className="fixed inset-0 z-50 bg-white flex items-center justify-center">جاري تحميل الأسئلة...</div>;
+  const currentQObj = displayQuestions[currentQIndex];
+  if (!currentQObj) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-100 flex flex-col font-['Cairo'] no-select" dir="rtl">
@@ -675,7 +690,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
         <div className="fixed inset-0 pointer-events-none z-[9999] overflow-hidden">
             {wmPositions.map((pos, i) => (
                 <div key={i} className="watermark-text" style={{ top: pos.top, left: pos.left }}>
-                    {user.displayName || user.name} - {user.email}
+                    {user?.displayName || user?.name || 'طالب'} - {user?.email}
                 </div>
             ))}
         </div>
@@ -702,7 +717,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
                     <Layout size={16}/> العودة للنتيجة
                 </button>
             )}
-            <h2 className="font-bold text-lg font-sans text-amber-400 truncate hidden md:block">{exam.title} {isSubmitted ? '(مراجعة الإجابات)' : ''}</h2>
+            <h2 className="font-bold text-lg font-sans text-amber-400 truncate hidden md:block">{exam?.title} {isSubmitted ? '(مراجعة الإجابات)' : ''}</h2>
             {!isSubmitted && <div className="bg-slate-800 px-6 py-2 rounded-full font-mono shadow-inner border border-slate-700 font-bold text-amber-400 text-lg flex items-center gap-2"><Timer size={18}/> {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</div>}
         </div>
 
@@ -761,7 +776,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
             <div className="flex justify-between items-center mb-8 border-b border-slate-100 pb-6">
               <div className="flex items-center gap-3">
                   <span className="bg-slate-900 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-md font-['Cairo']">سؤال {flatQuestions.findIndex(origQ => origQ.id === currentQObj.id) + 1}</span>
-                  {currentQObj.branch && (
+                  {currentQObj.branch && currentQObj.branch !== 'عام' && (
                       <span className="bg-blue-50 text-blue-700 px-4 py-2 rounded-xl text-sm font-bold border border-blue-100 flex items-center gap-2"><Layers size={16}/> {currentQObj.branch}</span>
                   )}
               </div>
@@ -812,69 +827,6 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
             </div>
           </div>
         </div>
-      </div>
-    </div>
-  );
-};
-
-// ------------------------------------------------------------------
-// 7. البث المباشر (LiveSessionView)
-// ------------------------------------------------------------------
-export const LiveSessionView = ({ session, user, onClose }) => {
-  const [messages, setMessages] = useState([]);
-  const [msgInput, setMsgInput] = useState("");
-  const chatRef = useRef(null);
-
-  useEffect(() => {
-    const q = query(collection(db, `live_sessions/${session.id}/chat`), orderBy('createdAt', 'asc'));
-    const unsub = onSnapshot(q, (snap) => {
-      setMessages(snap.docs.map(d => d.data()));
-      chatRef.current?.scrollIntoView({ behavior: "smooth" });
-    });
-    return () => unsub();
-  }, [session.id]);
-
-  const sendChat = async (e) => {
-    e.preventDefault();
-    if(!msgInput.trim()) return;
-    await addDoc(collection(db, `live_sessions/${session.id}/chat`), { text: msgInput, user: user.displayName || user.name || 'طالب', createdAt: serverTimestamp() });
-    setMsgInput("");
-  };
-
-  const isYouTube = (url) => (url || '').includes("youtube") || (url || '').includes("youtu.be");
-  const videoId = getYouTubeID(session.liveUrl);
-
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col md:flex-row font-['Cairo']" dir="rtl">
-      <div className="flex-1 flex flex-col">
-        <div className="bg-gradient-to-r from-red-600 to-red-800 p-3 text-white flex justify-between items-center shadow-lg">
-          <div className="flex items-center gap-2"><span className="w-3 h-3 bg-white rounded-full animate-pulse shadow-[0_0_10px_white]"></span><h2 className="font-bold">بث مباشر: {session.title}</h2></div>
-          <button onClick={onClose} className="text-sm bg-black/30 hover:bg-black/50 px-3 py-1 rounded transition">العودة للمنصة</button>
-        </div>
-        <div className="flex-1 bg-black relative flex items-center justify-center overflow-hidden">
-          <div className="watermark-video z-50">{user?.displayName || user?.name || 'طالب'}</div>
-          {isYouTube ? (
-            <iframe width="100%" height="100%" src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&controls=1&rel=0&modestbranding=1&playsinline=1`} title="Live" frameBorder="0" allowFullScreen style={{ WebkitTransform: 'translateZ(0)' }}></iframe>
-          ) : (
-            <div className="w-full h-full relative">
-              <iframe width="100%" height="100%" src={session.liveUrl} title="Live Meeting" frameBorder="0" allow="camera; microphone; display-capture; autoplay; clipboard-write; fullscreen" allowFullScreen className="relative z-10" style={{ WebkitTransform: 'translateZ(0)' }}></iframe>
-              <a href={session.liveUrl} target="_blank" rel="noopener noreferrer" className="absolute top-4 left-4 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-full text-xs font-bold backdrop-blur-md border border-white/20 transition flex items-center gap-2 z-50 shadow-lg"><ExternalLink size={14}/> للموبايل (لو البث مش شغال)</a>
-            </div>
-          )}
-        </div>
-      </div>
-      <div className="w-full md:w-80 bg-white border-r flex flex-col h-1/3 md:h-full">
-        <div className="p-3 border-b bg-slate-50 font-bold text-slate-700">المحادثة المباشرة</div>
-        <div className="flex-1 overflow-y-auto p-3 space-y-2">
-          {messages.map((m, i) => (
-            <div key={i} className="text-sm bg-slate-50 p-2 rounded"><span className="font-bold text-amber-700">{m.user}: </span><span className="text-slate-800">{m.text}</span></div>
-          ))}
-          <div ref={chatRef} />
-        </div>
-        <form onSubmit={sendChat} className="p-2 border-t flex gap-2">
-          <input className="flex-1 border rounded px-2 py-1 text-sm" placeholder="اكتب تعليق..." value={msgInput} onChange={e=>setMsgInput(e.target.value)} />
-          <button className="bg-blue-600 text-white p-2 rounded"><Send size={16}/></button>
-        </form>
       </div>
     </div>
   );
@@ -966,7 +918,7 @@ export const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
     const saveResult = async (aiResult) => {
         const finalData = {
             studentId: user.uid,
-            studentName: user.displayName || user.name,
+            studentName: user.displayName || user.name || 'طالب',
             homeworkId: homeworkData.id,
             homeworkTitle: homeworkData.title,
             bookName: homeworkData.bookName || 'عام',
