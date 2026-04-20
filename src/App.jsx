@@ -1,3 +1,268 @@
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { 
+  getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, 
+  signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail 
+} from 'firebase/auth';
+import { 
+  getFirestore, doc, setDoc, getDoc, getDocs, collection, addDoc, query, where, 
+  onSnapshot, updateDoc, deleteDoc, orderBy, serverTimestamp, writeBatch, limit, startAfter, increment 
+} from 'firebase/firestore';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+
+import { 
+  PlayCircle, FileText, LogOut, User, GraduationCap, Quote, CheckCircle, 
+  Lock, Mail, ChevronRight, Menu, X, Loader2, AlertTriangle, PlusCircle, 
+  Check, Trash2, Eye, ShieldAlert, Video, UploadCloud, Phone, Edit, KeyRound,
+  MessageSquare, Send, MessageCircle, Facebook, BookOpen, Feather, Radio, 
+  ExternalLink, ClipboardList, Timer, AlertOctagon, Flag, Save, HelpCircle, 
+  Reply, Unlock, Layout, Settings, Trophy, Megaphone, Bell, Download, XCircle, 
+  Calendar, Clock, FileWarning, Settings as GearIcon, Star, Bot, Power, Upload,
+  Users, PenTool, Code, Sparkles, Lamp, Ban, Shield, RefreshCw, Link as LinkIcon, 
+  History, Camera, QrCode, FileCheck, MousePointerClick, BarChart3, Layers,
+  BrainCircuit, Headphones, DownloadCloud, PenLine, Play, Pause, SkipForward, 
+  Target, AlertCircle, Crown, CreditCard, Key, Search, Flame
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+};
+
+let app, auth, db, storage;
+try {
+  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+  auth = getAuth(app);
+  db = getFirestore(app);
+} catch (error) { 
+  console.error("Firebase Base Init Error:", error); 
+}
+try {
+  storage = getStorage(app);
+} catch (error) {
+  console.warn("Firebase Storage Init Error (Images won't upload until enabled):", error);
+}
+
+const uploadFileToStorage = async (file, pathFolder) => {
+    if (!file || !storage) return null;
+    const fileExtension = file.name.split('.').pop();
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExtension}`;
+    const storageRef = ref(storage, `${pathFolder}/${fileName}`);
+    await uploadBytes(storageRef, file);
+    return await getDownloadURL(storageRef);
+};
+
+const formatWatchTime = (totalSeconds) => {
+    if (!totalSeconds || totalSeconds < 0) return 'أقل من ثانية';
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    let res = [];
+    if (h > 0) res.push(`${h} ساعة`);
+    if (m > 0) res.push(`${m} دقيقة`);
+    if (s > 0 || res.length === 0) res.push(`${s} ثانية`);
+    return res.join(' و ');
+};
+
+const requestNotificationPermission = () => {
+  if (!("Notification" in window)) return;
+  if (Notification.permission === "default") {
+    Notification.requestPermission().then(permission => {
+      if(permission === "granted") console.log("الإشعارات مفعلة");
+    });
+  }
+};
+
+const sendSystemNotification = (title, body) => {
+  if (Notification.permission === "granted") {
+    try {
+      new Notification(title, { body: body, icon: "https://cdn-icons-png.flaticon.com/512/3449/3449750.png", vibrate: [200, 100, 200] });
+      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+      audio.volume = 0.5; audio.play().catch(e => {});
+    } catch (e) { console.error("Notification Error:", e); }
+  }
+};
+
+const getYouTubeID = (url) => {
+    if (!url) return null;
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=|live\/|shorts\/)([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+};
+
+const generatePDF = (type, data) => {
+    if (!window.html2pdf) return alert("جاري تحميل نظام الطباعة... يرجى الانتظار ثوانٍ والمحاولة مرة أخرى.");
+    const percentage = data.total > 0 ? Math.round((data.score / data.total) * 100) : 0;
+    const date = new Date().toLocaleDateString('ar-EG');
+    const element = document.createElement('div');
+    let answersTable = '';
+    if (data.questions && data.answers) {
+        answersTable = `
+        <div style="margin-top: 30px; page-break-before: always;">
+            <h3 style="background: #eee; padding: 10px; border-right: 5px solid #d97706; font-family: 'Cairo', sans-serif;">تفاصيل الإجابات</h3>
+            <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 15px; font-family: 'Cairo', sans-serif;">
+                <thead>
+                    <tr style="background-color: #f3f4f6; color: #333;">
+                        <th style="border: 1px solid #ddd; padding: 10px; width: 5%;">#</th>
+                        <th style="border: 1px solid #ddd; padding: 10px; text-align: right;">السؤال</th>
+                        <th style="border: 1px solid #ddd; padding: 10px; width: 10%;">الفرع</th>
+                        <th style="border: 1px solid #ddd; padding: 10px; width: 15%;">إجابتك</th>
+                        <th style="border: 1px solid #ddd; padding: 10px; width: 15%;">الصح</th>
+                        <th style="border: 1px solid #ddd; padding: 10px; width: 10%;">الحالة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${data.questions.map((q, i) => {
+                        if (q.type === 'essay') {
+                             const studentText = data.answers[q.id]?.text || 'لم يجب';
+                             return `
+                             <tr>
+                                 <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${i + 1}</td>
+                                 <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">${q.text.replace(/\|/g, '<br>')} (سؤال مقالي)</td>
+                                 <td style="border: 1px solid #ddd; padding: 8px; color: #0284c7;">${q.branch || 'عام'}</td>
+                                 <td style="border: 1px solid #ddd; padding: 8px;" colspan="2">${studentText}</td>
+                                 <td style="border: 1px solid #ddd; padding: 8px; text-align: center; color: orange;">تصحيح يدوي</td>
+                             </tr>`;
+                        } else {
+                            const studentAnsIdx = data.answers[q.id];
+                            const correctAnsIdx = q.correctIdx;
+                            const isCorrect = studentAnsIdx === correctAnsIdx;
+                            const studentAnsText = studentAnsIdx !== undefined && q.options ? q.options[studentAnsIdx] : 'لم يجب';
+                            const correctAnsText = q.options ? q.options[correctAnsIdx] : '';
+                            const branchName = q.branch || 'عام';
+                            return `
+                            <tr style="background-color: ${isCorrect ? '#f0fdf4' : '#fef2f2'};">
+                                <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${i + 1}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">${q.text.replace(/\|/g, '<br>')}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold; color: #0284c7;">${branchName}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">${studentAnsText}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px; color: green;">${correctAnsText}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${isCorrect ? '<span style="color:green">✔ صحيح</span>' : '<span style="color:red">✘ خطأ</span>'}</td>
+                            </tr>`;
+                        }
+                    }).join('')}
+                </tbody>
+            </table>
+        </div>`;
+    }
+
+    const header = `
+      <div style="padding: 40px; font-family: 'Cairo', sans-serif; direction: rtl; color: #333;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #d97706; padding-bottom: 20px; margin-bottom: 30px;">
+            <div style="text-align: right;"><h1 style="margin: 0; color: #d97706; font-size: 28px;">منصة النحاس التعليمية</h1><p style="margin: 5px 0 0; color: #666;">للغة العربية - أ/ محمد النحاس</p></div>
+            <div style="text-align: left;"><p style="margin: 0; font-weight: bold;">تقرير نتيجة امتحان</p><p style="margin: 5px 0 0; color: #666;">${date}</p></div>
+        </div>
+        <div style="background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+            <table style="width: 100%; font-size: 18px; font-family: 'Cairo', sans-serif;">
+                <tr><td style="padding: 10px; font-weight: bold; width: 20%;">اسم الطالب:</td><td style="padding: 10px;">${data.studentName}</td><td style="padding: 10px; font-weight: bold; width: 20%;">الامتحان:</td><td style="padding: 10px;">${data.examTitle || 'اختبار عام'}</td></tr>
+                <tr><td style="padding: 10px; font-weight: bold; vertical-align: middle;">الدرجة الآلية:</td><td style="padding: 10px;"><div style="display: inline-block; border: 3px solid #d97706; border-radius: 8px; padding: 5px 20px; font-weight: bold; color: #d97706; direction: ltr; font-family: sans-serif; font-size: 20px; background: #fffbeb;">${data.score} / ${data.total}</div></td><td style="padding: 10px; font-weight: bold; vertical-align: middle;">النسبة:</td><td style="padding: 10px; font-size: 20px; font-weight: bold;">${percentage}%</td></tr>
+                <tr><td style="padding: 10px; font-weight: bold;">الحالة:</td><td style="padding: 10px;" colspan="3"><span style="background: ${data.status === 'cheated' ? '#fee2e2' : '#dcfce7'}; color: ${data.status === 'cheated' ? '#991b1b' : '#166534'}; padding: 5px 15px; border-radius: 20px; font-size: 14px;">${data.status === 'cheated' ? 'تم إلغاؤه (غش)' : percentage >= 50 ? 'ناجح' : 'راسب'}</span></td></tr>
+            </table>
+        </div>
+        ${answersTable}
+        <div style="margin-top: 50px; text-align: center; border-top: 1px solid #eee; padding-top: 20px;"><p style="font-size: 14px; color: #999;">تم استخراج هذا التقرير آلياً من منصة النحاس التعليمية</p></div>
+      </div>`;
+    element.innerHTML = header;
+    const opt = { margin: 0.5, filename: `تقرير_${data.studentName}_${date}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true, logging: false }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
+    window.html2pdf().set(opt).from(element).save();
+};
+
+const DesignSystemLoader = () => {
+  useEffect(() => {
+    if (!document.getElementById('tailwind-script')) {
+      const script = document.createElement('script'); script.id = 'tailwind-script'; script.src = "https://cdn.tailwindcss.com";
+      script.onload = () => {
+        if(window.tailwind) {
+            window.tailwind.config = {
+              theme: {
+                extend: {
+                  fontFamily: { sans: ['Cairo', 'sans-serif'], arabic: ['Aref Ruqaa', 'serif'] },
+                  colors: { amber: { 50: '#fffbeb', 100: '#fef3c7', 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 700: '#b45309', 900: '#78350f' }, royal: { 900: '#0f172a', 800: '#1e293b' } },
+                  backgroundImage: { 'arabesque': "url('https://www.transparenttextures.com/patterns/arabesque.png')" }
+                }
+              }
+            }
+        }
+      };
+      document.head.appendChild(script);
+    }
+    if (!document.getElementById('cairo-font')) {
+      const link = document.createElement('link'); link.id = 'cairo-font'; link.rel = 'stylesheet'; link.href = "https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Aref+Ruqaa:wght@400;700&display=swap"; document.head.appendChild(link);
+    }
+    if (!document.getElementById('html2pdf-script')) {
+        const script = document.createElement('script'); script.id = 'html2pdf-script'; script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"; document.head.appendChild(script);
+    }
+  }, []);
+
+  return (
+    <style>{`
+      html, body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; direction: rtl; -webkit-font-smoothing: antialiased; scroll-behavior: smooth; }
+      ::-webkit-scrollbar { width: 8px; } ::-webkit-scrollbar-track { background: #f1f1f1; } ::-webkit-scrollbar-thumb { background: linear-gradient(to bottom, #d97706, #b45309); border-radius: 4px; }
+      .glass-panel { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.4); box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+      .glass-card { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(6px); border: 1px solid rgba(255, 255, 255, 0.4); box-shadow: 0 4px 10px rgba(0,0,0,0.05); transition: transform 0.2s ease, box-shadow 0.2s ease; will-change: transform; }
+      .glass-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(217, 119, 6, 0.15); border-color: #fbbf24; }
+      .text-gradient-gold { background: linear-gradient(45deg, #b45309, #d97706, #fbbf24, #d97706); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-size: 200% auto; animation: shine 3s linear infinite; }
+      @keyframes shine { to { background-position: 200% center; } }
+      @keyframes floatChar { 0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); } 50% { transform: translate3d(0, -30px, 0) rotate(10deg); } }
+      .floating-char { animation: floatChar ease-in-out infinite; will-change: transform; }
+      @keyframes pulseSlow { 0%, 100% { transform: scale3d(1, 1, 1); opacity: 0.2; } 50% { transform: scale3d(1.1, 1.1, 1); opacity: 0.4; } }
+      .animate-pulse-slow { animation: pulseSlow 8s ease-in-out infinite; will-change: transform, opacity; }
+      .watermark-text { position: absolute; pointer-events: none; z-index: 9999; color: rgba(0, 0, 0, 0.08); font-weight: 900; font-size: 1.5rem; transform: rotate(-30deg); white-space: nowrap; text-shadow: 0 0 2px rgba(255,255,255,0.5); }
+      .watermark-video { position: absolute; pointer-events: none; z-index: 9999; color: rgba(255, 255, 255, 0.4); font-weight: 900; font-size: 1.5rem; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); white-space: nowrap; animation: moveWatermark 25s linear infinite; }
+      @keyframes moveWatermark { 0% { top: 10%; left: 10%; transform: rotate(-5deg); } 25% { top: 80%; left: 50%; transform: rotate(5deg); } 50% { top: 30%; left: 80%; transform: rotate(-5deg); } 75% { top: 70%; left: 10%; transform: rotate(5deg); } 100% { top: 10%; left: 10%; transform: rotate(-5deg); } }
+      .no-select { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
+    `}</style>
+  );
+};
+
+const GradeOptions = () => (
+    <>
+        <optgroup label="المرحلة الإعدادية">
+            <option value="1prep">الصف الأول الإعدادي</option>
+            <option value="2prep">الصف الثاني الإعدادي</option>
+            <option value="3prep">الصف الثالث الإعدادي</option>
+        </optgroup>
+        <optgroup label="المرحلة الثانوية">
+            <option value="1sec">الصف الأول الثانوي</option>
+            <option value="2sec">الصف الثاني الثانوي</option>
+            <option value="3sec">الصف الثالث الثانوي</option>
+        </optgroup>
+    </>
+);
+
+const getGradeLabel = (g) => {
+    const map = { '1prep': 'أولى إعدادي', '2prep': 'تانية إعدادي', '3prep': 'تالتة إعدادي', '1sec': 'أولى ثانوي', '2sec': 'تانية ثانوي', '3sec': 'تالتة ثانوي' };
+    return map[g] || g;
+};
+
+const ModernLogo = () => (
+  <div className="relative w-20 h-20 drop-shadow-2xl cursor-pointer hover:scale-105 hover:rotate-6 transition-transform">
+      <svg width="80" height="80" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs><linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#fbbf24" /><stop offset="50%" stopColor="#d97706" /><stop offset="100%" stopColor="#78350f" /></linearGradient><filter id="glow"><feGaussianBlur stdDeviation="2.5" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+        <path d="M100 20C55.8 20 20 55.8 20 100s35.8 80 80 80 80-35.8 80-80-35.8-80-80-80zm0 150c-38.6 0-70-31.4-70-70s31.4-70 70-70 70 31.4 70 70-31.4 70-70 70z" fill="url(#logoGrad)" opacity="0.2" />
+        <path d="M160 80 V 130 A 60 60 0 0 1 40 130 V 110" stroke="url(#logoGrad)" strokeWidth="22" strokeLinecap="round" strokeLinejoin="round" fill="none" filter="url(#glow)" />
+        <rect x="85" y="40" width="30" height="30" rx="4" fill="url(#logoGrad)" transform="rotate(45 100 55)" />
+      </svg>
+  </div>
+);
+
+const FloatingArabicBackground = React.memo(() => (
+  <div className="fixed inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 0, background: 'radial-gradient(circle at center, #fdfbf7 0%, #e2e8f0 100%)' }}>
+    <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: `url("https://www.transparenttextures.com/patterns/arabesque.png")` }} />
+    {['أ', 'ب', 'ج', 'د', 'هـ', 'و', 'ز', 'ح', 'ط', 'ي', 'ض', 'ع'].map((char, i) => (
+        <div key={i} className="absolute text-amber-500/15 font-arabic font-bold select-none floating-char" style={{ left: `${(i * 8.5) % 90 + 5}vw`, top: `${(i * 13) % 90 + 5}vh`, fontSize: `${(i % 3) + 3}rem`, animationDelay: `${i * 0.5}s`, animationDuration: `${15 + (i % 5)}s` }}>{char}</div>
+    ))}
+    <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-amber-400/10 rounded-full blur-xl animate-pulse-slow" />
+    <div className="absolute bottom-1/3 right-1/4 w-96 h-96 bg-blue-400/10 rounded-full blur-xl animate-pulse-slow" style={{ animationDelay: '2s' }} />
+  </div>
+));
+
 const WisdomBox = () => {
   const [idx, setIdx] = useState(0);
   const [quotes, setQuotes] = useState([
@@ -130,7 +395,7 @@ const ChatWidget = ({ user }) => {
       const lowerText = userMsg.text.toLowerCase();
 
       if (isContactAdminMode) {
-           botResponse = "تم استلام رسالتك! المستر أو الأدمن هيشوفها ويرد عليك في أقرب وقت. ✅";
+           botResponse = "تم استلام رسالتك! المستر هيشوفها ويرد عليك في أقرب وقت. ✅";
            await addDoc(collection(db, 'messages'), {
              text: userMsg.text, sender: user ? user.email : sessionId, 
              senderName: user ? user.displayName || user.name : 'زائر (' + sessionId.substr(0,4) + ')', 
@@ -211,33 +476,33 @@ const LiveSessionView = ({ session, user, onClose }) => {
       chatRef.current?.scrollIntoView({ behavior: "smooth" });
     });
     return () => unsub();
-  }, [session]);
+  }, [session.id]);
 
   const sendChat = async (e) => {
     e.preventDefault();
-    if(!msgInput.trim() || !session?.id) return;
-    await addDoc(collection(db, `live_sessions/${session.id}/chat`), { text: msgInput, user: user?.displayName || user?.name || 'طالب', createdAt: serverTimestamp() });
+    if(!msgInput.trim()) return;
+    await addDoc(collection(db, `live_sessions/${session.id}/chat`), { text: msgInput, user: user.displayName || user.name || 'طالب', createdAt: serverTimestamp() });
     setMsgInput("");
   };
 
   const isYouTube = (url) => (url || '').includes("youtube") || (url || '').includes("youtu.be");
-  const videoId = getYouTubeID(session?.liveUrl || '');
+  const videoId = getYouTubeID(session.liveUrl);
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col md:flex-row font-['Cairo']" dir="rtl">
       <div className="flex-1 flex flex-col">
         <div className="bg-gradient-to-r from-red-600 to-red-800 p-3 text-white flex justify-between items-center shadow-lg">
-          <div className="flex items-center gap-2"><span className="w-3 h-3 bg-white rounded-full animate-pulse shadow-[0_0_10px_white]"></span><h2 className="font-bold">بث مباشر: {session?.title || ''}</h2></div>
+          <div className="flex items-center gap-2"><span className="w-3 h-3 bg-white rounded-full animate-pulse shadow-[0_0_10px_white]"></span><h2 className="font-bold">بث مباشر: {session.title}</h2></div>
           <button onClick={onClose} className="text-sm bg-black/30 hover:bg-black/50 px-3 py-1 rounded transition">العودة للمنصة</button>
         </div>
         <div className="flex-1 bg-black relative flex items-center justify-center overflow-hidden">
           <div className="watermark-video z-50">{user?.displayName || user?.name || 'طالب'}</div>
-          {isYouTube(session?.liveUrl) ? (
+          {isYouTube(session.liveUrl) ? (
             <iframe width="100%" height="100%" src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&controls=1&rel=0&modestbranding=1&playsinline=1`} title="Live" frameBorder="0" allowFullScreen style={{ WebkitTransform: 'translateZ(0)' }}></iframe>
           ) : (
             <div className="w-full h-full relative">
-              <iframe width="100%" height="100%" src={session?.liveUrl || ''} title="Live Meeting" frameBorder="0" allow="camera; microphone; display-capture; autoplay; clipboard-write; fullscreen" allowFullScreen className="relative z-10" style={{ WebkitTransform: 'translateZ(0)' }}></iframe>
-              <a href={session?.liveUrl || '#'} target="_blank" rel="noopener noreferrer" className="absolute top-4 left-4 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-full text-xs font-bold backdrop-blur-md border border-white/20 transition flex items-center gap-2 z-50 shadow-lg"><ExternalLink size={14}/> للموبايل (لو البث مش شغال)</a>
+              <iframe width="100%" height="100%" src={session.liveUrl} title="Live Meeting" frameBorder="0" allow="camera; microphone; display-capture; autoplay; clipboard-write; fullscreen" allowFullScreen className="relative z-10" style={{ WebkitTransform: 'translateZ(0)' }}></iframe>
+              <a href={session.liveUrl} target="_blank" rel="noopener noreferrer" className="absolute top-4 left-4 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-full text-xs font-bold backdrop-blur-md border border-white/20 transition flex items-center gap-2 z-50 shadow-lg"><ExternalLink size={14}/> للموبايل (لو البث مش شغال)</a>
             </div>
           )}
         </div>
@@ -273,7 +538,7 @@ const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
       const q = query(collection(db, 'video_notes'), where('userId', '==', user.uid), where('videoId', '==', video.id), orderBy('timestamp', 'asc'));
       const unsub = onSnapshot(q, (snap) => { setNotes(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
       return () => unsub();
-  }, [user, video]);
+  }, [user, video.id]);
 
   useEffect(() => {
       if (!user || !video?.id) return;
@@ -295,14 +560,15 @@ const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
           }
       }, 1000);
       return () => { clearInterval(timerInterval); const remaining = localSeconds - lastSyncedSeconds; if (remaining > 0) syncToDatabase(remaining); };
-  }, [user, video, userName, videoId]);
+  }, [user, video.id, video.title, userName, videoId]);
 
   const changeSpeed = (rate) => { if(videoRef.current) videoRef.current.playbackRate = rate; setShowSettings(false); };
 
   const handleAddNote = async (e) => {
       e.preventDefault();
       if(!currentNote.trim() || !video?.id) return;
-      let currentTime = videoRef.current ? videoRef.current.currentTime : 0;
+      let currentTime = 0;
+      if (videoRef.current) currentTime = videoRef.current.currentTime;
       await addDoc(collection(db, 'video_notes'), { userId: user.uid, videoId: video.id, text: currentNote, timestamp: currentTime, createdAt: serverTimestamp() });
       setCurrentNote("");
   };
@@ -398,7 +664,7 @@ const PomodoroFocusMode = ({ onClose }) => {
 
     const toggleTimer = () => {
         setIsActive(!isActive);
-        if(!isActive && audioRef.current && !isBreak) { audioRef.current.play().catch(e => console.log("Audio play blocked")); } 
+        if(!isActive && audioRef.current && !isBreak) { audioRef.current.play().catch(e => {}); } 
         else if(isActive && audioRef.current) { audioRef.current.pause(); }
     };
 
@@ -490,7 +756,7 @@ const InteractiveViewer = ({ content, user, onClose }) => {
     );
 };
 
-// --- مشغل الامتحان المدمج مع حل الشاشة البيضاء وكاميرا المقالي ---
+// --- مشغل الامتحان المدمج مع حلول الكاميرا والشاشة البيضاء ---
 const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult = null }) => {
   const [activeView, setActiveView] = useState(isReviewMode || existingResult ? 'dashboard' : 'questions'); 
   const [currentQIndex, setCurrentQIndex] = useState(0);
@@ -578,9 +844,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
       window.addEventListener('beforeunload', handleBeforeUnload);
       
       const handleAntiCheat = () => { 
-          // منع الحظر لو الطالب بيختار ملف من التليفون للمقالي
           if (isPickingFile.current) return; 
-
           const { showSubmitConfirm, isSubmitted } = stateRefs.current;
           if (!showSubmitConfirm && !isSubmitted) handleCheatingRef.current();
       };
@@ -609,7 +873,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     }
   }, [timeLeft, isSubmitted, isCheating, isReviewMode]);
 
-  // الحماية ضد الشاشة البيضاء لو الامتحان فاضي
   if (!flatQuestions || flatQuestions.length === 0) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-white font-['Cairo']">عفواً، لا توجد أسئلة مسجلة.<button onClick={onClose} className="ml-4 bg-amber-600 text-white px-4 py-2 rounded font-bold">خروج</button></div>;
 
   if (isCheating) return <div className="fixed inset-0 z-[60] bg-red-900 flex items-center justify-center text-white text-center font-['Cairo']"><div><AlertOctagon size={80} className="mx-auto mb-4"/><h1>تم رصد محاولة غش!</h1><p className="text-red-200 mt-2">تم رصد درجتك (صفر) وحظرك.</p><button onClick={() => window.location.reload()} className="mt-4 bg-white text-red-900 px-6 py-2 rounded-full font-bold">العودة للرئيسية</button></div></div>;
@@ -904,7 +1167,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
         <div className={`flex-1 flex flex-col ${currentQObj?.blockText?.trim() ? 'md:flex-row' : 'items-center'} h-full overflow-hidden bg-slate-100 w-full p-4 md:p-8 gap-6`}>
           {currentQObj?.blockText?.trim() && (
             <div className="flex-1 w-full bg-blue-50 p-6 md:p-10 overflow-y-auto rounded-3xl shadow-sm border border-blue-100">
-              <h3 className="font-bold text-blue-900 mb-6 flex items-center gap-2 text-xl border-b border-blue-200 pb-4 font-['Cairo']"><FileText size={24}/> نص القراءة / المراجعة:</h3>
+              <h3 className="font-bold text-blue-900 mb-6 flex items-center gap-2 text-xl border-b border-blue-200 pb-4 font-['Cairo']"><FileText size={24}/> نص المراجعة / القراءة:</h3>
               <p className="whitespace-pre-line leading-loose text-lg md:text-xl font-bold text-slate-700 font-['Cairo']">{currentQObj.blockText}</p>
             </div>
           )}
@@ -925,7 +1188,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
               </h3>
             </div>
 
-            {/* ---> الإضافة: المقالي وإرفاق صورة مع إيقاف الحظر مؤقتاً <--- */}
             {currentQObj.type === 'essay' ? (
                 <div className="space-y-4">
                     <textarea 
@@ -940,7 +1202,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                         {!isSubmitted && (
                             <button 
                                 onClick={() => {
-                                    isPickingFile.current = true; // إيقاف الحماية ضد الغش
+                                    isPickingFile.current = true;
                                     document.getElementById(`file-${currentQObj.id}`).click();
                                     const handleFocus = () => { setTimeout(() => { isPickingFile.current = false; }, 1000); window.removeEventListener('focus', handleFocus); };
                                     window.addEventListener('focus', handleFocus);
@@ -979,8 +1241,8 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
             )}
 
             <div className="mt-auto pt-10 flex justify-between">
-              <button disabled={currentQIndex === 0} onClick={() => setCurrentQIndex(p => p - 1)} className="px-8 py-4 rounded-xl bg-slate-200 text-slate-700 font-bold disabled:opacity-50 hover:bg-slate-300 transition shadow-sm font-['Cairo'] flex items-center gap-2"><ChevronRight size={20}/> السابق</button>
-              <button disabled={currentQIndex === displayQuestions.length - 1} onClick={() => setCurrentQIndex(p => p + 1)} className="px-8 py-4 rounded-xl bg-slate-900 text-white font-bold disabled:opacity-50 hover:bg-slate-800 transition shadow-lg font-['Cairo'] flex items-center gap-2">التالي <ChevronRight size={20} className="rotate-180"/></button>
+              <button disabled={currentQIndex === 0} onClick={() => setCurrentQIndex(p => p - 1)} className="px-8 py-4 rounded-xl bg-slate-200 text-slate-700 font-bold disabled:opacity-50 hover:bg-slate-300 transition">السابق</button>
+              <button disabled={currentQIndex === displayQuestions.length - 1} onClick={() => setCurrentQIndex(p => p + 1)} className="px-8 py-4 rounded-xl bg-slate-900 text-white font-bold disabled:opacity-50 hover:bg-slate-800 transition">التالي</button>
             </div>
           </div>
         </div>
@@ -1307,6 +1569,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                     </div>
                 ))}
                 
+                {/* ---> واجهة تحدي العباقرة <--- */}
                 {weeklyChallenges.map(challenge => {
                     const isDone = examResults.some(r => r.examId === `challenge_${challenge.id}`);
                     return (
@@ -1636,14 +1899,14 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   );
 };
 
-// --- لوحة الأدمن (AdminDashboard) ---
+// --- لوحة الإدارة (AdminDashboard) وتتضمن الإحصائيات الصافية ---
 const AdminDashboard = ({ user }) => {
   const [activeTab, setActiveTab] = useState('users'); 
   const [adminGradeFilter, setAdminGradeFilter] = useState('all'); 
-  const [searchTerm, setSearchTerm] = useState(''); // الإضافة: البحث
+  const [searchTerm, setSearchTerm] = useState(''); 
   const [pendingUsers, setPendingUsers] = useState([]);
   const [activeUsersList, setActiveUsersList] = useState([]);
-  const [lastUserDoc, setLastUserDoc] = useState(null); // الإضافة: Pagination
+  const [lastUserDoc, setLastUserDoc] = useState(null); 
   const [loadingMore, setLoadingMore] = useState(false);
   const [contentList, setContentList] = useState([]);
   const [messagesList, setMessagesList] = useState([]); 
@@ -1679,16 +1942,13 @@ const AdminDashboard = ({ user }) => {
   const [newSmartHw, setNewSmartHw] = useState({ title: '', answerKey: '', grade: '3sec', bookName: '' });
   const [hwResults, setHwResults] = useState([]);
 
-  // أكواد الاشتراك
   const [subscriptionCodes, setSubscriptionCodes] = useState([]);
   const [codeGenCount, setCodeGenCount] = useState(10);
   const [codeGenDays, setCodeGenDays] = useState(30);
 
-  // الإضافة: تحديات العباقرة
   const [weeklyChallenges, setWeeklyChallenges] = useState([]);
   const [newChallenge, setNewChallenge] = useState({ question: '', options: '', correctIdx: 0, timerMinutes: 3, grade: '3sec' });
 
-  // الإضافة: تصحيح المقالي يدوياً
   const [essayGrades, setEssayGrades] = useState({});
 
   useEffect(() => {
@@ -1703,7 +1963,6 @@ const AdminDashboard = ({ user }) => {
       return onSnapshot(q, s => setPendingUsers(s.docs.map(d=>({id:d.id,...d.data()}))));
   }, []);
 
-  // الإضافة: جلب الطلاب بنظام الـ Pagination (أول 50 طالب)
   useEffect(() => {
       const fetchInitialUsers = async () => {
           const q = query(collection(db, 'users'), where('status', 'in', ['active', 'banned_cheating', 'banned_all', 'banned_exam', 'banned_content', 'rejected']), limit(50));
@@ -1714,7 +1973,6 @@ const AdminDashboard = ({ user }) => {
       fetchInitialUsers();
   }, []);
 
-  // دالة تحميل المزيد من الطلاب
   const loadMoreUsers = async () => {
       if(!lastUserDoc) return;
       setLoadingMore(true);
@@ -1724,67 +1982,25 @@ const AdminDashboard = ({ user }) => {
           if (!snap.empty) {
               setActiveUsersList(prev => [...prev, ...snap.docs.map(d=>({id:d.id,...d.data()}))]);
               setLastUserDoc(snap.docs[snap.docs.length - 1]);
-          } else {
-              setLastUserDoc(null);
-          }
+          } else { setLastUserDoc(null); }
       } catch (err) { console.error(err); }
       setLoadingMore(false);
   };
 
-  useEffect(() => {
-      return onSnapshot(query(collection(db, 'content'), orderBy('createdAt','desc')), s => setContentList(s.docs.map(d=>({id:d.id,...d.data()}))));
-  }, []);
+  useEffect(() => { return onSnapshot(query(collection(db, 'content'), orderBy('createdAt','desc')), s => setContentList(s.docs.map(d=>({id:d.id,...d.data()})))); }, []);
+  useEffect(() => { return onSnapshot(query(collection(db, 'messages'), orderBy('createdAt','desc')), s => setMessagesList(s.docs.map(d=>({id:d.id,...d.data()})))); }, []);
+  useEffect(() => { return onSnapshot(query(collection(db, 'live_sessions'), where('status', '==', 'active')), s => setActiveLiveSessions(s.docs.map(d=>({id:d.id,...d.data()})))); }, []);
+  useEffect(() => { return onSnapshot(query(collection(db, 'exams'), orderBy('createdAt', 'desc')), s => setExamsList(s.docs.map(d=>({id:d.id,...d.data()})))); }, []);
+  useEffect(() => { return onSnapshot(query(collection(db, 'exam_results'), orderBy('submittedAt', 'desc')), s => setExamResults(s.docs.map(d=>({id:d.id,...d.data()})))); }, []);
+  useEffect(() => { return onSnapshot(query(collection(db, 'announcements'), orderBy('createdAt', 'desc')), s => setAnnouncements(s.docs.map(d => ({id: d.id, ...d.data()})))); }, []);
+  useEffect(() => { return onSnapshot(collection(db, 'auto_replies'), s => setAutoReplies(s.docs.map(d => ({id: d.id, ...d.data()})))); }, []);
+  useEffect(() => { return onSnapshot(collection(db, 'quotes'), s => setQuotesList(s.docs.map(d => ({id: d.id, ...d.data()})))); }, []);
+  useEffect(() => { return onSnapshot(collection(db, 'smart_homeworks'), s => setSmartHomeworks(s.docs.map(d => ({id: d.id, ...d.data()})))); }, []);
+  useEffect(() => { return onSnapshot(query(collection(db, 'homework_results'), orderBy('submittedAt', 'desc')), s => setHwResults(s.docs.map(d => ({id: d.id, ...d.data()})))); }, []);
+  useEffect(() => { return onSnapshot(query(collection(db, 'subscription_codes'), orderBy('createdAt', 'desc')), s => setSubscriptionCodes(s.docs.map(d => ({id: d.id, ...d.data()})))); }, []);
+  useEffect(() => { return onSnapshot(query(collection(db, 'weekly_challenges'), orderBy('createdAt', 'desc')), s => setWeeklyChallenges(s.docs.map(d => ({id: d.id, ...d.data()})))); }, []);
 
-  useEffect(() => {
-      return onSnapshot(query(collection(db, 'messages'), orderBy('createdAt','desc')), s => setMessagesList(s.docs.map(d=>({id:d.id,...d.data()}))));
-  }, []);
-
-  useEffect(() => {
-      return onSnapshot(query(collection(db, 'live_sessions'), where('status', '==', 'active')), s => setActiveLiveSessions(s.docs.map(d=>({id:d.id,...d.data()}))));
-  }, []);
-
-  useEffect(() => {
-      return onSnapshot(query(collection(db, 'exams'), orderBy('createdAt', 'desc')), s => setExamsList(s.docs.map(d=>({id:d.id,...d.data()}))));
-  }, []);
-
-  useEffect(() => {
-      return onSnapshot(query(collection(db, 'exam_results'), orderBy('submittedAt', 'desc')), s => setExamResults(s.docs.map(d=>({id:d.id,...d.data()}))));
-  }, []);
-
-  useEffect(() => {
-      return onSnapshot(query(collection(db, 'announcements'), orderBy('createdAt', 'desc')), s => setAnnouncements(s.docs.map(d => ({id: d.id, ...d.data()}))));
-  }, []);
-
-  useEffect(() => {
-      return onSnapshot(collection(db, 'auto_replies'), s => setAutoReplies(s.docs.map(d => ({id: d.id, ...d.data()}))));
-  }, []);
-
-  useEffect(() => {
-      return onSnapshot(collection(db, 'quotes'), s => setQuotesList(s.docs.map(d => ({id: d.id, ...d.data()}))));
-  }, []);
-  
-  useEffect(() => {
-      return onSnapshot(collection(db, 'smart_homeworks'), s => setSmartHomeworks(s.docs.map(d => ({id: d.id, ...d.data()}))));
-  }, []);
-
-  useEffect(() => {
-      return onSnapshot(query(collection(db, 'homework_results'), orderBy('submittedAt', 'desc')), s => setHwResults(s.docs.map(d => ({id: d.id, ...d.data()}))));
-  }, []);
-
-  useEffect(() => {
-      return onSnapshot(query(collection(db, 'subscription_codes'), orderBy('createdAt', 'desc')), s => setSubscriptionCodes(s.docs.map(d => ({id: d.id, ...d.data()}))));
-  }, []);
-
-  // الإضافة: جلب تحديات العباقرة
-  useEffect(() => {
-      return onSnapshot(query(collection(db, 'weekly_challenges'), orderBy('createdAt', 'desc')), s => setWeeklyChallenges(s.docs.map(d => ({id: d.id, ...d.data()}))));
-  }, []);
-
-  const handleApprove = async (id) => {
-    await updateDoc(doc(db,'users',id), {status:'active'});
-    sendSystemNotification("طلب جديد", "تم تفعيل حساب طالب بنجاح.");
-  };
-
+  const handleApprove = async (id) => { await updateDoc(doc(db,'users',id), {status:'active'}); sendSystemNotification("طلب جديد", "تم تفعيل حساب طالب بنجاح."); };
   const handleReject = async (id) => { await updateDoc(doc(db,'users',id), {status:'rejected'}); };
   const handleChangeUserStatus = async (id, newStatus) => { await updateDoc(doc(db,'users',id), {status: newStatus}); };
 
@@ -1840,8 +2056,7 @@ const AdminDashboard = ({ user }) => {
       if (phone.startsWith('0')) phone = '20' + phone.substring(1);
       const examName = examsList.find(e => e.id === result.examId)?.title || 'اختبار';
       const message = `مرحباً ولي أمر الطالب/ة: *${result.studentName}* 🎓\n\nنحيط سيادتكم علماً بنتيجة امتحان: *${examName}*\nالدرجة التي حصل عليها: *${result.score}* من *${result.total}* 📊\n\nمع خالص تحيات إدارة منصة النحاس - أ/ محمد النحاس.`;
-      const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-      window.open(whatsappUrl, '_blank');
+      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
   const openStudentProfile = async (student) => {
@@ -1862,29 +2077,24 @@ const AdminDashboard = ({ user }) => {
           await updateDoc(doc(db, 'exams', editingExamTime.id), { endTime: newEndTime });
           alert("تم تمديد وقت الامتحان بنجاح!");
           setEditingExamTime(null); setNewEndTime('');
-      } catch (error) { console.error("Error updating exam time:", error); alert("حدث خطأ أثناء تعديل الوقت."); }
+      } catch (error) { console.error(error); alert("حدث خطأ أثناء تعديل الوقت."); }
   };
 
   const handleCreateSmartHw = async (e) => {
       e.preventDefault();
-      if (!newSmartHw.title || !newSmartHw.answerKey || !newSmartHw.bookName) return alert("أكمل البيانات (الاسم، الإجابة، والكتاب)");
+      if (!newSmartHw.title || !newSmartHw.answerKey || !newSmartHw.bookName) return alert("أكمل البيانات");
       await addDoc(collection(db, 'smart_homeworks'), { ...newSmartHw, createdAt: serverTimestamp() });
       setNewSmartHw(prev => ({ ...prev, title: '', answerKey: '' }));
-      alert("تم إنشاء الواجب! يمكنك نسخ الرابط الآن.");
+      alert("تم إنشاء الواجب!");
   };
 
-  // الإضافة: إضافة تحدي أسبوعي جديد
   const handleAddChallenge = async (e) => {
       e.preventDefault();
       if (!newChallenge.question || !newChallenge.options) return alert("أكمل بيانات التحدي");
       const optionsArray = newChallenge.options.split('-').map(o => o.trim());
       await addDoc(collection(db, 'weekly_challenges'), {
-          ...newChallenge,
-          options: optionsArray,
-          correctIdx: parseInt(newChallenge.correctIdx),
-          timerMinutes: parseInt(newChallenge.timerMinutes),
-          status: 'active',
-          createdAt: serverTimestamp()
+          ...newChallenge, options: optionsArray, correctIdx: parseInt(newChallenge.correctIdx),
+          timerMinutes: parseInt(newChallenge.timerMinutes), status: 'active', createdAt: serverTimestamp()
       });
       alert("تم إطلاق التحدي للطلاب!");
       setNewChallenge({ question: '', options: '', correctIdx: 0, timerMinutes: 3, grade: '3sec' });
@@ -1918,33 +2128,34 @@ const AdminDashboard = ({ user }) => {
   const approveGrade = async (user) => {
       if (!user.requestedGrade) return;
       await updateDoc(doc(db, 'users', user.id), { grade: user.requestedGrade, requestedGrade: null, gradeUpdateStatus: null });
-      alert(`تم تغيير مرحلة الطالب ${user.name} بنجاح.`);
+      alert(`تم تغيير مرحلة الطالب بنجاح.`);
   };
 
   const rejectGrade = async (user) => {
       await updateDoc(doc(db, 'users', user.id), { requestedGrade: null, gradeUpdateStatus: null });
-      alert(`تم رفض طلب تغيير المرحلة للطالب ${user.name}.`);
+      alert(`تم الرفض.`);
   };
 
   const handleFileSelect = async (e) => {
       const file = e.target.files[0];
       if (!file) return;
       if (file.size > 1048576) { 
-          alert("⚠️ تنبيه: حجم الملف أكبر من 1 ميجا.\n\nقواعد البيانات لا تقبل ملفات ضخمة مباشرة. لرفع ملفات كبيرة (كتب كاملة أو فيديوهات)، يرجى رفعها على Google Drive ونسخ الرابط هنا في خانة 'الرابط'.");
+          alert("⚠️ تنبيه: لرفع ملفات كبيرة (كتب أو فيديوهات)، يرجى رفعها على Google Drive ونسخ الرابط هنا في خانة 'الرابط'.");
           e.target.value = null; 
           return;
       }
       setIsUploading(true);
-      
-      // الإضافة: استخدام الـ Storage للملفات بدلاً من الـ base64 لتخفيف مساحة قاعدة البيانات
       try {
           const downloadUrl = await uploadFileToStorage(file, 'content_files');
-          setNewContent({...newContent, url: downloadUrl});
-          setUploadProgress(100);
-          setTimeout(() => setUploadProgress(0), 2000);
+          if(downloadUrl) {
+              setNewContent({...newContent, url: downloadUrl});
+              setUploadProgress(100);
+              setTimeout(() => setUploadProgress(0), 2000);
+          } else {
+             alert("عذراً، خدمة تخزين الملفات (Storage) غير مفعلة. استخدم روابط Drive.");
+          }
       } catch (err) {
-          console.error(err);
-          alert("حدث خطأ أثناء الرفع.");
+          console.error(err); alert("حدث خطأ أثناء الرفع.");
       }
       setIsUploading(false);
   };
@@ -1989,7 +2200,6 @@ const AdminDashboard = ({ user }) => {
       }
       if (line === 'نهاية القطعة') { isReadingPassage = false; return; }
       
-      // الإضافة: قراءة السؤال المقالي من النص المكتوب
       if (line.startsWith('#مقالي')) {
           if (currentQ) { currentBlock.subQuestions.push(currentQ); currentQ = null; }
           const essayText = line.replace('#مقالي', '').trim();
@@ -2022,7 +2232,6 @@ const AdminDashboard = ({ user }) => {
     setBulkText(""); alert(`تم نشر الامتحان بنجاح!`);
   };
 
-  // الإضافة: حفظ تصحيح المقالي يدوياً
   const handleSaveEssayGrade = async (resultId, qId) => {
       const grade = essayGrades[`${resultId}_${qId}`];
       if (grade === undefined || grade === '') return alert("أدخل الدرجة أولاً");
@@ -2033,7 +2242,6 @@ const AdminDashboard = ({ user }) => {
       const currentAnswers = resultDoc.answers || {};
       const updatedAnswers = { ...currentAnswers, [qId]: { ...(currentAnswers[qId] || {}), adminScore: parseInt(grade) } };
       
-      // إعادة حساب المجموع الكلي (اختياري + مقالي تم تصحيحه)
       let newTotalScore = 0;
       const examData = examsList.find(e => e.id === resultDoc.examId);
       if (examData) {
@@ -2076,7 +2284,6 @@ const AdminDashboard = ({ user }) => {
 
   const filteredPendingUsers = pendingUsers.filter(u => adminGradeFilter === 'all' || u.grade === adminGradeFilter);
   
-  // الإضافة: فلترة وبحث الطلاب
   const filteredActiveUsers = activeUsersList.filter(u => {
       const matchGrade = adminGradeFilter === 'all' || u.grade === adminGradeFilter;
       const matchSearch = u.name.includes(searchTerm) || u.phone.includes(searchTerm) || (u.parentPhone && u.parentPhone.includes(searchTerm));
@@ -2087,15 +2294,16 @@ const AdminDashboard = ({ user }) => {
   const filteredExamsList = examsList.filter(e => adminGradeFilter === 'all' || e.grade === adminGradeFilter);
   const filteredLiveSessions = activeLiveSessions.filter(ls => adminGradeFilter === 'all' || ls.grade === adminGradeFilter);
 
-  // إحصائيات عامة
+  // إحصائيات بـ Tailwind CSS النقي عشان نتفادى أي مشكلة في المكاتب الخارجية
   const statsData = [
-      { name: 'أولى إعدادي', users: activeUsersList.filter(u=>u.grade==='1prep').length },
-      { name: 'تانية إعدادي', users: activeUsersList.filter(u=>u.grade==='2prep').length },
-      { name: 'تالتة إعدادي', users: activeUsersList.filter(u=>u.grade==='3prep').length },
-      { name: 'أولى ثانوي', users: activeUsersList.filter(u=>u.grade==='1sec').length },
-      { name: 'تانية ثانوي', users: activeUsersList.filter(u=>u.grade==='2sec').length },
-      { name: 'تالتة ثانوي', users: activeUsersList.filter(u=>u.grade==='3sec').length },
+      { name: '1prep', label: '1 ع', users: activeUsersList.filter(u=>u.grade==='1prep').length, color: 'bg-blue-400' },
+      { name: '2prep', label: '2 ع', users: activeUsersList.filter(u=>u.grade==='2prep').length, color: 'bg-blue-500' },
+      { name: '3prep', label: '3 ع', users: activeUsersList.filter(u=>u.grade==='3prep').length, color: 'bg-blue-600' },
+      { name: '1sec', label: '1 ث', users: activeUsersList.filter(u=>u.grade==='1sec').length, color: 'bg-amber-400' },
+      { name: '2sec', label: '2 ث', users: activeUsersList.filter(u=>u.grade==='2sec').length, color: 'bg-amber-500' },
+      { name: '3sec', label: '3 ث', users: activeUsersList.filter(u=>u.grade==='3sec').length, color: 'bg-amber-600' },
   ];
+  const maxUsers = Math.max(...statsData.map(s => s.users), 1);
 
   return (
     <div className="min-h-screen bg-slate-100 font-['Cairo'] relative overflow-x-hidden" dir="rtl">
@@ -2212,28 +2420,38 @@ const AdminDashboard = ({ user }) => {
 
         <div className="md:col-span-3 w-full overflow-hidden">
           
-          {/* الإضافة: قسم الإحصائيات (Analytics) */}
+          {/* الإضافة: قسم الإحصائيات بالـ Tailwind بدون مكاتب خارجية */}
           {activeTab === 'analytics' && (
               <div className="space-y-6">
-                  <div className="glass-panel p-4 md:p-6 rounded-xl">
-                      <h2 className="font-bold text-xl mb-6 font-arabic text-slate-800"><BarChart3 className="inline mr-2 text-amber-600"/> إحصائيات عامة للمنصة</h2>
-                      <div className="h-80 w-full">
-                          <ResponsiveContainer width="100%" height="100%">
-                              <BarChart data={statsData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                                  <CartesianGrid strokeDasharray="3 3" />
-                                  <XAxis dataKey="name" />
-                                  <YAxis />
-                                  <Tooltip />
-                                  <Legend />
-                                  <Bar dataKey="users" name="عدد الطلاب النشطين" fill="#d97706" radius={[10, 10, 0, 0]} />
-                              </BarChart>
-                          </ResponsiveContainer>
+                  <div className="glass-panel p-6 rounded-xl border-t-4 border-blue-500">
+                      <h2 className="font-bold text-2xl mb-8 font-arabic text-slate-800 flex items-center gap-2"><BarChart3 className="text-blue-500"/> إحصائيات نشاط المنصة</h2>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 text-center"><p className="text-slate-500 font-bold mb-2">إجمالي الطلاب الفعالين</p><p className="text-4xl font-black text-blue-600">{activeUsersList.length}</p></div>
+                          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 text-center"><p className="text-slate-500 font-bold mb-2">الامتحانات المحلولة</p><p className="text-4xl font-black text-emerald-600">{examResults.length}</p></div>
+                          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 text-center"><p className="text-slate-500 font-bold mb-2">المحتوى المرفوع</p><p className="text-4xl font-black text-amber-600">{contentList.length}</p></div>
+                      </div>
+                      
+                      <h3 className="font-bold text-lg mb-6 text-slate-700">توزيع الطلاب حسب المراحل الدراسية</h3>
+                      <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-inner">
+                          <div className="flex items-end justify-around h-64 gap-2 md:gap-4">
+                              {statsData.map(stat => {
+                                  const heightPercent = maxUsers > 0 ? (stat.users / maxUsers) * 100 : 0;
+                                  return (
+                                      <div key={stat.name} className="flex flex-col items-center justify-end w-full group relative">
+                                          <div className="opacity-0 group-hover:opacity-100 absolute -top-8 bg-slate-800 text-white px-2 py-1 rounded text-xs font-bold transition-opacity">{stat.users} طالب</div>
+                                          <div className={`w-full max-w-[40px] md:max-w-[60px] rounded-t-lg transition-all duration-1000 ${stat.color} shadow-lg relative overflow-hidden`} style={{ height: `${Math.max(heightPercent, 2)}%` }}>
+                                              <div className="absolute inset-0 bg-white/20 w-1/2 h-full skew-x-12 transform -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                                          </div>
+                                          <div className="mt-4 font-bold text-[10px] md:text-sm text-slate-600 rotate-[-45deg] md:rotate-0 origin-top-left whitespace-nowrap">{stat.label}</div>
+                                      </div>
+                                  )
+                              })}
+                          </div>
                       </div>
                   </div>
               </div>
           )}
 
-          {/* الإضافة: قسم تحديات العباقرة */}
           {activeTab === 'challenges' && (
               <div className="space-y-6">
                   <div className="glass-panel p-4 md:p-6 rounded-xl border-t-4 border-purple-500">
@@ -2268,7 +2486,6 @@ const AdminDashboard = ({ user }) => {
               <div className="glass-panel p-4 md:p-6 rounded-xl">
                   <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
                       <h2 className="font-bold font-arabic text-xl">قائمة الطلاب</h2>
-                      {/* الإضافة: مربع البحث للطلاب */}
                       <div className="flex-1 w-full relative">
                           <Search className="absolute right-3 top-3 text-slate-400" size={20}/>
                           <input type="text" className="w-full bg-slate-50 border border-slate-200 rounded-full py-2 pr-10 pl-4 outline-none focus:border-amber-500 transition" placeholder="بحث بالاسم أو رقم التليفون..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
@@ -2342,7 +2559,6 @@ const AdminDashboard = ({ user }) => {
                           </div>
                       ))}
                       
-                      {/* الإضافة: زرار تحميل المزيد من الطلاب (Pagination) */}
                       {lastUserDoc && !searchTerm && (
                           <button onClick={loadMoreUsers} disabled={loadingMore} className="w-full bg-slate-200 text-slate-700 font-bold py-3 rounded-xl hover:bg-slate-300 transition mt-4 flex justify-center items-center gap-2">
                               {loadingMore ? <Loader2 className="animate-spin"/> : 'تحميل المزيد من الطلاب...'}
@@ -2577,7 +2793,6 @@ const AdminDashboard = ({ user }) => {
                                                        {q.text.split('|').map((part, i) => (<React.Fragment key={i}>{part.trim()}{i !== q.text.split('|').length - 1 && <br />}</React.Fragment>))}
                                                    </p>
                                                    
-                                                   {/* الإضافة: واجهة تصحيح المقالي للأدمن */}
                                                    {q.type === 'essay' ? (
                                                        <div className="mt-4 p-4 bg-purple-50 rounded-xl border border-purple-200">
                                                            <h5 className="font-bold text-purple-800 mb-2 text-sm flex items-center gap-2"><PenLine size={16}/> إجابة الطالب (مقالي)</h5>
@@ -2818,7 +3033,7 @@ const AdminDashboard = ({ user }) => {
   );
 };
 
-// --- شاشة الزوار (LandingPage) ---
+// --- شاشة الهبوط (LandingPage) ---
 const LandingPage = ({ onAuthClick, installPrompt }) => {
   const [publicContent, setPublicContent] = useState([]);
   const [playingVideo, setPlayingVideo] = useState(null); 
@@ -2955,7 +3170,7 @@ const AuthPage = ({ onBack }) => {
   );
 };
 
-// --- المكون الرئيسي (App) ---
+// --- المكون الرئيسي للمنصة (App) ---
 export default function App() {
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);
