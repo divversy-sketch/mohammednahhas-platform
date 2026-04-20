@@ -1,240 +1,3 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { 
-  getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, 
-  signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail 
-} from 'firebase/auth';
-import { 
-  getFirestore, doc, setDoc, getDoc, getDocs, collection, addDoc, query, where, 
-  onSnapshot, updateDoc, deleteDoc, orderBy, serverTimestamp, writeBatch, limit, increment 
-} from 'firebase/firestore';
-import { 
-  PlayCircle, FileText, LogOut, User, GraduationCap, Quote, CheckCircle, 
-  Lock, Mail, ChevronRight, Menu, X, Loader2, AlertTriangle, PlusCircle, 
-  Check, Trash2, Eye, ShieldAlert, Video, UploadCloud, Phone, Edit, KeyRound,
-  MessageSquare, Send, MessageCircle, Facebook, BookOpen, Feather, Radio, 
-  ExternalLink, ClipboardList, Timer, AlertOctagon, Flag, Save, HelpCircle, 
-  Reply, Unlock, Layout, Settings, Trophy, Megaphone, Bell, Download, XCircle, 
-  Calendar, Clock, FileWarning, Settings as GearIcon, Star, Bot, Power, Upload,
-  Users, PenTool, Code, Sparkles, Lamp, Ban, Shield, RefreshCw, Link as LinkIcon, 
-  History, Camera, QrCode, FileCheck, MousePointerClick, BarChart3, Layers,
-  BrainCircuit, Headphones, DownloadCloud, PenLine, Play, Pause, SkipForward, 
-  Target, AlertCircle, Crown, CreditCard, Key
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
-};
-
-let app, auth, db;
-try {
-  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-  auth = getAuth(app);
-  db = getFirestore(app);
-} catch (error) { 
-  console.error("Firebase Initialization Error:", error); 
-}
-
-const formatWatchTime = (totalSeconds) => {
-    if (!totalSeconds || totalSeconds < 0) return 'أقل من ثانية';
-    const h = Math.floor(totalSeconds / 3600);
-    const m = Math.floor((totalSeconds % 3600) / 60);
-    const s = totalSeconds % 60;
-    let res = [];
-    if (h > 0) res.push(`${h} ساعة`);
-    if (m > 0) res.push(`${m} دقيقة`);
-    if (s > 0 || res.length === 0) res.push(`${s} ثانية`);
-    return res.join(' و ');
-};
-
-const requestNotificationPermission = () => {
-  if (!("Notification" in window)) return;
-  if (Notification.permission === "default") {
-    Notification.requestPermission().then(permission => {
-      if(permission === "granted") console.log("الإشعارات مفعلة");
-    });
-  }
-};
-
-const sendSystemNotification = (title, body) => {
-  if (Notification.permission === "granted") {
-    try {
-      new Notification(title, { body: body, icon: "https://cdn-icons-png.flaticon.com/512/3449/3449750.png", vibrate: [200, 100, 200] });
-      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-      audio.volume = 0.5; audio.play().catch(e => {});
-    } catch (e) { console.error("Notification Error:", e); }
-  }
-};
-
-const getYouTubeID = (url) => {
-    if (!url) return null;
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=|live\/|shorts\/)([^#&?]*).*/;
-    const match = url.match(regExp);
-    return (match && match[2].length === 11) ? match[2] : null;
-};
-
-const generatePDF = (type, data) => {
-    if (!window.html2pdf) return alert("جاري تحميل نظام الطباعة... يرجى الانتظار ثوانٍ والمحاولة مرة أخرى.");
-    const percentage = data.total > 0 ? Math.round((data.score / data.total) * 100) : 0;
-    const date = new Date().toLocaleDateString('ar-EG');
-    const element = document.createElement('div');
-    let answersTable = '';
-    if (data.questions && data.answers) {
-        answersTable = `
-        <div style="margin-top: 30px; page-break-before: always;">
-            <h3 style="background: #eee; padding: 10px; border-right: 5px solid #d97706; font-family: 'Cairo', sans-serif;">تفاصيل الإجابات</h3>
-            <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 15px; font-family: 'Cairo', sans-serif;">
-                <thead>
-                    <tr style="background-color: #f3f4f6; color: #333;">
-                        <th style="border: 1px solid #ddd; padding: 10px; width: 5%;">#</th>
-                        <th style="border: 1px solid #ddd; padding: 10px; text-align: right;">السؤال</th>
-                        <th style="border: 1px solid #ddd; padding: 10px; width: 10%;">الفرع</th>
-                        <th style="border: 1px solid #ddd; padding: 10px; width: 15%;">إجابتك</th>
-                        <th style="border: 1px solid #ddd; padding: 10px; width: 15%;">الصح</th>
-                        <th style="border: 1px solid #ddd; padding: 10px; width: 10%;">الحالة</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${data.questions.map((q, i) => {
-                        const studentAnsIdx = data.answers[q.id];
-                        const correctAnsIdx = q.correctIdx;
-                        const isCorrect = studentAnsIdx === correctAnsIdx;
-                        const studentAnsText = studentAnsIdx !== undefined ? q.options[studentAnsIdx] : 'لم يجب';
-                        const correctAnsText = q.options[correctAnsIdx];
-                        const branchName = q.branch || 'عام';
-                        return `
-                        <tr style="background-color: ${isCorrect ? '#f0fdf4' : '#fef2f2'};">
-                            <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${i + 1}</td>
-                            <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">${q.text.replace(/\|/g, '<br>')}</td>
-                            <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold; color: #0284c7;">${branchName}</td>
-                            <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">${studentAnsText}</td>
-                            <td style="border: 1px solid #ddd; padding: 8px; color: green;">${correctAnsText}</td>
-                            <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${isCorrect ? '<span style="color:green">✔ صحيح</span>' : '<span style="color:red">✘ خطأ</span>'}</td>
-                        </tr>`;
-                    }).join('')}
-                </tbody>
-            </table>
-        </div>`;
-    }
-
-    const header = `
-      <div style="padding: 40px; font-family: 'Cairo', sans-serif; direction: rtl; color: #333;">
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #d97706; padding-bottom: 20px; margin-bottom: 30px;">
-            <div style="text-align: right;"><h1 style="margin: 0; color: #d97706; font-size: 28px;">منصة النحاس التعليمية</h1><p style="margin: 5px 0 0; color: #666;">للغة العربية - أ/ محمد النحاس</p></div>
-            <div style="text-align: left;"><p style="margin: 0; font-weight: bold;">تقرير نتيجة امتحان</p><p style="margin: 5px 0 0; color: #666;">${date}</p></div>
-        </div>
-        <div style="background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
-            <table style="width: 100%; font-size: 18px; font-family: 'Cairo', sans-serif;">
-                <tr><td style="padding: 10px; font-weight: bold; width: 20%;">اسم الطالب:</td><td style="padding: 10px;">${data.studentName}</td><td style="padding: 10px; font-weight: bold; width: 20%;">الامتحان:</td><td style="padding: 10px;">${data.examTitle || 'اختبار عام'}</td></tr>
-                <tr><td style="padding: 10px; font-weight: bold; vertical-align: middle;">الدرجة:</td><td style="padding: 10px;"><div style="display: inline-block; border: 3px solid #d97706; border-radius: 8px; padding: 5px 20px; font-weight: bold; color: #d97706; direction: ltr; font-family: sans-serif; font-size: 20px; background: #fffbeb;">${data.score} / ${data.total}</div></td><td style="padding: 10px; font-weight: bold; vertical-align: middle;">النسبة:</td><td style="padding: 10px; font-size: 20px; font-weight: bold;">${percentage}%</td></tr>
-                <tr><td style="padding: 10px; font-weight: bold;">الحالة:</td><td style="padding: 10px;" colspan="3"><span style="background: ${data.status === 'cheated' ? '#fee2e2' : '#dcfce7'}; color: ${data.status === 'cheated' ? '#991b1b' : '#166534'}; padding: 5px 15px; border-radius: 20px; font-size: 14px;">${data.status === 'cheated' ? 'تم إلغاؤه (غش)' : percentage >= 50 ? 'ناجح' : 'راسب'}</span></td></tr>
-            </table>
-        </div>
-        ${answersTable}
-        <div style="margin-top: 50px; text-align: center; border-top: 1px solid #eee; padding-top: 20px;"><p style="font-size: 14px; color: #999;">تم استخراج هذا التقرير آلياً من منصة النحاس التعليمية</p></div>
-      </div>`;
-    element.innerHTML = header;
-    const opt = { margin: 0.5, filename: `تقرير_${data.studentName}_${date}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true, logging: false }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
-    window.html2pdf().set(opt).from(element).save();
-};
-
-const DesignSystemLoader = () => {
-  useEffect(() => {
-    if (!document.getElementById('tailwind-script')) {
-      const script = document.createElement('script'); script.id = 'tailwind-script'; script.src = "https://cdn.tailwindcss.com";
-      script.onload = () => {
-        if(window.tailwind) {
-            window.tailwind.config = {
-              theme: {
-                extend: {
-                  fontFamily: { sans: ['Cairo', 'sans-serif'], arabic: ['Aref Ruqaa', 'serif'] },
-                  colors: { amber: { 50: '#fffbeb', 100: '#fef3c7', 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 700: '#b45309', 900: '#78350f' }, royal: { 900: '#0f172a', 800: '#1e293b' } },
-                  backgroundImage: { 'arabesque': "url('https://www.transparenttextures.com/patterns/arabesque.png')" }
-                }
-              }
-            }
-        }
-      };
-      document.head.appendChild(script);
-    }
-    if (!document.getElementById('cairo-font')) {
-      const link = document.createElement('link'); link.id = 'cairo-font'; link.rel = 'stylesheet'; link.href = "https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Aref+Ruqaa:wght@400;700&display=swap"; document.head.appendChild(link);
-    }
-    if (!document.getElementById('html2pdf-script')) {
-        const script = document.createElement('script'); script.id = 'html2pdf-script'; script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"; document.head.appendChild(script);
-    }
-  }, []);
-
-  return (
-    <style>{`
-      html, body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; direction: rtl; -webkit-font-smoothing: antialiased; scroll-behavior: smooth; }
-      ::-webkit-scrollbar { width: 8px; } ::-webkit-scrollbar-track { background: #f1f1f1; } ::-webkit-scrollbar-thumb { background: linear-gradient(to bottom, #d97706, #b45309); border-radius: 4px; }
-      .glass-panel { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.4); box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-      .glass-card { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(6px); border: 1px solid rgba(255, 255, 255, 0.4); box-shadow: 0 4px 10px rgba(0,0,0,0.05); transition: transform 0.2s ease, box-shadow 0.2s ease; will-change: transform; }
-      .glass-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(217, 119, 6, 0.15); border-color: #fbbf24; }
-      .text-gradient-gold { background: linear-gradient(45deg, #b45309, #d97706, #fbbf24, #d97706); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-size: 200% auto; animation: shine 3s linear infinite; }
-      @keyframes shine { to { background-position: 200% center; } }
-      @keyframes floatChar { 0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); } 50% { transform: translate3d(0, -30px, 0) rotate(10deg); } }
-      .floating-char { animation: floatChar ease-in-out infinite; will-change: transform; }
-      @keyframes pulseSlow { 0%, 100% { transform: scale3d(1, 1, 1); opacity: 0.2; } 50% { transform: scale3d(1.1, 1.1, 1); opacity: 0.4; } }
-      .animate-pulse-slow { animation: pulseSlow 8s ease-in-out infinite; will-change: transform, opacity; }
-      .watermark-text { position: absolute; pointer-events: none; z-index: 9999; color: rgba(0, 0, 0, 0.08); font-weight: 900; font-size: 1.5rem; transform: rotate(-30deg); white-space: nowrap; text-shadow: 0 0 2px rgba(255,255,255,0.5); }
-      .watermark-video { position: absolute; pointer-events: none; z-index: 9999; color: rgba(255, 255, 255, 0.4); font-weight: 900; font-size: 1.5rem; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); white-space: nowrap; animation: moveWatermark 25s linear infinite; }
-      @keyframes moveWatermark { 0% { top: 10%; left: 10%; transform: rotate(-5deg); } 25% { top: 80%; left: 50%; transform: rotate(5deg); } 50% { top: 30%; left: 80%; transform: rotate(-5deg); } 75% { top: 70%; left: 10%; transform: rotate(5deg); } 100% { top: 10%; left: 10%; transform: rotate(-5deg); } }
-      .no-select { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
-    `}</style>
-  );
-};
-
-const GradeOptions = () => (
-    <>
-        <optgroup label="المرحلة الإعدادية">
-            <option value="1prep">الصف الأول الإعدادي</option>
-            <option value="2prep">الصف الثاني الإعدادي</option>
-            <option value="3prep">الصف الثالث الإعدادي</option>
-        </optgroup>
-        <optgroup label="المرحلة الثانوية">
-            <option value="1sec">الصف الأول الثانوي</option>
-            <option value="2sec">الصف الثاني الثانوي</option>
-            <option value="3sec">الصف الثالث الثانوي</option>
-        </optgroup>
-    </>
-);
-
-const getGradeLabel = (g) => {
-    const map = { '1prep': 'أولى إعدادي', '2prep': 'تانية إعدادي', '3prep': 'تالتة إعدادي', '1sec': 'أولى ثانوي', '2sec': 'تانية ثانوي', '3sec': 'تالتة ثانوي' };
-    return map[g] || g;
-};
-
-const ModernLogo = () => (
-  <div className="relative w-20 h-20 drop-shadow-2xl cursor-pointer hover:scale-105 hover:rotate-6 transition-transform">
-      <svg width="80" height="80" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <defs><linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#fbbf24" /><stop offset="50%" stopColor="#d97706" /><stop offset="100%" stopColor="#78350f" /></linearGradient><filter id="glow"><feGaussianBlur stdDeviation="2.5" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
-        <path d="M100 20C55.8 20 20 55.8 20 100s35.8 80 80 80 80-35.8 80-80-35.8-80-80-80zm0 150c-38.6 0-70-31.4-70-70s31.4-70 70-70 70 31.4 70 70-31.4 70-70 70z" fill="url(#logoGrad)" opacity="0.2" />
-        <path d="M160 80 V 130 A 60 60 0 0 1 40 130 V 110" stroke="url(#logoGrad)" strokeWidth="22" strokeLinecap="round" strokeLinejoin="round" fill="none" filter="url(#glow)" />
-        <rect x="85" y="40" width="30" height="30" rx="4" fill="url(#logoGrad)" transform="rotate(45 100 55)" />
-      </svg>
-  </div>
-);
-
-const FloatingArabicBackground = React.memo(() => (
-  <div className="fixed inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 0, background: 'radial-gradient(circle at center, #fdfbf7 0%, #e2e8f0 100%)' }}>
-    <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: `url("https://www.transparenttextures.com/patterns/arabesque.png")` }} />
-    {['أ', 'ب', 'ج', 'د', 'هـ', 'و', 'ز', 'ح', 'ط', 'ي', 'ض', 'ع'].map((char, i) => (
-        <div key={i} className="absolute text-amber-500/15 font-arabic font-bold select-none floating-char" style={{ left: `${(i * 8.5) % 90 + 5}vw`, top: `${(i * 13) % 90 + 5}vh`, fontSize: `${(i % 3) + 3}rem`, animationDelay: `${i * 0.5}s`, animationDuration: `${15 + (i % 5)}s` }}>{char}</div>
-    ))}
-    <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-amber-400/10 rounded-full blur-xl animate-pulse-slow" />
-    <div className="absolute bottom-1/3 right-1/4 w-96 h-96 bg-blue-400/10 rounded-full blur-xl animate-pulse-slow" style={{ animationDelay: '2s' }} />
-  </div>
-));
-
 const WisdomBox = () => {
   const [idx, setIdx] = useState(0);
   const [quotes, setQuotes] = useState([
@@ -290,7 +53,7 @@ const Leaderboard = () => {
             const scores = {};
             snap.docs.forEach(doc => {
                 const data = doc.data();
-                if(data.score && data.status === 'completed') {
+                if(data.score && data.status === 'completed' && data.studentName) {
                     if(!scores[data.studentName]) scores[data.studentName] = 0;
                     scores[data.studentName] += parseInt(data.score);
                 }
@@ -370,7 +133,7 @@ const ChatWidget = ({ user }) => {
            botResponse = "تم استلام رسالتك! المستر أو الأدمن هيشوفها ويرد عليك في أقرب وقت. ✅";
            await addDoc(collection(db, 'messages'), {
              text: userMsg.text, sender: user ? user.email : sessionId, 
-             senderName: user ? user.displayName : 'زائر (' + sessionId.substr(0,4) + ')', 
+             senderName: user ? user.displayName || user.name : 'زائر (' + sessionId.substr(0,4) + ')', 
              createdAt: serverTimestamp(), read: false
            });
            setIsContactAdminMode(false);
@@ -441,39 +204,40 @@ const LiveSessionView = ({ session, user, onClose }) => {
   const chatRef = useRef(null);
 
   useEffect(() => {
+    if (!session?.id) return;
     const q = query(collection(db, `live_sessions/${session.id}/chat`), orderBy('createdAt', 'asc'));
     const unsub = onSnapshot(q, (snap) => {
       setMessages(snap.docs.map(d => d.data()));
       chatRef.current?.scrollIntoView({ behavior: "smooth" });
     });
     return () => unsub();
-  }, [session.id]);
+  }, [session]);
 
   const sendChat = async (e) => {
     e.preventDefault();
-    if(!msgInput.trim()) return;
-    await addDoc(collection(db, `live_sessions/${session.id}/chat`), { text: msgInput, user: user.displayName || 'طالب', createdAt: serverTimestamp() });
+    if(!msgInput.trim() || !session?.id) return;
+    await addDoc(collection(db, `live_sessions/${session.id}/chat`), { text: msgInput, user: user?.displayName || user?.name || 'طالب', createdAt: serverTimestamp() });
     setMsgInput("");
   };
 
-  const isYouTube = (url) => url.includes("youtube") || url.includes("youtu.be");
-  const videoId = getYouTubeID(session.liveUrl);
+  const isYouTube = (url) => (url || '').includes("youtube") || (url || '').includes("youtu.be");
+  const videoId = getYouTubeID(session?.liveUrl || '');
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col md:flex-row font-['Cairo']" dir="rtl">
       <div className="flex-1 flex flex-col">
         <div className="bg-gradient-to-r from-red-600 to-red-800 p-3 text-white flex justify-between items-center shadow-lg">
-          <div className="flex items-center gap-2"><span className="w-3 h-3 bg-white rounded-full animate-pulse shadow-[0_0_10px_white]"></span><h2 className="font-bold">بث مباشر: {session.title}</h2></div>
+          <div className="flex items-center gap-2"><span className="w-3 h-3 bg-white rounded-full animate-pulse shadow-[0_0_10px_white]"></span><h2 className="font-bold">بث مباشر: {session?.title || ''}</h2></div>
           <button onClick={onClose} className="text-sm bg-black/30 hover:bg-black/50 px-3 py-1 rounded transition">العودة للمنصة</button>
         </div>
         <div className="flex-1 bg-black relative flex items-center justify-center overflow-hidden">
-          <div className="watermark-video z-50">{user?.displayName || 'طالب'}</div>
-          {isYouTube ? (
+          <div className="watermark-video z-50">{user?.displayName || user?.name || 'طالب'}</div>
+          {isYouTube(session?.liveUrl) ? (
             <iframe width="100%" height="100%" src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&controls=1&rel=0&modestbranding=1&playsinline=1`} title="Live" frameBorder="0" allowFullScreen style={{ WebkitTransform: 'translateZ(0)' }}></iframe>
           ) : (
             <div className="w-full h-full relative">
-              <iframe width="100%" height="100%" src={session.liveUrl} title="Live Meeting" frameBorder="0" allow="camera; microphone; display-capture; autoplay; clipboard-write; fullscreen" allowFullScreen className="relative z-10" style={{ WebkitTransform: 'translateZ(0)' }}></iframe>
-              <a href={session.liveUrl} target="_blank" rel="noopener noreferrer" className="absolute top-4 left-4 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-full text-xs font-bold backdrop-blur-md border border-white/20 transition flex items-center gap-2 z-50 shadow-lg"><ExternalLink size={14}/> للموبايل (لو البث مش شغال)</a>
+              <iframe width="100%" height="100%" src={session?.liveUrl || ''} title="Live Meeting" frameBorder="0" allow="camera; microphone; display-capture; autoplay; clipboard-write; fullscreen" allowFullScreen className="relative z-10" style={{ WebkitTransform: 'translateZ(0)' }}></iframe>
+              <a href={session?.liveUrl || '#'} target="_blank" rel="noopener noreferrer" className="absolute top-4 left-4 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-full text-xs font-bold backdrop-blur-md border border-white/20 transition flex items-center gap-2 z-50 shadow-lg"><ExternalLink size={14}/> للموبايل (لو البث مش شغال)</a>
             </div>
           )}
         </div>
@@ -496,29 +260,29 @@ const LiveSessionView = ({ session, user, onClose }) => {
 };
 
 const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
-  const videoId = getYouTubeID(video.url || video.file);
+  const videoId = getYouTubeID(video?.url || video?.file || '');
   const [showSettings, setShowSettings] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   const [notes, setNotes] = useState([]);
   const [currentNote, setCurrentNote] = useState("");
   const videoRef = useRef(null);
-  const finalUrl = video.url || video.file;
+  const finalUrl = video?.url || video?.file || '';
 
   useEffect(() => {
-      if(!user || !video.id) return;
+      if(!user || !video?.id) return;
       const q = query(collection(db, 'video_notes'), where('userId', '==', user.uid), where('videoId', '==', video.id), orderBy('timestamp', 'asc'));
       const unsub = onSnapshot(q, (snap) => { setNotes(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
       return () => unsub();
-  }, [user, video.id]);
+  }, [user, video]);
 
   useEffect(() => {
-      if (!user || !video.id) return;
+      if (!user || !video?.id) return;
       const viewId = `${user.uid}_${video.id}`;
       const viewRef = doc(db, 'video_views', viewId);
       let timerInterval; let localSeconds = 0; let lastSyncedSeconds = 0;
 
       const syncToDatabase = async (secondsToAdd) => {
-          try { await setDoc(viewRef, { userId: user.uid, userName: userName, videoId: video.id, videoTitle: video.title, viewedAt: serverTimestamp(), watchedSeconds: increment(secondsToAdd) }, { merge: true }); } catch (e) { console.error("Sync error:", e); }
+          try { await setDoc(viewRef, { userId: user.uid, userName: userName || 'طالب', videoId: video.id, videoTitle: video.title || 'فيديو', viewedAt: serverTimestamp(), watchedSeconds: increment(secondsToAdd) }, { merge: true }); } catch (e) { console.error("Sync error:", e); }
       };
       syncToDatabase(0);
 
@@ -531,15 +295,14 @@ const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
           }
       }, 1000);
       return () => { clearInterval(timerInterval); const remaining = localSeconds - lastSyncedSeconds; if (remaining > 0) syncToDatabase(remaining); };
-  }, [user, video.id, video.title, userName, videoId]);
+  }, [user, video, userName, videoId]);
 
   const changeSpeed = (rate) => { if(videoRef.current) videoRef.current.playbackRate = rate; setShowSettings(false); };
 
   const handleAddNote = async (e) => {
       e.preventDefault();
-      if(!currentNote.trim()) return;
-      let currentTime = 0;
-      if (videoRef.current) currentTime = videoRef.current.currentTime;
+      if(!currentNote.trim() || !video?.id) return;
+      let currentTime = videoRef.current ? videoRef.current.currentTime : 0;
       await addDoc(collection(db, 'video_notes'), { userId: user.uid, videoId: video.id, text: currentNote, timestamp: currentTime, createdAt: serverTimestamp() });
       setCurrentNote("");
   };
@@ -601,8 +364,8 @@ const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
             <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white p-2 rounded-full shadow-lg"><X size={24}/></button>
         </div>
 
-        <div className="w-full relative flex items-center justify-center bg-black overflow-hidden" style={{ height: showNotes ? '50vh' : '100%', md: { height: '100%' } }}>
-          <div className="watermark-video">{userName} - {video.grade} — منصة النحاس</div>
+        <div className="w-full relative flex items-center justify-center bg-black overflow-hidden h-full">
+          <div className="watermark-video">{userName || 'طالب'} - {video?.grade || 'منصة النحاس'}</div>
           {videoId ? (
             <iframe className="w-full h-full" src={youtubeEmbedUrl} title="Video" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
           ) : (
@@ -626,7 +389,7 @@ const PomodoroFocusMode = ({ onClose }) => {
         let interval = null;
         if (isActive && timeLeft > 0) { interval = setInterval(() => setTimeLeft(prev => prev - 1), 1000); } 
         else if (timeLeft === 0) {
-            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); audio.play();
+            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); audio.play().catch(e=>{});
             if (isBreak) { setIsBreak(false); setTimeLeft(25 * 60); setIsActive(false); } 
             else { setIsBreak(true); setTimeLeft(5 * 60); setIsActive(false); }
         }
@@ -696,11 +459,11 @@ const InteractiveViewer = ({ content, user, onClose }) => {
     const [iframeSrc, setIframeSrc] = useState('');
     useEffect(() => {
         let activeBlobUrl = null;
-        if (content.url && content.url.startsWith('data:')) {
+        if (content?.url && content.url.startsWith('data:')) {
             fetch(content.url).then(res => res.blob()).then(blob => { activeBlobUrl = URL.createObjectURL(blob); setIframeSrc(activeBlobUrl); }).catch(err => { console.error("Error creating blob:", err); setIframeSrc(content.url); });
-        } else { setIframeSrc(content.url); }
+        } else { setIframeSrc(content?.url || ''); }
         return () => { if (activeBlobUrl) { URL.revokeObjectURL(activeBlobUrl); } };
-    }, [content.url]);
+    }, [content]);
     useEffect(() => {
         const handleKeyDown = (e) => { if (e.key === 'PrintScreen') { alert('غير مسموح بأخذ لقطات شاشة! المحتوى محمي.'); if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText('Screenshots are disabled'); } } };
         const handleCopy = (e) => { e.preventDefault(); alert("النسخ غير مسموح!"); };
@@ -712,27 +475,28 @@ const InteractiveViewer = ({ content, user, onClose }) => {
             <div className="w-full h-full max-w-7xl bg-white rounded-xl overflow-hidden relative shadow-2xl border border-gray-800 flex flex-col">
                 <div className="bg-slate-900 p-3 flex justify-between items-center text-white border-b border-gray-700 select-none">
                    <div className="flex items-center gap-4">
-                       <h3 className="font-bold flex items-center gap-2"><Code /> {content.title}</h3>
-                       <span className="hidden md:block text-xs bg-amber-600 px-3 py-1 rounded-full text-white font-bold">منصة النحاس - أ/ محمد النحاس</span>
+                       <h3 className="font-bold flex items-center gap-2"><Code /> {content?.title || 'محتوى تفاعلي'}</h3>
+                       <span className="hidden md:block text-xs bg-amber-600 px-3 py-1 rounded-full text-white font-bold">منصة النحاس</span>
                    </div>
                    <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white px-4 py-1 rounded font-bold transition">خروج</button>
                 </div>
                 <div className="flex-1 bg-white relative overflow-hidden">
-                   {user && (<div className="watermark-video" style={{ pointerEvents: 'none', zIndex: 9999 }}>{user.name} - {user.grade} — منصة النحاس — أ/ محمد النحاس</div>)}
+                   {user && (<div className="watermark-video" style={{ pointerEvents: 'none', zIndex: 9999 }}>{user.name || user.displayName || 'طالب'} — منصة النحاس</div>)}
                    <div className="absolute inset-0 z-[9998] pointer-events-none select-none"></div>
-                   <iframe src={iframeSrc} className="w-full h-full border-0 relative z-40 bg-white" title={content.title} sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals" style={{ pointerEvents: 'auto', WebkitTransform: 'translateZ(0)' }}></iframe>
+                   <iframe src={iframeSrc} className="w-full h-full border-0 relative z-40 bg-white" title={content?.title || ''} sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals" style={{ pointerEvents: 'auto', WebkitTransform: 'translateZ(0)' }}></iframe>
                 </div>
             </div>
         </div>
     );
 };
 
+// --- مشغل الامتحان المدمج مع حل الشاشة البيضاء وكاميرا المقالي ---
 const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult = null }) => {
   const [activeView, setActiveView] = useState(isReviewMode || existingResult ? 'dashboard' : 'questions'); 
   const [currentQIndex, setCurrentQIndex] = useState(0);
   const [answers, setAnswers] = useState(existingResult?.answers || {});
   const [flagged, setFlagged] = useState({});
-  const [timeLeft, setTimeLeft] = useState(exam.duration * 60);
+  const [timeLeft, setTimeLeft] = useState((exam?.duration || 60) * 60);
   const [isCheating, setIsCheating] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(isReviewMode || existingResult !== null);
   const [score, setScore] = useState(existingResult?.score || 0);
@@ -740,8 +504,12 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const [wmPositions, setWmPositions] = useState([]);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [activeBranchTab, setActiveBranchTab] = useState('الكل');
+  const [uploadingEssay, setUploadingEssay] = useState(null); 
+
+  const isPickingFile = useRef(false); // سطر الحماية ضد الحظر أثناء فتح الكاميرا
 
   const shuffleArray = (array) => {
+    if (!Array.isArray(array)) return [];
     const arr = [...array];
     for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
     return arr;
@@ -749,34 +517,33 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
   const flatQuestions = useMemo(() => {
     const flat = [];
-    if (exam.questions) {
+    if (exam && Array.isArray(exam.questions)) {
         let processedBlocks = [...exam.questions];
         if (!isReviewMode && !existingResult) processedBlocks = shuffleArray(processedBlocks);
         processedBlocks.forEach((block) => {
-            let subQs = [...block.subQuestions];
+            let subQs = Array.isArray(block?.subQuestions) ? [...block.subQuestions] : [];
             if (!isReviewMode && !existingResult) subQs = shuffleArray(subQs);
-            subQs.forEach((q) => { flat.push({ ...q, blockText: block.text, branch: q.branch || 'عام' }); });
+            subQs.forEach((q) => { 
+                if (q) flat.push({ ...q, blockText: block?.text || '', branch: q.branch || 'عام' }); 
+            });
         });
     }
     return flat;
-  }, [exam.questions, isReviewMode, existingResult]);
+  }, [exam, isReviewMode, existingResult]);
 
-  const uniqueBranches = useMemo(() => ['الكل', ...new Set(flatQuestions.map(q => q.branch))], [flatQuestions]);
+  const uniqueBranches = useMemo(() => ['الكل', ...new Set(flatQuestions.map(q => q.branch || 'عام'))], [flatQuestions]);
 
   const displayQuestions = useMemo(() => {
       if (!isSubmitted || activeBranchTab === 'الكل') return flatQuestions;
-      return flatQuestions.filter(q => q.branch === activeBranchTab);
+      return flatQuestions.filter(q => (q.branch || 'عام') === activeBranchTab);
   }, [flatQuestions, isSubmitted, activeBranchTab]);
 
   useEffect(() => { if (isSubmitted) setCurrentQIndex(0); }, [activeBranchTab, isSubmitted]);
 
-  if (flatQuestions.length === 0) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-white font-['Cairo']">عفواً، لا توجد أسئلة.<button onClick={onClose} className="ml-4 bg-gray-200 px-4 py-2 rounded">خروج</button></div>;
-
   useEffect(() => {
     if (isReviewMode) return;
     const updatePositions = () => {
-        const newPos = [...Array(6)].map(() => ({ top: Math.floor(Math.random() * 90) + '%', left: Math.floor(Math.random() * 90) + '%' }));
-        setWmPositions(newPos);
+        setWmPositions([...Array(6)].map(() => ({ top: Math.floor(Math.random() * 90) + '%', left: Math.floor(Math.random() * 90) + '%' })));
     };
     updatePositions();
     const interval = setInterval(updatePositions, 6000); 
@@ -792,17 +559,17 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
       if(isReviewMode || isSubmitted || isCheating) return;
       setIsCheating(true); setIsSubmitted(true); setActiveView('dashboard');
       const timeTaken = Math.round((Date.now() - startTime) / 1000);
-      if (exam.attemptId) {
+      if (exam?.attemptId) {
           await setDoc(doc(db, 'exam_results', exam.attemptId), { 
-              examId: exam.id, studentId: user.uid, studentName: user.displayName, 
-              score: 0, total: flatQuestions.length, status: 'cheated', timeTaken: timeTaken, totalTime: exam.duration, submittedAt: serverTimestamp() 
-          });
+              examId: exam.id, studentId: user?.uid, studentName: user?.displayName || user?.name || 'طالب', 
+              score: 0, total: flatQuestions.length, status: 'cheated', timeTaken: timeTaken, totalTime: exam?.duration || 60, submittedAt: serverTimestamp() 
+          }, { merge: true });
       }
-      await updateDoc(doc(db, 'users', user.uid), { status: 'banned_exam' });
+      if (user?.uid) await updateDoc(doc(db, 'users', user.uid), { status: 'banned_exam' });
   };
 
   useEffect(() => {
-      if (isReviewMode) return;
+      if (isReviewMode || isSubmitted) return;
       const handleBeforeUnload = (e) => {
           if (!stateRefs.current.isSubmitted) {
               e.preventDefault(); e.returnValue = "هل أنت متأكد؟ الخروج سيمنعك من العودة للامتحان!"; return e.returnValue;
@@ -811,6 +578,9 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
       window.addEventListener('beforeunload', handleBeforeUnload);
       
       const handleAntiCheat = () => { 
+          // منع الحظر لو الطالب بيختار ملف من التليفون للمقالي
+          if (isPickingFile.current) return; 
+
           const { showSubmitConfirm, isSubmitted } = stateRefs.current;
           if (!showSubmitConfirm && !isSubmitted) handleCheatingRef.current();
       };
@@ -827,7 +597,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
           window.removeEventListener("pagehide", handleAntiCheat);
           document.removeEventListener('contextmenu', blockContextMenu);
       };
-  }, [isReviewMode]);
+  }, [isReviewMode, isSubmitted]);
 
   useEffect(() => {
     if (isReviewMode || isSubmitted) return;
@@ -839,13 +609,37 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     }
   }, [timeLeft, isSubmitted, isCheating, isReviewMode]);
 
-  const handleAnswer = (qId, optionIdx) => { 
-    if(!isReviewMode && !isSubmitted) setAnswers(prev => ({ ...prev, [qId]: optionIdx }));
+  // الحماية ضد الشاشة البيضاء لو الامتحان فاضي
+  if (!flatQuestions || flatQuestions.length === 0) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-white font-['Cairo']">عفواً، لا توجد أسئلة مسجلة.<button onClick={onClose} className="ml-4 bg-amber-600 text-white px-4 py-2 rounded font-bold">خروج</button></div>;
+
+  if (isCheating) return <div className="fixed inset-0 z-[60] bg-red-900 flex items-center justify-center text-white text-center font-['Cairo']"><div><AlertOctagon size={80} className="mx-auto mb-4"/><h1>تم رصد محاولة غش!</h1><p className="text-red-200 mt-2">تم رصد درجتك (صفر) وحظرك.</p><button onClick={() => window.location.reload()} className="mt-4 bg-white text-red-900 px-6 py-2 rounded-full font-bold">العودة للرئيسية</button></div></div>;
+
+  const handleAnswer = (qId, optionIdxOrVal) => { 
+    if(!isReviewMode && !isSubmitted) setAnswers(prev => ({ ...prev, [qId]: optionIdxOrVal }));
+  };
+
+  const handleEssayFileUpload = async (e, qId) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      setUploadingEssay(qId);
+      try {
+          const url = await uploadFileToStorage(file, `essay_answers/${user?.uid}/${exam?.id}`);
+          setAnswers(prev => ({ ...prev, [qId]: { ...(prev[qId] || {}), imageUrl: url } }));
+          alert("تم إرفاق الصورة بنجاح!");
+      } catch (err) {
+          console.error(err); alert("حدث خطأ أثناء رفع الصورة.");
+      }
+      setUploadingEssay(null);
   };
   
   const calculateScore = () => {
     let rawScore = 0;
-    flatQuestions.forEach(q => { if (answers[q.id] === q.correctIdx) rawScore++; });
+    flatQuestions.forEach(q => { 
+        if (q.type !== 'essay') {
+            const safeAnswers = answers || {};
+            if (safeAnswers[q.id] === q.correctIdx) rawScore++; 
+        }
+    });
     return rawScore;
   };
 
@@ -853,64 +647,63 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
   const handleSubmit = async (auto = false) => {
     setShowSubmitConfirm(false);
-    const totalQs = flatQuestions.length;
     const finalScore = calculateScore();
     const timeTaken = Math.round((Date.now() - startTime) / 1000);
+    const mcqTotal = flatQuestions.filter(q => q.type !== 'essay').length;
     setScore(finalScore);
     setIsSubmitted(true);
     setActiveView('dashboard'); 
 
     const batch = writeBatch(db);
     flatQuestions.forEach(q => {
-        const studentAns = answers[q.id];
-        const isAnswered = studentAns !== undefined;
-        const isCorrect = studentAns === q.correctIdx;
-        
-        if (isAnswered && !isCorrect) {
-            const mistakeRef = doc(collection(db, 'student_mistakes'));
-            batch.set(mistakeRef, {
-                userId: user.uid, examTitle: exam.title,
-                question: { ...q, studentAnswerText: q.options[studentAns], correctAnswerText: q.options[q.correctIdx] },
-                timestamp: serverTimestamp()
-            });
+        if (q.type !== 'essay') {
+            const safeAnswers = answers || {};
+            const studentAns = safeAnswers[q.id];
+            if (studentAns !== undefined && studentAns !== q.correctIdx && user?.uid) {
+                const mistakeRef = doc(collection(db, 'student_mistakes'));
+                batch.set(mistakeRef, {
+                    userId: user.uid, examTitle: exam.title || 'امتحان',
+                    question: { ...q, studentAnswerText: q.options[studentAns], correctAnswerText: q.options[q.correctIdx] },
+                    timestamp: serverTimestamp()
+                });
+            }
         }
     });
 
-    if (exam.attemptId && exam.id !== 'custom_mistakes_exam') {
+    if (exam?.attemptId && exam?.id !== 'custom_mistakes_exam') {
         const attemptRef = doc(db, 'exam_results', exam.attemptId);
         batch.set(attemptRef, { 
-            examId: exam.id, studentId: user.uid, studentName: user.displayName, 
-            score: finalScore, total: totalQs, answers, status: 'completed', timeTaken: timeTaken, totalTime: exam.duration, submittedAt: serverTimestamp() 
+            examId: exam.id, studentId: user?.uid, studentName: user?.displayName || user?.name || 'طالب', 
+            score: finalScore, total: mcqTotal, answers: answers || {}, status: 'completed', timeTaken: timeTaken, totalTime: exam.duration || 60, submittedAt: serverTimestamp() 
         }, { merge: true });
     }
     try { await batch.commit(); } catch(err) { console.error("Error saving results or mistakes", err); }
   };
 
   const currentQObj = displayQuestions[currentQIndex];
-  
-  if (isCheating) return <div className="fixed inset-0 z-[60] bg-red-900 flex items-center justify-center text-white text-center font-['Cairo']"><div><AlertOctagon size={80} className="mx-auto mb-4"/><h1>تم رصد محاولة غش!</h1><p className="text-red-200 mt-2">خرجت من الامتحان. تم رصد درجتك (صفر) وحظرك من الامتحانات القادمة.</p><button onClick={() => window.location.reload()} className="mt-4 bg-white text-red-900 px-6 py-2 rounded-full font-bold">العودة للرئيسية</button></div></div>;
-
-  const totalQs = flatQuestions.length;
-  const solvedQs = Object.keys(answers).length;
-  const unsolvedQs = totalQs - solvedQs;
+  const safeAnswersFinal = answers || {};
+  const mcqTotal = flatQuestions.filter(q => q.type !== 'essay').length;
+  const solvedQs = Object.keys(safeAnswersFinal).length;
+  const unsolvedQs = flatQuestions.length - solvedQs;
   const correctQs = score;
-  const wrongQs = solvedQs - correctQs;
-  const percentage = totalQs > 0 ? Math.round((score / totalQs) * 100) : 0;
+  const percentage = mcqTotal > 0 ? Math.round((correctQs / mcqTotal) * 100) : 0;
   
   const branchStats = {};
   flatQuestions.forEach(q => {
-      const b = q.branch;
-      if (!branchStats[b]) branchStats[b] = { total: 0, solved: 0, correct: 0, wrong: 0, unsolved: 0 };
-      branchStats[b].total++;
-      const isSelected = answers[q.id] !== undefined;
-      const isCorrect = answers[q.id] === q.correctIdx;
-      if (isSelected) branchStats[b].solved++;
-      if (!isSelected) branchStats[b].unsolved++;
-      else if (isCorrect) branchStats[b].correct++;
-      else branchStats[b].wrong++;
+      if (q.type !== 'essay') {
+          const b = q.branch || 'عام';
+          if (!branchStats[b]) branchStats[b] = { total: 0, solved: 0, correct: 0, wrong: 0 };
+          branchStats[b].total++;
+          const isSelected = safeAnswersFinal[q.id] !== undefined;
+          if (isSelected) {
+              branchStats[b].solved++;
+              if (safeAnswersFinal[q.id] === q.correctIdx) branchStats[b].correct++;
+              else branchStats[b].wrong++;
+          }
+      }
   });
 
-  const canReview = exam.id === 'custom_mistakes_exam' || Date.now() > new Date(exam.endTime).getTime();
+  const canReview = exam?.id === 'custom_mistakes_exam' || exam?.id?.startsWith('challenge_') || (exam?.endTime && Date.now() > new Date(exam.endTime).getTime());
 
   if (activeView === 'dashboard') {
      return (
@@ -918,9 +711,9 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
             <div className="max-w-6xl mx-auto mt-6">
                 <div className="flex flex-col md:flex-row justify-between items-center mb-10 border-b border-slate-700 pb-4 gap-4">
                     <div className="text-center md:text-right">
-                        <h2 className="text-3xl font-black text-white mb-2">{exam.title}</h2>
+                        <h2 className="text-3xl font-black text-white mb-2">{exam?.title || 'النتيجة'}</h2>
                         {isSubmitted ? (
-                            <p className="text-lg text-slate-400">الطالب: {user.displayName}</p>
+                            <p className="text-lg text-slate-400">الطالب: {user?.displayName || user?.name || 'طالب'}</p>
                         ) : (
                             <p className="text-amber-400 font-bold">⏳ الوقت المتبقي: {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</p>
                         )}
@@ -928,7 +721,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                     <div className="flex items-center gap-3">
                         {isSubmitted ? (
                             <>
-                                <button onClick={() => generatePDF('student', {studentName: user.displayName, score, total: flatQuestions.length, status: 'completed', examTitle: exam.title, questions: flatQuestions, answers: answers })} className="w-12 h-12 bg-blue-600 rounded-full text-white flex items-center justify-center shadow-lg hover:bg-blue-700 transition" title="تحميل التقرير PDF">
+                                <button onClick={() => generatePDF('student', {studentName: user?.displayName || user?.name || 'طالب', score: correctQs, total: mcqTotal, status: 'completed', examTitle: exam?.title, questions: flatQuestions, answers: safeAnswersFinal })} className="w-12 h-12 bg-blue-600 rounded-full text-white flex items-center justify-center shadow-lg hover:bg-blue-700 transition" title="تحميل التقرير PDF">
                                     <FileText size={20}/>
                                 </button>
                                 <button onClick={onClose} className="bg-slate-700 text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-600 shadow-lg transition flex items-center gap-2">
@@ -945,18 +738,19 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
                 <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-10">
                     <div className="bg-[#1e293b] p-6 rounded-2xl text-center border-t-4 border-slate-500 shadow-xl flex flex-col justify-center">
-                        <p className="text-slate-400 text-sm mb-3 font-bold">عدد الأسئلة</p>
-                        <p className="text-4xl md:text-5xl font-black text-white">{totalQs}</p>
+                        <p className="text-slate-400 text-sm mb-3 font-bold">كل الأسئلة</p>
+                        <p className="text-4xl md:text-5xl font-black text-white">{flatQuestions.length}</p>
                     </div>
                     {isSubmitted ? (
                         <div className="bg-[#1e293b] p-6 rounded-2xl text-center border-t-4 border-slate-500 shadow-xl flex flex-col justify-center">
-                            <p className="text-slate-400 text-sm mb-3 font-bold">النتيجة</p>
+                            <p className="text-slate-400 text-sm mb-3 font-bold">النتيجة الآلية</p>
                             <p className="text-4xl md:text-5xl font-black text-white">{percentage}%</p>
+                            {flatQuestions.some(q => q.type === 'essay') && <p className="text-xs text-amber-500 mt-2 font-bold">لا تشمل المقالي</p>}
                         </div>
                     ) : (
                         <div className="bg-[#1e293b] p-6 rounded-2xl text-center border-t-4 border-slate-500 shadow-xl flex flex-col justify-center cursor-pointer hover:bg-slate-700 transition" onClick={() => {setActiveBranchTab('الكل'); setActiveView('questions');}}>
                             <p className="text-slate-400 text-sm mb-3 font-bold">عرض الكل</p>
-                            <p className="text-4xl md:text-5xl font-black text-blue-400">{solvedQs}/{totalQs}</p>
+                            <p className="text-4xl md:text-5xl font-black text-blue-400">{solvedQs}/{flatQuestions.length}</p>
                         </div>
                     )}
                     <div className="bg-[#0e7490] p-6 rounded-2xl text-center shadow-xl flex flex-col justify-center">
@@ -967,7 +761,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                         <>
                             <div className="bg-[#831843] p-6 rounded-2xl text-center shadow-xl flex flex-col justify-center">
                                 <p className="text-pink-100 text-sm mb-3 flex items-center justify-center gap-2 font-bold"><XCircle size={16}/> الخاطئة</p>
-                                <p className="text-4xl md:text-5xl font-black text-pink-50">{wrongQs}</p>
+                                <p className="text-4xl md:text-5xl font-black text-pink-50">{mcqTotal - correctQs}</p>
                             </div>
                             <div className="bg-[#115e59] p-6 rounded-2xl text-center shadow-xl flex flex-col justify-center">
                                 <p className="text-teal-100 text-sm mb-3 flex items-center justify-center gap-2 font-bold"><Check size={16}/> الصحيحة</p>
@@ -976,7 +770,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                         </>
                     ) : (
                         <div className="bg-[#b45309] p-6 rounded-2xl text-center shadow-xl flex flex-col justify-center col-span-2">
-                            <p className="text-amber-100 text-sm mb-3 flex items-center justify-center gap-2 font-bold"><Flag size={16}/> أسئلة محددة للمراجعة</p>
+                            <p className="text-amber-100 text-sm mb-3 flex items-center justify-center gap-2 font-bold"><Flag size={16}/> محدد للمراجعة</p>
                             <p className="text-4xl md:text-5xl font-black text-amber-50">{Object.values(flagged).filter(v=>v).length}</p>
                         </div>
                     )}
@@ -989,7 +783,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                 {Object.keys(branchStats).length > 0 && (
                     <div className="mb-10">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-2xl font-bold flex items-center gap-2 text-teal-400"><Layers size={28}/> {isSubmitted ? 'ملخص الفروع' : 'أقسام الامتحان (اضغط للدخول)'}</h3>
+                            <h3 className="text-2xl font-bold flex items-center gap-2 text-teal-400"><Layers size={28}/> ملخص الفروع (للاختياري)</h3>
                             {canReview && isSubmitted && (
                                 <button onClick={() => { setActiveBranchTab('الكل'); setActiveView('questions'); }} className="text-teal-400 bg-teal-900/30 px-4 py-2 rounded-lg font-bold hover:bg-teal-900/50 transition text-sm flex items-center gap-2">
                                     عرض كل الأسئلة <ClipboardList size={16}/>
@@ -998,10 +792,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                             {Object.entries(branchStats).map(([branch, stats], idx) => {
-                                const bPercent = isSubmitted 
-                                    ? Math.round((stats.correct / stats.total) * 100) 
-                                    : Math.round((stats.solved / stats.total) * 100);
-                                
+                                const bPercent = stats.total > 0 ? (isSubmitted ? Math.round((stats.correct / stats.total) * 100) : Math.round((stats.solved / stats.total) * 100)) : 0;
                                 let message = "";
                                 if (isSubmitted) {
                                     message = bPercent >= 90 ? `عاش يا بطل، مقفل ${branch} 🌟` : bPercent >= 70 ? `أداء محترم في ${branch} 👏` : "شد حيلك أكتر، تقدر تجيب أعلى 💪";
@@ -1010,44 +801,18 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                                 }
 
                                 return (
-                                    <div 
-                                        key={idx} 
-                                        onClick={() => {
-                                            if (!isSubmitted || canReview) {
-                                                setActiveBranchTab(branch);
-                                                setActiveView('questions');
-                                            } else {
-                                                alert("نموذج الإجابة سيتاح بعد انتهاء وقت الامتحان للجميع.");
-                                            }
-                                        }}
-                                        className={`bg-[#1e293b] p-6 rounded-2xl border border-[#334155] shadow-lg transition group ${(!isSubmitted || canReview) ? 'cursor-pointer hover:border-teal-400 hover:-translate-y-1' : ''}`}
-                                    >
-                                        <div className="flex justify-between items-center mb-6">
-                                            <span className={`text-4xl font-black ${isSubmitted ? 'text-teal-400' : 'text-blue-400'}`}>{bPercent}%</span>
-                                            <span className="text-xl font-bold text-white bg-slate-800 px-3 py-1 rounded-lg">{branch}</span>
-                                        </div>
+                                    <div key={idx} onClick={() => { if (!isSubmitted || canReview) { setActiveBranchTab(branch); setActiveView('questions'); } else { alert("نموذج الإجابة سيتاح بعد انتهاء وقت الامتحان للجميع."); } }} className={`bg-[#1e293b] p-6 rounded-2xl border border-[#334155] shadow-lg transition group ${(!isSubmitted || canReview) ? 'cursor-pointer hover:border-teal-400 hover:-translate-y-1' : ''}`}>
+                                        <div className="flex justify-between items-center mb-6"><span className={`text-4xl font-black ${isSubmitted ? 'text-teal-400' : 'text-blue-400'}`}>{bPercent}%</span><span className="text-xl font-bold text-white bg-slate-800 px-3 py-1 rounded-lg">{branch}</span></div>
                                         <p className="text-sm text-slate-400 text-left mb-2 font-bold">{isSubmitted ? 'نسبة النجاح' : 'نسبة الحل'}</p>
-                                        <div className="w-full bg-[#0f172a] rounded-full h-2.5 mb-6 overflow-hidden">
-                                            <div className={`${isSubmitted ? 'bg-teal-400' : 'bg-blue-400'} h-2.5 rounded-full transition-all duration-1000`} style={{ width: `${bPercent}%` }}></div>
-                                        </div>
+                                        <div className="w-full bg-[#0f172a] rounded-full h-2.5 mb-6 overflow-hidden"><div className={`${isSubmitted ? 'bg-teal-400' : 'bg-blue-400'} h-2.5 rounded-full transition-all duration-1000`} style={{ width: `${bPercent}%` }}></div></div>
                                         <div className="text-sm mt-4 bg-[#0f172a] p-3 rounded-lg">
                                             {!isSubmitted ? (
-                                                <div className="flex justify-between text-slate-400 font-bold">
-                                                    <span>محلول: <span className="text-blue-400">{stats.solved}</span></span>
-                                                    <span>المجموع: {stats.total}</span>
-                                                </div>
+                                                <div className="flex justify-between text-slate-400 font-bold"><span>محلول: <span className="text-blue-400">{stats.solved}</span></span><span>المجموع: {stats.total}</span></div>
                                             ) : (
-                                                <>
-                                                    <p className="text-slate-500 mb-1 text-xs">رسالة المنصة:</p>
-                                                    <p className={`${bPercent >= 90 ? 'text-teal-300' : 'text-amber-300'} font-bold`}>{message}</p>
-                                                </>
+                                                <><p className="text-slate-500 mb-1 text-xs">رسالة المنصة:</p><p className={`${bPercent >= 90 ? 'text-teal-300' : 'text-amber-300'} font-bold`}>{message}</p></>
                                             )}
                                         </div>
-                                        {(canReview && isSubmitted) && (
-                                            <div className="mt-4 text-center opacity-0 group-hover:opacity-100 transition-opacity text-teal-400 text-xs font-bold flex items-center justify-center gap-1">
-                                                اضغط لمراجعة أخطاء {branch} <MousePointerClick size={12}/>
-                                            </div>
-                                        )}
+                                        {(canReview && isSubmitted) && <div className="mt-4 text-center opacity-0 group-hover:opacity-100 transition-opacity text-teal-400 text-xs font-bold flex items-center justify-center gap-1">اضغط لمراجعة أخطاء {branch} <MousePointerClick size={12}/></div>}
                                     </div>
                                 )
                             })}
@@ -1056,17 +821,12 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                 )}
 
                 {!canReview && isSubmitted && (
-                    <div className="mt-8 bg-amber-900/30 text-amber-400 p-6 rounded-2xl border border-amber-900 text-center font-bold text-lg flex flex-col items-center gap-3">
-                        <Clock size={32}/>
-                        نموذج الإجابة والمراجعة سيظهر هنا تلقائياً بعد انتهاء وقت الامتحان للأغلبية.
-                    </div>
+                    <div className="mt-8 bg-amber-900/30 text-amber-400 p-6 rounded-2xl border border-amber-900 text-center font-bold text-lg flex flex-col items-center gap-3"><Clock size={32}/>نموذج الإجابة والمراجعة سيظهر هنا تلقائياً بعد انتهاء وقت الامتحان للأغلبية.</div>
                 )}
 
                 {!isSubmitted && (
                     <div className="flex justify-end mt-8 border-t border-slate-700 pt-6">
-                        <button onClick={confirmSubmit} className="bg-green-600 text-white px-8 py-3 rounded-lg font-bold shadow-lg hover:bg-green-700 transition flex items-center justify-center gap-2">
-                            <CheckCircle size={20}/> تسليم الامتحان نهائياً
-                        </button>
+                        <button onClick={confirmSubmit} className="bg-green-600 text-white px-8 py-3 rounded-lg font-bold shadow-lg hover:bg-green-700 transition flex items-center justify-center gap-2"><CheckCircle size={20}/> تسليم الامتحان نهائياً</button>
                     </div>
                 )}
             </div>
@@ -1081,9 +841,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
       {!isSubmitted && (
         <div className="fixed inset-0 pointer-events-none z-[9999] overflow-hidden">
             {wmPositions.map((pos, i) => (
-                <div key={i} className="watermark-text" style={{ top: pos.top, left: pos.left }}>
-                    {user.displayName} - {user.email}
-                </div>
+                <div key={i} className="watermark-text" style={{ top: pos.top, left: pos.left }}>{user?.displayName || user?.name || 'طالب'} - {user?.email || ''}</div>
             ))}
         </div>
       )}
@@ -1091,8 +849,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
       {showSubmitConfirm && (
         <div className="fixed inset-0 z-[10000] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center border-t-8 border-amber-500">
-                <AlertTriangle className="w-16 h-16 text-amber-500 mx-auto mb-4"/>
-                <h3 className="text-2xl font-bold mb-2 text-slate-800">هل أنت متأكد من التسليم؟</h3>
+                <AlertTriangle className="w-16 h-16 text-amber-500 mx-auto mb-4"/><h3 className="text-2xl font-bold mb-2 text-slate-800">هل أنت متأكد من التسليم؟</h3>
                 <p className="text-slate-500 mb-8 font-bold">لن يمكنك تعديل إجاباتك بعد ذلك، وسيتم نقلك للوحة النتيجة.</p>
                 <div className="flex gap-4">
                     <button onClick={() => handleSubmit(false)} className="flex-1 bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 shadow-md transition">نعم، سلم الآن</button>
@@ -1104,50 +861,38 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
       <div className="bg-slate-900 text-white p-4 flex flex-col md:flex-row justify-between items-center shadow-md relative z-50 gap-4">
         <div className="flex items-center gap-4 w-full md:w-auto justify-between">
-            {isSubmitted && (
-                <button onClick={() => setActiveView('dashboard')} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl font-bold transition flex items-center gap-2 shadow-sm text-sm">
-                    <Layout size={16}/> العودة للنتيجة
-                </button>
-            )}
-            <h2 className="font-bold text-lg font-sans text-amber-400 truncate hidden md:block">{exam.title} {isSubmitted ? '(مراجعة الإجابات)' : ''}</h2>
+            {isSubmitted && <button onClick={() => setActiveView('dashboard')} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl font-bold transition flex items-center gap-2 shadow-sm text-sm"><Layout size={16}/> العودة للنتيجة</button>}
+            <h2 className="font-bold text-lg font-sans text-amber-400 truncate hidden md:block">{exam?.title || ''} {isSubmitted ? '(مراجعة)' : ''}</h2>
             {!isSubmitted && <div className="bg-slate-800 px-6 py-2 rounded-full font-mono shadow-inner border border-slate-700 font-bold text-amber-400 text-lg flex items-center gap-2"><Timer size={18}/> {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</div>}
         </div>
 
         {isSubmitted && uniqueBranches.length > 2 && (
             <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-hide">
                 {uniqueBranches.map((branch, i) => (
-                    <button 
-                        key={i} onClick={() => setActiveBranchTab(branch)}
-                        className={`whitespace-nowrap px-5 py-2 rounded-full text-sm font-bold transition-colors ${activeBranchTab === branch ? 'bg-amber-500 text-slate-900 shadow-md' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
-                    >
-                        {branch}
-                    </button>
+                    <button key={i} onClick={() => setActiveBranchTab(branch)} className={`whitespace-nowrap px-5 py-2 rounded-full text-sm font-bold transition-colors ${activeBranchTab === branch ? 'bg-amber-500 text-slate-900 shadow-md' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>{branch}</button>
                 ))}
             </div>
         )}
 
-        {!isSubmitted && (
-            <button onClick={() => setActiveView('dashboard')} className="bg-slate-700 hover:bg-slate-600 px-6 py-2.5 rounded-xl font-bold transition whitespace-nowrap flex items-center gap-2">
-                <Layout size={18}/> لوحة التحكم
-            </button>
-        )}
+        {!isSubmitted && <button onClick={() => setShowSubmitConfirm(true)} className="bg-green-600 hover:bg-green-700 text-white px-8 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg"><CheckCircle size={18}/> إنهاء وتسليم</button>}
       </div>
 
       <div className="flex-1 flex overflow-hidden relative z-50">
         <div className="w-16 md:w-24 bg-white border-l flex flex-col p-2 overflow-y-auto shadow-inner scrollbar-hide">
           <div className="grid grid-cols-1 gap-3">
               {displayQuestions.map((q, idx) => {
-                  let statusClass = 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-2 border-transparent';
+                  let cls = 'bg-slate-100 text-slate-600 border-2 border-transparent hover:bg-slate-200';
                   if (isSubmitted) {
-                      if (answers[q.id] === q.correctIdx) statusClass = 'bg-green-100 text-green-700 border-green-500 shadow-sm';
-                      else if (answers[q.id] !== undefined) statusClass = 'bg-red-100 text-red-700 border-red-500 shadow-sm';
-                      else statusClass = 'bg-slate-100 text-slate-400 border-slate-300 border-dashed'; 
-                  } else if (answers[q.id] !== undefined) {
-                      statusClass = 'bg-blue-100 text-blue-700 border-blue-400 shadow-sm';
+                      if (q.type === 'essay') cls = 'bg-blue-100 text-blue-700 border-blue-500 shadow-sm';
+                      else if (safeAnswersFinal[q.id] === q.correctIdx) cls = 'bg-green-100 text-green-700 border-green-500 shadow-sm';
+                      else if (safeAnswersFinal[q.id] !== undefined) cls = 'bg-red-100 text-red-700 border-red-500 shadow-sm';
+                      else cls = 'bg-slate-100 text-slate-400 border-slate-300 border-dashed'; 
+                  } else if (safeAnswersFinal[q.id] !== undefined && (q.type !== 'essay' || safeAnswersFinal[q.id].text || safeAnswersFinal[q.id].imageUrl)) {
+                      cls = 'bg-blue-100 text-blue-700 border-blue-400 shadow-sm';
                   }
                   const originalIndex = flatQuestions.findIndex(origQ => origQ.id === q.id) + 1;
                   return (
-                    <button key={idx} onClick={() => setCurrentQIndex(idx)} className={`aspect-square rounded-xl font-bold text-base transition-all relative ${currentQIndex === idx ? 'ring-4 ring-amber-500 ring-offset-2 scale-105 z-10' : ''} ${statusClass}`}>
+                    <button key={idx} onClick={() => setCurrentQIndex(idx)} className={`aspect-square rounded-xl font-bold text-base transition-all relative ${currentQIndex === idx ? 'ring-4 ring-amber-500 ring-offset-2 scale-105 z-10' : ''} ${cls}`}>
                         {originalIndex}
                         {flagged[q.id] && !isSubmitted && <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full border-2 border-white shadow-sm"></div>}
                     </button>
@@ -1156,62 +901,82 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
           </div>
         </div>
 
-        <div className={`flex-1 flex flex-col ${currentQObj?.blockText && currentQObj.blockText.trim().length > 0 ? 'md:flex-row' : 'items-center'} h-full overflow-hidden bg-slate-100 w-full p-4 md:p-8 gap-6`}>
-          {currentQObj?.blockText && currentQObj.blockText.trim().length > 0 && (
-            <div className="flex-1 w-full bg-white p-6 md:p-10 overflow-y-auto rounded-3xl shadow-sm border border-slate-200">
-              <h3 className="font-bold text-blue-900 mb-6 flex items-center gap-2 text-xl border-b border-blue-100 pb-4 font-['Cairo']"><FileText size={24}/> نص المراجعة / القراءة:</h3>
+        <div className={`flex-1 flex flex-col ${currentQObj?.blockText?.trim() ? 'md:flex-row' : 'items-center'} h-full overflow-hidden bg-slate-100 w-full p-4 md:p-8 gap-6`}>
+          {currentQObj?.blockText?.trim() && (
+            <div className="flex-1 w-full bg-blue-50 p-6 md:p-10 overflow-y-auto rounded-3xl shadow-sm border border-blue-100">
+              <h3 className="font-bold text-blue-900 mb-6 flex items-center gap-2 text-xl border-b border-blue-200 pb-4 font-['Cairo']"><FileText size={24}/> نص القراءة / المراجعة:</h3>
               <p className="whitespace-pre-line leading-loose text-lg md:text-xl font-bold text-slate-700 font-['Cairo']">{currentQObj.blockText}</p>
             </div>
           )}
           
-          <div className={`${currentQObj?.blockText && currentQObj.blockText.trim().length > 0 ? 'flex-1' : 'w-full max-w-4xl mx-auto'} bg-white p-6 md:p-10 overflow-y-auto flex flex-col shadow-xl rounded-3xl h-full border border-slate-200 relative`}>
+          <div className={`${currentQObj?.blockText?.trim() ? 'flex-1' : 'w-full max-w-4xl mx-auto'} bg-white p-6 md:p-10 overflow-y-auto flex flex-col shadow-xl rounded-3xl h-full border border-slate-200 relative`}>
             <div className="flex justify-between items-center mb-8 border-b border-slate-100 pb-6">
               <div className="flex items-center gap-3">
                   <span className="bg-slate-900 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-md font-['Cairo']">سؤال {flatQuestions.findIndex(origQ => origQ.id === currentQObj.id) + 1}</span>
-                  {currentQObj.branch && currentQObj.branch !== 'عام' && (
-                      <span className="bg-blue-50 text-blue-700 px-4 py-2 rounded-xl text-sm font-bold border border-blue-100 flex items-center gap-2"><Layers size={16}/> {currentQObj.branch}</span>
-                  )}
+                  {currentQObj.branch && <span className="bg-blue-50 text-blue-700 px-4 py-2 rounded-xl text-sm font-bold border border-blue-100 flex items-center gap-2"><Layers size={16}/> {currentQObj.branch}</span>}
+                  {currentQObj.type === 'essay' && <span className="bg-purple-100 text-purple-700 px-4 py-2 rounded-xl text-sm font-bold border border-purple-200">سؤال مقالي 📝</span>}
               </div>
               {!isSubmitted && <button onClick={() => { setFlagged({...flagged, [currentQObj.id]: !flagged[currentQObj.id]}) }} className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold transition shadow-sm ${flagged[currentQObj.id] ? 'bg-amber-100 text-amber-700 border border-amber-300' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200'}`}><Flag size={16} /> {flagged[currentQObj.id] ? 'محدد للمراجعة' : 'تحديد لمراجعته لاحقاً'}</button>}
             </div>
             
             <div className="bg-slate-50 p-6 md:p-8 rounded-2xl border border-slate-200 mb-8 shadow-inner text-center">
               <h3 className="text-2xl md:text-3xl font-bold text-slate-900 leading-loose font-['Cairo'] drop-shadow-sm">
-                  {currentQObj.text.split('|').map((part, i) => (
-                      <React.Fragment key={i}>
-                          {part.trim()}
-                          {i !== currentQObj.text.split('|').length - 1 && <br />}
-                      </React.Fragment>
-                  ))}
+                  {(currentQObj.text || '').split('|').map((part, i, arr) => (<React.Fragment key={i}>{part.trim()}{i !== arr.length - 1 && <br />}</React.Fragment>))}
               </h3>
             </div>
 
-            <div className="space-y-4">
-              {currentQObj.options.map((opt, idx) => {
-                  let optionClass = 'border-slate-200 hover:bg-slate-50 bg-white text-slate-700';
-                  const isSelected = answers[currentQObj.id] === idx;
-                  
-                  if (isSubmitted) {
-                      if (idx === currentQObj.correctIdx) optionClass = 'border-green-500 bg-green-50 text-green-900 shadow-md ring-2 ring-green-200'; 
-                      else if (isSelected) optionClass = 'border-red-500 bg-red-50 text-red-900 shadow-md'; 
-                      else optionClass = 'border-slate-200 bg-slate-50 opacity-50'; 
-                  } else {
-                      if (isSelected) optionClass = 'border-amber-500 bg-amber-50 text-amber-900 shadow-md transform scale-[1.02] ring-2 ring-amber-200';
-                  }
-
-                  return (
-                    <div key={idx} onClick={() => handleAnswer(currentQObj.id, idx)} className={`p-5 rounded-2xl border-2 cursor-pointer transition-all duration-200 flex items-center gap-4 ${optionClass}`}>
-                      <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${isSelected || (isSubmitted && idx === currentQObj.correctIdx) ? 'border-transparent bg-current' : 'border-slate-300'}`}>
-                          {(isSubmitted && idx === currentQObj.correctIdx) && <Check size={16} className="text-white"/>}
-                          {(isSubmitted && isSelected && idx !== currentQObj.correctIdx) && <X size={16} className="text-white"/>}
-                      </div>
-                      <span className="font-['Cairo'] text-xl font-bold leading-relaxed">{opt}</span>
-                      {isSubmitted && idx === currentQObj.correctIdx && <span className="mr-auto text-green-600 bg-green-100 px-3 py-1 rounded-lg text-xs font-bold">الإجابة الصحيحة</span>}
-                      {isSubmitted && isSelected && idx !== currentQObj.correctIdx && <span className="mr-auto text-red-600 bg-red-100 px-3 py-1 rounded-lg text-xs font-bold">إجابتك (خطأ)</span>}
+            {/* ---> الإضافة: المقالي وإرفاق صورة مع إيقاف الحظر مؤقتاً <--- */}
+            {currentQObj.type === 'essay' ? (
+                <div className="space-y-4">
+                    <textarea 
+                        className="w-full border-2 border-slate-200 p-4 rounded-xl focus:border-amber-500 min-h-[150px] outline-none" 
+                        placeholder="اكتب إجابتك هنا..." 
+                        value={safeAnswersFinal[currentQObj.id]?.text || ''} 
+                        onChange={(e) => handleAnswer(currentQObj.id, { ...(safeAnswersFinal[currentQObj.id] || {}), text: e.target.value })}
+                        disabled={isSubmitted}
+                    />
+                    <div className="flex items-center gap-4 flex-wrap">
+                        <input type="file" id={`file-${currentQObj.id}`} className="hidden" accept="image/*" disabled={isSubmitted} onChange={(e) => handleEssayFileUpload(e, currentQObj.id)} />
+                        {!isSubmitted && (
+                            <button 
+                                onClick={() => {
+                                    isPickingFile.current = true; // إيقاف الحماية ضد الغش
+                                    document.getElementById(`file-${currentQObj.id}`).click();
+                                    const handleFocus = () => { setTimeout(() => { isPickingFile.current = false; }, 1000); window.removeEventListener('focus', handleFocus); };
+                                    window.addEventListener('focus', handleFocus);
+                                }} 
+                                disabled={uploadingEssay === currentQObj.id} 
+                                className="bg-slate-100 text-slate-700 px-4 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-200 transition shadow-sm border border-slate-200"
+                            >
+                                {uploadingEssay === currentQObj.id ? <Loader2 className="animate-spin" size={18}/> : <Camera size={18}/>}
+                                {safeAnswersFinal[currentQObj.id]?.imageUrl ? 'تغيير الصورة المرفقة' : 'إرفاق صورة للإجابة (اختياري)'}
+                            </button>
+                        )}
+                        {safeAnswersFinal[currentQObj.id]?.imageUrl && <a href={safeAnswersFinal[currentQObj.id].imageUrl} target="_blank" rel="noreferrer" className="text-blue-600 bg-blue-50 px-4 py-3 rounded-xl font-bold flex items-center gap-2 border border-blue-200"><ExternalLink size={18}/> عرض المرفق الخاص بك</a>}
                     </div>
-                  )
-              })}
-            </div>
+                    {isSubmitted && <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-xl text-purple-800 font-bold flex gap-2"><CheckCircle/> هذا السؤال مقالي وسيتم تقييمه يدوياً من قبل المستر وإضافة درجاته لمجموعك.</div>}
+                </div>
+            ) : (
+                <div className="space-y-4">
+                  {(currentQObj.options || []).map((opt, idx) => {
+                      let cls = 'border-slate-200 hover:bg-slate-50 bg-white text-slate-700';
+                      const isSelected = safeAnswersFinal[currentQObj.id] === idx;
+                      if (isSubmitted) {
+                          if (idx === currentQObj.correctIdx) cls = 'border-green-500 bg-green-50 text-green-900 shadow-md ring-2 ring-green-200 font-bold'; 
+                          else if (isSelected) cls = 'border-red-500 bg-red-50 text-red-900 shadow-md font-bold'; 
+                          else cls = 'border-slate-100 bg-slate-50 opacity-50'; 
+                      } else if (isSelected) cls = 'border-amber-500 bg-amber-50 text-amber-900 shadow-md transform scale-[1.02] ring-2 ring-amber-200 font-bold';
+
+                      return <div key={idx} onClick={() => handleAnswer(currentQObj.id, idx)} className={`p-5 rounded-2xl border-2 cursor-pointer transition-all duration-200 flex items-center gap-4 ${cls}`}>
+                          <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 ${isSelected || (isSubmitted && idx === currentQObj.correctIdx) ? 'border-transparent bg-current' : 'border-slate-300'}`}>
+                              {(isSubmitted && idx === currentQObj.correctIdx) && <Check size={16} className="text-white"/>}
+                              {(isSubmitted && isSelected && idx !== currentQObj.correctIdx) && <X size={16} className="text-white"/>}
+                          </div>
+                          <span className="text-xl leading-relaxed">{opt}</span>
+                      </div>
+                  })}
+                </div>
+            )}
 
             <div className="mt-auto pt-10 flex justify-between">
               <button disabled={currentQIndex === 0} onClick={() => setCurrentQIndex(p => p - 1)} className="px-8 py-4 rounded-xl bg-slate-200 text-slate-700 font-bold disabled:opacity-50 hover:bg-slate-300 transition shadow-sm font-['Cairo'] flex items-center gap-2"><ChevronRight size={20}/> السابق</button>
@@ -1224,7 +989,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   );
 };
 
-const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
+export const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
     const [homeworkData, setHomeworkData] = useState(null);
     const [imageSrc, setImageSrc] = useState(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -1235,35 +1000,22 @@ const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
         const fetchHw = async () => {
             const docRef = doc(db, 'smart_homeworks', hwId);
             const snap = await getDoc(docRef);
-            if (snap.exists()) {
-                setHomeworkData({ id: snap.id, ...snap.data() });
-            } else {
-                alert("الواجب غير موجود أو تم حذفه.");
-                onClose();
-            }
+            if (snap.exists()) { setHomeworkData({ id: snap.id, ...snap.data() }); } else { alert("الواجب غير موجود أو تم حذفه."); onClose(); }
         };
-        fetchHw();
+        if (hwId) fetchHw();
     }, [hwId, onClose]);
 
     const handleImageCapture = (e) => {
         const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                setImageSrc(event.target.result);
-            };
-            reader.readAsDataURL(file);
-        }
+        if (file) { const reader = new FileReader(); reader.onload = (event) => { setImageSrc(event.target.result); }; reader.readAsDataURL(file); }
     };
 
     const analyzeImageWithGemini = async () => {
         if (!imageSrc || !homeworkData) return;
         setIsAnalyzing(true);
-        
         try {
             const base64Data = imageSrc.split(',')[1];
             const apiKey = import.meta.env.VITE_GEMINI_API_KEY; 
-            
             if(!apiKey) {
                 setTimeout(async () => {
                     const dummyResult = { score: Math.floor(Math.random() * 10), total: 10, feedback: "تم استلام الواجب (محاكاة)." };
@@ -1271,55 +1023,24 @@ const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
                 }, 2000);
                 return;
             }
-
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
             const promptText = `أنت معلم لغة عربية. قم بتصحيح صورة الواجب هذه المكونة من أسئلة اختيار من متعدد. مفتاح الإجابة الصحيح هو: ${homeworkData.answerKey}. قم بإرجاع النتيجة بصيغة JSON فقط تحتوي على: {"score": عدد الإجابات الصحيحة, "total": العدد الكلي للأسئلة, "feedback": "تعليق قصير"}`;
-
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{
-                        role: "user",
-                        parts: [
-                            { text: promptText },
-                            { inlineData: { mimeType: "image/jpeg", data: base64Data } }
-                        ]
-                    }]
-                })
-            });
-
+            const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ role: "user", parts: [ { text: promptText }, { inlineData: { mimeType: "image/jpeg", data: base64Data } } ] }] }) });
             const data = await response.json();
             const textResult = data.candidates?.[0]?.content?.parts?.[0]?.text;
-            
             const cleanJson = textResult.replace(/```json/g, '').replace(/```/g, '');
             const parsedResult = JSON.parse(cleanJson);
-            
             await saveResult(parsedResult);
-
-        } catch (error) {
-            console.error("Error analyzing image:", error);
-            alert("حدث خطأ أثناء التصحيح. تأكد من وضوح الصورة.");
-            setIsAnalyzing(false);
-        }
+        } catch (error) { console.error("Error analyzing image:", error); alert("حدث خطأ أثناء التصحيح. تأكد من وضوح الصورة."); setIsAnalyzing(false); }
     };
 
     const saveResult = async (aiResult) => {
         const finalData = {
-            studentId: user.uid,
-            studentName: user.displayName,
-            homeworkId: homeworkData.id,
-            homeworkTitle: homeworkData.title,
-            bookName: homeworkData.bookName || 'عام',
-            grade: homeworkData.grade || 'غير محدد',
-            score: aiResult.score,
-            total: aiResult.total,
-            feedback: aiResult.feedback,
-            submittedAt: serverTimestamp()
+            studentId: user?.uid, studentName: user?.displayName || user?.name || 'طالب', homeworkId: homeworkData.id, homeworkTitle: homeworkData.title,
+            bookName: homeworkData.bookName || 'عام', grade: homeworkData.grade || 'غير محدد', score: aiResult.score, total: aiResult.total, feedback: aiResult.feedback, submittedAt: serverTimestamp()
         };
         await addDoc(collection(db, 'homework_results'), finalData);
-        setResult(aiResult);
-        setIsAnalyzing(false);
+        setResult(aiResult); setIsAnalyzing(false);
     };
 
     if (!homeworkData) return <div className="fixed inset-0 z-[100] bg-white flex items-center justify-center"><Loader2 className="animate-spin text-blue-600 w-12 h-12"/></div>;
@@ -1334,15 +1055,10 @@ const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
             <div className="flex-1 flex flex-col items-center justify-center p-6 text-center overflow-y-auto">
                 {!imageSrc ? (
                     <div className="space-y-6">
-                        <div className="w-32 h-32 bg-slate-800 rounded-full flex items-center justify-center mx-auto border-4 border-blue-500 border-dashed">
-                            <Camera size={48} className="text-blue-400"/>
-                        </div>
+                        <div className="w-32 h-32 bg-slate-800 rounded-full flex items-center justify-center mx-auto border-4 border-blue-500 border-dashed animate-pulse"><Camera size={48} className="text-blue-400"/></div>
                         <h3 className="text-2xl font-bold">صوّر صفحة الواجب</h3>
-                        <p className="text-slate-400 max-w-md">تأكد من أن الإضاءة جيدة وأن الإجابات (أ، ب، ج، د) واضحة في الصورة ليتمكن الذكاء الاصطناعي من قراءتها بدقة.</p>
-                        
-                        <button onClick={() => fileInputRef.current.click()} className="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-blue-700 shadow-lg flex items-center gap-2 mx-auto">
-                            <Camera /> افتح الكاميرا
-                        </button>
+                        <p className="text-slate-400 max-w-md">تأكد من أن الإضاءة جيدة وأن الإجابات واضحة ليتمكن الذكاء الاصطناعي من قراءتها بدقة.</p>
+                        <button onClick={() => fileInputRef.current.click()} className="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-blue-700 shadow-lg flex items-center gap-2 mx-auto"><Camera /> افتح الكاميرا</button>
                         <input type="file" accept="image/*" capture="environment" ref={fileInputRef} onChange={handleImageCapture} className="hidden" />
                     </div>
                 ) : !result ? (
@@ -1350,9 +1066,7 @@ const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
                         <img src={imageSrc} alt="Homework" className="w-full h-80 object-cover rounded-xl border-4 border-slate-700" />
                         {isAnalyzing ? (
                             <div className="bg-slate-800 p-6 rounded-xl border border-blue-500/50 flex flex-col items-center">
-                                <Loader2 className="animate-spin text-blue-500 w-10 h-10 mb-4"/>
-                                <p className="font-bold text-blue-400">الذكاء الاصطناعي يقوم بالتصحيح الآن...</p>
-                                <p className="text-xs text-slate-400 mt-2">يرجى الانتظار ثوانٍ قليلة</p>
+                                <Loader2 className="animate-spin text-blue-500 w-10 h-10 mb-4"/><p className="font-bold text-blue-400">الذكاء الاصطناعي يقوم بالتصحيح الآن...</p>
                             </div>
                         ) : (
                             <div className="flex gap-4">
@@ -1363,12 +1077,8 @@ const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
                     </div>
                 ) : (
                     <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white text-slate-900 p-8 rounded-3xl w-full max-w-sm shadow-2xl">
-                        <CheckCircle className="text-green-500 w-20 h-20 mx-auto mb-4"/>
-                        <h2 className="text-3xl font-black mb-2 text-slate-800">النتيجة</h2>
-                        <div className="text-5xl font-black text-amber-600 mb-6">{result.score} / {result.total}</div>
-                        <p className="text-slate-600 font-bold mb-6">{result.feedback}</p>
-                        <p className="text-xs text-slate-400 mb-6">تم إرسال الدرجة للمستر بنجاح.</p>
-                        <button onClick={onClose} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800">العودة للمنصة</button>
+                        <CheckCircle className="text-green-500 w-20 h-20 mx-auto mb-4"/><h2 className="text-3xl font-black mb-2 text-slate-800">النتيجة</h2>
+                        <div className="text-5xl font-black text-amber-600 mb-6">{result.score} / {result.total}</div><p className="text-slate-600 font-bold mb-6">{result.feedback}</p><p className="text-xs text-slate-400 mb-6">تم إرسال الدرجة للمستر بنجاح.</p><button onClick={onClose} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800">العودة للمنصة</button>
                     </motion.div>
                 )}
             </div>
@@ -1376,11 +1086,565 @@ const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
     );
 };
 
+// --- لوحة الطالب (StudentDashboard) ---
+const StudentDashboard = ({ user, userData, installPrompt }) => {
+  const [activeTab, setActiveTab] = useState('home');
+  const [videoSectionTab, setVideoSectionTab] = useState('explanation');
+  const [mobileMenu, setMobileMenu] = useState(false);
+  const [content, setContent] = useState([]);
+  const [liveSessions, setLiveSessions] = useState([]); 
+  const [activeLiveView, setActiveLiveView] = useState(null); 
+  const [exams, setExams] = useState([]);
+  const [activeExam, setActiveExam] = useState(null);
+  const [playingVideo, setPlayingVideo] = useState(null);
+  const [playingHtml, setPlayingHtml] = useState(null);
+  const [examResults, setExamResults] = useState([]);
+  const [hwResults, setHwResults] = useState([]); 
+  const [reviewingExam, setReviewingExam] = useState(null);
+  const [mistakes, setMistakes] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [hasNewNotif, setHasNewNotif] = useState(false);
+  const [editFormData, setEditFormData] = useState({ name: '', phone: '', parentPhone: '', grade: '' });
+  const [showFocusMode, setShowFocusMode] = useState(false);
+  const [scanningHwId, setScanningHwId] = useState(null);
+  const [subscriptionCodeInput, setSubscriptionCodeInput] = useState('');
+  const [isCharging, setIsCharging] = useState(false);
+  const [weeklyChallenges, setWeeklyChallenges] = useState([]);
+
+  useEffect(() => {
+      window.history.pushState({ tab: activeTab }, '');
+      const handlePopState = (e) => { if (e.state && e.state.tab) { setActiveTab(e.state.tab); setMobileMenu(false); } else { setActiveTab('home'); } };
+      window.addEventListener('popstate', handlePopState);
+      return () => window.removeEventListener('popstate', handlePopState);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if(!userData) return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const hwParam = urlParams.get('hw');
+    if (hwParam) { setScanningHwId(hwParam); window.history.replaceState({}, document.title, window.location.pathname); }
+
+    const unsubContent = onSnapshot(query(collection(db, 'content'), where('grade', '==', userData.grade)), s => setContent(s.docs.map(d=>({id:d.id,...d.data()})).filter(c => !c.allowedEmails || c.allowedEmails.length === 0 || c.allowedEmails.includes(user.email))));
+    const unsubLive = onSnapshot(query(collection(db, 'live_sessions'), where('status', '==', 'active'), where('grade', '==', userData.grade)), s => setLiveSessions(s.docs.map(d=>({id:d.id, ...d.data()})).filter(ls => !ls.allowedEmails || ls.allowedEmails.length === 0 || ls.allowedEmails.includes(user.email))));
+    const unsubExams = onSnapshot(query(collection(db, 'exams'), where('grade', '==', userData.grade)), s => setExams(s.docs.map(d=>({id:d.id,...d.data()}))));
+    const unsubResults = onSnapshot(query(collection(db, 'exam_results'), where('studentId', '==', user.uid)), s => setExamResults(s.docs.map(d=>({id:d.id,...d.data()}))));
+    const unsubHwResults = onSnapshot(query(collection(db, 'homework_results'), where('studentId', '==', user.uid)), s => setHwResults(s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b) => (b.submittedAt?.seconds || 0) - (a.submittedAt?.seconds || 0))));
+    const unsubMistakes = onSnapshot(query(collection(db, 'student_mistakes'), where('userId', '==', user.uid), orderBy('timestamp', 'desc')), s => setMistakes(s.docs.map(d => ({id: d.id, ...d.data()}))));
+    const unsubNotif = onSnapshot(query(collection(db, 'notifications'), where('grade', 'in', ['all', userData.grade]), orderBy('createdAt', 'desc'), limit(10)), s => { const newNotifs = s.docs.map(d => d.data()); setNotifications(newNotifs); if(newNotifs.length > 0) { setHasNewNotif(true); if(newNotifs[0].text) sendSystemNotification("تنبيه جديد 🔔", newNotifs[0].text); } });
+    const unsubChallenge = onSnapshot(query(collection(db, 'weekly_challenges'), where('status', '==', 'active'), where('grade', '==', userData.grade)), s => setWeeklyChallenges(s.docs.map(d=>({id:d.id, ...d.data()}))));
+
+    setEditFormData({ name: userData.name, phone: userData.phone, parentPhone: userData.parentPhone, grade: userData.grade });
+
+    return () => { unsubContent(); unsubLive(); unsubExams(); unsubResults(); unsubHwResults(); unsubMistakes(); unsubNotif(); unsubChallenge(); };
+  }, [userData, user]);
+
+  const isPremium = userData?.subscriptionStatus === 'premium' && (!userData.subscriptionExpiry || userData.subscriptionExpiry.toDate() > new Date());
+  
+  const startMistakesExam = () => {
+      if (mistakes.length === 0) return alert("ليس لديك أي أخطاء مسجلة بعد! استمر في التميز 👏");
+      const shuffledMistakes = [...mistakes].sort(() => 0.5 - Math.random()).slice(0, 20);
+      const generatedExam = { id: 'custom_mistakes_exam', title: 'امتحان نقاط الضعف (بنك الأخطاء) 🏦', duration: shuffledMistakes.length * 2, questions: [ { text: 'أجب عن هذه الأسئلة التي أخطأت بها سابقاً:', subQuestions: shuffledMistakes.map(m => m.question) } ] };
+      setActiveExam(generatedExam);
+  };
+
+  const startWeeklyChallenge = (challenge) => {
+      if (examResults.some(r => r.examId === `challenge_${challenge.id}`)) return alert("لقد قمت بأداء هذا التحدي مسبقاً.");
+      const challengeExam = {
+          id: `challenge_${challenge.id}`, title: 'تحدي العباقرة 🏆', duration: challenge.timerMinutes || 3, 
+          questions: [{ text: 'سؤال التحدي:', subQuestions: [{ id: `q_${challenge.id}`, text: challenge.question, options: challenge.options, correctIdx: challenge.correctIdx, branch: 'تحدي عباقرة' }] }]
+      };
+      setActiveExam(challengeExam);
+  };
+
+  const handleChargeSubscriptionCode = async (e) => {
+      e.preventDefault();
+      if(!subscriptionCodeInput.trim()) return alert("أدخل الكود أولاً");
+      setIsCharging(true);
+      try {
+          const qStr = query(collection(db, 'subscription_codes'), where('code', '==', subscriptionCodeInput.trim()));
+          const snap = await getDocs(qStr);
+          if(snap.empty) { alert("الكود غير صحيح أو غير موجود."); setIsCharging(false); return; }
+          const codeDoc = snap.docs[0]; const codeData = codeDoc.data();
+          if(codeData.used) { alert("عفواً، هذا الكود تم استخدامه من قبل."); setIsCharging(false); return; }
+          const days = codeData.days; let newExpiry = new Date();
+          if(isPremium && userData.subscriptionExpiry) newExpiry = userData.subscriptionExpiry.toDate();
+          newExpiry.setDate(newExpiry.getDate() + days);
+          const batch = writeBatch(db);
+          batch.update(doc(db, 'users', user.uid), { subscriptionStatus: 'premium', subscriptionExpiry: newExpiry });
+          batch.update(doc(db, 'subscription_codes', codeDoc.id), { used: true, usedBy: user.displayName || user.name });
+          await batch.commit();
+          alert(`تم شحن الكود بنجاح! تم تفعيل اشتراكك لمدة ${days} يوم.`);
+          setSubscriptionCodeInput('');
+      } catch (err) { console.error(err); alert("حدث خطأ أثناء الشحن"); }
+      setIsCharging(false);
+  };
+
+  const handlePremiumClick = (callback) => {
+      if(!isPremium) { alert("عفواً يا بطل، هذا المحتوى مخصص للطلاب المشتركين في الباقة المدفوعة (VIP). يرجى شحن حسابك أو التواصل مع المستر لترقية حسابك!"); setActiveTab('subscription'); } else callback();
+  };
+
+  const handleUpdateMyProfile = async (e) => {
+      e.preventDefault();
+      try {
+          const updateData = { phone: editFormData.phone };
+          if (editFormData.grade !== userData.grade) { updateData.requestedGrade = editFormData.grade; updateData.gradeUpdateStatus = 'pending'; alert("تم إرسال طلب تغيير المرحلة للمستر. سيتم تغييره فور موافقته."); } 
+          else alert("تم تحديث البيانات بنجاح.");
+          await updateDoc(doc(db, 'users', user.uid), updateData);
+      } catch (err) { alert("حدث خطأ أثناء التحديث."); }
+  };
+
+  if (scanningHwId) return <SmartHomeworkScanner hwId={scanningHwId} user={user} onClose={() => setScanningHwId(null)} />;
+  if (activeLiveView) return <LiveSessionView session={activeLiveView} user={user} onClose={() => setActiveLiveView(null)} />;
+  if (activeExam) return <ExamRunner exam={activeExam} user={user} onClose={() => setActiveExam(null)} />;
+  if (showFocusMode) return <PomodoroFocusMode onClose={() => setShowFocusMode(false)} />;
+  if (reviewingExam) {
+      const result = examResults.find(r => r.examId === reviewingExam.id);
+      return <ExamRunner exam={reviewingExam} user={user} onClose={() => setReviewingExam(null)} isReviewMode={true} existingResult={result} />;
+  }
+
+  const isBannedAll = userData?.status === 'banned_all';
+  const isBannedExam = userData?.status === 'banned_exam' || userData?.status === 'banned_cheating'; 
+  const isBannedContent = userData?.status === 'banned_content';
+
+  if(userData?.status === 'pending') return <div className="h-screen flex items-center justify-center bg-amber-50 text-center p-4"><div className="bg-white p-8 rounded-2xl shadow-xl"><h2 className="text-2xl font-bold mb-2">طلبك قيد المراجعة ⏳</h2><button onClick={()=>signOut(auth)} className="mt-4 text-red-500 underline">خروج</button></div></div>;
+  if(userData?.status === 'rejected') return <div className="h-screen flex items-center justify-center bg-red-50"><div className="text-red-600 font-bold">تم رفض طلبك</div><button onClick={()=>signOut(auth)} className="ml-4 bg-white px-4 py-1 rounded">خروج</button></div>;
+  if (isBannedAll) return <div className="h-screen flex flex-col items-center justify-center bg-red-50 text-center p-6"><Ban size={80} className="text-red-600 mb-4" /><h2 className="text-3xl font-bold text-red-800 mb-2 font-arabic">تم حظر حسابك</h2><p className="text-red-600 mb-6 font-bold">يرجى التواصل مع الإدارة لمعرفة السبب.</p><button onClick={()=>signOut(auth)} className="bg-white text-red-600 px-6 py-2 rounded-full font-bold shadow-md hover:bg-red-100">تسجيل الخروج</button></div>;
+
+  const videos = content.filter(c => c.type === 'video');
+  const filesAndLinks = content.filter(c => c.type === 'file' || c.type === 'link');
+  const htmls = content.filter(c => c.type === 'html');
+  const interactiveExams = content.filter(c => c.type === 'interactive_exam');
+
+  const startExamWithCode = async (exam) => {
+    if (isBannedExam) return alert("أنت محظور من دخول الامتحانات.");
+    const previousResult = examResults.find(r => r.examId === exam.id);
+    if (previousResult) {
+        if (previousResult.status === 'completed') alert(`أنت امتحنت الامتحان ده قبل كده وجبت ${previousResult.score}.`); 
+        else if (previousResult.status === 'in_progress' || previousResult.status === 'cheated') alert("لقد بدأت هذا الامتحان بالفعل وتم احتسابه عليك. لا يمكن الإعادة.");
+        return;
+    }
+    const now = new Date(); const start = new Date(exam.startTime); const end = new Date(exam.endTime);
+    if (now < start) return alert(`الامتحان لم يبدأ بعد. موعد البدء: ${start.toLocaleString('ar-EG')}`);
+    if (now > end) return alert("عفواً، انتهى وقت الامتحان.");
+    const code = prompt("أدخل كود الامتحان:");
+    if (code === exam.accessCode) {
+        try {
+            const attemptRef = await addDoc(collection(db, 'exam_results'), { examId: exam.id, studentId: user.uid, studentName: user.displayName || user.name, score: 0, total: 0, status: 'in_progress', submittedAt: serverTimestamp() });
+            setActiveExam({ ...exam, attemptId: attemptRef.id });
+        } catch (error) { console.error("Error creating attempt record:", error); alert("حدث خطأ أثناء بدء الامتحان. حاول مرة أخرى."); }
+    } else { alert("كود خاطئ!"); }
+  };
+
+  return (
+    <div className="bg-slate-50 relative font-['Cairo'] min-h-screen block" dir="rtl">
+      {playingVideo && <SecureVideoPlayer video={playingVideo} user={user} userName={userData.name} onClose={() => setPlayingVideo(null)} />}
+      {playingHtml && <InteractiveViewer content={playingHtml} user={userData} onClose={() => setPlayingHtml(null)} />}
+      <FloatingArabicBackground />
+      <ChatWidget user={user} />
+      
+      <aside className={`fixed top-0 bottom-0 right-0 z-40 bg-white/95 backdrop-blur-xl w-72 p-6 shadow-xl transition-transform duration-300 ${mobileMenu ? 'translate-x-0' : 'translate-x-full md:translate-x-0'} border-l border-slate-200 flex flex-col`}>
+        <div className="flex items-center justify-between mb-10 px-2">
+            <div className="flex items-center gap-3"><ModernLogo /><h1 className="text-2xl font-bold font-arabic text-amber-800">النحاس</h1></div>
+            <button onClick={() => setMobileMenu(false)} className="md:hidden"><X /></button>
+        </div>
+        <div className="space-y-2 flex-1 overflow-y-auto pr-2">
+          <button onClick={() => {setActiveTab('home'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='home'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><User/> الرئيسية</button>
+          <button onClick={() => {setActiveTab('subscription'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='subscription'?'bg-red-100 text-red-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-red-600'}`}><Crown/> الباقة والاشتراك</button>
+          {!isBannedContent && (
+              <>
+                <div onClick={() => {setActiveTab('videos'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='videos'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><PlayCircle/> المحاضرات</div>
+                <div onClick={() => {setActiveTab('files'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='files'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><FileText/> الملفات و الروابط</div>
+                <div onClick={() => {setActiveTab('htmls'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='htmls'?'bg-purple-100 text-purple-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-purple-600'}`}><Code/> محتوى تفاعلي</div>
+              </>
+          )}
+          {!isBannedExam && (
+              <>
+                <div onClick={() => {setActiveTab('exams'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><ClipboardList/> الامتحانات</div>
+                <div onClick={() => {setActiveTab('interactive_exams'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='interactive_exams'?'bg-emerald-100 text-emerald-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-emerald-600'}`}><Sparkles/> امتحان تفاعلي</div>
+                <div onClick={() => {setActiveTab('smart_hw_results'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='smart_hw_results'?'bg-blue-100 text-blue-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-blue-600'}`}><QrCode/> سجل الواجبات (QR)</div>
+                <div onClick={() => {setActiveTab('mistakes_bank'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='mistakes_bank'?'bg-red-100 text-red-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-red-600'}`}><BrainCircuit/> بنك الأخطاء</div>
+              </>
+          )}
+          <button onClick={() => {setActiveTab('settings'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='settings'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><Settings/> ملفي الشخصي</button>
+        </div>
+        <div className="mt-auto pt-6"><button onClick={() => signOut(auth)} className="flex items-center gap-3 text-red-500 font-bold hover:bg-red-50 w-full p-4 rounded-xl transition"><LogOut/> خروج</button></div>
+      </aside>
+
+      <main className="p-4 md:p-10 relative z-10 min-h-screen md:pr-72 w-full transition-all">
+        <div className="md:hidden flex justify-between items-center mb-6 glass-panel p-4 rounded-2xl shadow-sm"><h1 className="font-bold text-lg text-slate-800">منصة النحاس</h1><button onClick={() => setMobileMenu(true)} className="p-2 bg-slate-100 rounded-lg"><Menu /></button></div>
+        <div className="flex justify-between items-center mb-6 relative">
+            <div className="flex gap-2">
+                {installPrompt && ( <button onClick={installPrompt} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full font-bold shadow-lg shadow-green-500/30 transition flex items-center gap-2"><DownloadCloud size={18}/><span className="hidden md:inline">تثبيت التطبيق</span></button> )}
+                <button onClick={() => setShowFocusMode(true)} className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-full font-bold shadow-lg transition flex items-center gap-2"><Headphones size={18}/><span className="hidden md:inline">التركيز</span></button>
+            </div>
+            <div className="flex items-center gap-3">
+                {isPremium && <span className="hidden md:flex bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-bold items-center gap-1 border border-amber-200"><Crown size={14}/> VIP صالح حتى: {userData.subscriptionExpiry?.toDate().toLocaleDateString('ar-EG')}</span>}
+                <button onClick={() => {requestNotificationPermission(); setShowNotifications(!showNotifications); setHasNewNotif(false);}} className="relative p-2 glass-panel rounded-full shadow-sm hover:bg-white transition">
+                    <Bell className="text-slate-600"/>{hasNewNotif && <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>}
+                </button>
+            </div>
+            {showNotifications && (
+                <div className="absolute top-12 left-0 w-80 glass-panel rounded-xl shadow-xl border border-white/50 p-4 z-50 max-h-96 overflow-y-auto">
+                    <h3 className="font-bold mb-3 text-sm text-slate-500">الإشعارات</h3>
+                    {notifications.length === 0 ? <p className="text-xs text-slate-400">لا توجد إشعارات جديدة</p> : (
+                        <div className="space-y-3">
+                            {notifications.map((n, i) => (
+                                <div key={i} className="text-sm bg-slate-50/50 p-2 rounded border-l-4 border-amber-500">{n.text}<div className="text-[10px] text-slate-400 mt-1">{n.createdAt?.toDate().toLocaleDateString()}</div></div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+
+        {activeTab === 'home' && (
+            <div className="space-y-8">
+                {liveSessions.map(ls => (
+                    <div key={ls.id} className="bg-gradient-to-r from-red-600 to-red-800 text-white p-4 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-lg border border-red-500/50 animate-pulse-slow">
+                        <div><h3 className="font-bold font-arabic text-xl flex items-center gap-2"><Radio className="animate-pulse"/> بث مباشر الآن: {ls.title}</h3>{ls.passcode && <p className="text-xs text-red-200 mt-1">هذا البث محمي برقم سري</p>}</div>
+                        <button onClick={() => setActiveLiveView(ls)} className="bg-white text-red-700 px-6 py-2 rounded-full font-bold shadow-md hover:bg-red-50 transition w-full md:w-auto">انضمام الآن</button>
+                    </div>
+                ))}
+                
+                {weeklyChallenges.map(challenge => {
+                    const isDone = examResults.some(r => r.examId === `challenge_${challenge.id}`);
+                    return (
+                        <div key={challenge.id} className="bg-gradient-to-r from-purple-600 to-indigo-800 text-white p-6 rounded-2xl shadow-xl border border-purple-400 mb-6 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
+                            <Flame className="absolute -left-4 -bottom-4 w-32 h-32 text-purple-400 opacity-20"/>
+                            <div className="relative z-10 w-full md:w-2/3">
+                                <h3 className="text-2xl font-black mb-2 flex items-center gap-2 font-arabic text-amber-300"><Sparkles/> تحدي العباقرة الأسبوعي!</h3>
+                                <p className="font-bold text-lg leading-relaxed">{challenge.question}</p>
+                                <p className="text-sm mt-2 text-purple-200 flex items-center gap-1"><Timer size={14}/> لديك {challenge.timerMinutes} دقائق فقط للإجابة!</p>
+                            </div>
+                            <div className="relative z-10 w-full md:w-auto">
+                                {isDone ? (
+                                    <div className="bg-green-500 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg"><CheckCircle/> تم اجتياز التحدي</div>
+                                ) : (
+                                    <button onClick={() => startWeeklyChallenge(challenge)} className="w-full bg-white text-purple-800 px-8 py-3 rounded-xl font-bold shadow-xl hover:bg-amber-400 transition hover:text-white transform hover:scale-105">ابدأ التحدي الآن 🚀</button>
+                                )}
+                            </div>
+                        </div>
+                    )
+                })}
+
+                <WisdomBox />
+                <Announcements />
+                <h2 className="text-3xl font-bold text-slate-800 font-arabic flex flex-wrap items-center gap-2">
+                    منور يا <span className="text-amber-600">{userData.name.split(' ')[0]}</span> 👋 
+                    <span className="text-sm font-normal text-slate-500 bg-slate-200 px-3 py-1 rounded-full font-sans">{getGradeLabel(userData.grade)}</span>
+                    {isPremium ? (
+                        <span className="bg-amber-100 text-amber-700 text-xs px-3 py-1 rounded-full font-bold flex items-center gap-1 shadow-sm"><Crown size={14}/> حساب VIP</span>
+                    ) : (
+                        <span className="bg-slate-200 text-slate-600 text-xs px-3 py-1 rounded-full font-bold flex items-center gap-1 cursor-pointer" onClick={()=>setActiveTab('subscription')}>مجاني (رقي حسابك)</span>
+                    )}
+                </h2>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedContent && setActiveTab('videos')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}>
+                        <h3 className="relative z-10 text-xl font-bold mb-2 text-blue-900 group-hover:text-blue-600 transition">المحاضرات</h3>
+                        <p className="relative z-10 text-3xl font-black text-blue-600">{videos.length}</p><PlayCircle className="absolute -bottom-6 -left-6 text-blue-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
+                    </motion.div>
+                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedContent && setActiveTab('files')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}>
+                        <h3 className="relative z-10 text-xl font-bold mb-2 text-amber-900 group-hover:text-amber-600 transition">الملفات</h3>
+                        <p className="relative z-10 text-3xl font-black text-amber-600">{filesAndLinks.length}</p><FileText className="absolute -bottom-6 -left-6 text-amber-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
+                    </motion.div>
+                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedContent && setActiveTab('htmls')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}>
+                        <h3 className="relative z-10 text-xl font-bold mb-2 text-purple-900 group-hover:text-purple-600 transition">تفاعلي</h3>
+                        <p className="relative z-10 text-3xl font-black text-purple-600">{htmls.length}</p><Code className="absolute -bottom-6 -left-6 text-purple-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
+                    </motion.div>
+                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedExam && setActiveTab('exams')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedExam ? 'opacity-50 grayscale' : ''}`}>
+                        <h3 className="relative z-10 text-xl font-bold mb-2 text-slate-900 group-hover:text-slate-600 transition">الامتحانات</h3>
+                        <p className="relative z-10 text-3xl font-black text-slate-600">{exams.length}</p><ClipboardList className="absolute -bottom-6 -left-6 text-slate-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
+                    </motion.div>
+                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedExam && setActiveTab('smart_hw_results')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedExam ? 'opacity-50 grayscale' : ''}`}>
+                        <h3 className="relative z-10 text-xl font-bold mb-2 text-blue-900 group-hover:text-blue-600 transition">واجبات (QR)</h3>
+                        <p className="relative z-10 text-3xl font-black text-blue-600">{hwResults.length}</p><QrCode className="absolute -bottom-6 -left-6 text-blue-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
+                    </motion.div>
+                </div>
+                <Leaderboard />
+            </div>
+        )}
+
+        {activeTab === 'subscription' && (
+            <div className="glass-panel p-4 md:p-8 rounded-2xl max-w-4xl mx-auto">
+                <div className="text-center mb-8">
+                    <Crown size={64} className={`mx-auto mb-4 ${isPremium ? 'text-amber-500' : 'text-slate-300'}`} />
+                    <h2 className="text-3xl font-bold font-arabic text-slate-800 mb-2">حالة اشتراكك</h2>
+                    {isPremium ? (
+                        <p className="text-green-600 font-bold text-lg bg-green-50 inline-block px-4 py-2 rounded-full border border-green-200">أنت الآن على الباقة المدفوعة (VIP). صالحة حتى: {userData.subscriptionExpiry?.toDate().toLocaleDateString('ar-EG')}</p>
+                    ) : (
+                        <p className="text-slate-500 font-bold text-lg">حسابك الآن مجاني. اشحن لتتمكن من فتح كل الفيديوهات والامتحانات المغلقة.</p>
+                    )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border-t-4 border-amber-500">
+                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><Key className="text-amber-500"/> شحن بكود (كارت)</h3>
+                        <p className="text-slate-500 text-sm mb-6">إذا اشتريت كارت شحن أو حصلت على كود من السنتر، اكتبه هنا لتفعيل اشتراكك فوراً.</p>
+                        <form onSubmit={handleChargeSubscriptionCode} className="flex flex-col gap-3">
+                            <input 
+                                className="border-2 border-slate-200 p-4 rounded-xl text-center font-mono font-bold text-lg tracking-widest focus:border-amber-500 outline-none" 
+                                placeholder="مثال: NAHAS-XXXXXX"
+                                value={subscriptionCodeInput}
+                                onChange={e=>setSubscriptionCodeInput(e.target.value.toUpperCase())}
+                            />
+                            <button disabled={isCharging} className="bg-amber-600 text-white font-bold py-4 rounded-xl hover:bg-amber-700 shadow-lg flex justify-center items-center">
+                                {isCharging ? <Loader2 className="animate-spin" /> : 'اشحن الكود الآن'}
+                            </button>
+                        </form>
+                    </div>
+
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border-t-4 border-blue-500">
+                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><CreditCard className="text-blue-500"/> الدفع الآلي / فودافون كاش</h3>
+                        <p className="text-slate-500 text-sm mb-4">للشحن اليدوي، قم بتحويل قيمة الاشتراك إلى أحد الأرقام التالية:</p>
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mb-4 text-center">
+                            <p className="font-bold text-lg text-blue-900 font-mono">010XXXXXXXX</p>
+                            <p className="text-xs text-slate-400 mt-1">(فودافون كاش - إنستا باي)</p>
+                        </div>
+                        <p className="text-sm font-bold text-slate-700 mb-4">بعد التحويل، أرسل صورة الوصل على الواتساب مع إيميلك ليتم التفعيل.</p>
+                        <div className="flex flex-col gap-2">
+                            <button onClick={() => window.open("https://wa.me/201500076322", "_blank")} className="w-full bg-green-500 text-white font-bold py-4 rounded-xl hover:bg-green-600 shadow-lg flex items-center justify-center gap-2">
+                                <Phone size={20}/> إرسال الوصل واتساب
+                            </button>
+                            <button onClick={() => alert('بوابات الدفع قيد التفعيل. سيتم توفير الدفع المباشر بالبطاقة قريباً.')} className="w-full bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700 shadow-lg flex items-center justify-center gap-2">
+                                <CreditCard size={20}/> الدفع المباشر (قريباً)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {activeTab === 'mistakes_bank' && !isBannedExam && (
+            <div className="glass-panel p-4 md:p-8 rounded-2xl">
+                <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 border-b border-slate-200 pb-6">
+                    <div>
+                        <h2 className="text-2xl md:text-3xl font-bold font-arabic text-red-700 flex items-center gap-3"><BrainCircuit size={32} className="text-red-500" /> بنك أخطاء الطالب 🏦</h2>
+                        <p className="text-slate-500 mt-2 text-sm md:text-lg">كل سؤال أخطأت فيه سيتم تسجيله هنا لتتمكن من مراجعته والتدرب عليه.</p>
+                    </div>
+                    <button onClick={startMistakesExam} className="bg-red-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-bold shadow-xl shadow-red-500/30 hover:bg-red-700 transition flex items-center gap-2 transform hover:scale-105 w-full md:w-auto justify-center"><Target size={20}/> امتحان من أخطائي</button>
+                </div>
+                {mistakes.length === 0 ? (
+                    <div className="text-center py-16 bg-white rounded-2xl border border-slate-100 shadow-sm"><Trophy size={64} className="mx-auto text-amber-400 mb-4 opacity-80" /><h3 className="text-2xl font-bold text-slate-700">ممتاز جداً يا بطل! 👏</h3><p className="text-slate-500 mt-2">بنك الأخطاء الخاص بك فارغ تماماً. استمر على هذا المستوى.</p></div>
+                ) : (
+                    <div className="grid grid-cols-1 gap-6">
+                        <div className="bg-red-50 text-red-700 p-4 rounded-xl border border-red-200 font-bold flex items-center gap-2 text-sm md:text-base">
+                            <AlertOctagon /> لديك {mistakes.length} سؤال في بنك الأخطاء. يجب مراجعتها جيداً قبل الامتحان النهائي!
+                        </div>
+                        {mistakes.map(m => (
+                            <div key={m.id} className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-200 hover:border-red-300 transition relative overflow-hidden">
+                                <div className="absolute top-0 right-0 bg-slate-800 text-white text-xs px-3 py-1 rounded-bl-lg font-bold">من امتحان: {m.examTitle}</div>
+                                <h3 className="text-lg md:text-xl font-bold text-slate-800 mt-6 md:mt-4 mb-4 leading-relaxed font-sans">{m.question.text}</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="bg-red-50 p-4 rounded-xl border border-red-100"><p className="text-xs text-red-500 font-bold mb-1">إجابتك الخاطئة كانت:</p><p className="font-bold text-slate-800">{m.question.studentAnswerText || 'غير معروف'}</p></div>
+                                    <div className="bg-green-50 p-4 rounded-xl border border-green-100"><p className="text-xs text-green-600 font-bold mb-1">الإجابة الصحيحة هي:</p><p className="font-bold text-green-800">{m.question.correctAnswerText || 'غير معروف'}</p></div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        )}
+        
+        {activeTab === 'videos' && !isBannedContent && (
+            <div className="space-y-6">
+                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide border-b border-slate-200">
+                    <button onClick={() => setVideoSectionTab('explanation')} className={`px-6 py-2 rounded-full font-bold whitespace-nowrap transition ${videoSectionTab === 'explanation' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 border'}`}>شرح الدروس</button>
+                    <button onClick={() => setVideoSectionTab('exercises')} className={`px-6 py-2 rounded-full font-bold whitespace-nowrap transition ${videoSectionTab === 'exercises' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 border'}`}>حل التدريبات</button>
+                    <button onClick={() => setVideoSectionTab('reviews')} className={`px-6 py-2 rounded-full font-bold whitespace-nowrap transition ${videoSectionTab === 'reviews' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 border'}`}>المراجعات النهائية</button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                    {videos.filter(v => (v.videoSection || 'explanation') === videoSectionTab).length === 0 ? (
+                         <div className="col-span-full text-center py-12 bg-white rounded-xl border border-slate-100 shadow-sm">
+                             <PlayCircle className="mx-auto text-slate-300 w-16 h-16 mb-4"/>
+                             <p className="text-slate-500 font-bold">لا توجد فيديوهات في هذا القسم حالياً.</p>
+                         </div>
+                    ) : videos.filter(v => (v.videoSection || 'explanation') === videoSectionTab).map(v => (
+                        <div key={v.id} className="glass-card rounded-xl overflow-hidden cursor-pointer relative group" onClick={() => handlePremiumClick(() => setPlayingVideo(v))}>
+                            <div className="h-48 bg-gradient-to-br from-slate-800 to-black flex items-center justify-center relative">
+                                {v.isPremium && !isPremium ? <Lock className="text-slate-400 w-16 h-16 opacity-80" /> : <PlayCircle className="text-white w-16 h-16 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/>}
+                                <span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(v.grade)}</span>
+                                {v.isPremium && <span className="absolute top-2 right-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-full font-bold flex items-center gap-1 shadow-md"><Crown size={12}/> VIP</span>}
+                            </div>
+                            <div className="p-4"><h3 className={`font-bold text-lg ${v.isPremium && !isPremium ? 'text-slate-400' : 'text-slate-800'}`}>{v.title}</h3></div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
+
+        {activeTab === 'files' && !isBannedContent && (
+            <div className="glass-panel rounded-xl overflow-hidden">
+                {filesAndLinks.map(f => (
+                    <div key={f.id} className="p-4 flex flex-col md:flex-row justify-between md:items-center border-b last:border-0 hover:bg-white/50 transition gap-4">
+                        <div className="flex items-center gap-4">
+                            {f.type === 'link' ? (<div className="bg-blue-100 text-blue-600 p-3 rounded-lg font-bold text-xs shadow-sm flex items-center justify-center"><LinkIcon size={16}/></div>) : (<div className="bg-red-100 text-red-600 p-3 rounded-lg font-bold text-xs shadow-sm">PDF</div>)}
+                            <div>
+                                <h4 className={`font-bold text-lg ${f.isPremium && !isPremium ? 'text-slate-400' : 'text-slate-800'} flex items-center gap-2`}>
+                                    {f.title}
+                                    {f.isPremium && <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1"><Crown size={10}/> VIP</span>}
+                                </h4>
+                                <span className="text-xs text-slate-500">{getGradeLabel(f.grade)}</span>
+                            </div>
+                        </div>
+                        {f.isPremium && !isPremium ? (
+                            <button onClick={()=>handlePremiumClick(()=>{})} className="px-4 py-2 rounded-lg font-bold transition shadow-sm bg-slate-100 text-slate-400 flex items-center justify-center gap-2"><Lock size={16}/> مقفل</button>
+                        ) : (
+                            <a href={f.url} target="_blank" rel="noopener noreferrer" className={`px-4 py-2 rounded-lg font-bold transition shadow-sm text-center ${f.type === 'link' ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' : 'bg-green-50 text-green-700 hover:bg-green-100'}`}>{f.type === 'link' ? 'فتح الرابط' : 'تحميل'}</a>
+                        )}
+                    </div>
+                ))}
+            </div>
+        )}
+        
+        {activeTab === 'htmls' && !isBannedContent && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                {htmls.map(h => (
+                    <motion.div whileHover={{y:-5}} key={h.id} className="glass-card rounded-xl overflow-hidden cursor-pointer relative" onClick={() => handlePremiumClick(() => setPlayingHtml(h))}>
+                        <div className="h-48 bg-gradient-to-br from-purple-600 to-indigo-900 flex items-center justify-center relative group">
+                            {h.isPremium && !isPremium ? <Lock className="text-slate-400 w-20 h-20 opacity-80" /> : <Code className="text-white w-20 h-20 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/>}
+                            <span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(h.grade)}</span>
+                            {h.isPremium && <span className="absolute top-2 right-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-full font-bold flex items-center gap-1 shadow-md"><Crown size={12}/> VIP</span>}
+                        </div>
+                        <div className="p-4"><h3 className={`font-bold text-lg ${h.isPremium && !isPremium ? 'text-slate-400' : 'text-slate-800'}`}>{h.title}</h3><button className={`mt-2 w-full font-bold py-2 rounded-lg transition shadow-sm ${h.isPremium && !isPremium ? 'bg-slate-100 text-slate-400' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'}`}>{h.isPremium && !isPremium ? 'مقفل' : 'تشغيل'}</button></div>
+                    </motion.div>
+                ))}
+            </div>
+        )}
+
+        {activeTab === 'interactive_exams' && !isBannedExam && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                {interactiveExams.map(h => (
+                    <motion.div whileHover={{y:-5}} key={h.id} className="glass-card rounded-xl overflow-hidden cursor-pointer relative" onClick={() => handlePremiumClick(() => setPlayingHtml(h))}>
+                        <div className="h-48 bg-gradient-to-br from-emerald-600 to-teal-900 flex items-center justify-center relative group">
+                            {h.isPremium && !isPremium ? <Lock className="text-slate-400 w-20 h-20 opacity-80" /> : <Sparkles className="text-white w-20 h-20 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/>}
+                            <span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(h.grade)}</span>
+                            {h.isPremium && <span className="absolute top-2 right-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-full font-bold flex items-center gap-1 shadow-md"><Crown size={12}/> VIP</span>}
+                        </div>
+                        <div className="p-4"><h3 className={`font-bold text-lg ${h.isPremium && !isPremium ? 'text-slate-400' : 'text-slate-800'}`}>{h.title}</h3><button className={`mt-2 w-full font-bold py-2 rounded-lg transition shadow-sm ${h.isPremium && !isPremium ? 'bg-slate-100 text-slate-400' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}>{h.isPremium && !isPremium ? 'مقفل' : 'بدء الامتحان'}</button></div>
+                    </motion.div>
+                ))}
+            </div>
+        )}
+        
+        {activeTab === 'exams' && !isBannedExam && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+             {exams.map(e => {
+                const prevResult = examResults.find(r => r.examId === e.id);
+                const isExamTimeOver = Date.now() > new Date(e.endTime).getTime();
+                
+                let statusText = null; let statusClass = "";
+                if (prevResult) {
+                    if (prevResult.status === 'completed') { statusText = `تم الحل: ${prevResult.score} درجة`; statusClass = "bg-green-500 text-white"; } 
+                    else if (prevResult.status === 'in_progress') { statusText = "قيد التنفيذ / انسحاب ⚠️"; statusClass = "bg-yellow-500 text-white"; } 
+                    else if (prevResult.status === 'cheated') { statusText = "تم الحظر (غش)"; statusClass = "bg-red-600 text-white"; }
+                }
+
+                return (
+                  <motion.div whileHover={{scale:1.01}} key={e.id} className={`glass-card p-4 md:p-6 rounded-2xl relative overflow-hidden flex flex-col ${e.isPremium && !isPremium ? 'opacity-70' : ''}`}>
+                    {statusText && <div className={`absolute top-0 left-0 text-[10px] md:text-xs px-2 md:px-3 py-1 rounded-br-xl font-bold shadow-md ${statusClass}`}>{statusText}</div>}
+                    {e.isPremium && <div className="absolute top-2 right-2 bg-amber-100 text-amber-700 text-[10px] px-2 py-1 rounded-full font-bold flex items-center gap-1"><Crown size={12}/> VIP</div>}
+                    
+                    <h3 className={`text-lg md:text-xl font-bold mb-2 mt-4 md:mt-0 ${e.isPremium && !isPremium ? 'text-slate-400' : 'text-slate-800'}`}>{e.title}</h3>
+                    <div className="flex justify-between text-xs md:text-sm text-slate-500 mb-4"><span>⏳ {e.duration} دقيقة</span><span>📝 {e.questions.reduce((acc,g)=>acc+(g.subQuestions?.length||0),0)} سؤال</span></div>
+                    
+                    <div className="mt-auto">
+                        {prevResult && prevResult.status === 'completed' ? (
+                            <div className="flex flex-col sm:flex-row gap-2">
+                                 <button disabled className="flex-1 bg-slate-200 text-slate-500 py-2 md:py-3 rounded-xl font-bold cursor-not-allowed text-xs md:text-sm">تم الانتهاء</button>
+                                 {isExamTimeOver ? (
+                                    <button onClick={() => setReviewingExam(e)} className="flex-1 bg-blue-100 text-blue-700 py-2 md:py-3 rounded-xl font-bold hover:bg-blue-200 transition shadow-sm text-xs md:text-sm">عرض الأخطاء</button>
+                                 ) : (
+                                    <button disabled className="flex-1 bg-gray-100 text-gray-400 py-2 md:py-3 rounded-xl font-bold cursor-not-allowed text-[10px] md:text-xs">المراجعة بعد الوقت</button>
+                                 )}
+                                 <button onClick={() => generatePDF('student', {studentName: user.displayName || user.name, score: prevResult.score, total: e.questions.reduce((acc,g)=>acc+(g.subQuestions?.filter(sq => sq.type !== 'essay').length||0),0), status: prevResult.status, examTitle: e.title, questions: e.questions.flatMap(q => q.subQuestions || []), answers: prevResult.answers })} className="flex-1 bg-green-100 text-green-700 py-2 md:py-3 rounded-xl font-bold hover:bg-green-200 flex items-center justify-center gap-1 transition shadow-sm text-xs md:text-sm"><Download size={14}/> شهادة</button>
+                            </div>
+                        ) : prevResult ? (
+                            <div className="bg-red-50 text-red-600 p-2 md:p-3 rounded-xl font-bold text-center border border-red-200 text-sm">لا يمكن إعادة الامتحان</div>
+                        ) : (
+                            <div className="space-y-2">
+                                <p className="text-xs text-slate-500">يبدأ: {new Date(e.startTime).toLocaleString('ar-EG')}</p>
+                                {e.isPremium && !isPremium ? (
+                                    <button onClick={()=>handlePremiumClick(()=>{})} className="w-full bg-slate-200 text-slate-500 py-3 rounded-xl font-bold flex items-center justify-center gap-2 cursor-not-allowed text-sm"><Lock size={16}/> امتحان مقفل (للمشتركين)</button>
+                                ) : (
+                                    <button onClick={() => startExamWithCode(e)} className="w-full bg-slate-900 text-white py-2 md:py-3 rounded-xl font-bold hover:bg-slate-800 flex items-center justify-center gap-2 shadow-lg hover:shadow-slate-500/30 transition text-sm"><Lock size={14}/> ابدأ الامتحان</button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                  </motion.div>
+                )
+             })}
+          </div>
+        )}
+
+        {activeTab === 'smart_hw_results' && !isBannedExam && (
+            <div className="glass-panel p-4 md:p-6 rounded-xl">
+                <h2 className="text-xl md:text-2xl font-bold mb-6 font-arabic text-blue-800 flex items-center gap-2"><QrCode/> سجل الواجبات الذكية (QR)</h2>
+                {hwResults.length === 0 ? (
+                    <p className="text-slate-500 text-center py-10 bg-white rounded-xl border font-bold text-sm md:text-base">لم تقم بتسليم أي واجب ذكي عبر الكاميرا حتى الآن.</p>
+                ) : (
+                    <div className="space-y-6">
+                        {(() => {
+                            const hwByBook = hwResults.reduce((acc, hw) => { const book = hw.bookName || 'كتب غير مصنفة'; if(!acc[book]) acc[book] = []; acc[book].push(hw); return acc; }, {});
+                            return Object.entries(hwByBook).map(([bookName, hws]) => (
+                                <div key={bookName} className="mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200 overflow-x-auto">
+                                    <h4 className="font-bold text-base md:text-lg text-amber-700 bg-amber-100 p-2 rounded-lg mb-4 flex items-center gap-2 w-max"><BookOpen size={18}/> كتاب: {bookName}</h4>
+                                    <div className="space-y-3 pl-4 border-r-4 border-amber-300 pr-4 w-max min-w-full">
+                                        {hws.map(hw => (
+                                            <div key={hw.id} className="bg-white border shadow-sm p-4 rounded-xl flex flex-col md:flex-row justify-between md:items-center gap-4 hover:border-amber-400 transition">
+                                                <div className="flex-1">
+                                                    <p className="font-bold text-base md:text-lg text-slate-800">{hw.homeworkTitle}</p>
+                                                    <p className="text-xs md:text-sm text-slate-500 mb-2 mt-1 bg-slate-50 p-2 rounded text-wrap break-words whitespace-normal">تعليق المصحح: <span className="font-bold text-blue-600">{hw.feedback}</span></p>
+                                                </div>
+                                                <div className="flex flex-col md:items-end gap-2 flex-shrink-0 border-t md:border-t-0 pt-2 md:pt-0 mt-2 md:mt-0">
+                                                    <span className="text-lg md:text-xl font-black text-green-600 bg-green-50 px-4 py-2 rounded-lg border border-green-200 w-fit">{hw.score} / {hw.total}</span>
+                                                    <span className="text-xs text-slate-400">{hw.submittedAt?.toDate().toLocaleDateString('ar-EG')}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ));
+                        })()}
+                    </div>
+                )}
+            </div>
+        )}
+
+        {activeTab === 'settings' && (
+              <div className="glass-panel p-4 md:p-8 rounded-xl max-w-2xl mx-auto">
+                <h2 className="text-xl md:text-2xl font-bold mb-6 flex items-center gap-2 font-arabic text-slate-800"><Settings className="text-slate-700"/> إعدادات الحساب</h2>
+                {userData.gradeUpdateStatus === 'pending' && (
+                    <div className="mb-4 bg-yellow-50 text-yellow-800 p-4 rounded-xl border border-yellow-200 flex flex-col md:flex-row items-center gap-2 font-bold text-center md:text-right text-sm">
+                        <RefreshCw className="animate-spin-slow" size={20} /> 
+                        لقد قمت بطلب تغيير المرحلة إلى {getGradeLabel(userData.requestedGrade)}. الطلب قيد المراجعة.
+                    </div>
+                )}
+                <form onSubmit={handleUpdateMyProfile} className="space-y-4">
+                  <div><label className="block text-sm font-bold text-slate-700 mb-2">الاسم</label><input disabled className="w-full border p-3 rounded-xl bg-slate-100 text-slate-500 cursor-not-allowed" value={editFormData.name} /><p className="text-xs text-red-500 mt-1">لا يمكن تغيير الاسم (تواصل مع الإدارة).</p></div>
+                  <div><label className="block text-sm font-bold text-slate-700 mb-2">رقم الهاتف</label><input className="w-full border p-3 rounded-xl" value={editFormData.phone} onChange={e=>setEditFormData({...editFormData, phone:e.target.value})} /></div>
+                  <div><label className="block text-sm font-bold text-slate-700 mb-2">رقم ولي الأمر</label><input disabled className="w-full border p-3 rounded-xl bg-slate-100 text-slate-500 cursor-not-allowed" value={editFormData.parentPhone} /><p className="text-xs text-red-500 mt-1">لا يمكن تغيير رقم ولي الأمر.</p></div>
+                  <div><label className="block text-sm font-bold text-slate-700 mb-2">الصف الدراسي (يتطلب موافقة الأدمن)</label><select className="w-full border p-3 rounded-xl bg-white" value={editFormData.grade} onChange={e=>setEditFormData({...editFormData, grade:e.target.value})}><GradeOptions /></select></div>
+                  <button className="w-full bg-gradient-to-r from-amber-600 to-amber-700 text-white py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-amber-500/40 transition mt-4">حفظ التعديلات</button>
+                </form>
+              </div>
+        )}
+      </main>
+    </div>
+  );
+};
+
+// --- لوحة الأدمن (AdminDashboard) ---
 const AdminDashboard = ({ user }) => {
   const [activeTab, setActiveTab] = useState('users'); 
   const [adminGradeFilter, setAdminGradeFilter] = useState('all'); 
+  const [searchTerm, setSearchTerm] = useState(''); // الإضافة: البحث
   const [pendingUsers, setPendingUsers] = useState([]);
   const [activeUsersList, setActiveUsersList] = useState([]);
+  const [lastUserDoc, setLastUserDoc] = useState(null); // الإضافة: Pagination
+  const [loadingMore, setLoadingMore] = useState(false);
   const [contentList, setContentList] = useState([]);
   const [messagesList, setMessagesList] = useState([]); 
   const [newContent, setNewContent] = useState({ title: '', url: '', type: 'video', videoSection: 'explanation', isPublic: false, grade: '3sec', allowedEmails: '', isPremium: false });
@@ -1420,116 +1684,118 @@ const AdminDashboard = ({ user }) => {
   const [codeGenCount, setCodeGenCount] = useState(10);
   const [codeGenDays, setCodeGenDays] = useState(30);
 
-  // تحديث حالة زر الرجوع للموبايل للأدمن
+  // الإضافة: تحديات العباقرة
+  const [weeklyChallenges, setWeeklyChallenges] = useState([]);
+  const [newChallenge, setNewChallenge] = useState({ question: '', options: '', correctIdx: 0, timerMinutes: 3, grade: '3sec' });
+
+  // الإضافة: تصحيح المقالي يدوياً
+  const [essayGrades, setEssayGrades] = useState({});
+
   useEffect(() => {
       window.history.pushState({ tab: activeTab }, '');
-      const handlePopState = (e) => {
-          if (e.state && e.state.tab) { setActiveTab(e.state.tab); } 
-          else { setActiveTab('users'); }
-      };
+      const handlePopState = (e) => { if (e.state && e.state.tab) { setActiveTab(e.state.tab); } else { setActiveTab('users'); } };
       window.addEventListener('popstate', handlePopState);
       return () => window.removeEventListener('popstate', handlePopState);
   }, [activeTab]);
 
   useEffect(() => {
       const q = query(collection(db, 'users'), where('status','==','pending'));
-      const u = onSnapshot(q, s => setPendingUsers(s.docs.map(d=>({id:d.id,...d.data()}))));
-      return u;
+      return onSnapshot(q, s => setPendingUsers(s.docs.map(d=>({id:d.id,...d.data()}))));
+  }, []);
+
+  // الإضافة: جلب الطلاب بنظام الـ Pagination (أول 50 طالب)
+  useEffect(() => {
+      const fetchInitialUsers = async () => {
+          const q = query(collection(db, 'users'), where('status', 'in', ['active', 'banned_cheating', 'banned_all', 'banned_exam', 'banned_content', 'rejected']), limit(50));
+          const snap = await getDocs(q);
+          setActiveUsersList(snap.docs.map(d=>({id:d.id,...d.data()})));
+          setLastUserDoc(snap.docs[snap.docs.length - 1]);
+      };
+      fetchInitialUsers();
+  }, []);
+
+  // دالة تحميل المزيد من الطلاب
+  const loadMoreUsers = async () => {
+      if(!lastUserDoc) return;
+      setLoadingMore(true);
+      try {
+          const q = query(collection(db, 'users'), where('status', 'in', ['active', 'banned_cheating', 'banned_all', 'banned_exam', 'banned_content', 'rejected']), startAfter(lastUserDoc), limit(50));
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+              setActiveUsersList(prev => [...prev, ...snap.docs.map(d=>({id:d.id,...d.data()}))]);
+              setLastUserDoc(snap.docs[snap.docs.length - 1]);
+          } else {
+              setLastUserDoc(null);
+          }
+      } catch (err) { console.error(err); }
+      setLoadingMore(false);
+  };
+
+  useEffect(() => {
+      return onSnapshot(query(collection(db, 'content'), orderBy('createdAt','desc')), s => setContentList(s.docs.map(d=>({id:d.id,...d.data()}))));
   }, []);
 
   useEffect(() => {
-      const q = query(collection(db, 'users'), where('status', 'in', ['active', 'banned_cheating', 'banned_all', 'banned_exam', 'banned_content', 'rejected']));
-      const u = onSnapshot(q, s => setActiveUsersList(s.docs.map(d=>({id:d.id,...d.data()}))));
-      return u;
+      return onSnapshot(query(collection(db, 'messages'), orderBy('createdAt','desc')), s => setMessagesList(s.docs.map(d=>({id:d.id,...d.data()}))));
   }, []);
 
   useEffect(() => {
-      const q = query(collection(db, 'content'), orderBy('createdAt','desc'));
-      const u = onSnapshot(q, s => setContentList(s.docs.map(d=>({id:d.id,...d.data()}))));
-      return u;
+      return onSnapshot(query(collection(db, 'live_sessions'), where('status', '==', 'active')), s => setActiveLiveSessions(s.docs.map(d=>({id:d.id,...d.data()}))));
   }, []);
 
   useEffect(() => {
-      const q = query(collection(db, 'messages'), orderBy('createdAt','desc'));
-      const u = onSnapshot(q, s => setMessagesList(s.docs.map(d=>({id:d.id,...d.data()}))));
-      return u;
+      return onSnapshot(query(collection(db, 'exams'), orderBy('createdAt', 'desc')), s => setExamsList(s.docs.map(d=>({id:d.id,...d.data()}))));
   }, []);
 
   useEffect(() => {
-      const q = query(collection(db, 'live_sessions'), where('status', '==', 'active'));
-      const u = onSnapshot(q, s => setActiveLiveSessions(s.docs.map(d=>({id:d.id,...d.data()}))));
-      return u;
+      return onSnapshot(query(collection(db, 'exam_results'), orderBy('submittedAt', 'desc')), s => setExamResults(s.docs.map(d=>({id:d.id,...d.data()}))));
   }, []);
 
   useEffect(() => {
-      const q = query(collection(db, 'exams'), orderBy('createdAt', 'desc'));
-      const u = onSnapshot(q, s => setExamsList(s.docs.map(d=>({id:d.id,...d.data()}))));
-      return u;
+      return onSnapshot(query(collection(db, 'announcements'), orderBy('createdAt', 'desc')), s => setAnnouncements(s.docs.map(d => ({id: d.id, ...d.data()}))));
   }, []);
 
   useEffect(() => {
-      const q = query(collection(db, 'exam_results'), orderBy('submittedAt', 'desc'));
-      const u = onSnapshot(q, s => setExamResults(s.docs.map(d=>({id:d.id,...d.data()}))));
-      return u;
+      return onSnapshot(collection(db, 'auto_replies'), s => setAutoReplies(s.docs.map(d => ({id: d.id, ...d.data()}))));
   }, []);
 
   useEffect(() => {
-      const q = query(collection(db, 'announcements'), orderBy('createdAt', 'desc'));
-      const u = onSnapshot(q, s => setAnnouncements(s.docs.map(d => ({id: d.id, ...d.data()}))));
-      return u;
-  }, []);
-
-  useEffect(() => {
-      const u = onSnapshot(collection(db, 'auto_replies'), s => setAutoReplies(s.docs.map(d => ({id: d.id, ...d.data()}))));
-      return u;
-  }, []);
-
-  useEffect(() => {
-      const u = onSnapshot(collection(db, 'quotes'), s => setQuotesList(s.docs.map(d => ({id: d.id, ...d.data()}))));
-      return u;
+      return onSnapshot(collection(db, 'quotes'), s => setQuotesList(s.docs.map(d => ({id: d.id, ...d.data()}))));
   }, []);
   
   useEffect(() => {
-      const u = onSnapshot(collection(db, 'smart_homeworks'), s => setSmartHomeworks(s.docs.map(d => ({id: d.id, ...d.data()}))));
-      return u;
+      return onSnapshot(collection(db, 'smart_homeworks'), s => setSmartHomeworks(s.docs.map(d => ({id: d.id, ...d.data()}))));
   }, []);
 
   useEffect(() => {
-      const q = query(collection(db, 'homework_results'), orderBy('submittedAt', 'desc'));
-      const u = onSnapshot(q, s => setHwResults(s.docs.map(d => ({id: d.id, ...d.data()}))));
-      return u;
+      return onSnapshot(query(collection(db, 'homework_results'), orderBy('submittedAt', 'desc')), s => setHwResults(s.docs.map(d => ({id: d.id, ...d.data()}))));
   }, []);
 
   useEffect(() => {
-      const q = query(collection(db, 'subscription_codes'), orderBy('createdAt', 'desc'));
-      const u = onSnapshot(q, s => setSubscriptionCodes(s.docs.map(d => ({id: d.id, ...d.data()}))));
-      return u;
+      return onSnapshot(query(collection(db, 'subscription_codes'), orderBy('createdAt', 'desc')), s => setSubscriptionCodes(s.docs.map(d => ({id: d.id, ...d.data()}))));
+  }, []);
+
+  // الإضافة: جلب تحديات العباقرة
+  useEffect(() => {
+      return onSnapshot(query(collection(db, 'weekly_challenges'), orderBy('createdAt', 'desc')), s => setWeeklyChallenges(s.docs.map(d => ({id: d.id, ...d.data()}))));
   }, []);
 
   const handleApprove = async (id) => {
     await updateDoc(doc(db,'users',id), {status:'active'});
-    sendSystemNotification("مبروك! 🎉", "تم تفعيل حسابك بنجاح.");
+    sendSystemNotification("طلب جديد", "تم تفعيل حساب طالب بنجاح.");
   };
 
-  const handleReject = async (id) => {
-      await updateDoc(doc(db,'users',id), {status:'rejected'});
-  };
-  
-  const handleChangeUserStatus = async (id, newStatus) => {
-      await updateDoc(doc(db,'users',id), {status: newStatus});
-  };
+  const handleReject = async (id) => { await updateDoc(doc(db,'users',id), {status:'rejected'}); };
+  const handleChangeUserStatus = async (id, newStatus) => { await updateDoc(doc(db,'users',id), {status: newStatus}); };
 
   const handleToggleSubscription = async (user) => {
       const isCurrentlyPremium = user.subscriptionStatus === 'premium';
       if (isCurrentlyPremium) {
-          if(window.confirm("تحويل الطالب لباقة مجانية؟")) {
-              await updateDoc(doc(db, 'users', user.id), { subscriptionStatus: 'free', subscriptionExpiry: null });
-          }
+          if(window.confirm("تحويل الطالب لباقة مجانية؟")) await updateDoc(doc(db, 'users', user.id), { subscriptionStatus: 'free', subscriptionExpiry: null });
       } else {
           const days = prompt("كم يوم تريد تفعيل الباقة لهذا الطالب؟", "30");
           if (days && !isNaN(days)) {
-              const expiryDate = new Date();
-              expiryDate.setDate(expiryDate.getDate() + parseInt(days));
+              const expiryDate = new Date(); expiryDate.setDate(expiryDate.getDate() + parseInt(days));
               await updateDoc(doc(db, 'users', user.id), { subscriptionStatus: 'premium', subscriptionExpiry: expiryDate });
               alert(`تم تفعيل الطالب لمدة ${days} يوم.`);
           }
@@ -1543,35 +1809,25 @@ const AdminDashboard = ({ user }) => {
           for(let i=0; i<codeGenCount; i++) {
               const codeString = 'NAHAS-' + Math.random().toString(36).substring(2,8).toUpperCase();
               const newDocRef = doc(collection(db, 'subscription_codes'));
-              batch.set(newDocRef, {
-                  code: codeString,
-                  days: parseInt(codeGenDays),
-                  used: false,
-                  usedBy: null,
-                  createdAt: serverTimestamp()
-              });
+              batch.set(newDocRef, { code: codeString, days: parseInt(codeGenDays), used: false, usedBy: null, createdAt: serverTimestamp() });
           }
           await batch.commit();
           alert("تم توليد الأكواد بنجاح!");
       }
   };
 
-  const handleDeleteCode = async (id) => {
-      if(window.confirm("حذف هذا الكود؟")) await deleteDoc(doc(db, 'subscription_codes', id));
-  };
-
+  const handleDeleteCode = async (id) => { if(window.confirm("حذف هذا الكود؟")) await deleteDoc(doc(db, 'subscription_codes', id)); };
   const handleDeleteUser = async (id) => { if(window.confirm("حذف نهائي؟")) await deleteDoc(doc(db,'users',id)); };
   const handleDeleteMessage = async (id) => { if(window.confirm("حذف الرسالة؟")) await deleteDoc(doc(db,'messages',id)); };
   const handleDeleteExam = async (id) => { if(window.confirm("حذف الامتحان؟")) await deleteDoc(doc(db, 'exams', id)); };
   const handleDeleteAnnouncement = async (id) => { if(window.confirm("حذف الإعلان؟")) await deleteDoc(doc(db, 'announcements', id)); };
   const handleDeleteResult = async (resultId) => { if(window.confirm("حذف النتيجة؟")) await deleteDoc(doc(db, 'exam_results', resultId)); };
+  const handleDeleteChallenge = async (id) => { if(window.confirm("حذف التحدي؟")) await deleteDoc(doc(db, 'weekly_challenges', id)); };
   
   const handleDeleteAllResults = async () => {
     if(window.confirm("تحذير خطير: سيتم حذف جميع نتائج الامتحانات لكل الطلاب. هل أنت متأكد؟")) {
       const batch = writeBatch(db);
-      examResults.forEach(res => {
-        batch.delete(doc(db, 'exam_results', res.id));
-      });
+      examResults.forEach(res => { batch.delete(doc(db, 'exam_results', res.id)); });
       await batch.commit();
       alert("تم حذف جميع النتائج بنجاح.");
     }
@@ -1605,8 +1861,7 @@ const AdminDashboard = ({ user }) => {
       try {
           await updateDoc(doc(db, 'exams', editingExamTime.id), { endTime: newEndTime });
           alert("تم تمديد وقت الامتحان بنجاح!");
-          setEditingExamTime(null);
-          setNewEndTime('');
+          setEditingExamTime(null); setNewEndTime('');
       } catch (error) { console.error("Error updating exam time:", error); alert("حدث خطأ أثناء تعديل الوقت."); }
   };
 
@@ -1616,6 +1871,23 @@ const AdminDashboard = ({ user }) => {
       await addDoc(collection(db, 'smart_homeworks'), { ...newSmartHw, createdAt: serverTimestamp() });
       setNewSmartHw(prev => ({ ...prev, title: '', answerKey: '' }));
       alert("تم إنشاء الواجب! يمكنك نسخ الرابط الآن.");
+  };
+
+  // الإضافة: إضافة تحدي أسبوعي جديد
+  const handleAddChallenge = async (e) => {
+      e.preventDefault();
+      if (!newChallenge.question || !newChallenge.options) return alert("أكمل بيانات التحدي");
+      const optionsArray = newChallenge.options.split('-').map(o => o.trim());
+      await addDoc(collection(db, 'weekly_challenges'), {
+          ...newChallenge,
+          options: optionsArray,
+          correctIdx: parseInt(newChallenge.correctIdx),
+          timerMinutes: parseInt(newChallenge.timerMinutes),
+          status: 'active',
+          createdAt: serverTimestamp()
+      });
+      alert("تم إطلاق التحدي للطلاب!");
+      setNewChallenge({ question: '', options: '', correctIdx: 0, timerMinutes: 3, grade: '3sec' });
   };
 
   const handleReplyMessage = async (msgId) => {
@@ -1637,15 +1909,11 @@ const AdminDashboard = ({ user }) => {
   const handleUpdateUser = async (e) => { 
       e.preventDefault(); 
       if(!editingUser) return; 
-      await updateDoc(doc(db, 'users', editingUser.id), { 
-          name: editingUser.name, phone: editingUser.phone, parentPhone: editingUser.parentPhone, grade: editingUser.grade 
-      }); 
+      await updateDoc(doc(db, 'users', editingUser.id), { name: editingUser.name, phone: editingUser.phone, parentPhone: editingUser.parentPhone, grade: editingUser.grade }); 
       setEditingUser(null); 
   };
   
-  const handleSendResetPassword = async (email) => { 
-      if(window.confirm(`إرسال رابط تغيير كلمة السر لـ ${email}؟`)) await sendPasswordResetEmail(auth, email); 
-  };
+  const handleSendResetPassword = async (email) => { if(window.confirm(`إرسال رابط تغيير كلمة السر لـ ${email}؟`)) await sendPasswordResetEmail(auth, email); };
   
   const approveGrade = async (user) => {
       if (!user.requestedGrade) return;
@@ -1658,7 +1926,7 @@ const AdminDashboard = ({ user }) => {
       alert(`تم رفض طلب تغيير المرحلة للطالب ${user.name}.`);
   };
 
-  const handleFileSelect = (e) => {
+  const handleFileSelect = async (e) => {
       const file = e.target.files[0];
       if (!file) return;
       if (file.size > 1048576) { 
@@ -1667,68 +1935,42 @@ const AdminDashboard = ({ user }) => {
           return;
       }
       setIsUploading(true);
-      const reader = new FileReader();
-      reader.onprogress = (event) => {
-          if (event.lengthComputable) {
-              const percent = Math.round((event.loaded / event.total) * 100);
-              setUploadProgress(percent);
-          }
-      };
-      reader.onloadend = () => {
-          setNewContent({...newContent, url: reader.result});
-          setIsUploading(false);
+      
+      // الإضافة: استخدام الـ Storage للملفات بدلاً من الـ base64 لتخفيف مساحة قاعدة البيانات
+      try {
+          const downloadUrl = await uploadFileToStorage(file, 'content_files');
+          setNewContent({...newContent, url: downloadUrl});
           setUploadProgress(100);
           setTimeout(() => setUploadProgress(0), 2000);
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+          console.error(err);
+          alert("حدث خطأ أثناء الرفع.");
+      }
+      setIsUploading(false);
   };
 
   const handleAddContent = async (e) => { 
       e.preventDefault(); 
-      const allowedEmailsArray = newContent.allowedEmails 
-        ? newContent.allowedEmails.split(',').map(email => email.trim()) 
-        : [];
-
-      const contentData = { 
-          ...newContent, 
-          file: newContent.url, 
-          allowedEmails: allowedEmailsArray,
-          createdAt: new Date() 
-      };
-      
+      const allowedEmailsArray = newContent.allowedEmails ? newContent.allowedEmails.split(',').map(email => email.trim()) : [];
+      const contentData = { ...newContent, file: newContent.url, allowedEmails: allowedEmailsArray, createdAt: new Date() };
       await addDoc(collection(db, 'content'), contentData);
-      
-      if (allowedEmailsArray.length === 0) {
-          await addDoc(collection(db, 'notifications'), { text: `تم إضافة درس جديد: ${newContent.title}`, grade: newContent.grade, createdAt: serverTimestamp() });
-      } 
-      
+      if (allowedEmailsArray.length === 0) { await addDoc(collection(db, 'notifications'), { text: `تم إضافة درس جديد: ${newContent.title}`, grade: newContent.grade, createdAt: serverTimestamp() }); } 
       alert("تم النشر!"); 
       setNewContent({ title: '', url: '', type: 'video', videoSection: 'explanation', isPublic: false, grade: '3sec', allowedEmails: '', isPremium: false });
   }; 
   
-  const handleDeleteContent = async (id) => { 
-      if(window.confirm("حذف هذا المحتوى؟")) await deleteDoc(doc(db, 'content', id)); 
-  };
+  const handleDeleteContent = async (id) => { if(window.confirm("حذف هذا المحتوى؟")) await deleteDoc(doc(db, 'content', id)); };
 
   const startLiveStream = async () => { 
       if(!liveData.liveUrl) return alert("الرابط مطلوب!"); 
       const allowedEmailsArray = liveData.allowedEmails ? liveData.allowedEmails.split(',').map(email => email.trim()) : [];
-      await addDoc(collection(db, 'live_sessions'), { 
-          ...liveData, allowedEmails: allowedEmailsArray, status: 'active', createdAt: serverTimestamp() 
-      }); 
-      if (allowedEmailsArray.length === 0) {
-          await addDoc(collection(db, 'notifications'), { text: `🔴 بث مباشر الآن: ${liveData.title}`, grade: liveData.grade, createdAt: serverTimestamp() }); 
-      }
+      await addDoc(collection(db, 'live_sessions'), { ...liveData, allowedEmails: allowedEmailsArray, status: 'active', createdAt: serverTimestamp() }); 
+      if (allowedEmailsArray.length === 0) { await addDoc(collection(db, 'notifications'), { text: `🔴 بث مباشر الآن: ${liveData.title}`, grade: liveData.grade, createdAt: serverTimestamp() }); }
       alert("بدأ البث!"); 
       setLiveData({ title: '', liveUrl: '', grade: '3sec', passcode: '', allowedEmails: '' });
   };
 
-  const stopLiveStream = async (id) => { 
-      if(window.confirm("إنهاء البث؟")) { 
-          await updateDoc(doc(db, 'live_sessions', id), { status: 'ended' }); 
-          alert("تم الإنهاء"); 
-      } 
-  };
+  const stopLiveStream = async (id) => { if(window.confirm("إنهاء البث؟")) { await updateDoc(doc(db, 'live_sessions', id), { status: 'ended' }); alert("تم الإنهاء"); } };
 
   const parseExam = async () => {
     if (!bulkText.trim()) return alert("أدخل نص الامتحان");
@@ -1746,38 +1988,70 @@ const AdminDashboard = ({ user }) => {
           currentBlock = { text: '', subQuestions: [] }; isReadingPassage = true; return; 
       }
       if (line === 'نهاية القطعة') { isReadingPassage = false; return; }
-      if (line === 'حذف القطعة') { 
-          if(currentQ) { currentBlock.subQuestions.push(currentQ); currentQ = null; } 
-          if (currentBlock.subQuestions.length > 0) { blocks.push(currentBlock); }
-          currentBlock = { text: '', subQuestions: [] }; return; 
+      
+      // الإضافة: قراءة السؤال المقالي من النص المكتوب
+      if (line.startsWith('#مقالي')) {
+          if (currentQ) { currentBlock.subQuestions.push(currentQ); currentQ = null; }
+          const essayText = line.replace('#مقالي', '').trim();
+          currentBlock.subQuestions.push({ id: Date.now() + Math.random(), text: essayText, type: 'essay', branch: currentBranch });
+          return;
       }
 
       if (isReadingPassage) { if(line !== '') currentBlock.text += line + '\n'; } 
       else {
         if (line === '') { if (currentQ && currentQ.options.length > 0) { currentBlock.subQuestions.push(currentQ); currentQ = null; } return; }
         const isCorrect = line.startsWith('*'); const optText = isCorrect ? line.substring(1).trim() : line.trim();
-        if (currentQ && currentQ.options.length >= 4 && !isCorrect) { currentBlock.subQuestions.push(currentQ); currentQ = null; }
+        if (currentQ && currentQ.options && currentQ.options.length >= 4 && !isCorrect) { currentBlock.subQuestions.push(currentQ); currentQ = null; }
         if (!currentQ) { currentQ = { id: Date.now() + Math.random(), text: optText, options: [], correctIdx: 0, branch: currentBranch }; } 
         else { if (isCorrect) { currentQ.correctIdx = currentQ.options.length; } currentQ.options.push(optText); }
       }
     });
     
-    if (currentQ && currentQ.options.length > 0) currentBlock.subQuestions.push(currentQ);
+    if (currentQ && currentQ.options && currentQ.options.length > 0) currentBlock.subQuestions.push(currentQ);
     if (currentBlock.subQuestions.length > 0) blocks.push(currentBlock);
 
     const finalBlocks = blocks.filter(b => b.subQuestions.length > 0);
-    if (finalBlocks.length === 0) return alert("لم يتم التعرف على أسئلة بشكل صحيح. تأكد من وجود إجابات تحت كل سؤال.");
+    if (finalBlocks.length === 0) return alert("لم يتم التعرف على أسئلة بشكل صحيح.");
 
     await addDoc(collection(db, 'exams'), { 
         title: examBuilder.title, grade: examBuilder.grade, duration: examBuilder.duration, 
         startTime: examBuilder.startTime, endTime: examBuilder.endTime, accessCode: examBuilder.accessCode, 
-        isPremium: examBuilder.isPremium,
-        questions: finalBlocks, createdAt: serverTimestamp() 
+        isPremium: examBuilder.isPremium, questions: finalBlocks, createdAt: serverTimestamp() 
     });
-    
     await addDoc(collection(db, 'notifications'), { text: `امتحان جديد: ${examBuilder.title}`, grade: examBuilder.grade, createdAt: serverTimestamp() });
-    setBulkText(""); 
-    alert(`تم نشر الامتحان بنجاح!`);
+    setBulkText(""); alert(`تم نشر الامتحان بنجاح!`);
+  };
+
+  // الإضافة: حفظ تصحيح المقالي يدوياً
+  const handleSaveEssayGrade = async (resultId, qId) => {
+      const grade = essayGrades[`${resultId}_${qId}`];
+      if (grade === undefined || grade === '') return alert("أدخل الدرجة أولاً");
+      
+      const resultDoc = examResults.find(r => r.id === resultId);
+      if (!resultDoc) return;
+
+      const currentAnswers = resultDoc.answers || {};
+      const updatedAnswers = { ...currentAnswers, [qId]: { ...(currentAnswers[qId] || {}), adminScore: parseInt(grade) } };
+      
+      // إعادة حساب المجموع الكلي (اختياري + مقالي تم تصحيحه)
+      let newTotalScore = 0;
+      const examData = examsList.find(e => e.id === resultDoc.examId);
+      if (examData) {
+          examData.questions.forEach(block => {
+              block.subQuestions.forEach(q => {
+                  if (q.type === 'essay') {
+                      if (updatedAnswers[q.id] && updatedAnswers[q.id].adminScore) newTotalScore += updatedAnswers[q.id].adminScore;
+                  } else {
+                      if (updatedAnswers[q.id] === q.correctIdx) newTotalScore += 1;
+                  }
+              });
+          });
+      }
+
+      try {
+          await updateDoc(doc(db, 'exam_results', resultId), { answers: updatedAnswers, score: newTotalScore });
+          alert("تم حفظ درجة السؤال المقالي وتحديث المجموع!");
+      } catch (err) { alert("حدث خطأ أثناء الحفظ."); }
   };
 
   const toggleLeaderboard = async () => {
@@ -1801,10 +2075,27 @@ const AdminDashboard = ({ user }) => {
   const deleteQuote = async (id) => { if(window.confirm("حذف هذه الحكمة؟")) await deleteDoc(doc(db, 'quotes', id)); };
 
   const filteredPendingUsers = pendingUsers.filter(u => adminGradeFilter === 'all' || u.grade === adminGradeFilter);
-  const filteredActiveUsers = activeUsersList.filter(u => adminGradeFilter === 'all' || u.grade === adminGradeFilter);
+  
+  // الإضافة: فلترة وبحث الطلاب
+  const filteredActiveUsers = activeUsersList.filter(u => {
+      const matchGrade = adminGradeFilter === 'all' || u.grade === adminGradeFilter;
+      const matchSearch = u.name.includes(searchTerm) || u.phone.includes(searchTerm) || (u.parentPhone && u.parentPhone.includes(searchTerm));
+      return matchGrade && matchSearch;
+  });
+  
   const filteredContentList = contentList.filter(c => adminGradeFilter === 'all' || c.grade === adminGradeFilter);
   const filteredExamsList = examsList.filter(e => adminGradeFilter === 'all' || e.grade === adminGradeFilter);
   const filteredLiveSessions = activeLiveSessions.filter(ls => adminGradeFilter === 'all' || ls.grade === adminGradeFilter);
+
+  // إحصائيات عامة
+  const statsData = [
+      { name: 'أولى إعدادي', users: activeUsersList.filter(u=>u.grade==='1prep').length },
+      { name: 'تانية إعدادي', users: activeUsersList.filter(u=>u.grade==='2prep').length },
+      { name: 'تالتة إعدادي', users: activeUsersList.filter(u=>u.grade==='3prep').length },
+      { name: 'أولى ثانوي', users: activeUsersList.filter(u=>u.grade==='1sec').length },
+      { name: 'تانية ثانوي', users: activeUsersList.filter(u=>u.grade==='2sec').length },
+      { name: 'تالتة ثانوي', users: activeUsersList.filter(u=>u.grade==='3sec').length },
+  ];
 
   return (
     <div className="min-h-screen bg-slate-100 font-['Cairo'] relative overflow-x-hidden" dir="rtl">
@@ -1831,9 +2122,7 @@ const AdminDashboard = ({ user }) => {
                   <button onClick={() => setViewingStudentProfile(null)} className="absolute top-4 left-4 md:top-6 md:left-6 z-50 bg-red-100 p-2 md:p-3 rounded-full text-red-600 hover:bg-red-200 hover:text-red-700 transition shadow-md border border-red-200"><X size={24}/></button>
                   <div className="bg-white border-b border-slate-200 p-6 pt-16 md:pt-6 flex justify-between items-start flex-shrink-0">
                       <div className="flex gap-4 items-center">
-                          <div className="w-16 h-16 bg-blue-100 text-blue-700 rounded-2xl flex items-center justify-center font-bold text-2xl shadow-inner">
-                              {viewingStudentProfile.name.charAt(0)}
-                          </div>
+                          <div className="w-16 h-16 bg-blue-100 text-blue-700 rounded-2xl flex items-center justify-center font-bold text-2xl shadow-inner">{viewingStudentProfile.name.charAt(0)}</div>
                           <div>
                               <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
                                   {viewingStudentProfile.name} 
@@ -1855,10 +2144,7 @@ const AdminDashboard = ({ user }) => {
                               <div className="flex-1 overflow-y-auto space-y-3 pr-2">
                                   {studentHistoryData.length === 0 ? <p className="text-slate-400 text-center py-10">لم يفتح أي فيديو.</p> : studentHistoryData.map((v, i) => (
                                       <div key={i} className="bg-slate-50 p-3 rounded-xl flex justify-between items-center border border-slate-100">
-                                          <div>
-                                              <p className="font-bold text-slate-800">{v.videoTitle}</p>
-                                              <p className="text-xs text-slate-400 mt-1">آخر فتح: {v.viewedAt?.toDate().toLocaleString('ar-EG')}</p>
-                                          </div>
+                                          <div><p className="font-bold text-slate-800">{v.videoTitle}</p><p className="text-xs text-slate-400 mt-1">آخر فتح: {v.viewedAt?.toDate().toLocaleString('ar-EG')}</p></div>
                                           <div className="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg text-xs font-bold text-center">شاهد لمدة<br/><span className="text-sm">{formatWatchTime(v.watchedSeconds)}</span></div>
                                       </div>
                                   ))}
@@ -1890,10 +2176,7 @@ const AdminDashboard = ({ user }) => {
                                           if (sHw.length === 0) return <p className="text-slate-400 text-center py-4">لم يقم بتسليم أي واجب QR.</p>;
                                           return sHw.map(hw => (
                                               <div key={hw.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
-                                                  <div>
-                                                      <p className="font-bold text-slate-700 text-sm">{hw.homeworkTitle}</p>
-                                                      <p className="text-xs text-slate-400">{hw.bookName}</p>
-                                                  </div>
+                                                  <div><p className="font-bold text-slate-700 text-sm">{hw.homeworkTitle}</p><p className="text-xs text-slate-400">{hw.bookName}</p></div>
                                                   <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-lg text-sm font-bold">{hw.score}/${hw.total}</span>
                                               </div>
                                           ))
@@ -1920,24 +2203,75 @@ const AdminDashboard = ({ user }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-4 md:p-6 relative z-10">
         <div className="glass-panel p-4 rounded-xl h-fit space-y-2 flex md:flex-col overflow-x-auto md:overflow-x-visible whitespace-nowrap scrollbar-hide">
-          {['users', 'all_users', 'subscriptions', 'exams', 'results', 'smart_hw', 'live', 'content', 'messages', 'auto_reply', 'quotes', 'settings'].map(tab => (
+          {['users', 'all_users', 'subscriptions', 'exams', 'results', 'smart_hw', 'live', 'challenges', 'content', 'messages', 'auto_reply', 'quotes', 'analytics', 'settings'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 transition-all ${activeTab===tab?'bg-amber-100 text-amber-700 shadow-sm border-b-4 md:border-b-0 md:border-r-4 border-amber-500':'hover:bg-slate-50 text-slate-600'}`}>
-              {tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : 'الإعدادات'}
+              {tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'الاشتراكات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج والمقالي' : tab === 'smart_hw' ? 'الواجب الذكي' : tab === 'live' ? 'البث المباشر' : tab === 'challenges' ? 'تحديات العباقرة' : tab === 'content' ? 'المحتوى' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : tab === 'analytics' ? 'الإحصائيات' : 'الإعدادات'}
             </button>
           ))}
         </div>
 
         <div className="md:col-span-3 w-full overflow-hidden">
-          {activeTab === 'users' && <div className="glass-panel p-4 md:p-6 rounded-xl"><h2 className="font-bold mb-4 font-arabic text-xl">طلبات الانضمام</h2>{filteredPendingUsers.map(u=><div key={u.id} className="border p-4 mb-2 rounded-lg flex flex-col md:flex-row gap-3 justify-between bg-white/50 backdrop-blur-sm"><div><p className="font-bold">{u.name}</p><p className="text-sm">{u.grade}</p></div><div className="flex gap-2"><button onClick={()=>handleApprove(u.id)} className="bg-green-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-green-500/50 transition flex-1"><Check className="mx-auto"/></button><button onClick={()=>handleReject(u.id)} className="bg-red-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-red-500/50 transition flex-1"><X className="mx-auto"/></button></div></div>)}</div>}
+          
+          {/* الإضافة: قسم الإحصائيات (Analytics) */}
+          {activeTab === 'analytics' && (
+              <div className="space-y-6">
+                  <div className="glass-panel p-4 md:p-6 rounded-xl">
+                      <h2 className="font-bold text-xl mb-6 font-arabic text-slate-800"><BarChart3 className="inline mr-2 text-amber-600"/> إحصائيات عامة للمنصة</h2>
+                      <div className="h-80 w-full">
+                          <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={statsData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis dataKey="name" />
+                                  <YAxis />
+                                  <Tooltip />
+                                  <Legend />
+                                  <Bar dataKey="users" name="عدد الطلاب النشطين" fill="#d97706" radius={[10, 10, 0, 0]} />
+                              </BarChart>
+                          </ResponsiveContainer>
+                      </div>
+                  </div>
+              </div>
+          )}
+
+          {/* الإضافة: قسم تحديات العباقرة */}
+          {activeTab === 'challenges' && (
+              <div className="space-y-6">
+                  <div className="glass-panel p-4 md:p-6 rounded-xl border-t-4 border-purple-500">
+                      <h2 className="font-bold text-xl mb-4 font-arabic text-purple-700 flex items-center gap-2"><Flame/> إطلاق تحدي العباقرة</h2>
+                      <p className="text-sm text-slate-500 mb-4">هذا السؤال سيظهر للطلاب في الصفحة الرئيسية ببنر ملفت للانتباه بوقت محدد جداً.</p>
+                      <form onSubmit={handleAddChallenge} className="grid gap-4">
+                          <input className="border p-3 rounded-xl w-full" placeholder="اكتب السؤال النحوي أو البلاغي القوي هنا..." value={newChallenge.question} onChange={e=>setNewChallenge({...newChallenge, question:e.target.value})} required/>
+                          <input className="border p-3 rounded-xl w-full" placeholder="الاختيارات (افصل بينها بعلامة - مثال: فاعل - مفعول - مضاف إليه)" value={newChallenge.options} onChange={e=>setNewChallenge({...newChallenge, options:e.target.value})} required/>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div><label className="block text-xs font-bold text-slate-500 mb-1">رقم الإجابة الصحيحة (0 للأولى، 1 للثانية..)</label><input type="number" className="border p-3 rounded-xl w-full" value={newChallenge.correctIdx} onChange={e=>setNewChallenge({...newChallenge, correctIdx:e.target.value})} required min="0" max="3"/></div>
+                              <div><label className="block text-xs font-bold text-slate-500 mb-1">وقت التحدي (بالدقائق)</label><input type="number" className="border p-3 rounded-xl w-full" value={newChallenge.timerMinutes} onChange={e=>setNewChallenge({...newChallenge, timerMinutes:e.target.value})} required min="1"/></div>
+                              <div><label className="block text-xs font-bold text-slate-500 mb-1">المرحلة المستهدفة</label><select className="border p-3 rounded-xl w-full" value={newChallenge.grade} onChange={e=>setNewChallenge({...newChallenge, grade:e.target.value})}><GradeOptions/></select></div>
+                          </div>
+                          <button type="submit" className="bg-purple-600 text-white font-bold py-3 rounded-xl hover:bg-purple-700 shadow-lg">إطلاق التحدي الآن 🚀</button>
+                      </form>
+                  </div>
+                  <div className="glass-panel p-4 md:p-6 rounded-xl">
+                      <h3 className="font-bold mb-4">التحديات الحالية النشطة</h3>
+                      {weeklyChallenges.filter(c => adminGradeFilter === 'all' || c.grade === adminGradeFilter).map(c => (
+                          <div key={c.id} className="bg-purple-50 p-4 rounded-xl border border-purple-200 flex justify-between items-center mb-2">
+                              <div><p className="font-bold text-purple-900">{c.question}</p><p className="text-xs text-purple-600">{getGradeLabel(c.grade)} - {c.timerMinutes} دقائق</p></div>
+                              <button onClick={() => handleDeleteChallenge(c.id)} className="text-red-500 hover:bg-red-100 p-2 rounded"><Trash2/></button>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+          )}
+
+          {activeTab === 'users' && <div className="glass-panel p-4 md:p-6 rounded-xl"><h2 className="font-bold mb-4 font-arabic text-xl">طلبات الانضمام</h2>{pendingUsers.filter(u => adminGradeFilter === 'all' || u.grade === adminGradeFilter).map(u=><div key={u.id} className="border p-4 mb-2 rounded-lg flex flex-col md:flex-row gap-3 justify-between bg-white/50 backdrop-blur-sm"><div><p className="font-bold">{u.name}</p><p className="text-sm">{u.grade}</p></div><div className="flex gap-2"><button onClick={()=>handleApprove(u.id)} className="bg-green-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-green-500/50 transition flex-1"><Check className="mx-auto"/></button><button onClick={()=>handleReject(u.id)} className="bg-red-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-red-500/50 transition flex-1"><X className="mx-auto"/></button></div></div>)}</div>}
 
           {activeTab === 'all_users' && (
               <div className="glass-panel p-4 md:p-6 rounded-xl">
                   <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
-                      <h2 className="font-bold font-arabic text-xl">قائمة الطلاب ({filteredActiveUsers.length})</h2>
-                      <div className="md:hidden">
-                          <select className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg font-bold shadow-sm w-full" value={adminGradeFilter} onChange={(e) => setAdminGradeFilter(e.target.value)}>
-                              <option value="all">كل المراحل</option><GradeOptions />
-                          </select>
+                      <h2 className="font-bold font-arabic text-xl">قائمة الطلاب</h2>
+                      {/* الإضافة: مربع البحث للطلاب */}
+                      <div className="flex-1 w-full relative">
+                          <Search className="absolute right-3 top-3 text-slate-400" size={20}/>
+                          <input type="text" className="w-full bg-slate-50 border border-slate-200 rounded-full py-2 pr-10 pl-4 outline-none focus:border-amber-500 transition" placeholder="بحث بالاسم أو رقم التليفون..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                       </div>
                   </div>
                   
@@ -2007,6 +2341,13 @@ const AdminDashboard = ({ user }) => {
                               )}
                           </div>
                       ))}
+                      
+                      {/* الإضافة: زرار تحميل المزيد من الطلاب (Pagination) */}
+                      {lastUserDoc && !searchTerm && (
+                          <button onClick={loadMoreUsers} disabled={loadingMore} className="w-full bg-slate-200 text-slate-700 font-bold py-3 rounded-xl hover:bg-slate-300 transition mt-4 flex justify-center items-center gap-2">
+                              {loadingMore ? <Loader2 className="animate-spin"/> : 'تحميل المزيد من الطلاب...'}
+                          </button>
+                      )}
                   </div>
               </div>
           )}
@@ -2162,8 +2503,8 @@ const AdminDashboard = ({ user }) => {
                           </div>
                       </div>
                       <div className="bg-slate-50 p-4 rounded-xl border mb-6">
-                          <textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm" placeholder="اكتب الأسئلة هنا...&#10;(هام 1: افصل بين كل سؤال والذي يليه بسطر فارغ تماماً، وضع علامة * قبل الإجابة الصحيحة)&#10;(هام 2: لتحديد فرع، اكتب #فرع: اسم_الفرع في سطر لوحده)" value={bulkText} onChange={e=>setBulkText(e.target.value)}/>
-                          <button onClick={parseExam} className="mt-4 w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-green-500/50 transition">نشر</button>
+                          <textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm leading-relaxed" placeholder="اكتب الأسئلة هنا...&#10;(هام 1: افصل بين كل سؤال والذي يليه بسطر فارغ تماماً، وضع علامة * قبل الإجابة الصحيحة)&#10;(هام 2: لتحديد فرع، اكتب #فرع: اسم_الفرع في سطر لوحده)&#10;(هام 3 للأسئلة المقالية: اكتب #مقالي متبوعاً بنص السؤال، وسيظهر للطالب مربع نص يكتب فيه إجابته أو يرفق صورة)" value={bulkText} onChange={e=>setBulkText(e.target.value)}/>
+                          <button onClick={parseExam} className="mt-4 w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-green-500/50 transition">نشر الامتحان</button>
                       </div>
                   </div>
                   <div className="glass-panel p-4 md:p-6 rounded-xl">
@@ -2195,7 +2536,7 @@ const AdminDashboard = ({ user }) => {
           {activeTab === 'results' && (
              <div className="glass-panel p-4 md:p-6 rounded-xl">
                <div className="flex flex-col md:flex-row justify-between md:items-center mb-4 gap-4">
-                 <h2 className="font-bold flex items-center gap-2 font-arabic text-xl"><Layout/> نتائج الامتحانات</h2>
+                 <h2 className="font-bold flex items-center gap-2 font-arabic text-xl"><Layout/> نتائج الامتحانات والتصحيح اليدوي</h2>
                  {!viewingResult && examResults.length > 0 && (
                      <button onClick={handleDeleteAllResults} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-red-700 transition shadow-lg w-full md:w-auto justify-center"><Trash2 size={16}/> حذف جميع النتائج</button>
                  )}
@@ -2206,11 +2547,13 @@ const AdminDashboard = ({ user }) => {
                            <button onClick={() => setViewingResult(null)} className="text-sm text-slate-500 underline font-bold text-right">العودة للقائمة</button>
                            {(() => {
                                const examData = examsList.find(e => e.id === viewingResult.examId);
-                               const questions = getQuestionsForExam(examData);
+                               let mcqTotal = 0;
+                               if(examData) examData.questions.forEach(block => block.subQuestions.forEach(q => { if(q.type !== 'essay') mcqTotal++; }));
+                               const questions = examData ? examData.questions.flatMap(b => b.subQuestions) : [];
                                return (
                                    <div className="flex gap-2">
                                        <button onClick={() => sendWhatsAppToParent(viewingResult)} className="flex-1 md:flex-none justify-center bg-green-500 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 font-bold hover:bg-green-600 shadow-sm"><MessageCircle size={16}/> واتساب لولي الأمر</button>
-                                       <button onClick={() => generatePDF('admin', {...viewingResult, total: viewingResult.total || 0, examTitle: examData?.title, questions: questions, answers: viewingResult.answers })} className="flex-1 md:flex-none justify-center bg-blue-600 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 shadow-sm"><Download size={16}/> التقرير</button>
+                                       <button onClick={() => generatePDF('admin', {...viewingResult, total: mcqTotal, examTitle: examData?.title, questions: questions, answers: viewingResult.answers })} className="flex-1 md:flex-none justify-center bg-blue-600 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 shadow-sm"><Download size={16}/> التقرير</button>
                                    </div>
                                );
                            })()}
@@ -2220,8 +2563,10 @@ const AdminDashboard = ({ user }) => {
                            {(() => {
                                const examData = examsList.find(e => e.id === viewingResult.examId);
                                if(!examData) return <p>بيانات الامتحان محذوفة</p>;
-                               const questions = getQuestionsForExam(examData);
+                               
+                               const questions = examData.questions.flatMap(b => b.subQuestions);
                                const groupedQuestions = questions.reduce((acc, q) => { const b = q.branch || 'عام'; if(!acc[b]) acc[b] = []; acc[b].push(q); return acc; }, {});
+                               
                                return Object.entries(groupedQuestions).map(([branch, qs]) => (
                                    <div key={branch} className="mb-6">
                                        <h4 className="font-bold text-xl text-amber-700 bg-amber-100 p-2 rounded-lg mb-4">{branch}</h4>
@@ -2231,16 +2576,35 @@ const AdminDashboard = ({ user }) => {
                                                    <p className="font-bold mb-2 text-lg md:text-xl text-blue-900 font-sans pr-10">
                                                        {q.text.split('|').map((part, i) => (<React.Fragment key={i}>{part.trim()}{i !== q.text.split('|').length - 1 && <br />}</React.Fragment>))}
                                                    </p>
-                                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                                                       {q.options.map((opt, oIdx) => {
-                                                           const isCorrect = oIdx === q.correctIdx;
-                                                           const isSelected = viewingResult.answers[q.id] === oIdx;
-                                                           let style = "bg-gray-50 text-gray-500";
-                                                           if (isCorrect) style = "bg-green-100 text-green-800 border-green-500 border font-bold md:text-lg";
-                                                           if (isSelected && !isCorrect) style = "bg-red-100 text-red-800 border-red-500 border font-bold md:text-lg";
-                                                           return <div key={oIdx} className={`p-3 rounded font-sans font-bold ${style}`}>{opt}</div>
-                                                       })}
-                                                   </div>
+                                                   
+                                                   {/* الإضافة: واجهة تصحيح المقالي للأدمن */}
+                                                   {q.type === 'essay' ? (
+                                                       <div className="mt-4 p-4 bg-purple-50 rounded-xl border border-purple-200">
+                                                           <h5 className="font-bold text-purple-800 mb-2 text-sm flex items-center gap-2"><PenLine size={16}/> إجابة الطالب (مقالي)</h5>
+                                                           <p className="bg-white p-3 rounded border text-slate-700 whitespace-pre-wrap">{viewingResult.answers[q.id]?.text || 'لم يكتب نصاً.'}</p>
+                                                           {viewingResult.answers[q.id]?.imageUrl && (
+                                                               <div className="mt-2">
+                                                                   <a href={viewingResult.answers[q.id].imageUrl} target="_blank" rel="noreferrer" className="text-blue-600 font-bold underline flex items-center gap-1 text-sm"><ExternalLink size={14}/> عرض الصورة المرفقة من الطالب</a>
+                                                               </div>
+                                                           )}
+                                                           <div className="mt-4 flex flex-col md:flex-row gap-2 items-center">
+                                                               <input type="number" className="border p-2 rounded w-full md:w-32 bg-white" placeholder="الدرجة" value={essayGrades[`${viewingResult.id}_${q.id}`] !== undefined ? essayGrades[`${viewingResult.id}_${q.id}`] : (viewingResult.answers[q.id]?.adminScore || '')} onChange={e => setEssayGrades({...essayGrades, [`${viewingResult.id}_${q.id}`]: e.target.value})} />
+                                                               <button onClick={() => handleSaveEssayGrade(viewingResult.id, q.id)} className="bg-purple-600 text-white px-4 py-2 rounded font-bold hover:bg-purple-700 transition w-full md:w-auto shadow-sm">حفظ الدرجة الكلية</button>
+                                                           </div>
+                                                           {viewingResult.answers[q.id]?.adminScore !== undefined && <p className="text-green-600 font-bold text-xs mt-2 flex items-center gap-1"><CheckCircle size={12}/> تم تصحيحه: أخذ {viewingResult.answers[q.id].adminScore} درجات.</p>}
+                                                       </div>
+                                                   ) : (
+                                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                                                           {q.options.map((opt, oIdx) => {
+                                                               const isCorrect = oIdx === q.correctIdx;
+                                                               const isSelected = viewingResult.answers[q.id] === oIdx;
+                                                               let style = "bg-gray-50 text-gray-500";
+                                                               if (isCorrect) style = "bg-green-100 text-green-800 border-green-500 border font-bold md:text-lg";
+                                                               if (isSelected && !isCorrect) style = "bg-red-100 text-red-800 border-red-500 border font-bold md:text-lg";
+                                                               return <div key={oIdx} className={`p-3 rounded font-sans font-bold ${style}`}>{opt}</div>
+                                                           })}
+                                                       </div>
+                                                   )}
                                                </div>
                                            ))}
                                        </div>
@@ -2252,16 +2616,24 @@ const AdminDashboard = ({ user }) => {
                ) : (
                    <div className="overflow-x-auto">
                        <div className="min-w-[600px] space-y-2">
-                           {examResults.map(res => (
-                               <div key={res.id} className="flex justify-between items-center border p-3 rounded hover:bg-slate-50 transition bg-white/50">
-                                   <div><p className="font-bold">{res.studentName}</p><p className="text-xs text-slate-500">{res.status==='cheated'?'غش 🚫': res.status==='in_progress' ? 'قيد التنفيذ (لم يسلم) ⏳' : `درجة: ${res.score}/${res.total}`}</p></div>
-                                   <div className="flex gap-2">
-                                      {res.status === 'completed' && <button onClick={()=>sendWhatsAppToParent(res)} className="bg-green-100 text-green-700 px-3 py-1 rounded text-xs font-bold flex items-center gap-1 hover:bg-green-200"><MessageCircle size={14}/><span className="hidden md:inline"> إرسال لولي الأمر</span></button>}
-                                      <button onClick={()=>setViewingResult(res)} className="bg-blue-100 text-blue-600 px-3 py-1 rounded text-xs font-bold">التفاصيل</button>
-                                      <button onClick={()=>handleDeleteResult(res.id)} className="bg-amber-100 text-amber-600 px-3 py-1 rounded text-xs font-bold">إعادة</button>
+                           {examResults.filter(res => adminGradeFilter === 'all' || activeUsersList.find(u=>u.id === res.studentId)?.grade === adminGradeFilter).map(res => {
+                               const exData = examsList.find(e=>e.id === res.examId);
+                               const hasEssay = exData && exData.questions.some(b => b.subQuestions.some(q => q.type === 'essay'));
+                               return (
+                                   <div key={res.id} className={`flex justify-between items-center border p-3 rounded hover:bg-slate-50 transition bg-white/50 ${hasEssay ? 'border-l-4 border-l-purple-500' : ''}`}>
+                                       <div>
+                                           <p className="font-bold">{res.studentName}</p>
+                                           <p className="text-xs text-slate-500">{res.status==='cheated'?'غش 🚫': res.status==='in_progress' ? 'قيد التنفيذ (لم يسلم) ⏳' : `المجموع: ${res.score}`}</p>
+                                           {hasEssay && <p className="text-[10px] text-purple-600 font-bold mt-1 bg-purple-100 px-2 py-0.5 rounded w-fit">يحتوي على مقالي يحتاج تصحيح</p>}
+                                       </div>
+                                       <div className="flex gap-2">
+                                          {res.status === 'completed' && <button onClick={()=>sendWhatsAppToParent(res)} className="bg-green-100 text-green-700 px-3 py-1 rounded text-xs font-bold flex items-center gap-1 hover:bg-green-200"><MessageCircle size={14}/><span className="hidden md:inline"> إرسال لولي الأمر</span></button>}
+                                          <button onClick={()=>setViewingResult(res)} className="bg-blue-100 text-blue-600 px-3 py-1 rounded text-xs font-bold">التفاصيل وتصحيح المقالي</button>
+                                          <button onClick={()=>handleDeleteResult(res.id)} className="bg-amber-100 text-amber-600 px-3 py-1 rounded text-xs font-bold">إعادة</button>
+                                       </div>
                                    </div>
-                               </div>
-                           ))}
+                               )
+                           })}
                        </div>
                    </div>
                )}
@@ -2305,15 +2677,15 @@ const AdminDashboard = ({ user }) => {
                           <input type="file" onChange={handleFileSelect} className="absolute inset-0 opacity-0 cursor-pointer" />
                           <div className="flex flex-col items-center gap-2 text-slate-500">
                               <Upload size={32} />
-                              <span className="text-sm font-bold">اضغط هنا لرفع ملف (الحد الأقصى 1 ميجا)</span><span className="text-xs text-red-400">للملفات الأكبر، استخدم رابط خارجي</span>
+                              <span className="text-sm font-bold">اضغط هنا لرفع ملف مباشر (سحابياً) للطلاب</span><span className="text-xs text-red-400">للملفات الضخمة، استخدم رابط خارجي</span>
                           </div>
                           {isUploading && (
                               <div className="absolute inset-0 bg-white/90 flex flex-col items-center justify-center rounded-xl z-10">
-                                  <span className="text-sm font-bold text-amber-600 mb-1">جاري القراءة... {uploadProgress}%</span>
+                                  <span className="text-sm font-bold text-amber-600 mb-1">جاري الرفع... {uploadProgress}%</span>
                                   <div className="w-3/4 h-2 bg-slate-200 rounded-full overflow-hidden"><div className="h-full bg-amber-500 transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div></div>
                               </div>
                           )}
-                          {!isUploading && uploadProgress === 100 && (<div className="absolute inset-0 bg-white/90 flex items-center justify-center rounded-xl z-10"><span className="text-green-600 font-bold flex items-center gap-1"><CheckCircle size={20}/> تم اختيار الملف</span></div>)}
+                          {!isUploading && uploadProgress === 100 && (<div className="absolute inset-0 bg-white/90 flex items-center justify-center rounded-xl z-10"><span className="text-green-600 font-bold flex items-center gap-1"><CheckCircle size={20}/> تم الرفع السحابي بنجاح</span></div>)}
                       </div>
                       
                       <div className="flex flex-col md:flex-row gap-2">
@@ -2446,556 +2818,7 @@ const AdminDashboard = ({ user }) => {
   );
 };
 
-const StudentDashboard = ({ user, userData, installPrompt }) => {
-  const [activeTab, setActiveTab] = useState('home');
-  const [videoSectionTab, setVideoSectionTab] = useState('explanation');
-  const [mobileMenu, setMobileMenu] = useState(false);
-  const [content, setContent] = useState([]);
-  const [liveSessions, setLiveSessions] = useState([]); 
-  const [activeLiveView, setActiveLiveView] = useState(null); 
-  const [exams, setExams] = useState([]);
-  const [activeExam, setActiveExam] = useState(null);
-  const [playingVideo, setPlayingVideo] = useState(null);
-  const [playingHtml, setPlayingHtml] = useState(null);
-  const [examResults, setExamResults] = useState([]);
-  const [hwResults, setHwResults] = useState([]); 
-  const [reviewingExam, setReviewingExam] = useState(null);
-  const [mistakes, setMistakes] = useState([]);
-  const [notifications, setNotifications] = useState([]);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [hasNewNotif, setHasNewNotif] = useState(false);
-  const [editFormData, setEditFormData] = useState({ name: '', phone: '', parentPhone: '', grade: '' });
-  const [showFocusMode, setShowFocusMode] = useState(false);
-  const [scanningHwId, setScanningHwId] = useState(null);
-  
-  const [subscriptionCodeInput, setSubscriptionCodeInput] = useState('');
-  const [isCharging, setIsCharging] = useState(false);
-
-  useEffect(() => {
-      window.history.pushState({ tab: activeTab }, '');
-      const handlePopState = (e) => {
-          if (e.state && e.state.tab) {
-              setActiveTab(e.state.tab);
-              setMobileMenu(false);
-          } else {
-              setActiveTab('home');
-          }
-      };
-      window.addEventListener('popstate', handlePopState);
-      return () => window.removeEventListener('popstate', handlePopState);
-  }, [activeTab]);
-
-  useEffect(() => {
-    if(!userData) return;
-    const urlParams = new URLSearchParams(window.location.search);
-    const hwParam = urlParams.get('hw');
-    if (hwParam) { setScanningHwId(hwParam); window.history.replaceState({}, document.title, window.location.pathname); }
-
-    const unsubContent = onSnapshot(query(collection(db, 'content'), where('grade', '==', userData.grade)), s => {
-        const allContent = s.docs.map(d=>({id:d.id,...d.data()}));
-        const visibleContent = allContent.filter(c => { if (!c.allowedEmails || c.allowedEmails.length === 0) return true; return c.allowedEmails.includes(user.email); });
-        setContent(visibleContent);
-    });
-
-    const unsubLive = onSnapshot(query(collection(db, 'live_sessions'), where('status', '==', 'active'), where('grade', '==', userData.grade)), s => {
-        const activeSessions = s.docs.map(d=>({id:d.id, ...d.data()}));
-        const visibleSessions = activeSessions.filter(ls => { if (!ls.allowedEmails || ls.allowedEmails.length === 0) return true; return ls.allowedEmails.includes(user.email); });
-        setLiveSessions(visibleSessions);
-    });
-
-    const unsubExams = onSnapshot(query(collection(db, 'exams'), where('grade', '==', userData.grade)), s => setExams(s.docs.map(d=>({id:d.id,...d.data()}))));
-    const unsubResults = onSnapshot(query(collection(db, 'exam_results'), where('studentId', '==', user.uid)), s => setExamResults(s.docs.map(d=>({id:d.id,...d.data()}))));
-    const unsubHwResults = onSnapshot(query(collection(db, 'homework_results'), where('studentId', '==', user.uid)), s => {
-        const results = s.docs.map(d=>({id:d.id,...d.data()})); results.sort((a,b) => (b.submittedAt?.seconds || 0) - (a.submittedAt?.seconds || 0)); setHwResults(results);
-    });
-    const unsubMistakes = onSnapshot(query(collection(db, 'student_mistakes'), where('userId', '==', user.uid), orderBy('timestamp', 'desc')), s => { setMistakes(s.docs.map(d => ({id: d.id, ...d.data()}))); });
-    const unsubNotif = onSnapshot(query(collection(db, 'notifications'), where('grade', 'in', ['all', userData.grade]), orderBy('createdAt', 'desc'), limit(10)), s => {
-        const newNotifs = s.docs.map(d => d.data()); setNotifications(newNotifs);
-        if(newNotifs.length > 0) { setHasNewNotif(true); if(newNotifs[0].text) sendSystemNotification("تنبيه جديد 🔔", newNotifs[0].text); }
-    });
-
-    setEditFormData({ name: userData.name, phone: userData.phone, parentPhone: userData.parentPhone, grade: userData.grade });
-
-    return () => { unsubContent(); unsubLive(); unsubExams(); unsubResults(); unsubHwResults(); unsubMistakes(); unsubNotif(); };
-  }, [userData, user]);
-
-  const isPremium = userData?.subscriptionStatus === 'premium' && (!userData.subscriptionExpiry || userData.subscriptionExpiry.toDate() > new Date());
-  
-  const startMistakesExam = () => {
-      if (mistakes.length === 0) return alert("ليس لديك أي أخطاء مسجلة بعد! استمر في التميز 👏");
-      const shuffledMistakes = [...mistakes].sort(() => 0.5 - Math.random()).slice(0, 20);
-      const generatedExam = {
-          id: 'custom_mistakes_exam', title: 'امتحان نقاط الضعف (بنك الأخطاء) 🏦', duration: shuffledMistakes.length * 2, 
-          questions: [ { text: 'أجب عن هذه الأسئلة التي أخطأت بها سابقاً:', subQuestions: shuffledMistakes.map(m => m.question) } ]
-      };
-      setActiveExam(generatedExam);
-  };
-
-  const handleChargeSubscriptionCode = async (e) => {
-      e.preventDefault();
-      if(!subscriptionCodeInput.trim()) return alert("أدخل الكود أولاً");
-      setIsCharging(true);
-      try {
-          const qStr = query(collection(db, 'subscription_codes'), where('code', '==', subscriptionCodeInput.trim()));
-          const snap = await getDocs(qStr);
-          if(snap.empty) { alert("الكود غير صحيح أو غير موجود."); setIsCharging(false); return; }
-          
-          const codeDoc = snap.docs[0];
-          const codeData = codeDoc.data();
-          if(codeData.used) { alert("عفواً، هذا الكود تم استخدامه من قبل."); setIsCharging(false); return; }
-
-          const days = codeData.days;
-          let newExpiry = new Date();
-          if(isPremium && userData.subscriptionExpiry) {
-              newExpiry = userData.subscriptionExpiry.toDate();
-          }
-          newExpiry.setDate(newExpiry.getDate() + days);
-
-          const batch = writeBatch(db);
-          batch.update(doc(db, 'users', user.uid), { subscriptionStatus: 'premium', subscriptionExpiry: newExpiry });
-          batch.update(doc(db, 'subscription_codes', codeDoc.id), { used: true, usedBy: user.displayName });
-          
-          await batch.commit();
-          alert(`تم شحن الكود بنجاح! تم تفعيل اشتراكك لمدة ${days} يوم.`);
-          setSubscriptionCodeInput('');
-      } catch (err) { console.error(err); alert("حدث خطأ أثناء الشحن"); }
-      setIsCharging(false);
-  };
-
-  const handlePremiumClick = (callback) => {
-      if(!isPremium) {
-          alert("عفواً يا بطل، هذا المحتوى مخصص للطلاب المشتركين في الباقة المدفوعة (VIP). يرجى شحن حسابك أو التواصل مع المستر لترقية حسابك!");
-          setActiveTab('subscription');
-      } else {
-          callback();
-      }
-  };
-
-  if (scanningHwId) return <SmartHomeworkScanner hwId={scanningHwId} user={user} onClose={() => setScanningHwId(null)} />;
-  if (activeLiveView) return <LiveSessionView session={activeLiveView} user={user} onClose={() => setActiveLiveView(null)} />;
-  if (activeExam) return <ExamRunner exam={activeExam} user={user} onClose={() => setActiveExam(null)} />;
-  if (showFocusMode) return <PomodoroFocusMode onClose={() => setShowFocusMode(false)} />;
-  if (reviewingExam) {
-      const result = examResults.find(r => r.examId === reviewingExam.id);
-      return <ExamRunner exam={reviewingExam} user={user} onClose={() => setReviewingExam(null)} isReviewMode={true} existingResult={result} />;
-  }
-
-  const isBannedAll = userData?.status === 'banned_all';
-  const isBannedExam = userData?.status === 'banned_exam' || userData?.status === 'banned_cheating'; 
-  const isBannedContent = userData?.status === 'banned_content';
-
-  if(userData?.status === 'pending') return <div className="h-screen flex items-center justify-center bg-amber-50 text-center p-4"><div className="bg-white p-8 rounded-2xl shadow-xl"><h2 className="text-2xl font-bold mb-2">طلبك قيد المراجعة ⏳</h2><button onClick={()=>signOut(auth)} className="mt-4 text-red-500 underline">خروج</button></div></div>;
-  if(userData?.status === 'rejected') return <div className="h-screen flex items-center justify-center bg-red-50"><div className="text-red-600 font-bold">تم رفض طلبك</div><button onClick={()=>signOut(auth)} className="ml-4 bg-white px-4 py-1 rounded">خروج</button></div>;
-  if (isBannedAll) return (
-      <div className="h-screen flex flex-col items-center justify-center bg-red-50 text-center p-6"><Ban size={80} className="text-red-600 mb-4" /><h2 className="text-3xl font-bold text-red-800 mb-2 font-arabic">تم حظر حسابك</h2><p className="text-red-600 mb-6 font-bold">يرجى التواصل مع الإدارة أو المستر لمعرفة السبب.</p><button onClick={()=>signOut(auth)} className="bg-white text-red-600 px-6 py-2 rounded-full font-bold shadow-md hover:bg-red-100">تسجيل الخروج</button></div>
-  );
-
-  const videos = content.filter(c => c.type === 'video');
-  const filesAndLinks = content.filter(c => c.type === 'file' || c.type === 'link');
-  const htmls = content.filter(c => c.type === 'html');
-  const interactiveExams = content.filter(c => c.type === 'interactive_exam');
-
-  const startExamWithCode = async (exam) => {
-    if (isBannedExam) return alert("أنت محظور من دخول الامتحانات.");
-    const previousResult = examResults.find(r => r.examId === exam.id);
-    if (previousResult) {
-        if (previousResult.status === 'completed') { alert(`أنت امتحنت الامتحان ده قبل كده وجبت ${previousResult.score}.`); } 
-        else if (previousResult.status === 'in_progress' || previousResult.status === 'cheated') { alert("لقد بدأت هذا الامتحان بالفعل وتم احتسابه عليك. لا يمكن الإعادة."); }
-        return;
-    }
-    const now = new Date(); const start = new Date(exam.startTime); const end = new Date(exam.endTime);
-    if (now < start) return alert(`الامتحان لم يبدأ بعد. موعد البدء: ${start.toLocaleString('ar-EG')}`);
-    if (now > end) return alert("عفواً، انتهى وقت الامتحان.");
-    const code = prompt("أدخل كود الامتحان:");
-    if (code === exam.accessCode) {
-        try {
-            const attemptRef = await addDoc(collection(db, 'exam_results'), { examId: exam.id, studentId: user.uid, studentName: user.displayName, score: 0, total: 0, status: 'in_progress', submittedAt: serverTimestamp() });
-            setActiveExam({ ...exam, attemptId: attemptRef.id });
-        } catch (error) { console.error("Error creating attempt record:", error); alert("حدث خطأ أثناء بدء الامتحان. حاول مرة أخرى."); }
-    } else { alert("كود خاطئ!"); }
-  };
-
-  return (
-    <div className="bg-slate-50 relative font-['Cairo'] min-h-screen block" dir="rtl">
-      {playingVideo && <SecureVideoPlayer video={playingVideo} user={user} userName={userData.name} onClose={() => setPlayingVideo(null)} />}
-      {playingHtml && <InteractiveViewer content={playingHtml} user={userData} onClose={() => setPlayingHtml(null)} />}
-      <FloatingArabicBackground />
-      <ChatWidget user={user} />
-      
-      <aside className={`fixed top-0 bottom-0 right-0 z-40 bg-white/95 backdrop-blur-xl w-72 p-6 shadow-xl transition-transform duration-300 ${mobileMenu ? 'translate-x-0' : 'translate-x-full md:translate-x-0'} border-l border-slate-200 flex flex-col`}>
-        <div className="flex items-center justify-between mb-10 px-2">
-            <div className="flex items-center gap-3">
-                <ModernLogo />
-                <h1 className="text-2xl font-bold font-arabic text-amber-800">النحاس</h1>
-            </div>
-            <button onClick={() => setMobileMenu(false)} className="md:hidden"><X /></button>
-        </div>
-        <div className="space-y-2 flex-1 overflow-y-auto pr-2">
-          <button onClick={() => {setActiveTab('home'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='home'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><User/> الرئيسية</button>
-          
-          <button onClick={() => {setActiveTab('subscription'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='subscription'?'bg-red-100 text-red-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-red-600'}`}><Crown/> الباقة والاشتراك</button>
-
-          {!isBannedContent && (
-              <>
-                <div onClick={() => {setActiveTab('videos'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='videos'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><PlayCircle/> المحاضرات</div>
-                <div onClick={() => {setActiveTab('files'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='files'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><FileText/> الملفات و الروابط</div>
-                <div onClick={() => {setActiveTab('htmls'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='htmls'?'bg-purple-100 text-purple-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-purple-600'}`}><Code/> محتوى تفاعلي</div>
-              </>
-          )}
-          {!isBannedExam && (
-              <>
-                <div onClick={() => {setActiveTab('exams'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><ClipboardList/> الامتحانات</div>
-                <div onClick={() => {setActiveTab('interactive_exams'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='interactive_exams'?'bg-emerald-100 text-emerald-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-emerald-600'}`}><Sparkles/> امتحان تفاعلي</div>
-                <div onClick={() => {setActiveTab('smart_hw_results'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='smart_hw_results'?'bg-blue-100 text-blue-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-blue-600'}`}><QrCode/> سجل الواجبات (QR)</div>
-                <div onClick={() => {setActiveTab('mistakes_bank'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='mistakes_bank'?'bg-red-100 text-red-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-red-600'}`}><BrainCircuit/> بنك الأخطاء</div>
-              </>
-          )}
-          <button onClick={() => {setActiveTab('settings'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='settings'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><Settings/> ملفي الشخصي</button>
-        </div>
-        <div className="mt-auto pt-6"><button onClick={() => signOut(auth)} className="flex items-center gap-3 text-red-500 font-bold hover:bg-red-50 w-full p-4 rounded-xl transition"><LogOut/> خروج</button></div>
-      </aside>
-
-      <main className="p-4 md:p-10 relative z-10 min-h-screen md:pr-72 w-full transition-all">
-        <div className="md:hidden flex justify-between items-center mb-6 glass-panel p-4 rounded-2xl shadow-sm"><h1 className="font-bold text-lg text-slate-800">منصة النحاس</h1><button onClick={() => setMobileMenu(true)} className="p-2 bg-slate-100 rounded-lg"><Menu /></button></div>
-        <div className="flex justify-between items-center mb-6 relative">
-            <div className="flex gap-2">
-                {installPrompt && ( <button onClick={installPrompt} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full font-bold shadow-lg shadow-green-500/30 transition flex items-center gap-2"><DownloadCloud size={18}/><span className="hidden md:inline">تثبيت التطبيق</span></button> )}
-                <button onClick={() => setShowFocusMode(true)} className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-full font-bold shadow-lg transition flex items-center gap-2"><Headphones size={18}/><span className="hidden md:inline">التركيز</span></button>
-            </div>
-            <div className="flex items-center gap-3">
-                {isPremium && <span className="hidden md:flex bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-bold items-center gap-1 border border-amber-200"><Crown size={14}/> VIP صالح حتى: {userData.subscriptionExpiry?.toDate().toLocaleDateString('ar-EG')}</span>}
-                <button onClick={() => {requestNotificationPermission(); setShowNotifications(!showNotifications); setHasNewNotif(false);}} className="relative p-2 glass-panel rounded-full shadow-sm hover:bg-white transition">
-                    <Bell className="text-slate-600"/>{hasNewNotif && <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>}
-                </button>
-            </div>
-            {showNotifications && (
-                <div className="absolute top-12 left-0 w-80 glass-panel rounded-xl shadow-xl border border-white/50 p-4 z-50 max-h-96 overflow-y-auto">
-                    <h3 className="font-bold mb-3 text-sm text-slate-500">الإشعارات</h3>
-                    {notifications.length === 0 ? <p className="text-xs text-slate-400">لا توجد إشعارات جديدة</p> : (
-                        <div className="space-y-3">
-                            {notifications.map((n, i) => (
-                                <div key={i} className="text-sm bg-slate-50/50 p-2 rounded border-l-4 border-amber-500">{n.text}<div className="text-[10px] text-slate-400 mt-1">{n.createdAt?.toDate().toLocaleDateString()}</div></div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            )}
-        </div>
-
-        {activeTab === 'home' && (
-            <div className="space-y-8">
-                {liveSessions.map(ls => (
-                    <div key={ls.id} className="bg-gradient-to-r from-red-600 to-red-800 text-white p-4 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-lg border border-red-500/50 animate-pulse-slow">
-                        <div>
-                           <h3 className="font-bold font-arabic text-xl flex items-center gap-2"><Radio className="animate-pulse"/> بث مباشر الآن: {ls.title}</h3>
-                           {ls.passcode && <p className="text-xs text-red-200 mt-1">هذا البث محمي برقم سري</p>}
-                        </div>
-                        <button onClick={() => handleJoinLive(ls)} className="bg-white text-red-700 px-6 py-2 rounded-full font-bold shadow-md hover:bg-red-50 transition w-full md:w-auto">انضمام الآن</button>
-                    </div>
-                ))}
-                <WisdomBox />
-                <Announcements />
-                <h2 className="text-3xl font-bold text-slate-800 font-arabic flex flex-wrap items-center gap-2">
-                    منور يا <span className="text-amber-600">{userData.name.split(' ')[0]}</span> 👋 
-                    <span className="text-sm font-normal text-slate-500 bg-slate-200 px-3 py-1 rounded-full font-sans">{getGradeLabel(userData.grade)}</span>
-                    {isPremium ? (
-                        <span className="bg-amber-100 text-amber-700 text-xs px-3 py-1 rounded-full font-bold flex items-center gap-1 shadow-sm"><Crown size={14}/> حساب VIP</span>
-                    ) : (
-                        <span className="bg-slate-200 text-slate-600 text-xs px-3 py-1 rounded-full font-bold flex items-center gap-1 cursor-pointer" onClick={()=>setActiveTab('subscription')}>مجاني (رقي حسابك)</span>
-                    )}
-                </h2>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedContent && setActiveTab('videos')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}>
-                        <h3 className="relative z-10 text-xl font-bold mb-2 text-blue-900 group-hover:text-blue-600 transition">المحاضرات</h3>
-                        <p className="relative z-10 text-3xl font-black text-blue-600">{videos.length}</p><PlayCircle className="absolute -bottom-6 -left-6 text-blue-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
-                    </motion.div>
-                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedContent && setActiveTab('files')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}>
-                        <h3 className="relative z-10 text-xl font-bold mb-2 text-amber-900 group-hover:text-amber-600 transition">الملفات</h3>
-                        <p className="relative z-10 text-3xl font-black text-amber-600">{filesAndLinks.length}</p><FileText className="absolute -bottom-6 -left-6 text-amber-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
-                    </motion.div>
-                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedContent && setActiveTab('htmls')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}>
-                        <h3 className="relative z-10 text-xl font-bold mb-2 text-purple-900 group-hover:text-purple-600 transition">تفاعلي</h3>
-                        <p className="relative z-10 text-3xl font-black text-purple-600">{htmls.length}</p><Code className="absolute -bottom-6 -left-6 text-purple-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
-                    </motion.div>
-                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedExam && setActiveTab('exams')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedExam ? 'opacity-50 grayscale' : ''}`}>
-                        <h3 className="relative z-10 text-xl font-bold mb-2 text-slate-900 group-hover:text-slate-600 transition">الامتحانات</h3>
-                        <p className="relative z-10 text-3xl font-black text-slate-600">{exams.length}</p><ClipboardList className="absolute -bottom-6 -left-6 text-slate-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
-                    </motion.div>
-                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedExam && setActiveTab('smart_hw_results')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedExam ? 'opacity-50 grayscale' : ''}`}>
-                        <h3 className="relative z-10 text-xl font-bold mb-2 text-blue-900 group-hover:text-blue-600 transition">واجبات (QR)</h3>
-                        <p className="relative z-10 text-3xl font-black text-blue-600">{hwResults.length}</p><QrCode className="absolute -bottom-6 -left-6 text-blue-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
-                    </motion.div>
-                </div>
-                <Leaderboard />
-            </div>
-        )}
-
-        {activeTab === 'subscription' && (
-            <div className="glass-panel p-4 md:p-8 rounded-2xl max-w-4xl mx-auto">
-                <div className="text-center mb-8">
-                    <Crown size={64} className={`mx-auto mb-4 ${isPremium ? 'text-amber-500' : 'text-slate-300'}`} />
-                    <h2 className="text-3xl font-bold font-arabic text-slate-800 mb-2">حالة اشتراكك</h2>
-                    {isPremium ? (
-                        <p className="text-green-600 font-bold text-lg bg-green-50 inline-block px-4 py-2 rounded-full border border-green-200">أنت الآن على الباقة المدفوعة (VIP). صالحة حتى: {userData.subscriptionExpiry?.toDate().toLocaleDateString('ar-EG')}</p>
-                    ) : (
-                        <p className="text-slate-500 font-bold text-lg">حسابك الآن مجاني. اشحن لتتمكن من فتح كل الفيديوهات والامتحانات المغلقة.</p>
-                    )}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border-t-4 border-amber-500">
-                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><Key className="text-amber-500"/> شحن بكود (كارت)</h3>
-                        <p className="text-slate-500 text-sm mb-6">إذا اشتريت كارت شحن أو حصلت على كود من السنتر، اكتبه هنا لتفعيل اشتراكك فوراً.</p>
-                        <form onSubmit={handleChargeSubscriptionCode} className="flex flex-col gap-3">
-                            <input 
-                                className="border-2 border-slate-200 p-4 rounded-xl text-center font-mono font-bold text-lg tracking-widest focus:border-amber-500 outline-none" 
-                                placeholder="مثال: NAHAS-XXXXXX"
-                                value={subscriptionCodeInput}
-                                onChange={e=>setSubscriptionCodeInput(e.target.value.toUpperCase())}
-                            />
-                            <button disabled={isCharging} className="bg-amber-600 text-white font-bold py-4 rounded-xl hover:bg-amber-700 shadow-lg flex justify-center items-center">
-                                {isCharging ? <Loader2 className="animate-spin" /> : 'اشحن الكود الآن'}
-                            </button>
-                        </form>
-                    </div>
-
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border-t-4 border-blue-500">
-                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><CreditCard className="text-blue-500"/> شحن فودافون كاش / إنستا باي</h3>
-                        <p className="text-slate-500 text-sm mb-4">للشحن اليدوي، قم بتحويل قيمة الاشتراك إلى أحد الأرقام التالية:</p>
-                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mb-4 text-center">
-                            <p className="font-bold text-lg text-blue-900 font-mono">010XXXXXXXX</p>
-                            <p className="text-xs text-slate-400 mt-1">(فودافون كاش - إنستا باي)</p>
-                        </div>
-                        <p className="text-sm font-bold text-slate-700 mb-4">بعد التحويل، أرسل صورة الوصل على الواتساب مع إيميلك ليتم التفعيل.</p>
-                        <button onClick={() => window.open("https://wa.me/201500076322", "_blank")} className="w-full bg-green-500 text-white font-bold py-4 rounded-xl hover:bg-green-600 shadow-lg flex items-center justify-center gap-2">
-                            <Phone size={20}/> إرسال الوصل واتساب
-                        </button>
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {activeTab === 'mistakes_bank' && !isBannedExam && (
-            <div className="glass-panel p-4 md:p-8 rounded-2xl">
-                <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 border-b border-slate-200 pb-6">
-                    <div>
-                        <h2 className="text-2xl md:text-3xl font-bold font-arabic text-red-700 flex items-center gap-3"><BrainCircuit size={32} className="text-red-500" /> بنك أخطاء الطالب 🏦</h2>
-                        <p className="text-slate-500 mt-2 text-sm md:text-lg">كل سؤال أخطأت فيه سيتم تسجيله هنا لتتمكن من مراجعته والتدرب عليه.</p>
-                    </div>
-                    <button onClick={startMistakesExam} className="bg-red-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-bold shadow-xl shadow-red-500/30 hover:bg-red-700 transition flex items-center gap-2 transform hover:scale-105 w-full md:w-auto justify-center"><Target size={20}/> امتحان من أخطائي</button>
-                </div>
-                {mistakes.length === 0 ? (
-                    <div className="text-center py-16 bg-white rounded-2xl border border-slate-100 shadow-sm"><Trophy size={64} className="mx-auto text-amber-400 mb-4 opacity-80" /><h3 className="text-2xl font-bold text-slate-700">ممتاز جداً يا بطل! 👏</h3><p className="text-slate-500 mt-2">بنك الأخطاء الخاص بك فارغ تماماً. استمر على هذا المستوى.</p></div>
-                ) : (
-                    <div className="grid grid-cols-1 gap-6">
-                        <div className="bg-red-50 text-red-700 p-4 rounded-xl border border-red-200 font-bold flex items-center gap-2 text-sm md:text-base">
-                            <AlertOctagon /> لديك {mistakes.length} سؤال في بنك الأخطاء. يجب مراجعتها جيداً قبل الامتحان النهائي!
-                        </div>
-                        {mistakes.map(m => (
-                            <div key={m.id} className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-200 hover:border-red-300 transition relative overflow-hidden">
-                                <div className="absolute top-0 right-0 bg-slate-800 text-white text-xs px-3 py-1 rounded-bl-lg font-bold">من امتحان: {m.examTitle}</div>
-                                <h3 className="text-lg md:text-xl font-bold text-slate-800 mt-6 md:mt-4 mb-4 leading-relaxed font-sans">{m.question.text}</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="bg-red-50 p-4 rounded-xl border border-red-100"><p className="text-xs text-red-500 font-bold mb-1">إجابتك الخاطئة كانت:</p><p className="font-bold text-slate-800">{m.question.studentAnswerText || 'غير معروف'}</p></div>
-                                    <div className="bg-green-50 p-4 rounded-xl border border-green-100"><p className="text-xs text-green-600 font-bold mb-1">الإجابة الصحيحة هي:</p><p className="font-bold text-green-800">{m.question.correctAnswerText || 'غير معروف'}</p></div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-        )}
-        
-        {activeTab === 'videos' && !isBannedContent && (
-            <div className="space-y-6">
-                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide border-b border-slate-200">
-                    <button onClick={() => setVideoSectionTab('explanation')} className={`px-6 py-2 rounded-full font-bold whitespace-nowrap transition ${videoSectionTab === 'explanation' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 border'}`}>شرح الدروس</button>
-                    <button onClick={() => setVideoSectionTab('exercises')} className={`px-6 py-2 rounded-full font-bold whitespace-nowrap transition ${videoSectionTab === 'exercises' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 border'}`}>حل التدريبات</button>
-                    <button onClick={() => setVideoSectionTab('reviews')} className={`px-6 py-2 rounded-full font-bold whitespace-nowrap transition ${videoSectionTab === 'reviews' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 border'}`}>المراجعات النهائية</button>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                    {videos.filter(v => (v.videoSection || 'explanation') === videoSectionTab).length === 0 ? (
-                         <div className="col-span-full text-center py-12 bg-white rounded-xl border border-slate-100 shadow-sm">
-                             <PlayCircle className="mx-auto text-slate-300 w-16 h-16 mb-4"/>
-                             <p className="text-slate-500 font-bold">لا توجد فيديوهات في هذا القسم حالياً.</p>
-                         </div>
-                    ) : videos.filter(v => (v.videoSection || 'explanation') === videoSectionTab).map(v => (
-                        <div key={v.id} className="glass-card rounded-xl overflow-hidden cursor-pointer relative group" onClick={() => handlePremiumClick(() => setPlayingVideo(v))}>
-                            <div className="h-48 bg-gradient-to-br from-slate-800 to-black flex items-center justify-center relative">
-                                {v.isPremium && !isPremium ? <Lock className="text-slate-400 w-16 h-16 opacity-80" /> : <PlayCircle className="text-white w-16 h-16 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/>}
-                                <span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(v.grade)}</span>
-                                {v.isPremium && <span className="absolute top-2 right-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-full font-bold flex items-center gap-1 shadow-md"><Crown size={12}/> VIP</span>}
-                            </div>
-                            <div className="p-4"><h3 className={`font-bold text-lg ${v.isPremium && !isPremium ? 'text-slate-400' : 'text-slate-800'}`}>{v.title}</h3></div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        )}
-
-        {activeTab === 'files' && !isBannedContent && (
-            <div className="glass-panel rounded-xl overflow-hidden">
-                {filesAndLinks.map(f => (
-                    <div key={f.id} className="p-4 flex flex-col md:flex-row justify-between md:items-center border-b last:border-0 hover:bg-white/50 transition gap-4">
-                        <div className="flex items-center gap-4">
-                            {f.type === 'link' ? (<div className="bg-blue-100 text-blue-600 p-3 rounded-lg font-bold text-xs shadow-sm flex items-center justify-center"><LinkIcon size={16}/></div>) : (<div className="bg-red-100 text-red-600 p-3 rounded-lg font-bold text-xs shadow-sm">PDF</div>)}
-                            <div>
-                                <h4 className={`font-bold text-lg ${f.isPremium && !isPremium ? 'text-slate-400' : 'text-slate-800'} flex items-center gap-2`}>
-                                    {f.title}
-                                    {f.isPremium && <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1"><Crown size={10}/> VIP</span>}
-                                </h4>
-                                <span className="text-xs text-slate-500">{getGradeLabel(f.grade)}</span>
-                            </div>
-                        </div>
-                        {f.isPremium && !isPremium ? (
-                            <button onClick={()=>handlePremiumClick(()=>{})} className="px-4 py-2 rounded-lg font-bold transition shadow-sm bg-slate-100 text-slate-400 flex items-center justify-center gap-2"><Lock size={16}/> مقفل</button>
-                        ) : (
-                            <a href={f.url} target="_blank" rel="noopener noreferrer" className={`px-4 py-2 rounded-lg font-bold transition shadow-sm text-center ${f.type === 'link' ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' : 'bg-green-50 text-green-700 hover:bg-green-100'}`}>{f.type === 'link' ? 'فتح الرابط' : 'تحميل'}</a>
-                        )}
-                    </div>
-                ))}
-            </div>
-        )}
-        
-        {activeTab === 'htmls' && !isBannedContent && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                {htmls.map(h => (
-                    <motion.div whileHover={{y:-5}} key={h.id} className="glass-card rounded-xl overflow-hidden cursor-pointer relative" onClick={() => handlePremiumClick(() => setPlayingHtml(h))}>
-                        <div className="h-48 bg-gradient-to-br from-purple-600 to-indigo-900 flex items-center justify-center relative group">
-                            {h.isPremium && !isPremium ? <Lock className="text-slate-400 w-20 h-20 opacity-80" /> : <Code className="text-white w-20 h-20 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/>}
-                            <span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(h.grade)}</span>
-                            {h.isPremium && <span className="absolute top-2 right-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-full font-bold flex items-center gap-1 shadow-md"><Crown size={12}/> VIP</span>}
-                        </div>
-                        <div className="p-4"><h3 className={`font-bold text-lg ${h.isPremium && !isPremium ? 'text-slate-400' : 'text-slate-800'}`}>{h.title}</h3><button className={`mt-2 w-full font-bold py-2 rounded-lg transition shadow-sm ${h.isPremium && !isPremium ? 'bg-slate-100 text-slate-400' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'}`}>{h.isPremium && !isPremium ? 'مقفل' : 'تشغيل'}</button></div>
-                    </motion.div>
-                ))}
-            </div>
-        )}
-
-        {activeTab === 'interactive_exams' && !isBannedExam && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                {interactiveExams.map(h => (
-                    <motion.div whileHover={{y:-5}} key={h.id} className="glass-card rounded-xl overflow-hidden cursor-pointer relative" onClick={() => handlePremiumClick(() => setPlayingHtml(h))}>
-                        <div className="h-48 bg-gradient-to-br from-emerald-600 to-teal-900 flex items-center justify-center relative group">
-                            {h.isPremium && !isPremium ? <Lock className="text-slate-400 w-20 h-20 opacity-80" /> : <Sparkles className="text-white w-20 h-20 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/>}
-                            <span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(h.grade)}</span>
-                            {h.isPremium && <span className="absolute top-2 right-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-full font-bold flex items-center gap-1 shadow-md"><Crown size={12}/> VIP</span>}
-                        </div>
-                        <div className="p-4"><h3 className={`font-bold text-lg ${h.isPremium && !isPremium ? 'text-slate-400' : 'text-slate-800'}`}>{h.title}</h3><button className={`mt-2 w-full font-bold py-2 rounded-lg transition shadow-sm ${h.isPremium && !isPremium ? 'bg-slate-100 text-slate-400' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}>{h.isPremium && !isPremium ? 'مقفل' : 'بدء الامتحان'}</button></div>
-                    </motion.div>
-                ))}
-            </div>
-        )}
-        
-        {activeTab === 'exams' && !isBannedExam && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-             {exams.map(e => {
-                const prevResult = examResults.find(r => r.examId === e.id);
-                const isExamTimeOver = Date.now() > new Date(e.endTime).getTime();
-                
-                let statusText = null; let statusClass = "";
-                if (prevResult) {
-                    if (prevResult.status === 'completed') { statusText = `تم الحل: ${prevResult.score} درجة`; statusClass = "bg-green-500 text-white"; } 
-                    else if (prevResult.status === 'in_progress') { statusText = "قيد التنفيذ / انسحاب ⚠️"; statusClass = "bg-yellow-500 text-white"; } 
-                    else if (prevResult.status === 'cheated') { statusText = "تم الحظر (غش)"; statusClass = "bg-red-600 text-white"; }
-                }
-
-                return (
-                  <motion.div whileHover={{scale:1.01}} key={e.id} className={`glass-card p-4 md:p-6 rounded-2xl relative overflow-hidden flex flex-col ${e.isPremium && !isPremium ? 'opacity-70' : ''}`}>
-                    {statusText && <div className={`absolute top-0 left-0 text-[10px] md:text-xs px-2 md:px-3 py-1 rounded-br-xl font-bold shadow-md ${statusClass}`}>{statusText}</div>}
-                    {e.isPremium && <div className="absolute top-2 right-2 bg-amber-100 text-amber-700 text-[10px] px-2 py-1 rounded-full font-bold flex items-center gap-1"><Crown size={12}/> VIP</div>}
-                    
-                    <h3 className={`text-lg md:text-xl font-bold mb-2 mt-4 md:mt-0 ${e.isPremium && !isPremium ? 'text-slate-400' : 'text-slate-800'}`}>{e.title}</h3>
-                    <div className="flex justify-between text-xs md:text-sm text-slate-500 mb-4"><span>⏳ {e.duration} دقيقة</span><span>📝 {e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0)} سؤال</span></div>
-                    
-                    <div className="mt-auto">
-                        {prevResult && prevResult.status === 'completed' ? (
-                            <div className="flex flex-col sm:flex-row gap-2">
-                                 <button disabled className="flex-1 bg-slate-200 text-slate-500 py-2 md:py-3 rounded-xl font-bold cursor-not-allowed text-xs md:text-sm">تم الانتهاء</button>
-                                 {isExamTimeOver ? (
-                                    <button onClick={() => setReviewingExam(e)} className="flex-1 bg-blue-100 text-blue-700 py-2 md:py-3 rounded-xl font-bold hover:bg-blue-200 transition shadow-sm text-xs md:text-sm">عرض الأخطاء</button>
-                                 ) : (
-                                    <button disabled className="flex-1 bg-gray-100 text-gray-400 py-2 md:py-3 rounded-xl font-bold cursor-not-allowed text-[10px] md:text-xs">المراجعة بعد الوقت</button>
-                                 )}
-                                 <button onClick={() => generatePDF('student', {studentName: user.displayName, score: prevResult.score, total: e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0), status: prevResult.status, examTitle: e.title, questions: e.questions.flatMap(q => q.subQuestions), answers: prevResult.answers })} className="flex-1 bg-green-100 text-green-700 py-2 md:py-3 rounded-xl font-bold hover:bg-green-200 flex items-center justify-center gap-1 transition shadow-sm text-xs md:text-sm"><Download size={14}/> شهادة</button>
-                            </div>
-                        ) : prevResult ? (
-                            <div className="bg-red-50 text-red-600 p-2 md:p-3 rounded-xl font-bold text-center border border-red-200 text-sm">لا يمكن إعادة الامتحان</div>
-                        ) : (
-                            <div className="space-y-2">
-                                <p className="text-xs text-slate-500">يبدأ: {new Date(e.startTime).toLocaleString('ar-EG')}</p>
-                                {e.isPremium && !isPremium ? (
-                                    <button onClick={()=>handlePremiumClick(()=>{})} className="w-full bg-slate-200 text-slate-500 py-3 rounded-xl font-bold flex items-center justify-center gap-2 cursor-not-allowed text-sm"><Lock size={16}/> امتحان مقفل (للمشتركين)</button>
-                                ) : (
-                                    <button onClick={() => startExamWithCode(e)} className="w-full bg-slate-900 text-white py-2 md:py-3 rounded-xl font-bold hover:bg-slate-800 flex items-center justify-center gap-2 shadow-lg hover:shadow-slate-500/30 transition text-sm"><Lock size={14}/> ابدأ الامتحان</button>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                  </motion.div>
-                )
-             })}
-          </div>
-        )}
-
-        {activeTab === 'smart_hw_results' && !isBannedExam && (
-            <div className="glass-panel p-4 md:p-6 rounded-xl">
-                <h2 className="text-xl md:text-2xl font-bold mb-6 font-arabic text-blue-800 flex items-center gap-2"><QrCode/> سجل الواجبات الذكية (QR)</h2>
-                {hwResults.length === 0 ? (
-                    <p className="text-slate-500 text-center py-10 bg-white rounded-xl border font-bold text-sm md:text-base">لم تقم بتسليم أي واجب ذكي عبر الكاميرا حتى الآن.</p>
-                ) : (
-                    <div className="space-y-6">
-                        {(() => {
-                            const hwByBook = hwResults.reduce((acc, hw) => { const book = hw.bookName || 'كتب غير مصنفة'; if(!acc[book]) acc[book] = []; acc[book].push(hw); return acc; }, {});
-                            return Object.entries(hwByBook).map(([bookName, hws]) => (
-                                <div key={bookName} className="mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200 overflow-x-auto">
-                                    <h4 className="font-bold text-base md:text-lg text-amber-700 bg-amber-100 p-2 rounded-lg mb-4 flex items-center gap-2 w-max"><BookOpen size={18}/> كتاب: {bookName}</h4>
-                                    <div className="space-y-3 pl-4 border-r-4 border-amber-300 pr-4 w-max min-w-full">
-                                        {hws.map(hw => (
-                                            <div key={hw.id} className="bg-white border shadow-sm p-4 rounded-xl flex flex-col md:flex-row justify-between md:items-center gap-4 hover:border-amber-400 transition">
-                                                <div className="flex-1">
-                                                    <p className="font-bold text-base md:text-lg text-slate-800">{hw.homeworkTitle}</p>
-                                                    <p className="text-xs md:text-sm text-slate-500 mb-2 mt-1 bg-slate-50 p-2 rounded text-wrap break-words whitespace-normal">تعليق المصحح: <span className="font-bold text-blue-600">{hw.feedback}</span></p>
-                                                </div>
-                                                <div className="flex flex-col md:items-end gap-2 flex-shrink-0 border-t md:border-t-0 pt-2 md:pt-0 mt-2 md:mt-0">
-                                                    <span className="text-lg md:text-xl font-black text-green-600 bg-green-50 px-4 py-2 rounded-lg border border-green-200 w-fit">{hw.score} / {hw.total}</span>
-                                                    <span className="text-xs text-slate-400">{hw.submittedAt?.toDate().toLocaleDateString('ar-EG')}</span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ));
-                        })()}
-                    </div>
-                )}
-            </div>
-        )}
-
-        {activeTab === 'settings' && (
-              <div className="glass-panel p-4 md:p-8 rounded-xl max-w-2xl mx-auto">
-                <h2 className="text-xl md:text-2xl font-bold mb-6 flex items-center gap-2 font-arabic text-slate-800"><Settings className="text-slate-700"/> إعدادات الحساب</h2>
-                {userData.gradeUpdateStatus === 'pending' && (
-                    <div className="mb-4 bg-yellow-50 text-yellow-800 p-4 rounded-xl border border-yellow-200 flex flex-col md:flex-row items-center gap-2 font-bold text-center md:text-right text-sm">
-                        <RefreshCw className="animate-spin-slow" size={20} /> 
-                        لقد قمت بطلب تغيير المرحلة إلى {getGradeLabel(userData.requestedGrade)}. الطلب قيد المراجعة.
-                    </div>
-                )}
-                <form onSubmit={handleUpdateMyProfile} className="space-y-4">
-                  <div><label className="block text-sm font-bold text-slate-700 mb-2">الاسم</label><input disabled className="w-full border p-3 rounded-xl bg-slate-100 text-slate-500 cursor-not-allowed" value={editFormData.name} /><p className="text-xs text-red-500 mt-1">لا يمكن تغيير الاسم (تواصل مع الإدارة).</p></div>
-                  <div><label className="block text-sm font-bold text-slate-700 mb-2">رقم الهاتف</label><input className="w-full border p-3 rounded-xl" value={editFormData.phone} onChange={e=>setEditFormData({...editFormData, phone:e.target.value})} /></div>
-                  <div><label className="block text-sm font-bold text-slate-700 mb-2">رقم ولي الأمر</label><input disabled className="w-full border p-3 rounded-xl bg-slate-100 text-slate-500 cursor-not-allowed" value={editFormData.parentPhone} /><p className="text-xs text-red-500 mt-1">لا يمكن تغيير رقم ولي الأمر.</p></div>
-                  <div><label className="block text-sm font-bold text-slate-700 mb-2">الصف الدراسي (يتطلب موافقة الأدمن)</label><select className="w-full border p-3 rounded-xl bg-white" value={editFormData.grade} onChange={e=>setEditFormData({...editFormData, grade:e.target.value})}><GradeOptions /></select></div>
-                  <button className="w-full bg-gradient-to-r from-amber-600 to-amber-700 text-white py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-amber-500/40 transition mt-4">حفظ التعديلات</button>
-                </form>
-              </div>
-        )}
-      </main>
-    </div>
-  );
-};
-
+// --- شاشة الزوار (LandingPage) ---
 const LandingPage = ({ onAuthClick, installPrompt }) => {
   const [publicContent, setPublicContent] = useState([]);
   const [playingVideo, setPlayingVideo] = useState(null); 
@@ -3059,6 +2882,7 @@ const LandingPage = ({ onAuthClick, installPrompt }) => {
   );
 };
 
+// --- شاشة تسجيل الدخول (AuthPage) ---
 const AuthPage = ({ onBack }) => {
   const [isRegister, setIsRegister] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -3131,6 +2955,7 @@ const AuthPage = ({ onBack }) => {
   );
 };
 
+// --- المكون الرئيسي (App) ---
 export default function App() {
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);
