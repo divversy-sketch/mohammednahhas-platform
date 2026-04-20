@@ -49,13 +49,29 @@ try {
   console.warn("Firebase Storage Init Error (Images won't upload until enabled):", error);
 }
 
-const uploadFileToStorage = async (file, pathFolder) => {
-    if (!file || !storage) return null;
-    const fileExtension = file.name.split('.').pop();
-    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExtension}`;
-    const storageRef = ref(storage, `${pathFolder}/${fileName}`);
-    await uploadBytes(storageRef, file);
-    return await getDownloadURL(storageRef);
+const uploadFileToStorage = async (file) => {
+    if (!file) return null;
+    
+    const cloudName = "df7wxvb0a"; 
+    const uploadPreset = "mmudgc4o"; 
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", uploadPreset);
+
+    try {
+        // رفع الصورة على سيرفرات Cloudinary المجانية
+        const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+            method: "POST",
+            body: formData
+        });
+        const data = await response.json();
+        return data.secure_url; // إرجاع الرابط المباشر لحفظه في المنصة
+    } catch (error) {
+        console.error("خطأ في رفع الصورة:", error);
+        alert("حدث خطأ أثناء رفع الصورة، تأكد من اتصالك بالإنترنت وأن حجم الصورة مناسب.");
+        return null;
+    }
 };
 
 const formatWatchTime = (totalSeconds) => {
