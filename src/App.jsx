@@ -61,7 +61,7 @@ const uploadFileToStorage = async (file) => {
 
     try {
         // رفع الصورة على سيرفرات Cloudinary المجانية
-        const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+        const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
             method: "POST",
             body: formData
         });
@@ -2155,11 +2155,11 @@ const AdminDashboard = ({ user }) => {
   const handleFileSelect = async (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      if (file.size > 1048576) { 
-          alert("⚠️ تنبيه: لرفع ملفات كبيرة (كتب أو فيديوهات)، يرجى رفعها على Google Drive ونسخ الرابط هنا في خانة 'الرابط'.");
-          e.target.value = null; 
-          return;
-      }
+      if (file.size > 104857600) { 
+    alert("⚠️ تنبيه: حجم الملف أكبر من 100 ميجا. يرجى رفع الفيديوهات الضخمة جداً على Google Drive أو YouTube ونسخ الرابط هنا.");
+    e.target.value = null; 
+    return;
+}
       setIsUploading(true);
       try {
           const downloadUrl = await uploadFileToStorage(file, 'content_files');
