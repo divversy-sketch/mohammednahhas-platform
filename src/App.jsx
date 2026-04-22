@@ -8,7 +8,6 @@ import {
   getFirestore, doc, setDoc, getDoc, getDocs, collection, addDoc, query, where, 
   onSnapshot, updateDoc, deleteDoc, orderBy, serverTimestamp, writeBatch, limit, startAfter, increment 
 } from 'firebase/firestore';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 import { 
   PlayCircle, FileText, LogOut, User, GraduationCap, Quote, CheckCircle, 
@@ -25,6 +24,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+// --- إعدادات Firebase ---
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -35,7 +35,7 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
-let app, auth, db, storage;
+let app, auth, db;
 try {
   app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
   auth = getAuth(app);
@@ -43,12 +43,8 @@ try {
 } catch (error) { 
   console.error("Firebase Base Init Error:", error); 
 }
-try {
-  storage = getStorage(app);
-} catch (error) {
-  console.warn("Firebase Storage Init Error (Images won't upload until enabled):", error);
-}
 
+// دالة رفع الصور المجانية باستخدام Cloudinary (تقبل الصور والملفات)
 const uploadFileToStorage = async (file) => {
     if (!file) return null;
     
@@ -60,13 +56,12 @@ const uploadFileToStorage = async (file) => {
     formData.append("upload_preset", uploadPreset);
 
     try {
-        // رفع الصورة على سيرفرات Cloudinary المجانية
         const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
             method: "POST",
             body: formData
         });
         const data = await response.json();
-        return data.secure_url; // إرجاع الرابط المباشر لحفظه في المنصة
+        return data.secure_url; 
     } catch (error) {
         console.error("خطأ في رفع الصورة:", error);
         alert("حدث خطأ أثناء رفع الصورة، تأكد من اتصالك بالإنترنت وأن حجم الصورة مناسب.");
@@ -112,6 +107,7 @@ const getYouTubeID = (url) => {
     return (match && match[2].length === 11) ? match[2] : null;
 };
 
+// --- دالة إنشاء PDF للمنصة ---
 const generatePDF = (type, data) => {
     if (!window.html2pdf) return alert("جاري تحميل نظام الطباعة... يرجى الانتظار ثوانٍ والمحاولة مرة أخرى.");
     const percentage = data.total > 0 ? Math.round((data.score / data.total) * 100) : 0;
@@ -171,7 +167,7 @@ const generatePDF = (type, data) => {
     const header = `
       <div style="padding: 40px; font-family: 'Cairo', sans-serif; direction: rtl; color: #333;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #d97706; padding-bottom: 20px; margin-bottom: 30px;">
-            <div style="text-align: right;"><h1 style="margin: 0; color: #d97706; font-size: 28px;">منصة النحاس التعليمية</h1><p style="margin: 5px 0 0; color: #666;">للغة العربية - أ/ محمد النحاس</p></div>
+            <div style="text-align: right;"><h1 style="margin: 0; color: #d97706; font-size: 28px;">منصة النحاس التعليمية</h1><p style="margin: 5px 0 0; color: #666;">للغة العربية - أ / محمد النحاس</p></div>
             <div style="text-align: left;"><p style="margin: 0; font-weight: bold;">تقرير نتيجة امتحان</p><p style="margin: 5px 0 0; color: #666;">${date}</p></div>
         </div>
         <div style="background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
@@ -282,7 +278,7 @@ const FloatingArabicBackground = React.memo(() => (
 const WisdomBox = () => {
   const [idx, setIdx] = useState(0);
   const [quotes, setQuotes] = useState([
-    { text: "النجاح مش صدفة، النجاح عزيمة وإصرار", source: "تحفيز" }, { text: "ذاكر صح، مش تذاكر كتير.. ركز يا بطل", source: "نصيحة" }, { text: "حلمك يستاهل تعبك، متوقفش", source: "تحفيز" }, { text: "وَمَا نَيْلُ الْمَطَالِبِ بِالتَّمَنِّي ... وَلَكِنْ تُؤْخَذُ الدُّنْيَا غِلَابَا", source: "شعر" }
+    { text: "النجاح مش صدفة، النجاح عزيمة وإصرار", source: "أ / محمد النحاس" }, { text: "ذاكر صح، مش تذاكر كتير.. ركز يا بطل", source: "نصيحة" }, { text: "حلمك يستاهل تعبك، متوقفش", source: "تحفيز" }, { text: "وَمَا نَيْلُ الْمَطَالِبِ بِالتَّمَنِّي ... وَلَكِنْ تُؤْخَذُ الدُّنْيَا غِلَابَا", source: "شعر" }
   ]);
   useEffect(() => {
       const q = query(collection(db, 'quotes'), orderBy('createdAt', 'desc'));
@@ -411,7 +407,7 @@ const ChatWidget = ({ user }) => {
       const lowerText = userMsg.text.toLowerCase();
 
       if (isContactAdminMode) {
-           botResponse = "تم استلام رسالتك! المستر هيشوفها ويرد عليك في أقرب وقت. ✅";
+           botResponse = "تم استلام رسالتك! أ / محمد النحاس هيشوفها ويرد عليك في أقرب وقت. ✅";
            await addDoc(collection(db, 'messages'), {
              text: userMsg.text, sender: user ? user.email : sessionId, 
              senderName: user ? user.displayName || user.name : 'زائر (' + sessionId.substr(0,4) + ')', 
@@ -427,10 +423,10 @@ const ChatWidget = ({ user }) => {
           }
           if (matchedRule) botResponse = matchedRule.response;
           else if (lowerText.includes("ادمن") || lowerText.includes("مستر") || lowerText.includes("تواصل")) {
-               botResponse = "اكتب رسالتك للمستر وهيتم الرد عليك هنا 👇";
+               botResponse = "اكتب رسالتك لـ أ / محمد النحاس وهيتم الرد عليك هنا 👇";
                setIsContactAdminMode(true);
           } else {
-               botResponse = "ممكن تختار:\n1. تفاصيل الحجز (اسأل عن الحجز)\n2. رقم الواتس (اسأل عن الرقم)\n3. التواصل مع الادمن";
+               botResponse = "ممكن تختار:\n1. تفاصيل الحجز (اسأل عن الحجز)\n2. رقم الواتس (اسأل عن الرقم)\n3. التواصل مع الإدارة";
           }
       }
       if(botResponse) setMessages(prev => [...prev, { id: Date.now()+1, text: botResponse, sender: 'bot', createdAt: { seconds: Date.now() / 1000 } }]);
@@ -449,7 +445,7 @@ const ChatWidget = ({ user }) => {
         {isOpen && (
           <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 50 }} className="fixed bottom-24 right-6 z-50 w-80 bg-white/95 backdrop-blur rounded-2xl shadow-2xl border border-white/50 overflow-hidden flex flex-col font-['Cairo']" style={{ height: '450px' }}>
             <div className="bg-gradient-to-r from-amber-600 to-amber-700 p-4 text-white font-bold flex justify-between items-center shadow-md">
-              <div className="flex items-center gap-2"><div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div><span>مساعد النحاس</span></div>
+              <div className="flex items-center gap-2"><div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div><span>مساعد أ / محمد النحاس</span></div>
               <div className="flex gap-2"><Facebook size={18} onClick={openFacebook} className="cursor-pointer hover:text-blue-200"/><Phone size={18} onClick={openWhatsApp} className="cursor-pointer hover:text-green-200"/></div>
             </div>
             <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50 space-y-2">
@@ -464,12 +460,12 @@ const ChatWidget = ({ user }) => {
             </div>
             {!isContactAdminMode && (
               <div className="p-2 bg-slate-100 flex gap-2 overflow-x-auto">
-                <button onClick={() => setInputText("التواصل مع الادمن")} className="text-xs bg-white border px-3 py-1 rounded-full whitespace-nowrap hover:bg-slate-200 text-slate-700">تحدث مع المستر</button>
+                <button onClick={() => setInputText("التواصل مع الادمن")} className="text-xs bg-white border px-3 py-1 rounded-full whitespace-nowrap hover:bg-slate-200 text-slate-700">تحدث مع الإدارة</button>
                 <button onClick={openWhatsApp} className="text-xs bg-green-100 text-green-700 border border-green-200 px-3 py-1 rounded-full whitespace-nowrap hover:bg-green-100">واتساب</button>
               </div>
             )}
             <div className="p-3 border-t flex gap-2 bg-white">
-              <input value={inputText} onChange={(e) => setInputText(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSend()} className="flex-1 border rounded-lg px-3 py-2 text-sm focus:border-amber-500 outline-none" placeholder={isContactAdminMode ? "اكتب رسالتك للمستر..." : "اكتب سؤالك..."} />
+              <input value={inputText} onChange={(e) => setInputText(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSend()} className="flex-1 border rounded-lg px-3 py-2 text-sm focus:border-amber-500 outline-none" placeholder={isContactAdminMode ? "اكتب رسالتك للإدارة..." : "اكتب سؤالك..."} />
               <button onClick={handleSend} className="bg-amber-600 text-white p-2 rounded-lg hover:bg-amber-700 transition"><Send size={16}/></button>
             </div>
           </motion.div>
@@ -496,29 +492,29 @@ const LiveSessionView = ({ session, user, onClose }) => {
 
   const sendChat = async (e) => {
     e.preventDefault();
-    if(!msgInput.trim()) return;
-    await addDoc(collection(db, `live_sessions/${session.id}/chat`), { text: msgInput, user: user.displayName || user.name || 'طالب', createdAt: serverTimestamp() });
+    if(!msgInput.trim() || !session?.id) return;
+    await addDoc(collection(db, `live_sessions/${session.id}/chat`), { text: msgInput, user: user?.displayName || user?.name || 'طالب', createdAt: serverTimestamp() });
     setMsgInput("");
   };
 
   const isYouTube = (url) => (url || '').includes("youtube") || (url || '').includes("youtu.be");
-  const videoId = getYouTubeID(session.liveUrl);
+  const videoId = getYouTubeID(session?.liveUrl || '');
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col md:flex-row font-['Cairo']" dir="rtl">
       <div className="flex-1 flex flex-col">
         <div className="bg-gradient-to-r from-red-600 to-red-800 p-3 text-white flex justify-between items-center shadow-lg">
-          <div className="flex items-center gap-2"><span className="w-3 h-3 bg-white rounded-full animate-pulse shadow-[0_0_10px_white]"></span><h2 className="font-bold">بث مباشر: {session.title}</h2></div>
+          <div className="flex items-center gap-2"><span className="w-3 h-3 bg-white rounded-full animate-pulse shadow-[0_0_10px_white]"></span><h2 className="font-bold">بث مباشر: {session?.title || ''}</h2></div>
           <button onClick={onClose} className="text-sm bg-black/30 hover:bg-black/50 px-3 py-1 rounded transition">العودة للمنصة</button>
         </div>
         <div className="flex-1 bg-black relative flex items-center justify-center overflow-hidden">
-          <div className="watermark-video z-50">{user?.displayName || user?.name || 'طالب'}</div>
-          {isYouTube(session.liveUrl) ? (
+          <div className="watermark-video z-50">{user?.displayName || user?.name || 'طالب'} - أ / محمد النحاس - منصة النحاس</div>
+          {isYouTube(session?.liveUrl) ? (
             <iframe width="100%" height="100%" src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&controls=1&rel=0&modestbranding=1&playsinline=1`} title="Live" frameBorder="0" allowFullScreen style={{ WebkitTransform: 'translateZ(0)' }}></iframe>
           ) : (
             <div className="w-full h-full relative">
-              <iframe width="100%" height="100%" src={session.liveUrl} title="Live Meeting" frameBorder="0" allow="camera; microphone; display-capture; autoplay; clipboard-write; fullscreen" allowFullScreen className="relative z-10" style={{ WebkitTransform: 'translateZ(0)' }}></iframe>
-              <a href={session.liveUrl} target="_blank" rel="noopener noreferrer" className="absolute top-4 left-4 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-full text-xs font-bold backdrop-blur-md border border-white/20 transition flex items-center gap-2 z-50 shadow-lg"><ExternalLink size={14}/> للموبايل (لو البث مش شغال)</a>
+              <iframe width="100%" height="100%" src={session?.liveUrl || ''} title="Live Meeting" frameBorder="0" allow="camera; microphone; display-capture; autoplay; clipboard-write; fullscreen" allowFullScreen className="relative z-10" style={{ WebkitTransform: 'translateZ(0)' }}></iframe>
+              <a href={session?.liveUrl || '#'} target="_blank" rel="noopener noreferrer" className="absolute top-4 left-4 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-full text-xs font-bold backdrop-blur-md border border-white/20 transition flex items-center gap-2 z-50 shadow-lg"><ExternalLink size={14}/> للموبايل (لو البث مش شغال)</a>
             </div>
           )}
         </div>
@@ -647,7 +643,7 @@ const SecureVideoPlayer = ({ video, user, userName, onClose }) => {
         </div>
 
         <div className="w-full relative flex items-center justify-center bg-black overflow-hidden h-full">
-          <div className="watermark-video">{userName || 'طالب'} - {video?.grade || 'منصة النحاس'}</div>
+          <div className="watermark-video">{userName || 'طالب'} - أ / محمد النحاس - منصة النحاس</div>
           {videoId ? (
             <iframe className="w-full h-full" src={youtubeEmbedUrl} title="Video" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
           ) : (
@@ -680,7 +676,7 @@ const PomodoroFocusMode = ({ onClose }) => {
 
     const toggleTimer = () => {
         setIsActive(!isActive);
-        if(!isActive && audioRef.current && !isBreak) { audioRef.current.play().catch(e => {}); } 
+        if(!isActive && audioRef.current && !isBreak) { audioRef.current.play().catch(e => console.log("Audio play blocked")); } 
         else if(isActive && audioRef.current) { audioRef.current.pause(); }
     };
 
@@ -758,12 +754,12 @@ const InteractiveViewer = ({ content, user, onClose }) => {
                 <div className="bg-slate-900 p-3 flex justify-between items-center text-white border-b border-gray-700 select-none">
                    <div className="flex items-center gap-4">
                        <h3 className="font-bold flex items-center gap-2"><Code /> {content?.title || 'محتوى تفاعلي'}</h3>
-                       <span className="hidden md:block text-xs bg-amber-600 px-3 py-1 rounded-full text-white font-bold">منصة النحاس</span>
+                       <span className="hidden md:block text-xs bg-amber-600 px-3 py-1 rounded-full text-white font-bold">أ / محمد النحاس - منصة النحاس</span>
                    </div>
                    <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white px-4 py-1 rounded font-bold transition">خروج</button>
                 </div>
                 <div className="flex-1 bg-white relative overflow-hidden">
-                   {user && (<div className="watermark-video" style={{ pointerEvents: 'none', zIndex: 9999 }}>{user.name || user.displayName || 'طالب'} — منصة النحاس</div>)}
+                   {user && (<div className="watermark-video" style={{ pointerEvents: 'none', zIndex: 9999 }}>{user.name || user.displayName || 'طالب'} — أ / محمد النحاس - منصة النحاس</div>)}
                    <div className="absolute inset-0 z-[9998] pointer-events-none select-none"></div>
                    <iframe src={iframeSrc} className="w-full h-full border-0 relative z-40 bg-white" title={content?.title || ''} sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals" style={{ pointerEvents: 'auto', WebkitTransform: 'translateZ(0)' }}></iframe>
                 </div>
@@ -772,7 +768,7 @@ const InteractiveViewer = ({ content, user, onClose }) => {
     );
 };
 
-// --- مشغل الامتحان المدمج مع حلول الكاميرا والشاشة البيضاء ---
+// --- مشغل الامتحان المدمج مع حل مشكلة حظر الصور أثناء الرفع ---
 const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult = null }) => {
   const [activeView, setActiveView] = useState(isReviewMode || existingResult ? 'dashboard' : 'questions'); 
   const [currentQIndex, setCurrentQIndex] = useState(0);
@@ -788,7 +784,8 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const [activeBranchTab, setActiveBranchTab] = useState('الكل');
   const [uploadingEssay, setUploadingEssay] = useState(null); 
 
-  const isPickingFile = useRef(false); // سطر الحماية ضد الحظر أثناء فتح الكاميرا
+  // مفتاح الحماية لمنع الحظر أثناء فتح الكاميرا
+  const isPickingFile = useRef(false);
 
   const shuffleArray = (array) => {
     if (!Array.isArray(array)) return [];
@@ -860,7 +857,9 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
       window.addEventListener('beforeunload', handleBeforeUnload);
       
       const handleAntiCheat = () => { 
+          // منع الحظر إذا كان مفتاح الأمان مفعل لرفع صورة
           if (isPickingFile.current) return; 
+
           const { showSubmitConfirm, isSubmitted } = stateRefs.current;
           if (!showSubmitConfirm && !isSubmitted) handleCheatingRef.current();
       };
@@ -902,9 +901,11 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
       if (!file) return;
       setUploadingEssay(qId);
       try {
-          const url = await uploadFileToStorage(file, `essay_answers/${user?.uid}/${exam?.id}`);
-          setAnswers(prev => ({ ...prev, [qId]: { ...(prev[qId] || {}), imageUrl: url } }));
-          alert("تم إرفاق الصورة بنجاح!");
+          const url = await uploadFileToStorage(file);
+          if (url) {
+              setAnswers(prev => ({ ...prev, [qId]: { ...(prev[qId] || {}), imageUrl: url } }));
+              alert("تم إرفاق الصورة بنجاح!");
+          }
       } catch (err) {
           console.error(err); alert("حدث خطأ أثناء رفع الصورة.");
       }
@@ -1120,7 +1121,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
       {!isSubmitted && (
         <div className="fixed inset-0 pointer-events-none z-[9999] overflow-hidden">
             {wmPositions.map((pos, i) => (
-                <div key={i} className="watermark-text" style={{ top: pos.top, left: pos.left }}>{user?.displayName || user?.name || 'طالب'} - {user?.email || ''}</div>
+                <div key={i} className="watermark-text" style={{ top: pos.top, left: pos.left }}>{user?.displayName || user?.name || 'طالب'} - أ / محمد النحاس - منصة النحاس</div>
             ))}
         </div>
       )}
@@ -1183,7 +1184,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
         <div className={`flex-1 flex flex-col ${currentQObj?.blockText?.trim() ? 'md:flex-row' : 'items-center'} h-full overflow-hidden bg-slate-100 w-full p-4 md:p-8 gap-6`}>
           {currentQObj?.blockText?.trim() && (
             <div className="flex-1 w-full bg-blue-50 p-6 md:p-10 overflow-y-auto rounded-3xl shadow-sm border border-blue-100">
-              <h3 className="font-bold text-blue-900 mb-6 flex items-center gap-2 text-xl border-b border-blue-200 pb-4 font-['Cairo']"><FileText size={24}/> نص المراجعة / القراءة:</h3>
+              <h3 className="font-bold text-blue-900 mb-6 flex items-center gap-2 text-xl border-b border-blue-200 pb-4 font-['Cairo']"><FileText size={24}/> نص القراءة / المراجعة:</h3>
               <p className="whitespace-pre-line leading-loose text-lg md:text-xl font-bold text-slate-700 font-['Cairo']">{currentQObj.blockText}</p>
             </div>
           )}
@@ -1232,7 +1233,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                         )}
                         {safeAnswersFinal[currentQObj.id]?.imageUrl && <a href={safeAnswersFinal[currentQObj.id].imageUrl} target="_blank" rel="noreferrer" className="text-blue-600 bg-blue-50 px-4 py-3 rounded-xl font-bold flex items-center gap-2 border border-blue-200"><ExternalLink size={18}/> عرض المرفق الخاص بك</a>}
                     </div>
-                    {isSubmitted && <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-xl text-purple-800 font-bold flex gap-2"><CheckCircle/> هذا السؤال مقالي وسيتم تقييمه يدوياً من قبل المستر وإضافة درجاته لمجموعك.</div>}
+                    {isSubmitted && <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-xl text-purple-800 font-bold flex gap-2"><CheckCircle/> هذا السؤال مقالي وسيتم تقييمه يدوياً وإضافة درجاته لمجموعك.</div>}
                 </div>
             ) : (
                 <div className="space-y-4">
@@ -1257,8 +1258,8 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
             )}
 
             <div className="mt-auto pt-10 flex justify-between">
-              <button disabled={currentQIndex === 0} onClick={() => setCurrentQIndex(p => p - 1)} className="px-8 py-4 rounded-xl bg-slate-200 text-slate-700 font-bold disabled:opacity-50 hover:bg-slate-300 transition">السابق</button>
-              <button disabled={currentQIndex === displayQuestions.length - 1} onClick={() => setCurrentQIndex(p => p + 1)} className="px-8 py-4 rounded-xl bg-slate-900 text-white font-bold disabled:opacity-50 hover:bg-slate-800 transition">التالي</button>
+              <button disabled={currentQIndex === 0} onClick={() => setCurrentQIndex(p => p - 1)} className="px-8 py-4 rounded-xl bg-slate-200 text-slate-700 font-bold disabled:opacity-50 hover:bg-slate-300 transition shadow-sm font-['Cairo'] flex items-center gap-2"><ChevronRight size={20}/> السابق</button>
+              <button disabled={currentQIndex === displayQuestions.length - 1} onClick={() => setCurrentQIndex(p => p + 1)} className="px-8 py-4 rounded-xl bg-slate-900 text-white font-bold disabled:opacity-50 hover:bg-slate-800 transition shadow-lg font-['Cairo'] flex items-center gap-2">التالي <ChevronRight size={20} className="rotate-180"/></button>
             </div>
           </div>
         </div>
@@ -1356,7 +1357,7 @@ export const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
                 ) : (
                     <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white text-slate-900 p-8 rounded-3xl w-full max-w-sm shadow-2xl">
                         <CheckCircle className="text-green-500 w-20 h-20 mx-auto mb-4"/><h2 className="text-3xl font-black mb-2 text-slate-800">النتيجة</h2>
-                        <div className="text-5xl font-black text-amber-600 mb-6">{result.score} / {result.total}</div><p className="text-slate-600 font-bold mb-6">{result.feedback}</p><p className="text-xs text-slate-400 mb-6">تم إرسال الدرجة للمستر بنجاح.</p><button onClick={onClose} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800">العودة للمنصة</button>
+                        <div className="text-5xl font-black text-amber-600 mb-6">{result.score} / {result.total}</div><p className="text-slate-600 font-bold mb-6">{result.feedback}</p><p className="text-xs text-slate-400 mb-6">تم إرسال الدرجة بنجاح.</p><button onClick={onClose} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800">العودة للمنصة</button>
                     </motion.div>
                 )}
             </div>
@@ -1585,7 +1586,6 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                     </div>
                 ))}
                 
-                {/* ---> واجهة تحدي العباقرة <--- */}
                 {weeklyChallenges.map(challenge => {
                     const isDone = examResults.some(r => r.examId === `challenge_${challenge.id}`);
                     return (
@@ -1905,7 +1905,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                   <div><label className="block text-sm font-bold text-slate-700 mb-2">الاسم</label><input disabled className="w-full border p-3 rounded-xl bg-slate-100 text-slate-500 cursor-not-allowed" value={editFormData.name} /><p className="text-xs text-red-500 mt-1">لا يمكن تغيير الاسم (تواصل مع الإدارة).</p></div>
                   <div><label className="block text-sm font-bold text-slate-700 mb-2">رقم الهاتف</label><input className="w-full border p-3 rounded-xl" value={editFormData.phone} onChange={e=>setEditFormData({...editFormData, phone:e.target.value})} /></div>
                   <div><label className="block text-sm font-bold text-slate-700 mb-2">رقم ولي الأمر</label><input disabled className="w-full border p-3 rounded-xl bg-slate-100 text-slate-500 cursor-not-allowed" value={editFormData.parentPhone} /><p className="text-xs text-red-500 mt-1">لا يمكن تغيير رقم ولي الأمر.</p></div>
-                  <div><label className="block text-sm font-bold text-slate-700 mb-2">الصف الدراسي (يتطلب موافقة الأدمن)</label><select className="w-full border p-3 rounded-xl bg-white" value={editFormData.grade} onChange={e=>setEditFormData({...editFormData, grade:e.target.value})}><GradeOptions /></select></div>
+                  <div><label className="block text-sm font-bold text-slate-700 mb-2">الصف الدراسي (يتطلب موافقة المستر)</label><select className="w-full border p-3 rounded-xl bg-white" value={editFormData.grade} onChange={e=>setEditFormData({...editFormData, grade:e.target.value})}><GradeOptions /></select></div>
                   <button className="w-full bg-gradient-to-r from-amber-600 to-amber-700 text-white py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-amber-500/40 transition mt-4">حفظ التعديلات</button>
                 </form>
               </div>
@@ -1915,7 +1915,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   );
 };
 
-// --- لوحة الإدارة (AdminDashboard) وتتضمن الإحصائيات الصافية ---
+// --- لوحة الإدارة (AdminDashboard) ---
 const AdminDashboard = ({ user }) => {
   const [activeTab, setActiveTab] = useState('users'); 
   const [adminGradeFilter, setAdminGradeFilter] = useState('all'); 
@@ -2071,7 +2071,7 @@ const AdminDashboard = ({ user }) => {
       let phone = student.parentPhone.trim();
       if (phone.startsWith('0')) phone = '20' + phone.substring(1);
       const examName = examsList.find(e => e.id === result.examId)?.title || 'اختبار';
-      const message = `مرحباً ولي أمر الطالب/ة: *${result.studentName}* 🎓\n\nنحيط سيادتكم علماً بنتيجة امتحان: *${examName}*\nالدرجة التي حصل عليها: *${result.score}* من *${result.total}* 📊\n\nمع خالص تحيات إدارة منصة النحاس - أ/ محمد النحاس.`;
+      const message = `مرحباً ولي أمر الطالب/ة: *${result.studentName}* 🎓\n\nنحيط سيادتكم علماً بنتيجة امتحان: *${examName}*\nالدرجة التي حصل عليها: *${result.score}* من *${result.total}* 📊\n\nمع خالص تحيات إدارة منصة النحاس - أ / محمد النحاس.`;
       window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
@@ -2155,20 +2155,13 @@ const AdminDashboard = ({ user }) => {
   const handleFileSelect = async (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      if (file.size > 104857600) { 
-    alert("⚠️ تنبيه: حجم الملف أكبر من 100 ميجا. يرجى رفع الفيديوهات الضخمة جداً على Google Drive أو YouTube ونسخ الرابط هنا.");
-    e.target.value = null; 
-    return;
-}
       setIsUploading(true);
       try {
-          const downloadUrl = await uploadFileToStorage(file, 'content_files');
+          const downloadUrl = await uploadFileToStorage(file);
           if(downloadUrl) {
               setNewContent({...newContent, url: downloadUrl});
               setUploadProgress(100);
               setTimeout(() => setUploadProgress(0), 2000);
-          } else {
-             alert("عذراً، خدمة تخزين الملفات (Storage) غير مفعلة. استخدم روابط Drive.");
           }
       } catch (err) {
           console.error(err); alert("حدث خطأ أثناء الرفع.");
@@ -2310,7 +2303,7 @@ const AdminDashboard = ({ user }) => {
   const filteredExamsList = examsList.filter(e => adminGradeFilter === 'all' || e.grade === adminGradeFilter);
   const filteredLiveSessions = activeLiveSessions.filter(ls => adminGradeFilter === 'all' || ls.grade === adminGradeFilter);
 
-  // إحصائيات بـ Tailwind CSS النقي عشان نتفادى أي مشكلة في المكاتب الخارجية
+  // إحصائيات بـ Tailwind CSS النقي
   const statsData = [
       { name: '1prep', label: '1 ع', users: activeUsersList.filter(u=>u.grade==='1prep').length, color: 'bg-blue-400' },
       { name: '2prep', label: '2 ع', users: activeUsersList.filter(u=>u.grade==='2prep').length, color: 'bg-blue-500' },
@@ -2735,7 +2728,7 @@ const AdminDashboard = ({ user }) => {
                           </div>
                       </div>
                       <div className="bg-slate-50 p-4 rounded-xl border mb-6">
-                          <textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm leading-relaxed" placeholder="اكتب الأسئلة هنا...&#10;(هام 1: افصل بين كل سؤال والذي يليه بسطر فارغ تماماً، وضع علامة * قبل الإجابة الصحيحة)&#10;(هام 2: لتحديد فرع، اكتب #فرع: اسم_الفرع في سطر لوحده)&#10;(هام 3 للأسئلة المقالية: اكتب #مقالي متبوعاً بنص السؤال، وسيظهر للطالب مربع نص يكتب فيه إجابته أو يرفق صورة)" value={bulkText} onChange={e=>setBulkText(e.target.value)}/>
+                          <textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm leading-relaxed" placeholder="اكتب الأسئلة هنا...&#10;(هام 1: افصل بين كل سؤال والذي يليه بسطر فارغ تماماً، وضع علامة * قبل الإجابة الصحيحة)&#10;(هام 2: لتحديد فرع، اكتب #فرع: اسم_الفرع في سطر لوحده)&#10;(هام 3 للأسئلة المقالية: اكتب #مقالي متبوعاً بنص السؤال، وسيظهر للطالب مربع نص يكتب فيه إجابته أو يرفق صورة)&#10;(هام 4 للقطع: اكتب بداية القطعة، ونهاية القطعة، وحذف القطعة لفصل الأسئلة)" value={bulkText} onChange={e=>setBulkText(e.target.value)}/>
                           <button onClick={parseExam} className="mt-4 w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-green-500/50 transition">نشر الامتحان</button>
                       </div>
                   </div>
@@ -3049,7 +3042,7 @@ const AdminDashboard = ({ user }) => {
   );
 };
 
-// --- شاشة الهبوط (LandingPage) ---
+// --- شاشة الزوار (LandingPage) ---
 const LandingPage = ({ onAuthClick, installPrompt }) => {
   const [publicContent, setPublicContent] = useState([]);
   const [playingVideo, setPlayingVideo] = useState(null); 
@@ -3147,7 +3140,7 @@ const AuthPage = ({ onBack }) => {
             parentPhone: formData.parentPhone, role: 'student', status: 'pending', 
             subscriptionStatus: 'free', subscriptionExpiry: null, createdAt: new Date() 
         });
-        alert("تم إنشاء الحساب! انتظر تفعيل الأدمن.");
+        alert("تم إنشاء الحساب! انتظر تفعيل الإدارة.");
       } else { await signInWithEmailAndPassword(auth, formData.email, formData.password); }
     } catch (error) { alert("حدث خطأ: " + error.message); } 
     finally { setLoading(false); }
@@ -3181,7 +3174,6 @@ const AuthPage = ({ onBack }) => {
         </form>
         <button onClick={() => setIsRegister(!isRegister)} className="mt-4 md:mt-6 text-amber-800 font-bold hover:underline w-full text-center block text-sm">{isRegister ? 'تسجيل الدخول' : 'حساب جديد'}</button>
       </motion.div>
-      <ChatWidget />
     </div>
   );
 };
