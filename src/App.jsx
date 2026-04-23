@@ -664,8 +664,15 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
 
   useEffect(() => {
       if(!user || !video.id) return;
-      const q = query(collection(db, 'video_notes'), where('userId', '==', user.uid), where('videoId', '==', video.id), orderBy('timestamp', 'asc'));
-      const unsub = onSnapshot(q, (snap) => { setNotes(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
+      const q = query(collection(db, 'video_notes'), where('userId', '==', user.uid), where('videoId', '==', video.id));
+      const unsub = onSnapshot(q, (snap) => {
+          const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          rows.sort((a, b) => safeNumber(a.timestamp, 0) - safeNumber(b.timestamp, 0));
+          setNotes(rows);
+      }, (error) => {
+          console.warn('Video notes listener blocked:', error?.message);
+          setNotes([]);
+      });
       return () => unsub();
   }, [user, video.id]);
 
@@ -3195,14 +3202,26 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
     const unsubContent = onSnapshot(query(collection(db, 'content'), where('grade', '==', userData.grade)), s => {
         const allContent = s.docs.map(d=>({id:d.id,...d.data()}));
-        const visibleContent = allContent.filter(c => { if (!c.allowedEmails || c.allowedEmails.length === 0) return true; return c.allowedEmails.includes(user.email); });
+        const visibleContent = allContent.filter(c => {
+            const allowed = Array.isArray(c.allowedEmails) ? c.allowedEmails : [];
+            if (allowed.length === 0) return true;
+            return allowed.includes(user.email);
+        });
         setContent(visibleContent);
     });
 
-    const unsubLive = onSnapshot(query(collection(db, 'live_sessions'), where('status', '==', 'active'), where('grade', '==', userData.grade)), s => {
-        const activeSessions = s.docs.map(d=>({id:d.id, ...d.data()}));
-        const visibleSessions = activeSessions.filter(ls => { if (!ls.allowedEmails || ls.allowedEmails.length === 0) return true; return ls.allowedEmails.includes(user.email); });
+    const unsubLive = onSnapshot(collection(db, 'live_sessions'), s => {
+        const allSessions = s.docs.map(d=>({id:d.id, ...d.data()}));
+        const activeSessions = allSessions.filter(ls => ls.status === 'active' && ls.grade === userData.grade);
+        const visibleSessions = activeSessions.filter(ls => {
+            const allowed = Array.isArray(ls.allowedEmails) ? ls.allowedEmails : [];
+            if (allowed.length === 0) return true;
+            return allowed.includes(user.email);
+        });
         setLiveSessions(visibleSessions);
+    }, (error) => {
+        console.warn('Live sessions listener blocked:', error?.message);
+        setLiveSessions([]);
     });
 
     const unsubExams = onSnapshot(query(collection(db, 'exams'), where('grade', '==', userData.grade)), s => setExams(s.docs.map(d=>({id:d.id,...d.data()}))));
@@ -3213,10 +3232,25 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
     });
     const unsubAssignmentSubs = onSnapshot(query(collection(db, 'assignment_submissions'), where('studentId', '==', user.uid)), s => setAssignmentSubmissions(s.docs.map(d=>({id:d.id,...d.data()}))), (error) => { console.warn('Assignment submissions listener blocked:', error?.message); setAssignmentSubmissions([]); });
     const unsubVideoViews = onSnapshot(query(collection(db, 'video_views'), where('userId', '==', user.uid)), s => { const map = {}; s.docs.forEach(d => { const data = d.data(); map[data.videoId] = data; }); setVideoProgressMap(map); }, (error) => { console.warn('Video views listener blocked:', error?.message); setVideoProgressMap({}); });
-    const unsubMistakes = onSnapshot(query(collection(db, 'student_mistakes'), where('userId', '==', user.uid), orderBy('timestamp', 'desc')), s => { setMistakes(s.docs.map(d => ({id: d.id, ...d.data()}))); });
-    const unsubNotif = onSnapshot(query(collection(db, 'notifications'), where('grade', 'in', ['all', userData.grade]), orderBy('createdAt', 'desc'), limit(10)), s => {
-        const newNotifs = s.docs.map(d => d.data()); setNotifications(newNotifs);
+    const unsubMistakes = onSnapshot(query(collection(db, 'student_mistakes'), where('userId', '==', user.uid)), s => {
+        const rows = s.docs.map(d => ({id: d.id, ...d.data()}));
+        rows.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+        setMistakes(rows);
+    }, (error) => {
+        console.warn('Mistakes listener blocked:', error?.message);
+        setMistakes([]);
+    });
+    const unsubNotif = onSnapshot(collection(db, 'notifications'), s => {
+        const newNotifs = s.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter(n => ['all', userData.grade].includes(n.grade))
+            .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
+            .slice(0, 10);
+        setNotifications(newNotifs);
         if(newNotifs.length > 0) { setHasNewNotif(true); if(newNotifs[0].text) sendSystemNotification("تنبيه جديد 🔔", newNotifs[0].text); }
+    }, (error) => {
+        console.warn('Notifications listener blocked:', error?.message);
+        setNotifications([]);
     });
 
     setEditFormData({ name: userData.name, phone: userData.phone, parentPhone: userData.parentPhone, grade: userData.grade });
@@ -3328,6 +3362,32 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
     graded: assignmentSubmissions.filter(s => s.reviewStatus === 'graded').length,
     pending: Math.max(assignments.length - assignmentSubmissions.length, 0)
   }), [assignments, assignmentSubmissions]);
+
+  const getVideoWatchPercent = (video) => {
+    if (!video?.id) return 0;
+    return Math.max(0, Math.min(100, safeNumber(videoProgressMap?.[video.id]?.watchedPercent, 0)));
+  };
+
+  const canOpenLinkedExam = (video) => !!video?.linkedExamId && getVideoWatchPercent(video) >= 75;
+
+  const openLinkedExamFromVideo = (video) => {
+    if (!video?.linkedExamId) return;
+    if (!canOpenLinkedExam(video)) {
+      return alert(`يجب مشاهدة 75% من الفيديو أولاً. النسبة الحالية: ${getVideoWatchPercent(video)}%`);
+    }
+    const linkedExam = exams.find(e => e.id === video.linkedExamId);
+    if (!linkedExam) return alert('الامتحان المرتبط بهذا الفيديو غير موجود حالياً.');
+    startExamWithCode(linkedExam);
+  };
+
+  const handleJoinLive = (session) => {
+    if (!session) return;
+    if (session.passcode) {
+      const entered = prompt('هذا البث محمي برقم سري، أدخل الرقم السري:');
+      if (entered !== session.passcode) return alert('الرقم السري غير صحيح.');
+    }
+    setActiveLiveView(session);
+  };
 
 
   const startExamWithCode = async (exam) => {
