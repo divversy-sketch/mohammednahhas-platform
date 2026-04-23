@@ -1968,8 +1968,8 @@ const AdminDashboard = ({ user }) => {
       const u = onSnapshot(q, s => setSubscriptionCodes(s.docs.map(d => ({id: d.id, ...d.data()}))));
       return u;
   }, []);
-  useEffect(() => onSnapshot(collection(db, 'question_bank'), snap => setQuestionBankCount(snap.size)), []);
-  useEffect(() => onSnapshot(collection(db, 'assignments'), snap => setAssignmentsCount(snap.size)), []);
+  useEffect(() => onSnapshot(collection(db, 'question_bank'), snap => setQuestionBankCount(snap.size), (error) => { console.warn('Question bank counter blocked:', error?.message); setQuestionBankCount(0); }), []);
+  useEffect(() => onSnapshot(collection(db, 'assignments'), snap => setAssignmentsCount(snap.size), (error) => { console.warn('Assignments counter blocked:', error?.message); setAssignmentsCount(0); }), []);
 
   const handleApprove = async (id) => {
     await updateDoc(doc(db,'users',id), {status:'active'});
@@ -3206,13 +3206,13 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
     });
 
     const unsubExams = onSnapshot(query(collection(db, 'exams'), where('grade', '==', userData.grade)), s => setExams(s.docs.map(d=>({id:d.id,...d.data()}))));
-    const unsubAssignments = onSnapshot(query(collection(db, 'assignments'), where('grade', '==', userData.grade)), s => setAssignments(s.docs.map(d=>({id:d.id,...d.data()}))));
+    const unsubAssignments = onSnapshot(query(collection(db, 'assignments'), where('grade', '==', userData.grade)), s => setAssignments(s.docs.map(d=>({id:d.id,...d.data()}))), (error) => { console.warn('Assignments listener blocked:', error?.message); setAssignments([]); });
     const unsubResults = onSnapshot(query(collection(db, 'exam_results'), where('studentId', '==', user.uid)), s => setExamResults(s.docs.map(d=>({id:d.id,...d.data()}))));
     const unsubHwResults = onSnapshot(query(collection(db, 'homework_results'), where('studentId', '==', user.uid)), s => {
         const results = s.docs.map(d=>({id:d.id,...d.data()})); results.sort((a,b) => (b.submittedAt?.seconds || 0) - (a.submittedAt?.seconds || 0)); setHwResults(results);
     });
-    const unsubAssignmentSubs = onSnapshot(query(collection(db, 'assignment_submissions'), where('studentId', '==', user.uid)), s => setAssignmentSubmissions(s.docs.map(d=>({id:d.id,...d.data()}))));
-    const unsubVideoViews = onSnapshot(query(collection(db, 'video_views'), where('userId', '==', user.uid)), s => { const map = {}; s.docs.forEach(d => { const data = d.data(); map[data.videoId] = data; }); setVideoProgressMap(map); });
+    const unsubAssignmentSubs = onSnapshot(query(collection(db, 'assignment_submissions'), where('studentId', '==', user.uid)), s => setAssignmentSubmissions(s.docs.map(d=>({id:d.id,...d.data()}))), (error) => { console.warn('Assignment submissions listener blocked:', error?.message); setAssignmentSubmissions([]); });
+    const unsubVideoViews = onSnapshot(query(collection(db, 'video_views'), where('userId', '==', user.uid)), s => { const map = {}; s.docs.forEach(d => { const data = d.data(); map[data.videoId] = data; }); setVideoProgressMap(map); }, (error) => { console.warn('Video views listener blocked:', error?.message); setVideoProgressMap({}); });
     const unsubMistakes = onSnapshot(query(collection(db, 'student_mistakes'), where('userId', '==', user.uid), orderBy('timestamp', 'desc')), s => { setMistakes(s.docs.map(d => ({id: d.id, ...d.data()}))); });
     const unsubNotif = onSnapshot(query(collection(db, 'notifications'), where('grade', 'in', ['all', userData.grade]), orderBy('createdAt', 'desc'), limit(10)), s => {
         const newNotifs = s.docs.map(d => d.data()); setNotifications(newNotifs);
@@ -3342,11 +3342,6 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
         } catch (error) { console.error("Error creating attempt record:", error); alert("حدث خطأ أثناء بدء الامتحان. حاول مرة أخرى."); }
     } else { alert("كود خاطئ!"); }
   };
-
-  const getVideoWatchPercent = (video) => safeNumber(videoProgressMap?.[video.id]?.watchedPercent, 0);
-  const canOpenLinkedExam = (video) => getVideoWatchPercent(video) >= safeNumber(video.requiredWatchPercent, 75);
-  const openLinkedExamFromVideo = (video) => { const linked = exams.find(ex => ex.id === video.linkedExamId); if (!linked) return alert('لا يوجد امتحان مرتبط بهذا الفيديو حالياً.'); if (!canOpenLinkedExam(video)) return alert(`يجب مشاهدة ${safeNumber(video.requiredWatchPercent, 75)}% من الفيديو أولاً. نسبة مشاهدتك الحالية ${getVideoWatchPercent(video)}%`); startExamWithCode(linked); };
-  const assignmentStats = { total: assignments.length, submitted: assignmentSubmissions.length, graded: assignmentSubmissions.filter(item => item.reviewStatus === 'graded').length };
 
   return (
     <div className="bg-slate-50 relative font-['Cairo'] min-h-screen block" dir="rtl">
@@ -3854,11 +3849,6 @@ const AuthPage = ({ onBack }) => {
     if(!formData.email) { alert("من فضلك اكتب الإيميل الأول."); return; }
     try { await sendPasswordResetEmail(auth, formData.email); alert("تم إرسال رابط استعادة كلمة السر."); } catch (error) { alert("حدث خطأ: " + error.message); }
   };
-
-  const getVideoWatchPercent = (video) => safeNumber(videoProgressMap?.[video.id]?.watchedPercent, 0);
-  const canOpenLinkedExam = (video) => getVideoWatchPercent(video) >= safeNumber(video.requiredWatchPercent, 75);
-  const openLinkedExamFromVideo = (video) => { const linked = exams.find(ex => ex.id === video.linkedExamId); if (!linked) return alert('لا يوجد امتحان مرتبط بهذا الفيديو حالياً.'); if (!canOpenLinkedExam(video)) return alert(`يجب مشاهدة ${safeNumber(video.requiredWatchPercent, 75)}% من الفيديو أولاً. نسبة مشاهدتك الحالية ${getVideoWatchPercent(video)}%`); startExamWithCode(linked); };
-  const assignmentStats = { total: assignments.length, submitted: assignmentSubmissions.length, graded: assignmentSubmissions.filter(item => item.reviewStatus === 'graded').length };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-slate-900 font-['Cairo'] relative overflow-hidden" dir="rtl">
