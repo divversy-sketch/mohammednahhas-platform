@@ -103,12 +103,30 @@ const generatePDF = (type, data) => {
                 </thead>
                 <tbody>
                     ${data.questions.map((q, i) => {
+                        const branchName = q.branch || 'عام';
+
+                        if (q.type === 'essay') {
+                            const essayAnswer = data.answers?.[q.id];
+                            const studentEssayText = typeof essayAnswer === 'object'
+                                ? (essayAnswer?.text || (essayAnswer?.image ? 'تم رفع صورة إجابة' : 'لم يجب'))
+                                : (essayAnswer || 'لم يجب');
+                            const modelEssayAnswer = q.modelAnswer || 'سؤال مقالي - يحتاج مراجعة يدوية';
+                            return `
+                            <tr style="background-color: #eff6ff;">
+                                <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${i + 1}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">${q.text.replace(/\|/g, '<br>')}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold; color: #0284c7;">${branchName}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">${studentEssayText}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px; color: #1d4ed8;">${modelEssayAnswer}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px; text-align: center;"><span style="color:#1d4ed8">📝 مقالي</span></td>
+                            </tr>`;
+                        }
+
                         const studentAnsIdx = data.answers[q.id];
                         const correctAnsIdx = q.correctIdx;
                         const isCorrect = studentAnsIdx === correctAnsIdx;
-                        const studentAnsText = studentAnsIdx !== undefined ? q.options[studentAnsIdx] : 'لم يجب';
-                        const correctAnsText = q.options[correctAnsIdx];
-                        const branchName = q.branch || 'عام';
+                        const studentAnsText = studentAnsIdx !== undefined ? q.options?.[studentAnsIdx] || 'لم يجب' : 'لم يجب';
+                        const correctAnsText = q.options?.[correctAnsIdx] || 'غير محدد';
                         return `
                         <tr style="background-color: ${isCorrect ? '#f0fdf4' : '#fef2f2'};">
                             <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${i + 1}</td>
@@ -212,6 +230,35 @@ const getGradeLabel = (g) => {
     const map = { '1prep': 'أولى إعدادي', '2prep': 'تانية إعدادي', '3prep': 'تالتة إعدادي', '1sec': 'أولى ثانوي', '2sec': 'تانية ثانوي', '3sec': 'تالتة ثانوي' };
     return map[g] || g;
 };
+
+
+const normalizeEgyptPhone = (value = '') => value.replace(/\D/g, '').slice(0, 11);
+
+const isValidEgyptPhone = (value = '') => /^01[0125]\d{8}$/.test(normalizeEgyptPhone(value));
+
+const validateEgyptianPhones = (studentPhone, parentPhone) => {
+    const normalizedStudentPhone = normalizeEgyptPhone(studentPhone);
+    const normalizedParentPhone = normalizeEgyptPhone(parentPhone);
+
+    if (!isValidEgyptPhone(normalizedStudentPhone)) {
+        return { ok: false, message: "رقم الطالب غير صحيح! يجب أن يكون 11 رقم ويبدأ بـ 010 أو 011 أو 012 أو 015" };
+    }
+
+    if (!isValidEgyptPhone(normalizedParentPhone)) {
+        return { ok: false, message: "رقم ولي الأمر غير صحيح! يجب أن يكون 11 رقم ويبدأ بـ 010 أو 011 أو 012 أو 015" };
+    }
+
+    if (normalizedStudentPhone === normalizedParentPhone) {
+        return { ok: false, message: "عفواً، لا يمكن أن يكون رقم الطالب هو نفسه رقم ولي الأمر." };
+    }
+
+    return {
+        ok: true,
+        normalizedStudentPhone,
+        normalizedParentPhone
+    };
+};
+
 
 const ModernLogo = () => (
   <div className="relative w-20 h-20 drop-shadow-2xl cursor-pointer hover:scale-105 hover:rotate-6 transition-transform">
@@ -727,8 +774,9 @@ const InteractiveViewer = ({ content, user, onClose }) => {
     );
 };
 
+
 const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult = null }) => {
-  const [activeView, setActiveView] = useState(isReviewMode || existingResult ? 'dashboard' : 'questions'); 
+  const [activeView, setActiveView] = useState(isReviewMode || existingResult ? 'dashboard' : 'questions');
   const [currentQIndex, setCurrentQIndex] = useState(0);
   const [answers, setAnswers] = useState(existingResult?.answers || {});
   const [flagged, setFlagged] = useState({});
@@ -736,27 +784,43 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const [isCheating, setIsCheating] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(isReviewMode || existingResult !== null);
   const [score, setScore] = useState(existingResult?.score || 0);
-  const [startTime] = useState(Date.now()); 
+  const [startTime] = useState(Date.now());
   const [wmPositions, setWmPositions] = useState([]);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [activeBranchTab, setActiveBranchTab] = useState('الكل');
 
+  const fileDialogBypassRef = useRef(false);
+  const stateRefs = useRef({ isSubmitted, showSubmitConfirm, isCheating });
+
   const shuffleArray = (array) => {
     const arr = [...array];
-    for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
     return arr;
   };
 
   const flatQuestions = useMemo(() => {
     const flat = [];
     if (exam.questions) {
-        let processedBlocks = [...exam.questions];
-        if (!isReviewMode && !existingResult) processedBlocks = shuffleArray(processedBlocks);
-        processedBlocks.forEach((block) => {
-            let subQs = [...block.subQuestions];
-            if (!isReviewMode && !existingResult) subQs = shuffleArray(subQs);
-            subQs.forEach((q) => { flat.push({ ...q, blockText: block.text, branch: q.branch || 'عام' }); });
+      let processedBlocks = [...exam.questions];
+      if (!isReviewMode && !existingResult) processedBlocks = shuffleArray(processedBlocks);
+
+      processedBlocks.forEach((block) => {
+        let subQs = [...(block.subQuestions || [])];
+        const hasEssay = subQs.some((q) => q.type === 'essay');
+        if (!isReviewMode && !existingResult && !hasEssay) subQs = shuffleArray(subQs);
+
+        subQs.forEach((q) => {
+          flat.push({
+            ...q,
+            type: q.type || 'mcq',
+            blockText: block.text || '',
+            branch: q.branch || 'عام'
+          });
         });
+      });
     }
     return flat;
   }, [exam.questions, isReviewMode, existingResult]);
@@ -764,88 +828,156 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const uniqueBranches = useMemo(() => ['الكل', ...new Set(flatQuestions.map(q => q.branch))], [flatQuestions]);
 
   const displayQuestions = useMemo(() => {
-      if (!isSubmitted || activeBranchTab === 'الكل') return flatQuestions;
-      return flatQuestions.filter(q => q.branch === activeBranchTab);
+    if (!isSubmitted || activeBranchTab === 'الكل') return flatQuestions;
+    return flatQuestions.filter(q => q.branch === activeBranchTab);
   }, [flatQuestions, isSubmitted, activeBranchTab]);
 
-  useEffect(() => { if (isSubmitted) setCurrentQIndex(0); }, [activeBranchTab, isSubmitted]);
+  const mcqQuestions = useMemo(() => flatQuestions.filter(q => q.type !== 'essay'), [flatQuestions]);
+  const essayQuestions = useMemo(() => flatQuestions.filter(q => q.type === 'essay'), [flatQuestions]);
 
-  if (flatQuestions.length === 0) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-white font-['Cairo']">عفواً، لا توجد أسئلة.<button onClick={onClose} className="ml-4 bg-gray-200 px-4 py-2 rounded">خروج</button></div>;
+  useEffect(() => {
+    if (isSubmitted) setCurrentQIndex(0);
+  }, [activeBranchTab, isSubmitted]);
+
+  useEffect(() => {
+    stateRefs.current = { isSubmitted, showSubmitConfirm, isCheating };
+  }, [isSubmitted, showSubmitConfirm, isCheating]);
 
   useEffect(() => {
     if (isReviewMode) return;
+
     const updatePositions = () => {
-        const newPos = [...Array(6)].map(() => ({ top: Math.floor(Math.random() * 90) + '%', left: Math.floor(Math.random() * 90) + '%' }));
-        setWmPositions(newPos);
+      const newPos = [...Array(6)].map(() => ({
+        top: Math.floor(Math.random() * 90) + '%',
+        left: Math.floor(Math.random() * 90) + '%'
+      }));
+      setWmPositions(newPos);
     };
+
     updatePositions();
-    const interval = setInterval(updatePositions, 6000); 
+    const interval = setInterval(updatePositions, 6000);
     return () => clearInterval(interval);
   }, [isReviewMode]);
 
-  const stateRefs = useRef({ isSubmitted, showSubmitConfirm, isCheating });
-  useEffect(() => { stateRefs.current = { isSubmitted, showSubmitConfirm, isCheating }; });
+  useEffect(() => {
+    const restoreBypass = () => {
+      setTimeout(() => {
+        fileDialogBypassRef.current = false;
+      }, 1200);
+    };
+
+    window.addEventListener('focus', restoreBypass);
+    return () => window.removeEventListener('focus', restoreBypass);
+  }, []);
 
   const handleCheatingRef = useRef();
   handleCheatingRef.current = async () => {
-      const { isSubmitted, isCheating } = stateRefs.current;
-      if(isReviewMode || isSubmitted || isCheating) return;
-      setIsCheating(true); setIsSubmitted(true); setActiveView('dashboard');
-      const timeTaken = Math.round((Date.now() - startTime) / 1000);
-      if (exam.attemptId) {
-          await setDoc(doc(db, 'exam_results', exam.attemptId), { 
-              examId: exam.id, studentId: user.uid, studentName: user.displayName, 
-              score: 0, total: flatQuestions.length, status: 'cheated', timeTaken: timeTaken, totalTime: exam.duration, submittedAt: serverTimestamp() 
-          });
-      }
-      await updateDoc(doc(db, 'users', user.uid), { status: 'banned_exam' });
+    const { isSubmitted, isCheating } = stateRefs.current;
+    if (fileDialogBypassRef.current || isReviewMode || isSubmitted || isCheating) return;
+
+    setIsCheating(true);
+    setIsSubmitted(true);
+    setActiveView('dashboard');
+
+    const timeTaken = Math.round((Date.now() - startTime) / 1000);
+    if (exam.attemptId) {
+      await setDoc(doc(db, 'exam_results', exam.attemptId), {
+        examId: exam.id,
+        studentId: user.uid,
+        studentName: user.displayName,
+        score: 0,
+        total: mcqQuestions.length,
+        status: 'cheated',
+        timeTaken,
+        totalTime: exam.duration,
+        submittedAt: serverTimestamp()
+      });
+    }
+
+    await updateDoc(doc(db, 'users', user.uid), { status: 'banned_exam' });
   };
 
   useEffect(() => {
-      if (isReviewMode) return;
-      const handleBeforeUnload = (e) => {
-          if (!stateRefs.current.isSubmitted) {
-              e.preventDefault(); e.returnValue = "هل أنت متأكد؟ الخروج سيمنعك من العودة للامتحان!"; return e.returnValue;
-          }
-      };
-      window.addEventListener('beforeunload', handleBeforeUnload);
-      
-      const handleAntiCheat = () => { 
-          const { showSubmitConfirm, isSubmitted } = stateRefs.current;
-          if (!showSubmitConfirm && !isSubmitted) handleCheatingRef.current();
-      };
-      const handleVisibilityChange = () => { if (document.hidden) handleAntiCheat(); };
-      const blockContextMenu = (e) => e.preventDefault();
-      document.addEventListener("visibilitychange", handleVisibilityChange);
-      window.addEventListener("blur", handleAntiCheat);
-      window.addEventListener("pagehide", handleAntiCheat);
-      document.addEventListener('contextmenu', blockContextMenu); 
-      return () => {
-          window.removeEventListener('beforeunload', handleBeforeUnload);
-          document.removeEventListener("visibilitychange", handleVisibilityChange);
-          window.removeEventListener("blur", handleAntiCheat);
-          window.removeEventListener("pagehide", handleAntiCheat);
-          document.removeEventListener('contextmenu', blockContextMenu);
-      };
-  }, [isReviewMode]);
+    if (isReviewMode) return;
+
+    const handleBeforeUnload = (e) => {
+      if (!stateRefs.current.isSubmitted) {
+        e.preventDefault();
+        e.returnValue = "هل أنت متأكد؟ الخروج سيمنعك من العودة للامتحان!";
+        return e.returnValue;
+      }
+    };
+
+    const handleAntiCheat = () => {
+      const { showSubmitConfirm, isSubmitted } = stateRefs.current;
+      if (fileDialogBypassRef.current) return;
+      if (!showSubmitConfirm && !isSubmitted) handleCheatingRef.current();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden && !fileDialogBypassRef.current) handleAntiCheat();
+    };
+
+    const blockContextMenu = (e) => e.preventDefault();
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("blur", handleAntiCheat);
+    window.addEventListener("pagehide", handleAntiCheat);
+    document.addEventListener('contextmenu', blockContextMenu);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("blur", handleAntiCheat);
+      window.removeEventListener("pagehide", handleAntiCheat);
+      document.removeEventListener('contextmenu', blockContextMenu);
+    };
+  }, [isReviewMode, mcqQuestions.length, exam.attemptId, exam.id, exam.duration, startTime, user.uid, user.displayName]);
 
   useEffect(() => {
     if (isReviewMode || isSubmitted) return;
     if (timeLeft > 0 && !isCheating) {
-      const timer = setInterval(() => setTimeLeft(p => p - 1), 1000);
+      const timer = setInterval(() => setTimeLeft((p) => p - 1), 1000);
       return () => clearInterval(timer);
     } else if (timeLeft === 0) {
       handleSubmit(true);
     }
   }, [timeLeft, isSubmitted, isCheating, isReviewMode]);
 
-  const handleAnswer = (qId, optionIdx) => { 
-    if(!isReviewMode && !isSubmitted) setAnswers(prev => ({ ...prev, [qId]: optionIdx }));
+  const handleAnswer = (qId, value) => {
+    if (!isReviewMode && !isSubmitted) {
+      setAnswers((prev) => ({ ...prev, [qId]: value }));
+    }
   };
-  
+
+  const handleEssayImageUpload = (qId, file) => {
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      alert("حجم الصورة كبير. الحد الأقصى 2 ميجا.");
+      fileDialogBypassRef.current = false;
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const previousAnswer = answers[qId];
+      const currentText = typeof previousAnswer === 'object' ? previousAnswer?.text || '' : '';
+      handleAnswer(qId, { text: currentText, image: reader.result, fileName: file.name });
+      fileDialogBypassRef.current = false;
+    };
+    reader.onerror = () => {
+      alert("حدث خطأ أثناء قراءة الصورة.");
+      fileDialogBypassRef.current = false;
+    };
+    reader.readAsDataURL(file);
+  };
+
   const calculateScore = () => {
     let rawScore = 0;
-    flatQuestions.forEach(q => { if (answers[q.id] === q.correctIdx) rawScore++; });
+    mcqQuestions.forEach((q) => {
+      if (answers[q.id] === q.correctIdx) rawScore++;
+    });
     return rawScore;
   };
 
@@ -853,369 +985,481 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
   const handleSubmit = async (auto = false) => {
     setShowSubmitConfirm(false);
-    const totalQs = flatQuestions.length;
     const finalScore = calculateScore();
     const timeTaken = Math.round((Date.now() - startTime) / 1000);
+
     setScore(finalScore);
     setIsSubmitted(true);
-    setActiveView('dashboard'); 
+    setActiveView('dashboard');
 
     const batch = writeBatch(db);
-    flatQuestions.forEach(q => {
-        const studentAns = answers[q.id];
-        const isAnswered = studentAns !== undefined;
-        const isCorrect = studentAns === q.correctIdx;
-        
-        if (isAnswered && !isCorrect) {
-            const mistakeRef = doc(collection(db, 'student_mistakes'));
-            batch.set(mistakeRef, {
-                userId: user.uid, examTitle: exam.title,
-                question: { ...q, studentAnswerText: q.options[studentAns], correctAnswerText: q.options[q.correctIdx] },
-                timestamp: serverTimestamp()
-            });
-        }
+
+    mcqQuestions.forEach((q) => {
+      const studentAns = answers[q.id];
+      const isAnswered = studentAns !== undefined;
+      const isCorrect = studentAns === q.correctIdx;
+
+      if (isAnswered && !isCorrect) {
+        const mistakeRef = doc(collection(db, 'student_mistakes'));
+        batch.set(mistakeRef, {
+          userId: user.uid,
+          examTitle: exam.title,
+          question: {
+            ...q,
+            studentAnswerText: q.options?.[studentAns],
+            correctAnswerText: q.options?.[q.correctIdx]
+          },
+          timestamp: serverTimestamp()
+        });
+      }
     });
 
     if (exam.attemptId && exam.id !== 'custom_mistakes_exam') {
-        const attemptRef = doc(db, 'exam_results', exam.attemptId);
-        batch.set(attemptRef, { 
-            examId: exam.id, studentId: user.uid, studentName: user.displayName, 
-            score: finalScore, total: totalQs, answers, status: 'completed', timeTaken: timeTaken, totalTime: exam.duration, submittedAt: serverTimestamp() 
-        }, { merge: true });
+      const attemptRef = doc(db, 'exam_results', exam.attemptId);
+      batch.set(attemptRef, {
+        examId: exam.id,
+        studentId: user.uid,
+        studentName: user.displayName,
+        score: finalScore,
+        total: mcqQuestions.length,
+        answers,
+        status: 'completed',
+        timeTaken,
+        totalTime: exam.duration,
+        hasEssay: essayQuestions.length > 0,
+        submittedAt: serverTimestamp()
+      }, { merge: true });
     }
-    try { await batch.commit(); } catch(err) { console.error("Error saving results or mistakes", err); }
+
+    try {
+      await batch.commit();
+    } catch (err) {
+      console.error("Error saving results or mistakes", err);
+    }
   };
 
+  if (flatQuestions.length === 0) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-white font-['Cairo']">
+        عفواً، لا توجد أسئلة.
+        <button onClick={onClose} className="ml-4 bg-gray-200 px-4 py-2 rounded">خروج</button>
+      </div>
+    );
+  }
+
   const currentQObj = displayQuestions[currentQIndex];
-  
-  if (isCheating) return <div className="fixed inset-0 z-[60] bg-red-900 flex items-center justify-center text-white text-center font-['Cairo']"><div><AlertOctagon size={80} className="mx-auto mb-4"/><h1>تم رصد محاولة غش!</h1><p className="text-red-200 mt-2">خرجت من الامتحان. تم رصد درجتك (صفر) وحظرك من الامتحانات القادمة.</p><button onClick={() => window.location.reload()} className="mt-4 bg-white text-red-900 px-6 py-2 rounded-full font-bold">العودة للرئيسية</button></div></div>;
+  if (!currentQObj) return null;
+
+  if (isCheating) {
+    return (
+      <div className="fixed inset-0 z-[60] bg-red-900 flex items-center justify-center text-white text-center font-['Cairo']">
+        <div>
+          <AlertOctagon size={80} className="mx-auto mb-4" />
+          <h1>تم رصد محاولة غش!</h1>
+          <p className="text-red-200 mt-2">خرجت من الامتحان. تم رصد درجتك (صفر) وحظرك من الامتحانات القادمة.</p>
+          <button onClick={() => window.location.reload()} className="mt-4 bg-white text-red-900 px-6 py-2 rounded-full font-bold">العودة للرئيسية</button>
+        </div>
+      </div>
+    );
+  }
 
   const totalQs = flatQuestions.length;
-  const solvedQs = Object.keys(answers).length;
+  const solvedQs = flatQuestions.filter((q) => answers[q.id] !== undefined && answers[q.id] !== '' && answers[q.id] !== null).length;
   const unsolvedQs = totalQs - solvedQs;
   const correctQs = score;
-  const wrongQs = solvedQs - correctQs;
-  const percentage = totalQs > 0 ? Math.round((score / totalQs) * 100) : 0;
-  
+  const wrongQs = mcqQuestions.filter((q) => answers[q.id] !== undefined && answers[q.id] !== q.correctIdx).length;
+  const percentage = mcqQuestions.length > 0 ? Math.round((score / mcqQuestions.length) * 100) : 0;
+  const essayAnswered = essayQuestions.filter((q) => {
+    const val = answers[q.id];
+    if (typeof val === 'object') return !!(val?.text?.trim() || val?.image);
+    return !!val;
+  }).length;
+
   const branchStats = {};
-  flatQuestions.forEach(q => {
-      const b = q.branch;
-      if (!branchStats[b]) branchStats[b] = { total: 0, solved: 0, correct: 0, wrong: 0, unsolved: 0 };
-      branchStats[b].total++;
-      const isSelected = answers[q.id] !== undefined;
-      const isCorrect = answers[q.id] === q.correctIdx;
-      if (isSelected) branchStats[b].solved++;
-      if (!isSelected) branchStats[b].unsolved++;
-      else if (isCorrect) branchStats[b].correct++;
-      else branchStats[b].wrong++;
+  flatQuestions.forEach((q) => {
+    const b = q.branch;
+    if (!branchStats[b]) branchStats[b] = { total: 0, solved: 0, correct: 0, wrong: 0, unsolved: 0, essay: 0 };
+    branchStats[b].total++;
+    const isAnswered = answers[q.id] !== undefined && answers[q.id] !== '' && answers[q.id] !== null;
+    if (isAnswered) branchStats[b].solved++;
+    else branchStats[b].unsolved++;
+
+    if (q.type === 'essay') {
+      branchStats[b].essay++;
+    } else if (answers[q.id] === q.correctIdx) {
+      branchStats[b].correct++;
+    } else if (answers[q.id] !== undefined) {
+      branchStats[b].wrong++;
+    }
   });
 
   const canReview = exam.id === 'custom_mistakes_exam' || Date.now() > new Date(exam.endTime).getTime();
 
   if (activeView === 'dashboard') {
-     return (
-        <div className="fixed inset-0 z-[60] bg-[#0f172a] overflow-y-auto p-4 md:p-8 font-['Cairo'] text-slate-200" dir="rtl">
-            <div className="max-w-6xl mx-auto mt-6">
-                <div className="flex flex-col md:flex-row justify-between items-center mb-10 border-b border-slate-700 pb-4 gap-4">
-                    <div className="text-center md:text-right">
-                        <h2 className="text-3xl font-black text-white mb-2">{exam.title}</h2>
-                        {isSubmitted ? (
-                            <p className="text-lg text-slate-400">الطالب: {user.displayName}</p>
-                        ) : (
-                            <p className="text-amber-400 font-bold">⏳ الوقت المتبقي: {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</p>
-                        )}
-                    </div>
-                    <div className="flex items-center gap-3">
-                        {isSubmitted ? (
-                            <>
-                                <button onClick={() => generatePDF('student', {studentName: user.displayName, score, total: flatQuestions.length, status: 'completed', examTitle: exam.title, questions: flatQuestions, answers: answers })} className="w-12 h-12 bg-blue-600 rounded-full text-white flex items-center justify-center shadow-lg hover:bg-blue-700 transition" title="تحميل التقرير PDF">
-                                    <FileText size={20}/>
-                                </button>
-                                <button onClick={onClose} className="bg-slate-700 text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-600 shadow-lg transition flex items-center gap-2">
-                                    خروج <LogOut size={18}/>
-                                </button>
-                            </>
-                        ) : (
-                            <button onClick={() => setActiveView('questions')} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold shadow-lg hover:bg-blue-700 transition flex items-center gap-2">
-                                استكمال الامتحان <Play size={18}/>
-                            </button>
-                        )}
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-10">
-                    <div className="bg-[#1e293b] p-6 rounded-2xl text-center border-t-4 border-slate-500 shadow-xl flex flex-col justify-center">
-                        <p className="text-slate-400 text-sm mb-3 font-bold">عدد الأسئلة</p>
-                        <p className="text-4xl md:text-5xl font-black text-white">{totalQs}</p>
-                    </div>
-                    {isSubmitted ? (
-                        <div className="bg-[#1e293b] p-6 rounded-2xl text-center border-t-4 border-slate-500 shadow-xl flex flex-col justify-center">
-                            <p className="text-slate-400 text-sm mb-3 font-bold">النتيجة</p>
-                            <p className="text-4xl md:text-5xl font-black text-white">{percentage}%</p>
-                        </div>
-                    ) : (
-                        <div className="bg-[#1e293b] p-6 rounded-2xl text-center border-t-4 border-slate-500 shadow-xl flex flex-col justify-center cursor-pointer hover:bg-slate-700 transition" onClick={() => {setActiveBranchTab('الكل'); setActiveView('questions');}}>
-                            <p className="text-slate-400 text-sm mb-3 font-bold">عرض الكل</p>
-                            <p className="text-4xl md:text-5xl font-black text-blue-400">{solvedQs}/{totalQs}</p>
-                        </div>
-                    )}
-                    <div className="bg-[#0e7490] p-6 rounded-2xl text-center shadow-xl flex flex-col justify-center">
-                        <p className="text-cyan-100 text-sm mb-3 flex items-center justify-center gap-2 font-bold"><CheckCircle size={16}/> المحلولة</p>
-                        <p className="text-4xl md:text-5xl font-black text-white">{solvedQs}</p>
-                    </div>
-                    {isSubmitted ? (
-                        <>
-                            <div className="bg-[#831843] p-6 rounded-2xl text-center shadow-xl flex flex-col justify-center">
-                                <p className="text-pink-100 text-sm mb-3 flex items-center justify-center gap-2 font-bold"><XCircle size={16}/> الخاطئة</p>
-                                <p className="text-4xl md:text-5xl font-black text-pink-50">{wrongQs}</p>
-                            </div>
-                            <div className="bg-[#115e59] p-6 rounded-2xl text-center shadow-xl flex flex-col justify-center">
-                                <p className="text-teal-100 text-sm mb-3 flex items-center justify-center gap-2 font-bold"><Check size={16}/> الصحيحة</p>
-                                <p className="text-4xl md:text-5xl font-black text-teal-50">{correctQs}</p>
-                            </div>
-                        </>
-                    ) : (
-                        <div className="bg-[#b45309] p-6 rounded-2xl text-center shadow-xl flex flex-col justify-center col-span-2">
-                            <p className="text-amber-100 text-sm mb-3 flex items-center justify-center gap-2 font-bold"><Flag size={16}/> أسئلة محددة للمراجعة</p>
-                            <p className="text-4xl md:text-5xl font-black text-amber-50">{Object.values(flagged).filter(v=>v).length}</p>
-                        </div>
-                    )}
-                    <div className="bg-[#78350f] p-6 rounded-2xl text-center shadow-xl flex flex-col justify-center">
-                        <p className="text-amber-100 text-sm mb-3 flex items-center justify-center gap-2 font-bold"><AlertCircle size={16}/> لم تُحل</p>
-                        <p className="text-4xl md:text-5xl font-black text-amber-50">{unsolvedQs}</p>
-                    </div>
-                </div>
-
-                {Object.keys(branchStats).length > 0 && (
-                    <div className="mb-10">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-2xl font-bold flex items-center gap-2 text-teal-400"><Layers size={28}/> {isSubmitted ? 'ملخص الفروع' : 'أقسام الامتحان (اضغط للدخول)'}</h3>
-                            {canReview && isSubmitted && (
-                                <button onClick={() => { setActiveBranchTab('الكل'); setActiveView('questions'); }} className="text-teal-400 bg-teal-900/30 px-4 py-2 rounded-lg font-bold hover:bg-teal-900/50 transition text-sm flex items-center gap-2">
-                                    عرض كل الأسئلة <ClipboardList size={16}/>
-                                </button>
-                            )}
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                            {Object.entries(branchStats).map(([branch, stats], idx) => {
-                                const bPercent = isSubmitted 
-                                    ? Math.round((stats.correct / stats.total) * 100) 
-                                    : Math.round((stats.solved / stats.total) * 100);
-                                
-                                let message = "";
-                                if (isSubmitted) {
-                                    message = bPercent >= 90 ? `عاش يا بطل، مقفل ${branch} 🌟` : bPercent >= 70 ? `أداء محترم في ${branch} 👏` : "شد حيلك أكتر، تقدر تجيب أعلى 💪";
-                                } else {
-                                    message = bPercent === 100 ? "تم حل كل أسئلة القسم ✅" : "يوجد أسئلة متبقية ⏳";
-                                }
-
-                                return (
-                                    <div 
-                                        key={idx} 
-                                        onClick={() => {
-                                            if (!isSubmitted || canReview) {
-                                                setActiveBranchTab(branch);
-                                                setActiveView('questions');
-                                            } else {
-                                                alert("نموذج الإجابة سيتاح بعد انتهاء وقت الامتحان للجميع.");
-                                            }
-                                        }}
-                                        className={`bg-[#1e293b] p-6 rounded-2xl border border-[#334155] shadow-lg transition group ${(!isSubmitted || canReview) ? 'cursor-pointer hover:border-teal-400 hover:-translate-y-1' : ''}`}
-                                    >
-                                        <div className="flex justify-between items-center mb-6">
-                                            <span className={`text-4xl font-black ${isSubmitted ? 'text-teal-400' : 'text-blue-400'}`}>{bPercent}%</span>
-                                            <span className="text-xl font-bold text-white bg-slate-800 px-3 py-1 rounded-lg">{branch}</span>
-                                        </div>
-                                        <p className="text-sm text-slate-400 text-left mb-2 font-bold">{isSubmitted ? 'نسبة النجاح' : 'نسبة الحل'}</p>
-                                        <div className="w-full bg-[#0f172a] rounded-full h-2.5 mb-6 overflow-hidden">
-                                            <div className={`${isSubmitted ? 'bg-teal-400' : 'bg-blue-400'} h-2.5 rounded-full transition-all duration-1000`} style={{ width: `${bPercent}%` }}></div>
-                                        </div>
-                                        <div className="text-sm mt-4 bg-[#0f172a] p-3 rounded-lg">
-                                            {!isSubmitted ? (
-                                                <div className="flex justify-between text-slate-400 font-bold">
-                                                    <span>محلول: <span className="text-blue-400">{stats.solved}</span></span>
-                                                    <span>المجموع: {stats.total}</span>
-                                                </div>
-                                            ) : (
-                                                <>
-                                                    <p className="text-slate-500 mb-1 text-xs">رسالة المنصة:</p>
-                                                    <p className={`${bPercent >= 90 ? 'text-teal-300' : 'text-amber-300'} font-bold`}>{message}</p>
-                                                </>
-                                            )}
-                                        </div>
-                                        {(canReview && isSubmitted) && (
-                                            <div className="mt-4 text-center opacity-0 group-hover:opacity-100 transition-opacity text-teal-400 text-xs font-bold flex items-center justify-center gap-1">
-                                                اضغط لمراجعة أخطاء {branch} <MousePointerClick size={12}/>
-                                            </div>
-                                        )}
-                                    </div>
-                                )
-                            })}
-                        </div>
-                    </div>
-                )}
-
-                {!canReview && isSubmitted && (
-                    <div className="mt-8 bg-amber-900/30 text-amber-400 p-6 rounded-2xl border border-amber-900 text-center font-bold text-lg flex flex-col items-center gap-3">
-                        <Clock size={32}/>
-                        نموذج الإجابة والمراجعة سيظهر هنا تلقائياً بعد انتهاء وقت الامتحان للأغلبية.
-                    </div>
-                )}
-
-                {!isSubmitted && (
-                    <div className="flex justify-end mt-8 border-t border-slate-700 pt-6">
-                        <button onClick={confirmSubmit} className="bg-green-600 text-white px-8 py-3 rounded-lg font-bold shadow-lg hover:bg-green-700 transition flex items-center justify-center gap-2">
-                            <CheckCircle size={20}/> تسليم الامتحان نهائياً
-                        </button>
-                    </div>
-                )}
+    return (
+      <div className="fixed inset-0 z-[60] bg-[#0f172a] overflow-y-auto p-4 md:p-8 font-['Cairo'] text-slate-200" dir="rtl">
+        <div className="max-w-6xl mx-auto mt-6">
+          <div className="flex flex-col md:flex-row justify-between items-center mb-10 border-b border-slate-700 pb-4 gap-4">
+            <div className="text-center md:text-right">
+              <h2 className="text-3xl font-black text-white mb-2">{exam.title}</h2>
+              {isSubmitted ? (
+                <p className="text-lg text-slate-400">الطالب: {user.displayName}</p>
+              ) : (
+                <p className="text-amber-400 font-bold">⏳ الوقت المتبقي: {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</p>
+              )}
             </div>
-        </div>
-     );
-  }
+            <div className="flex items-center gap-3">
+              {isSubmitted ? (
+                <>
+                  <button
+                    onClick={() => generatePDF('student', { studentName: user.displayName, score, total: mcqQuestions.length, status: 'completed', examTitle: exam.title, questions: flatQuestions, answers })}
+                    className="w-12 h-12 bg-blue-600 rounded-full text-white flex items-center justify-center shadow-lg hover:bg-blue-700 transition"
+                    title="تحميل التقرير PDF"
+                  >
+                    <FileText size={20} />
+                  </button>
+                  <button onClick={onClose} className="bg-slate-700 text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-600 shadow-lg transition flex items-center gap-2">
+                    خروج <LogOut size={18} />
+                  </button>
+                </>
+              ) : (
+                <div className="flex gap-3">
+                  <button onClick={() => setActiveView('questions')} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold shadow-lg hover:bg-blue-700 transition flex items-center gap-2">
+                    استكمال الامتحان <Play size={18} />
+                  </button>
+                  <button onClick={confirmSubmit} className="bg-green-600 text-white px-6 py-2 rounded-lg font-bold shadow-lg hover:bg-green-700 transition flex items-center gap-2">
+                    تسليم الآن <CheckCircle size={18} />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
 
-  if (!currentQObj) return null;
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-10">
+            <div className="bg-[#1e293b] p-6 rounded-2xl text-center border-t-4 border-slate-500 shadow-xl flex flex-col justify-center">
+              <p className="text-slate-400 text-sm mb-3 font-bold">عدد الأسئلة</p>
+              <p className="text-4xl md:text-5xl font-black text-white">{totalQs}</p>
+            </div>
+            <div className="bg-[#1e293b] p-6 rounded-2xl text-center border-t-4 border-slate-500 shadow-xl flex flex-col justify-center">
+              <p className="text-slate-400 text-sm mb-3 font-bold">{isSubmitted ? 'النتيجة' : 'تم الحل'}</p>
+              <p className="text-4xl md:text-5xl font-black text-white">{isSubmitted ? `${percentage}%` : `${solvedQs}/${totalQs}`}</p>
+            </div>
+            <div className="bg-[#0e7490] p-6 rounded-2xl text-center shadow-xl flex flex-col justify-center">
+              <p className="text-cyan-100 text-sm mb-3 flex items-center justify-center gap-2 font-bold"><CheckCircle size={16} /> المحلولة</p>
+              <p className="text-4xl md:text-5xl font-black text-white">{solvedQs}</p>
+            </div>
+            <div className="bg-[#115e59] p-6 rounded-2xl text-center shadow-xl flex flex-col justify-center">
+              <p className="text-teal-100 text-sm mb-3 flex items-center justify-center gap-2 font-bold"><Check size={16} /> الصحيحة</p>
+              <p className="text-4xl md:text-5xl font-black text-teal-50">{correctQs}</p>
+            </div>
+            <div className="bg-[#831843] p-6 rounded-2xl text-center shadow-xl flex flex-col justify-center">
+              <p className="text-pink-100 text-sm mb-3 flex items-center justify-center gap-2 font-bold"><XCircle size={16} /> الخاطئة</p>
+              <p className="text-4xl md:text-5xl font-black text-pink-50">{wrongQs}</p>
+            </div>
+            <div className="bg-[#78350f] p-6 rounded-2xl text-center shadow-xl flex flex-col justify-center">
+              <p className="text-amber-100 text-sm mb-3 flex items-center justify-center gap-2 font-bold"><PenTool size={16} /> المقالي</p>
+              <p className="text-4xl md:text-5xl font-black text-amber-50">{essayAnswered}/{essayQuestions.length}</p>
+            </div>
+          </div>
+
+          {!isSubmitted && (
+            <div className="mb-6 bg-blue-900/20 text-blue-300 p-4 rounded-2xl border border-blue-900/40 text-center font-bold">
+              زر التسليم أصبح ظاهرًا في أعلى صفحة الأسئلة وأيضًا داخل لوحة التحكم.
+            </div>
+          )}
+
+          {Object.keys(branchStats).length > 0 && (
+            <div className="mb-10">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-bold flex items-center gap-2 text-teal-400"><Layers size={28} /> {isSubmitted ? 'ملخص الفروع' : 'أقسام الامتحان'}</h3>
+                {(canReview || !isSubmitted) && (
+                  <button onClick={() => { setActiveBranchTab('الكل'); setActiveView('questions'); }} className="text-teal-400 bg-teal-900/30 px-4 py-2 rounded-lg font-bold hover:bg-teal-900/50 transition text-sm flex items-center gap-2">
+                    عرض كل الأسئلة <ClipboardList size={16} />
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                {Object.entries(branchStats).map(([branch, stats], idx) => {
+                  const branchMcqTotal = flatQuestions.filter(q => q.branch === branch && q.type !== 'essay').length;
+                  const bPercent = branchMcqTotal > 0 ? Math.round((stats.correct / branchMcqTotal) * 100) : 100;
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => {
+                        if (!isSubmitted || canReview) {
+                          setActiveBranchTab(branch);
+                          setActiveView('questions');
+                        } else {
+                          alert("نموذج الإجابة سيتاح بعد انتهاء وقت الامتحان للجميع.");
+                        }
+                      }}
+                      className={`bg-[#1e293b] p-6 rounded-2xl border border-[#334155] shadow-lg transition group ${(!isSubmitted || canReview) ? 'cursor-pointer hover:border-teal-400 hover:-translate-y-1' : ''}`}
+                    >
+                      <div className="flex justify-between items-center mb-6">
+                        <span className={`${isSubmitted ? 'text-teal-400' : 'text-blue-400'} text-4xl font-black`}>{bPercent}%</span>
+                        <span className="text-xl font-bold text-white bg-slate-800 px-3 py-1 rounded-lg">{branch}</span>
+                      </div>
+                      <div className="w-full bg-[#0f172a] rounded-full h-2.5 mb-6 overflow-hidden">
+                        <div className={`${isSubmitted ? 'bg-teal-400' : 'bg-blue-400'} h-2.5 rounded-full transition-all duration-1000`} style={{ width: `${bPercent}%` }} />
+                      </div>
+                      <div className="text-sm mt-4 bg-[#0f172a] p-3 rounded-lg text-slate-300 space-y-1">
+                        <div className="flex justify-between"><span>إجمالي</span><span>{stats.total}</span></div>
+                        <div className="flex justify-between"><span>صحيحة</span><span className="text-teal-300">{stats.correct}</span></div>
+                        <div className="flex justify-between"><span>خاطئة</span><span className="text-pink-300">{stats.wrong}</span></div>
+                        <div className="flex justify-between"><span>مقالي</span><span className="text-amber-300">{stats.essay}</span></div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {!canReview && isSubmitted && (
+            <div className="mt-8 bg-amber-900/30 text-amber-400 p-6 rounded-2xl border border-amber-900 text-center font-bold text-lg flex flex-col items-center gap-3">
+              <Clock size={32} />
+              نموذج الإجابة والمراجعة سيظهر هنا تلقائياً بعد انتهاء وقت الامتحان للأغلبية.
+            </div>
+          )}
+
+          {!isSubmitted && (
+            <div className="flex justify-end mt-8 border-t border-slate-700 pt-6">
+              <button onClick={confirmSubmit} className="bg-green-600 text-white px-8 py-3 rounded-lg font-bold shadow-lg hover:bg-green-700 transition flex items-center justify-center gap-2">
+                <CheckCircle size={20} /> تسليم الامتحان نهائياً
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-100 flex flex-col font-['Cairo'] no-select" dir="rtl">
       {!isSubmitted && (
         <div className="fixed inset-0 pointer-events-none z-[9999] overflow-hidden">
-            {wmPositions.map((pos, i) => (
-                <div key={i} className="watermark-text" style={{ top: pos.top, left: pos.left }}>
-                    {user.displayName} - {user.email}
-                </div>
-            ))}
+          {wmPositions.map((pos, i) => (
+            <div key={i} className="watermark-text" style={{ top: pos.top, left: pos.left }}>
+              {user.displayName} - {user.email}
+            </div>
+          ))}
         </div>
       )}
-      
+
       {showSubmitConfirm && (
         <div className="fixed inset-0 z-[10000] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center border-t-8 border-amber-500">
-                <AlertTriangle className="w-16 h-16 text-amber-500 mx-auto mb-4"/>
-                <h3 className="text-2xl font-bold mb-2 text-slate-800">هل أنت متأكد من التسليم؟</h3>
-                <p className="text-slate-500 mb-8 font-bold">لن يمكنك تعديل إجاباتك بعد ذلك، وسيتم نقلك للوحة النتيجة.</p>
-                <div className="flex gap-4">
-                    <button onClick={() => handleSubmit(false)} className="flex-1 bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 shadow-md transition">نعم، سلم الآن</button>
-                    <button onClick={() => setShowSubmitConfirm(false)} className="flex-1 bg-slate-200 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-300 shadow-sm transition">تراجع</button>
-                </div>
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center border-t-8 border-amber-500">
+            <AlertTriangle className="w-16 h-16 text-amber-500 mx-auto mb-4" />
+            <h3 className="text-2xl font-bold mb-2 text-slate-800">هل أنت متأكد من التسليم؟</h3>
+            <p className="text-slate-500 mb-8 font-bold">لن يمكنك تعديل إجاباتك بعد ذلك، وسيتم نقلك للوحة النتيجة.</p>
+            <div className="flex gap-4">
+              <button onClick={() => handleSubmit(false)} className="flex-1 bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 shadow-md transition">نعم، سلم الآن</button>
+              <button onClick={() => setShowSubmitConfirm(false)} className="flex-1 bg-slate-200 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-300 shadow-sm transition">تراجع</button>
             </div>
+          </div>
         </div>
       )}
 
       <div className="bg-slate-900 text-white p-4 flex flex-col md:flex-row justify-between items-center shadow-md relative z-50 gap-4">
         <div className="flex items-center gap-4 w-full md:w-auto justify-between">
-            {isSubmitted && (
-                <button onClick={() => setActiveView('dashboard')} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl font-bold transition flex items-center gap-2 shadow-sm text-sm">
-                    <Layout size={16}/> العودة للنتيجة
-                </button>
-            )}
-            <h2 className="font-bold text-lg font-sans text-amber-400 truncate hidden md:block">{exam.title} {isSubmitted ? '(مراجعة الإجابات)' : ''}</h2>
-            {!isSubmitted && <div className="bg-slate-800 px-6 py-2 rounded-full font-mono shadow-inner border border-slate-700 font-bold text-amber-400 text-lg flex items-center gap-2"><Timer size={18}/> {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</div>}
+          {isSubmitted && (
+            <button onClick={() => setActiveView('dashboard')} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl font-bold transition flex items-center gap-2 shadow-sm text-sm">
+              <Layout size={16} /> العودة للنتيجة
+            </button>
+          )}
+          <h2 className="font-bold text-lg font-sans text-amber-400 truncate hidden md:block">{exam.title} {isSubmitted ? '(مراجعة الإجابات)' : ''}</h2>
+          {!isSubmitted && (
+            <div className="flex items-center gap-3">
+              <div className="bg-slate-800 px-6 py-2 rounded-full font-mono shadow-inner border border-slate-700 font-bold text-amber-400 text-lg flex items-center gap-2">
+                <Timer size={18} /> {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+              </div>
+              <button onClick={confirmSubmit} className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-xl font-bold transition whitespace-nowrap flex items-center gap-2 shadow-lg">
+                <CheckCircle size={18} /> تسليم
+              </button>
+            </div>
+          )}
         </div>
 
         {isSubmitted && uniqueBranches.length > 2 && (
-            <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-hide">
-                {uniqueBranches.map((branch, i) => (
-                    <button 
-                        key={i} onClick={() => setActiveBranchTab(branch)}
-                        className={`whitespace-nowrap px-5 py-2 rounded-full text-sm font-bold transition-colors ${activeBranchTab === branch ? 'bg-amber-500 text-slate-900 shadow-md' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
-                    >
-                        {branch}
-                    </button>
-                ))}
-            </div>
+          <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-hide">
+            {uniqueBranches.map((branch, i) => (
+              <button
+                key={i}
+                onClick={() => setActiveBranchTab(branch)}
+                className={`whitespace-nowrap px-5 py-2 rounded-full text-sm font-bold transition-colors ${activeBranchTab === branch ? 'bg-amber-500 text-slate-900 shadow-md' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              >
+                {branch}
+              </button>
+            ))}
+          </div>
         )}
 
         {!isSubmitted && (
-            <button onClick={() => setActiveView('dashboard')} className="bg-slate-700 hover:bg-slate-600 px-6 py-2.5 rounded-xl font-bold transition whitespace-nowrap flex items-center gap-2">
-                <Layout size={18}/> لوحة التحكم
-            </button>
+          <button onClick={() => setActiveView('dashboard')} className="bg-slate-700 hover:bg-slate-600 px-6 py-2.5 rounded-xl font-bold transition whitespace-nowrap flex items-center gap-2">
+            <Layout size={18} /> لوحة التحكم
+          </button>
         )}
       </div>
 
       <div className="flex-1 flex overflow-hidden relative z-50">
         <div className="w-16 md:w-24 bg-white border-l flex flex-col p-2 overflow-y-auto shadow-inner scrollbar-hide">
           <div className="grid grid-cols-1 gap-3">
-              {displayQuestions.map((q, idx) => {
-                  let statusClass = 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-2 border-transparent';
-                  if (isSubmitted) {
-                      if (answers[q.id] === q.correctIdx) statusClass = 'bg-green-100 text-green-700 border-green-500 shadow-sm';
-                      else if (answers[q.id] !== undefined) statusClass = 'bg-red-100 text-red-700 border-red-500 shadow-sm';
-                      else statusClass = 'bg-slate-100 text-slate-400 border-slate-300 border-dashed'; 
-                  } else if (answers[q.id] !== undefined) {
-                      statusClass = 'bg-blue-100 text-blue-700 border-blue-400 shadow-sm';
-                  }
-                  const originalIndex = flatQuestions.findIndex(origQ => origQ.id === q.id) + 1;
-                  return (
-                    <button key={idx} onClick={() => setCurrentQIndex(idx)} className={`aspect-square rounded-xl font-bold text-base transition-all relative ${currentQIndex === idx ? 'ring-4 ring-amber-500 ring-offset-2 scale-105 z-10' : ''} ${statusClass}`}>
-                        {originalIndex}
-                        {flagged[q.id] && !isSubmitted && <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full border-2 border-white shadow-sm"></div>}
-                    </button>
-                  )
-              })}
+            {displayQuestions.map((q, idx) => {
+              let statusClass = 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-2 border-transparent';
+              const currentAnswer = answers[q.id];
+              const isAnswered = currentAnswer !== undefined && currentAnswer !== '' && currentAnswer !== null;
+
+              if (isSubmitted) {
+                if (q.type === 'essay') {
+                  statusClass = isAnswered ? 'bg-blue-100 text-blue-700 border-blue-500 shadow-sm' : 'bg-slate-100 text-slate-400 border-slate-300 border-dashed';
+                } else if (answers[q.id] === q.correctIdx) {
+                  statusClass = 'bg-green-100 text-green-700 border-green-500 shadow-sm';
+                } else if (isAnswered) {
+                  statusClass = 'bg-red-100 text-red-700 border-red-500 shadow-sm';
+                } else {
+                  statusClass = 'bg-slate-100 text-slate-400 border-slate-300 border-dashed';
+                }
+              } else if (isAnswered) {
+                statusClass = q.type === 'essay' ? 'bg-purple-100 text-purple-700 border-purple-400 shadow-sm' : 'bg-blue-100 text-blue-700 border-blue-400 shadow-sm';
+              }
+
+              const originalIndex = flatQuestions.findIndex(origQ => origQ.id === q.id) + 1;
+              return (
+                <button key={idx} onClick={() => setCurrentQIndex(idx)} className={`aspect-square rounded-xl font-bold text-base transition-all relative ${currentQIndex === idx ? 'ring-4 ring-amber-500 ring-offset-2 scale-105 z-10' : ''} ${statusClass}`}>
+                  {originalIndex}
+                  {flagged[q.id] && !isSubmitted && <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full border-2 border-white shadow-sm"></div>}
+                </button>
+              );
+            })}
           </div>
         </div>
 
         <div className={`flex-1 flex flex-col ${currentQObj?.blockText && currentQObj.blockText.trim().length > 0 ? 'md:flex-row' : 'items-center'} h-full overflow-hidden bg-slate-100 w-full p-4 md:p-8 gap-6`}>
           {currentQObj?.blockText && currentQObj.blockText.trim().length > 0 && (
             <div className="flex-1 w-full bg-white p-6 md:p-10 overflow-y-auto rounded-3xl shadow-sm border border-slate-200">
-              <h3 className="font-bold text-blue-900 mb-6 flex items-center gap-2 text-xl border-b border-blue-100 pb-4 font-['Cairo']"><FileText size={24}/> نص المراجعة / القراءة:</h3>
+              <h3 className="font-bold text-blue-900 mb-6 flex items-center gap-2 text-xl border-b border-blue-100 pb-4 font-['Cairo']"><FileText size={24} /> نص المراجعة / القراءة:</h3>
               <p className="whitespace-pre-line leading-loose text-lg md:text-xl font-bold text-slate-700 font-['Cairo']">{currentQObj.blockText}</p>
             </div>
           )}
-          
+
           <div className={`${currentQObj?.blockText && currentQObj.blockText.trim().length > 0 ? 'flex-1' : 'w-full max-w-4xl mx-auto'} bg-white p-6 md:p-10 overflow-y-auto flex flex-col shadow-xl rounded-3xl h-full border border-slate-200 relative`}>
             <div className="flex justify-between items-center mb-8 border-b border-slate-100 pb-6">
               <div className="flex items-center gap-3">
-                  <span className="bg-slate-900 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-md font-['Cairo']">سؤال {flatQuestions.findIndex(origQ => origQ.id === currentQObj.id) + 1}</span>
-                  {currentQObj.branch && currentQObj.branch !== 'عام' && (
-                      <span className="bg-blue-50 text-blue-700 px-4 py-2 rounded-xl text-sm font-bold border border-blue-100 flex items-center gap-2"><Layers size={16}/> {currentQObj.branch}</span>
-                  )}
+                <span className="bg-slate-900 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-md font-['Cairo']">سؤال {flatQuestions.findIndex(origQ => origQ.id === currentQObj.id) + 1}</span>
+                {currentQObj.branch && currentQObj.branch !== 'عام' && (
+                  <span className="bg-blue-50 text-blue-700 px-4 py-2 rounded-xl text-sm font-bold border border-blue-100 flex items-center gap-2"><Layers size={16} /> {currentQObj.branch}</span>
+                )}
+                {currentQObj.type === 'essay' && (
+                  <span className="bg-purple-50 text-purple-700 px-4 py-2 rounded-xl text-sm font-bold border border-purple-100 flex items-center gap-2"><PenTool size={16} /> سؤال مقالي</span>
+                )}
               </div>
-              {!isSubmitted && <button onClick={() => { setFlagged({...flagged, [currentQObj.id]: !flagged[currentQObj.id]}) }} className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold transition shadow-sm ${flagged[currentQObj.id] ? 'bg-amber-100 text-amber-700 border border-amber-300' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200'}`}><Flag size={16} /> {flagged[currentQObj.id] ? 'محدد للمراجعة' : 'تحديد لمراجعته لاحقاً'}</button>}
+              {!isSubmitted && <button onClick={() => { setFlagged({ ...flagged, [currentQObj.id]: !flagged[currentQObj.id] }); }} className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold transition shadow-sm ${flagged[currentQObj.id] ? 'bg-amber-100 text-amber-700 border border-amber-300' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200'}`}><Flag size={16} /> {flagged[currentQObj.id] ? 'محدد للمراجعة' : 'تحديد لمراجعته لاحقاً'}</button>}
             </div>
-            
+
             <div className="bg-slate-50 p-6 md:p-8 rounded-2xl border border-slate-200 mb-8 shadow-inner text-center">
               <h3 className="text-2xl md:text-3xl font-bold text-slate-900 leading-loose font-['Cairo'] drop-shadow-sm">
-                  {currentQObj.text.split('|').map((part, i) => (
-                      <React.Fragment key={i}>
-                          {part.trim()}
-                          {i !== currentQObj.text.split('|').length - 1 && <br />}
-                      </React.Fragment>
-                  ))}
+                {currentQObj.text.split('|').map((part, i) => (
+                  <React.Fragment key={i}>
+                    {part.trim()}
+                    {i !== currentQObj.text.split('|').length - 1 && <br />}
+                  </React.Fragment>
+                ))}
               </h3>
             </div>
 
-            <div className="space-y-4">
-              {currentQObj.options.map((opt, idx) => {
+            {currentQObj.type === 'essay' ? (
+              <div className="space-y-4">
+                {!isSubmitted ? (
+                  <>
+                    <textarea
+                      className="w-full min-h-[180px] border-2 border-slate-200 rounded-2xl p-4 text-lg focus:border-amber-500 outline-none transition"
+                      placeholder="اكتب إجابتك المقالية هنا..."
+                      value={typeof answers[currentQObj.id] === 'object' ? (answers[currentQObj.id]?.text || '') : (answers[currentQObj.id] || '')}
+                      onChange={(e) => {
+                        const previousImage = typeof answers[currentQObj.id] === 'object' ? answers[currentQObj.id]?.image : null;
+                        const previousFileName = typeof answers[currentQObj.id] === 'object' ? answers[currentQObj.id]?.fileName : null;
+                        handleAnswer(currentQObj.id, { text: e.target.value, image: previousImage, fileName: previousFileName });
+                      }}
+                    />
+                    <div className="border-2 border-dashed border-slate-300 rounded-2xl p-5 bg-slate-50">
+                      <label className="cursor-pointer flex flex-col md:flex-row items-center justify-between gap-4">
+                        <div>
+                          <p className="font-bold text-slate-700 flex items-center gap-2"><UploadCloud size={18} /> أو ارفع صورة لإجابة مكتوبة يدويًا</p>
+                          <p className="text-sm text-slate-500 mt-1">فتح الكاميرا/الملفات لهذا السؤال لا يُعتبر غشًا.</p>
+                        </div>
+                        <span className="bg-blue-600 text-white px-4 py-2 rounded-xl font-bold">اختيار صورة</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          className="hidden"
+                          onClick={() => { fileDialogBypassRef.current = true; }}
+                          onChange={(e) => handleEssayImageUpload(currentQObj.id, e.target.files?.[0])}
+                        />
+                      </label>
+                      {typeof answers[currentQObj.id] === 'object' && answers[currentQObj.id]?.image && (
+                        <div className="mt-4">
+                          <img src={answers[currentQObj.id].image} alt="إجابة مقالية" className="max-h-64 rounded-xl border border-slate-200 mx-auto" />
+                          <p className="text-xs text-slate-500 mt-2">{answers[currentQObj.id]?.fileName || 'تم رفع صورة'}</p>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5">
+                      <p className="font-bold text-blue-800 mb-2">إجابتك النصية</p>
+                      <p className="whitespace-pre-wrap text-slate-700">
+                        {typeof answers[currentQObj.id] === 'object' ? (answers[currentQObj.id]?.text || 'لم يتم إدخال نص') : (answers[currentQObj.id] || 'لم يتم إدخال نص')}
+                      </p>
+                    </div>
+                    {typeof answers[currentQObj.id] === 'object' && answers[currentQObj.id]?.image && (
+                      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5">
+                        <p className="font-bold text-slate-800 mb-2">الصورة المرفوعة</p>
+                        <img src={answers[currentQObj.id].image} alt="إجابة مقالية" className="max-h-80 rounded-xl border border-slate-200 mx-auto" />
+                      </div>
+                    )}
+                    {currentQObj.modelAnswer && (
+                      <div className="bg-green-50 border border-green-200 rounded-2xl p-5">
+                        <p className="font-bold text-green-800 mb-2">نموذج الإجابة</p>
+                        <p className="whitespace-pre-wrap text-slate-700">{currentQObj.modelAnswer}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {currentQObj.options?.map((opt, idx) => {
                   let optionClass = 'border-slate-200 hover:bg-slate-50 bg-white text-slate-700';
                   const isSelected = answers[currentQObj.id] === idx;
-                  
+
                   if (isSubmitted) {
-                      if (idx === currentQObj.correctIdx) optionClass = 'border-green-500 bg-green-50 text-green-900 shadow-md ring-2 ring-green-200'; 
-                      else if (isSelected) optionClass = 'border-red-500 bg-red-50 text-red-900 shadow-md'; 
-                      else optionClass = 'border-slate-200 bg-slate-50 opacity-50'; 
-                  } else {
-                      if (isSelected) optionClass = 'border-amber-500 bg-amber-50 text-amber-900 shadow-md transform scale-[1.02] ring-2 ring-amber-200';
+                    if (idx === currentQObj.correctIdx) optionClass = 'border-green-500 bg-green-50 text-green-900 shadow-md ring-2 ring-green-200';
+                    else if (isSelected) optionClass = 'border-red-500 bg-red-50 text-red-900 shadow-md';
+                    else optionClass = 'border-slate-200 bg-slate-50 opacity-50';
+                  } else if (isSelected) {
+                    optionClass = 'border-amber-500 bg-amber-50 text-amber-900 shadow-md transform scale-[1.02] ring-2 ring-amber-200';
                   }
 
                   return (
                     <div key={idx} onClick={() => handleAnswer(currentQObj.id, idx)} className={`p-5 rounded-2xl border-2 cursor-pointer transition-all duration-200 flex items-center gap-4 ${optionClass}`}>
                       <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${isSelected || (isSubmitted && idx === currentQObj.correctIdx) ? 'border-transparent bg-current' : 'border-slate-300'}`}>
-                          {(isSubmitted && idx === currentQObj.correctIdx) && <Check size={16} className="text-white"/>}
-                          {(isSubmitted && isSelected && idx !== currentQObj.correctIdx) && <X size={16} className="text-white"/>}
+                        {(isSubmitted && idx === currentQObj.correctIdx) && <Check size={16} className="text-white" />}
+                        {(isSubmitted && isSelected && idx !== currentQObj.correctIdx) && <X size={16} className="text-white" />}
                       </div>
                       <span className="font-['Cairo'] text-xl font-bold leading-relaxed">{opt}</span>
                       {isSubmitted && idx === currentQObj.correctIdx && <span className="mr-auto text-green-600 bg-green-100 px-3 py-1 rounded-lg text-xs font-bold">الإجابة الصحيحة</span>}
                       {isSubmitted && isSelected && idx !== currentQObj.correctIdx && <span className="mr-auto text-red-600 bg-red-100 px-3 py-1 rounded-lg text-xs font-bold">إجابتك (خطأ)</span>}
                     </div>
-                  )
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
 
             <div className="mt-auto pt-10 flex justify-between">
-              <button disabled={currentQIndex === 0} onClick={() => setCurrentQIndex(p => p - 1)} className="px-8 py-4 rounded-xl bg-slate-200 text-slate-700 font-bold disabled:opacity-50 hover:bg-slate-300 transition shadow-sm font-['Cairo'] flex items-center gap-2"><ChevronRight size={20}/> السابق</button>
-              <button disabled={currentQIndex === displayQuestions.length - 1} onClick={() => setCurrentQIndex(p => p + 1)} className="px-8 py-4 rounded-xl bg-slate-900 text-white font-bold disabled:opacity-50 hover:bg-slate-800 transition shadow-lg font-['Cairo'] flex items-center gap-2">التالي <ChevronRight size={20} className="rotate-180"/></button>
+              <button disabled={currentQIndex === 0} onClick={() => setCurrentQIndex((p) => p - 1)} className="px-8 py-4 rounded-xl bg-slate-200 text-slate-700 font-bold disabled:opacity-50 hover:bg-slate-300 transition shadow-sm font-['Cairo'] flex items-center gap-2"><ChevronRight size={20} /> السابق</button>
+              <button disabled={currentQIndex === displayQuestions.length - 1} onClick={() => setCurrentQIndex((p) => p + 1)} className="px-8 py-4 rounded-xl bg-slate-900 text-white font-bold disabled:opacity-50 hover:bg-slate-800 transition shadow-lg font-['Cairo'] flex items-center gap-2">التالي <ChevronRight size={20} className="rotate-180" /></button>
             </div>
           </div>
         </div>
@@ -1637,8 +1881,12 @@ const AdminDashboard = ({ user }) => {
   const handleUpdateUser = async (e) => { 
       e.preventDefault(); 
       if(!editingUser) return; 
+
+      const validation = validateEgyptianPhones(editingUser.phone, editingUser.parentPhone);
+      if (!validation.ok) return alert(validation.message);
+
       await updateDoc(doc(db, 'users', editingUser.id), { 
-          name: editingUser.name, phone: editingUser.phone, parentPhone: editingUser.parentPhone, grade: editingUser.grade 
+          name: editingUser.name?.trim(), phone: validation.normalizedStudentPhone, parentPhone: validation.normalizedParentPhone, grade: editingUser.grade 
       }); 
       setEditingUser(null); 
   };
@@ -1736,37 +1984,132 @@ const AdminDashboard = ({ user }) => {
     if (!examBuilder.startTime || !examBuilder.endTime) return alert("يرجى تحديد وقت البدء والانتهاء");
 
     const lines = bulkText.split('\n').map(l => l.trim());
-    const blocks = []; let currentBlock = { text: '', subQuestions: [] }; let currentQ = null; let isReadingPassage = false; let currentBranch = 'عام'; 
+    const blocks = [];
+    let currentBlock = { text: '', subQuestions: [] };
+    let currentQuestion = null;
+    let currentBranch = 'عام';
+    let isReadingPassage = false;
 
-    lines.forEach(line => {
-      if (line.startsWith('#فرع:') || line.startsWith('#الفرع:')) { currentBranch = line.replace('#فرع:', '').replace('#الفرع:', '').trim(); return; }
-      if (line === 'بداية القطعة') { 
-          if (currentQ) { currentBlock.subQuestions.push(currentQ); currentQ = null; }
-          if (currentBlock.subQuestions.length > 0) { blocks.push(currentBlock); } 
-          currentBlock = { text: '', subQuestions: [] }; isReadingPassage = true; return; 
-      }
-      if (line === 'نهاية القطعة') { isReadingPassage = false; return; }
-      if (line === 'حذف القطعة') { 
-          if(currentQ) { currentBlock.subQuestions.push(currentQ); currentQ = null; } 
-          if (currentBlock.subQuestions.length > 0) { blocks.push(currentBlock); }
-          currentBlock = { text: '', subQuestions: [] }; return; 
-      }
+    const pushCurrentQuestion = () => {
+        if (!currentQuestion) return;
 
-      if (isReadingPassage) { if(line !== '') currentBlock.text += line + '\n'; } 
-      else {
-        if (line === '') { if (currentQ && currentQ.options.length > 0) { currentBlock.subQuestions.push(currentQ); currentQ = null; } return; }
-        const isCorrect = line.startsWith('*'); const optText = isCorrect ? line.substring(1).trim() : line.trim();
-        if (currentQ && currentQ.options.length >= 4 && !isCorrect) { currentBlock.subQuestions.push(currentQ); currentQ = null; }
-        if (!currentQ) { currentQ = { id: Date.now() + Math.random(), text: optText, options: [], correctIdx: 0, branch: currentBranch }; } 
-        else { if (isCorrect) { currentQ.correctIdx = currentQ.options.length; } currentQ.options.push(optText); }
-      }
+        if (currentQuestion.type === 'essay') {
+            currentBlock.subQuestions.push({
+                id: currentQuestion.id,
+                type: 'essay',
+                text: currentQuestion.text.trim(),
+                branch: currentQuestion.branch || currentBranch,
+                modelAnswer: currentQuestion.modelAnswer || ''
+            });
+            currentQuestion = null;
+            return;
+        }
+
+        if (currentQuestion.text?.trim() && currentQuestion.options.length >= 2) {
+            if (currentQuestion.correctIdx < 0) currentQuestion.correctIdx = 0;
+            currentBlock.subQuestions.push({
+                ...currentQuestion,
+                text: currentQuestion.text.trim(),
+                branch: currentQuestion.branch || currentBranch
+            });
+        }
+        currentQuestion = null;
+    };
+
+    const pushCurrentBlock = () => {
+        pushCurrentQuestion();
+        if (currentBlock.text.trim() || currentBlock.subQuestions.length > 0) {
+            blocks.push({
+                text: currentBlock.text.trim(),
+                subQuestions: currentBlock.subQuestions
+            });
+        }
+        currentBlock = { text: '', subQuestions: [] };
+    };
+
+    lines.forEach((line) => {
+        if (!line) {
+            pushCurrentQuestion();
+            return;
+        }
+
+        if (line.startsWith('#فرع:') || line.startsWith('#الفرع:')) {
+            pushCurrentQuestion();
+            currentBranch = line.replace('#فرع:', '').replace('#الفرع:', '').trim() || 'عام';
+            return;
+        }
+
+        if (line === 'بداية القطعة') {
+            pushCurrentBlock();
+            isReadingPassage = true;
+            return;
+        }
+
+        if (line === 'نهاية القطعة') {
+            isReadingPassage = false;
+            return;
+        }
+
+        if (line === 'حذف القطعة') {
+            pushCurrentBlock();
+            isReadingPassage = false;
+            return;
+        }
+
+        if (isReadingPassage) {
+            currentBlock.text += (currentBlock.text ? '\n' : '') + line;
+            return;
+        }
+
+        const essayMatch = line.match(/^(#?مقالي|essay)\s*[:：-]\s*(.+)$/i);
+        if (essayMatch) {
+            pushCurrentQuestion();
+            currentQuestion = {
+                id: Date.now() + Math.random(),
+                type: 'essay',
+                text: essayMatch[2].trim(),
+                branch: currentBranch,
+                modelAnswer: ''
+            };
+            return;
+        }
+
+        const isCorrect = line.startsWith('*');
+        const cleanLine = isCorrect ? line.slice(1).trim() : line.trim();
+
+        if (!currentQuestion) {
+            currentQuestion = {
+                id: Date.now() + Math.random(),
+                type: 'mcq',
+                text: cleanLine.replace(/^(س|سؤال)\s*[:：-]\s*/i, ''),
+                options: [],
+                correctIdx: -1,
+                branch: currentBranch
+            };
+            return;
+        }
+
+        if (currentQuestion.type === 'essay') {
+            if (cleanLine.startsWith('نموذج:') || cleanLine.startsWith('إجابة نموذجية:')) {
+                currentQuestion.modelAnswer = cleanLine.replace('نموذج:', '').replace('إجابة نموذجية:', '').trim();
+            } else {
+                currentQuestion.text += '\n' + cleanLine;
+            }
+            return;
+        }
+
+        currentQuestion.options.push(cleanLine);
+        if (isCorrect) currentQuestion.correctIdx = currentQuestion.options.length - 1;
+
+        if (currentQuestion.options.length >= 4) {
+            pushCurrentQuestion();
+        }
     });
-    
-    if (currentQ && currentQ.options.length > 0) currentBlock.subQuestions.push(currentQ);
-    if (currentBlock.subQuestions.length > 0) blocks.push(currentBlock);
+
+    pushCurrentBlock();
 
     const finalBlocks = blocks.filter(b => b.subQuestions.length > 0);
-    if (finalBlocks.length === 0) return alert("لم يتم التعرف على أسئلة بشكل صحيح. تأكد من وجود إجابات تحت كل سؤال.");
+    if (finalBlocks.length === 0) return alert("لم يتم التعرف على الأسئلة بشكل صحيح. افصل بين كل سؤال بسطر فارغ، واستخدم #فرع: للفروع و #مقالي: للسؤال المقالي.");
 
     await addDoc(collection(db, 'exams'), { 
         title: examBuilder.title, grade: examBuilder.grade, duration: examBuilder.duration, 
@@ -1774,7 +2117,7 @@ const AdminDashboard = ({ user }) => {
         isPremium: examBuilder.isPremium,
         questions: finalBlocks, createdAt: serverTimestamp() 
     });
-    
+
     await addDoc(collection(db, 'notifications'), { text: `امتحان جديد: ${examBuilder.title}`, grade: examBuilder.grade, createdAt: serverTimestamp() });
     setBulkText(""); 
     alert(`تم نشر الامتحان بنجاح!`);
@@ -1948,8 +2291,8 @@ const AdminDashboard = ({ user }) => {
                               <h3 className="text-xl font-bold mb-6 text-blue-800 flex items-center gap-2 border-b pb-2"><Edit size={24}/> تعديل بيانات الطالب</h3>
                               <form onSubmit={handleUpdateUser} className="space-y-4">
                                   <div><label className="block text-sm font-bold mb-1 text-slate-700">اسم الطالب</label><input className="w-full border-2 border-blue-100 p-3 rounded-xl bg-blue-50 focus:border-blue-500 outline-none transition" value={editingUser.name || ''} onChange={e=>setEditingUser({...editingUser, name:e.target.value})} required/></div>
-                                  <div><label className="block text-sm font-bold mb-1 text-slate-700">رقم هاتف الطالب</label><input type="tel" className="w-full border-2 border-blue-100 p-3 rounded-xl bg-blue-50 focus:border-blue-500 outline-none transition" value={editingUser.phone || ''} onChange={e=>setEditingUser({...editingUser, phone:e.target.value})} required/></div>
-                                  <div><label className="block text-sm font-bold mb-1 text-slate-700">رقم هاتف ولي الأمر</label><input type="tel" className="w-full border-2 border-blue-100 p-3 rounded-xl bg-blue-50 focus:border-blue-500 outline-none transition" value={editingUser.parentPhone || ''} onChange={e=>setEditingUser({...editingUser, parentPhone:e.target.value})} required/></div>
+                                  <div><label className="block text-sm font-bold mb-1 text-slate-700">رقم هاتف الطالب</label><input type="tel" className="w-full border-2 border-blue-100 p-3 rounded-xl bg-blue-50 focus:border-blue-500 outline-none transition" value={editingUser.phone || ''} onChange={e=>setEditingUser({...editingUser, phone: normalizeEgyptPhone(e.target.value)})} required/></div>
+                                  <div><label className="block text-sm font-bold mb-1 text-slate-700">رقم هاتف ولي الأمر</label><input type="tel" className="w-full border-2 border-blue-100 p-3 rounded-xl bg-blue-50 focus:border-blue-500 outline-none transition" value={editingUser.parentPhone || ''} onChange={e=>setEditingUser({...editingUser, parentPhone: normalizeEgyptPhone(e.target.value)})} required/></div>
                                   <div><label className="block text-sm font-bold mb-1 text-slate-700">المرحلة الدراسية</label><select className="w-full border-2 border-blue-100 p-3 rounded-xl bg-white focus:border-blue-500 outline-none transition" value={editingUser.grade || '1sec'} onChange={e=>setEditingUser({...editingUser, grade:e.target.value})}><GradeOptions /></select></div>
                                   <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg hover:shadow-blue-500/50 mt-2">حفظ التعديلات</button>
                               </form>
@@ -2162,7 +2505,7 @@ const AdminDashboard = ({ user }) => {
                           </div>
                       </div>
                       <div className="bg-slate-50 p-4 rounded-xl border mb-6">
-                          <textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm" placeholder="اكتب الأسئلة هنا...&#10;(هام 1: افصل بين كل سؤال والذي يليه بسطر فارغ تماماً، وضع علامة * قبل الإجابة الصحيحة)&#10;(هام 2: لتحديد فرع، اكتب #فرع: اسم_الفرع في سطر لوحده)" value={bulkText} onChange={e=>setBulkText(e.target.value)}/>
+                          <textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm" placeholder="اكتب الأسئلة هنا...&#10;(هام 1: افصل بين كل سؤال والذي يليه بسطر فارغ تماماً، وضع علامة * قبل الإجابة الصحيحة)&#10;(هام 2: لتحديد فرع، اكتب #فرع: اسم_الفرع في سطر لوحده)&#10;(هام 3: للسؤال المقالي اكتب #مقالي: نص السؤال)" value={bulkText} onChange={e=>setBulkText(e.target.value)}/>
                           <button onClick={parseExam} className="mt-4 w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-green-500/50 transition">نشر</button>
                       </div>
                   </div>
@@ -2569,6 +2912,29 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
       } else {
           callback();
       }
+  };
+
+  const handleUpdateMyProfile = async (e) => {
+      e.preventDefault();
+
+      const normalizedPhone = normalizeEgyptPhone(editFormData.phone);
+      if (!isValidEgyptPhone(normalizedPhone)) {
+          return alert("رقم الهاتف غير صحيح! يجب أن يكون 11 رقم ويبدأ بـ 010 أو 011 أو 012 أو 015");
+      }
+
+      if (normalizedPhone === normalizeEgyptPhone(editFormData.parentPhone)) {
+          return alert("لا يمكن أن يكون رقم الطالب هو نفسه رقم ولي الأمر.");
+      }
+
+      const payload = { phone: normalizedPhone };
+
+      if (editFormData.grade !== userData.grade) {
+          payload.requestedGrade = editFormData.grade;
+          payload.gradeUpdateStatus = 'pending';
+      }
+
+      await updateDoc(doc(db, 'users', user.uid), payload);
+      alert(editFormData.grade !== userData.grade ? "تم حفظ رقم الهاتف وإرسال طلب تغيير المرحلة إلى الأدمن." : "تم تحديث رقم الهاتف بنجاح.");
   };
 
   if (scanningHwId) return <SmartHomeworkScanner hwId={scanningHwId} user={user} onClose={() => setScanningHwId(null)} />;
@@ -2984,7 +3350,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                 )}
                 <form onSubmit={handleUpdateMyProfile} className="space-y-4">
                   <div><label className="block text-sm font-bold text-slate-700 mb-2">الاسم</label><input disabled className="w-full border p-3 rounded-xl bg-slate-100 text-slate-500 cursor-not-allowed" value={editFormData.name} /><p className="text-xs text-red-500 mt-1">لا يمكن تغيير الاسم (تواصل مع الإدارة).</p></div>
-                  <div><label className="block text-sm font-bold text-slate-700 mb-2">رقم الهاتف</label><input className="w-full border p-3 rounded-xl" value={editFormData.phone} onChange={e=>setEditFormData({...editFormData, phone:e.target.value})} /></div>
+                  <div><label className="block text-sm font-bold text-slate-700 mb-2">رقم الهاتف</label><input className="w-full border p-3 rounded-xl" value={editFormData.phone} onChange={e=>setEditFormData({...editFormData, phone: normalizeEgyptPhone(e.target.value)})} /></div>
                   <div><label className="block text-sm font-bold text-slate-700 mb-2">رقم ولي الأمر</label><input disabled className="w-full border p-3 rounded-xl bg-slate-100 text-slate-500 cursor-not-allowed" value={editFormData.parentPhone} /><p className="text-xs text-red-500 mt-1">لا يمكن تغيير رقم ولي الأمر.</p></div>
                   <div><label className="block text-sm font-bold text-slate-700 mb-2">الصف الدراسي (يتطلب موافقة الأدمن)</label><select className="w-full border p-3 rounded-xl bg-white" value={editFormData.grade} onChange={e=>setEditFormData({...editFormData, grade:e.target.value})}><GradeOptions /></select></div>
                   <button className="w-full bg-gradient-to-r from-amber-600 to-amber-700 text-white py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-amber-500/40 transition mt-4">حفظ التعديلات</button>
@@ -3067,29 +3433,24 @@ const AuthPage = ({ onBack }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    const egyptPhoneRegex = /^01[0125][0-9]{8}$/;
+
     if (isRegister) {
-        if (!egyptPhoneRegex.test(formData.phone)) {
-            alert("رقم الطالب غير صحيح! يجب أن يكون 11 رقم ويبدأ بـ 010, 011, 012, أو 015");
-            setLoading(false); return;
-        }
-        if (!egyptPhoneRegex.test(formData.parentPhone)) {
-            alert("رقم ولي الأمر غير صحيح!");
-            setLoading(false); return;
-        }
-        if (formData.phone === formData.parentPhone) {
-            alert("عفواً، لا يمكن تكرار رقم الهاتف!");
-            setLoading(false); return;
+        const validation = validateEgyptianPhones(formData.phone, formData.parentPhone);
+        if (!validation.ok) {
+            alert(validation.message);
+            setLoading(false);
+            return;
         }
     }
 
     try {
       if (isRegister) {
-        const userCred = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-        await updateProfile(userCred.user, { displayName: formData.name });
+        const validation = validateEgyptianPhones(formData.phone, formData.parentPhone);
+        const userCred = await createUserWithEmailAndPassword(auth, formData.email.trim(), formData.password);
+        await updateProfile(userCred.user, { displayName: formData.name.trim() });
         await setDoc(doc(db, 'users', userCred.user.uid), { 
-            name: formData.name, email: formData.email, grade: formData.grade, phone: formData.phone, 
-            parentPhone: formData.parentPhone, role: 'student', status: 'pending', 
+            name: formData.name.trim(), email: formData.email.trim(), grade: formData.grade, phone: validation.normalizedStudentPhone, 
+            parentPhone: validation.normalizedParentPhone, role: 'student', status: 'pending', 
             subscriptionStatus: 'free', subscriptionExpiry: null, createdAt: new Date() 
         });
         alert("تم إنشاء الحساب! انتظر تفعيل الأدمن.");
@@ -3114,8 +3475,8 @@ const AuthPage = ({ onBack }) => {
           {isRegister && (
             <>
               <div className="relative"><User className="absolute top-3.5 right-4 text-slate-400" size={18} /><input required type="text" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition text-sm md:text-base" placeholder="الاسم ثلاثي" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
-              <div className="relative"><Phone className="absolute top-3.5 right-4 text-slate-400" size={18} /><input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition text-sm md:text-base" placeholder="رقم هاتفك" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} /></div>
-              <div className="relative"><Phone className="absolute top-3.5 right-4 text-slate-400" size={18} /><input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition text-sm md:text-base" placeholder="رقم ولي الأمر" value={formData.parentPhone} onChange={e => setFormData({...formData, parentPhone: e.target.value})} /></div>
+              <div className="relative"><Phone className="absolute top-3.5 right-4 text-slate-400" size={18} /><input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition text-sm md:text-base" placeholder="رقم هاتفك" value={formData.phone} onChange={e => setFormData({...formData, phone: normalizeEgyptPhone(e.target.value)})} /></div>
+              <div className="relative"><Phone className="absolute top-3.5 right-4 text-slate-400" size={18} /><input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition text-sm md:text-base" placeholder="رقم ولي الأمر" value={formData.parentPhone} onChange={e => setFormData({...formData, parentPhone: normalizeEgyptPhone(e.target.value)})} /></div>
               <div className="relative"><GraduationCap className="absolute top-3.5 right-4 text-slate-400" size={18} /><select className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 appearance-none focus:border-amber-500 outline-none transition text-sm md:text-base" value={formData.grade} onChange={e => setFormData({...formData, grade: e.target.value})}><GradeOptions /></select></div>
             </>
           )}
