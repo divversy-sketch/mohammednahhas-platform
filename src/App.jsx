@@ -1880,6 +1880,8 @@ const AdminDashboard = ({ user }) => {
   const [subscriptionCodes, setSubscriptionCodes] = useState([]);
   const [codeGenCount, setCodeGenCount] = useState(10);
   const [codeGenDays, setCodeGenDays] = useState(30);
+  const [questionBankCount, setQuestionBankCount] = useState(0);
+  const [assignmentsCount, setAssignmentsCount] = useState(0);
 
   // تحديث حالة زر الرجوع للموبايل للأدمن
   useEffect(() => {
