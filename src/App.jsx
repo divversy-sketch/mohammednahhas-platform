@@ -3322,6 +3322,13 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   const filesAndLinks = content.filter(c => c.type === 'file' || c.type === 'link');
   const htmls = content.filter(c => c.type === 'html');
   const interactiveExams = content.filter(c => c.type === 'interactive_exam');
+  const assignmentStats = useMemo(() => ({
+    total: assignments.length,
+    submitted: assignmentSubmissions.length,
+    graded: assignmentSubmissions.filter(s => s.reviewStatus === 'graded').length,
+    pending: Math.max(assignments.length - assignmentSubmissions.length, 0)
+  }), [assignments, assignmentSubmissions]);
+
 
   const startExamWithCode = async (exam) => {
     if (isBannedExam) return alert("أنت محظور من دخول الامتحانات.");
