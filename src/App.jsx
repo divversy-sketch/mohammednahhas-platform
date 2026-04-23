@@ -2079,7 +2079,7 @@ const AdminDashboard = ({ user }) => {
             currentQuestion = {
                 id: Date.now() + Math.random(),
                 type: 'essay',
-                text: essayMatch[2].trim(),
+                text: (essayMatch[1] || '').trim(),
                 branch: currentBranch,
                 modelAnswer: ''
             };
