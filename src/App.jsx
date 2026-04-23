@@ -1237,7 +1237,8 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     }
   });
 
-  const canReview = exam.id === 'custom_mistakes_exam' || Date.now() > new Date(exam.endTime).getTime();
+  const examEndTimeValue = exam?.endTime ? new Date(exam.endTime).getTime() : NaN;
+  const canReview = exam.id === 'custom_mistakes_exam' || Number.isNaN(examEndTimeValue) || Date.now() > examEndTimeValue;
 
   if (activeView === 'dashboard') {
     return (
@@ -1513,10 +1514,10 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
             <div className="bg-slate-50 p-6 md:p-8 rounded-2xl border border-slate-200 mb-8 shadow-inner text-center">
               <h3 className="text-2xl md:text-3xl font-bold text-slate-900 leading-loose font-['Cairo'] drop-shadow-sm">
-                {currentQObj.text.split('|').map((part, i) => (
+                {String(currentQObj.text || '').split('|').map((part, i) => (
                   <React.Fragment key={i}>
                     {part.trim()}
-                    {i !== currentQObj.text.split('|').length - 1 && <br />}
+                    {i !== String(currentQObj.text || '').split('|').length - 1 && <br />}
                   </React.Fragment>
                 ))}
               </h3>
@@ -1585,7 +1586,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
               </div>
             ) : (
               <div className="space-y-4">
-                {currentQObj.options?.map((opt, idx) => {
+                {(Array.isArray(currentQObj.options) ? currentQObj.options : []).map((opt, idx) => {
                   let optionClass = 'border-slate-200 hover:bg-slate-50 bg-white text-slate-700';
                   const isSelected = answers[currentQObj.id] === idx;
 
@@ -3208,6 +3209,9 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
             return allowed.includes(user.email);
         });
         setContent(visibleContent);
+    }, (error) => {
+        console.warn('Content listener blocked:', error?.message);
+        setContent([]);
     });
 
     const unsubLive = onSnapshot(collection(db, 'live_sessions'), s => {
@@ -3224,11 +3228,20 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
         setLiveSessions([]);
     });
 
-    const unsubExams = onSnapshot(query(collection(db, 'exams'), where('grade', '==', userData.grade)), s => setExams(s.docs.map(d=>({id:d.id,...d.data()}))));
+    const unsubExams = onSnapshot(query(collection(db, 'exams'), where('grade', '==', userData.grade)), s => setExams(s.docs.map(d=>({id:d.id,...d.data()}))), (error) => {
+        console.warn('Exams listener blocked:', error?.message);
+        setExams([]);
+    });
     const unsubAssignments = onSnapshot(query(collection(db, 'assignments'), where('grade', '==', userData.grade)), s => setAssignments(s.docs.map(d=>({id:d.id,...d.data()}))), (error) => { console.warn('Assignments listener blocked:', error?.message); setAssignments([]); });
-    const unsubResults = onSnapshot(query(collection(db, 'exam_results'), where('studentId', '==', user.uid)), s => setExamResults(s.docs.map(d=>({id:d.id,...d.data()}))));
+    const unsubResults = onSnapshot(query(collection(db, 'exam_results'), where('studentId', '==', user.uid)), s => setExamResults(s.docs.map(d=>({id:d.id,...d.data()}))), (error) => {
+        console.warn('Exam results listener blocked:', error?.message);
+        setExamResults([]);
+    });
     const unsubHwResults = onSnapshot(query(collection(db, 'homework_results'), where('studentId', '==', user.uid)), s => {
         const results = s.docs.map(d=>({id:d.id,...d.data()})); results.sort((a,b) => (b.submittedAt?.seconds || 0) - (a.submittedAt?.seconds || 0)); setHwResults(results);
+    }, (error) => {
+        console.warn('Homework results listener blocked:', error?.message);
+        setHwResults([]);
     });
     const unsubAssignmentSubs = onSnapshot(query(collection(db, 'assignment_submissions'), where('studentId', '==', user.uid)), s => setAssignmentSubmissions(s.docs.map(d=>({id:d.id,...d.data()}))), (error) => { console.warn('Assignment submissions listener blocked:', error?.message); setAssignmentSubmissions([]); });
     const unsubVideoViews = onSnapshot(query(collection(db, 'video_views'), where('userId', '==', user.uid)), s => { const map = {}; s.docs.forEach(d => { const data = d.data(); map[data.videoId] = data; }); setVideoProgressMap(map); }, (error) => { console.warn('Video views listener blocked:', error?.message); setVideoProgressMap({}); });
@@ -3398,9 +3411,9 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
         else if (previousResult.status === 'in_progress' || previousResult.status === 'cheated') { alert("لقد بدأت هذا الامتحان بالفعل وتم احتسابه عليك. لا يمكن الإعادة."); }
         return;
     }
-    const now = new Date(); const start = new Date(exam.startTime); const end = new Date(exam.endTime);
-    if (now < start) return alert(`الامتحان لم يبدأ بعد. موعد البدء: ${start.toLocaleString('ar-EG')}`);
-    if (now > end) return alert("عفواً، انتهى وقت الامتحان.");
+    const now = new Date(); const start = exam.startTime ? new Date(exam.startTime) : null; const end = exam.endTime ? new Date(exam.endTime) : null;
+    if (start && !Number.isNaN(start.getTime()) && now < start) return alert(`الامتحان لم يبدأ بعد. موعد البدء: ${start.toLocaleString('ar-EG')}`);
+    if (end && !Number.isNaN(end.getTime()) && now > end) return alert("عفواً، انتهى وقت الامتحان.");
     const code = prompt("أدخل كود الامتحان:");
     if (code === exam.accessCode) {
         try {
