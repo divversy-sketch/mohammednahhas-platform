@@ -1174,7 +1174,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                 <h3 className="text-2xl font-bold flex items-center gap-2 text-teal-400"><Layers size={28} /> {isSubmitted ? 'ملخص الفروع' : 'أقسام الامتحان'}</h3>
                 {(canReview || !isSubmitted) && (
                   <button onClick={() => { setActiveBranchTab('الكل'); setActiveView('questions'); }} className="text-teal-400 bg-teal-900/30 px-4 py-2 rounded-lg font-bold hover:bg-teal-900/50 transition text-sm flex items-center gap-2">
-                    عرض كل الأسئلة <ClipboardList size={16} />
+                    مراجعة الامتحان كله <ClipboardList size={16} />
                   </button>
                 )}
               </div>
@@ -1208,6 +1208,11 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                         <div className="flex justify-between"><span>خاطئة</span><span className="text-pink-300">{stats.wrong}</span></div>
                         <div className="flex justify-between"><span>مقالي</span><span className="text-amber-300">{stats.essay}</span></div>
                       </div>
+                      {(canReview || !isSubmitted) && (
+                        <div className="mt-4 text-center text-teal-300 text-xs font-bold">
+                          اضغط لمراجعة هذا الفرع فقط
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -1280,9 +1285,15 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
           )}
         </div>
 
-        {isSubmitted && uniqueBranches.length > 2 && (
-          <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-hide">
-            {uniqueBranches.map((branch, i) => (
+        {isSubmitted && (
+          <div className="flex flex-wrap gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-hide items-center">
+            <button
+              onClick={() => setActiveBranchTab('الكل')}
+              className={`whitespace-nowrap px-5 py-2 rounded-full text-sm font-bold transition-colors ${activeBranchTab === 'الكل' ? 'bg-emerald-500 text-slate-900 shadow-md' : 'bg-emerald-900/40 text-emerald-200 hover:bg-emerald-900/60'}`}
+            >
+              مراجعة الامتحان كله
+            </button>
+            {uniqueBranches.filter(branch => branch !== 'الكل').map((branch, i) => (
               <button
                 key={i}
                 onClick={() => setActiveBranchTab(branch)}
@@ -2033,9 +2044,10 @@ const AdminDashboard = ({ user }) => {
             return;
         }
 
-        if (line.startsWith('#فرع:') || line.startsWith('#الفرع:')) {
+        const branchMatch = line.match(/^#\s*(?:فرع|الفرع)\s*:\s*(.+)$/);
+        if (branchMatch) {
             pushCurrentQuestion();
-            currentBranch = line.replace('#فرع:', '').replace('#الفرع:', '').trim() || 'عام';
+            currentBranch = branchMatch[1].trim() || 'عام';
             return;
         }
 
@@ -2061,7 +2073,7 @@ const AdminDashboard = ({ user }) => {
             return;
         }
 
-        const essayMatch = line.match(/^(#?مقالي|essay)\s*[:：-]\s*(.+)$/i);
+        const essayMatch = line.match(/^#?\s*(?:مقالي|essay)\s*[:：\-\)\.]?\s*(.+)$/i);
         if (essayMatch) {
             pushCurrentQuestion();
             currentQuestion = {
