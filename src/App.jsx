@@ -276,18 +276,17 @@ const validateEgyptianPhones = (studentPhone, parentPhone) => {
     };
 };
 
+
 const safeNumber = (value, fallback = 0) => {
     const num = Number(value);
     return Number.isFinite(num) ? num : fallback;
 };
 
-const getExamQuestionCount = (exam) => (exam?.questions || []).reduce((acc, block) => acc + (block?.subQuestions?.length || 0), 0);
+const getQuestionMaxScore = (q) => safeNumber(q?.maxScore ?? q?.mark ?? q?.points, q?.type === 'essay' ? 10 : 1);
 
 const extractAllQuestions = (exam) => (exam?.questions || []).flatMap(block =>
     (block?.subQuestions || []).map(q => ({ ...q, blockText: block?.text || '', branch: q?.branch || 'عام' }))
 );
-
-const getQuestionMaxScore = (q) => safeNumber(q?.maxScore ?? q?.mark ?? q?.points, q?.type === 'essay' ? 10 : 1);
 
 const calculateDetailedExamMetrics = (exam, answers = {}, essayGrades = {}) => {
     const questions = extractAllQuestions(exam);
@@ -368,6 +367,7 @@ const getReviewRecommendations = (branchStats = {}, content = []) => {
         return { branch: item.branch, pct: item.pct, title: related?.title || `راجع فرع ${item.branch}` };
     });
 };
+
 
 
 const ModernLogo = () => (
@@ -660,19 +660,11 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
   const [currentNote, setCurrentNote] = useState("");
   const videoRef = useRef(null);
   const finalUrl = video.url || video.file;
-  const [watchedPercent, setWatchedPercent] = useState(0);
 
   useEffect(() => {
       if(!user || !video.id) return;
-      const q = query(collection(db, 'video_notes'), where('userId', '==', user.uid), where('videoId', '==', video.id));
-      const unsub = onSnapshot(q, (snap) => {
-          const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          rows.sort((a, b) => safeNumber(a.timestamp, 0) - safeNumber(b.timestamp, 0));
-          setNotes(rows);
-      }, (error) => {
-          console.warn('Video notes listener blocked:', error?.message);
-          setNotes([]);
-      });
+      const q = query(collection(db, 'video_notes'), where('userId', '==', user.uid), where('videoId', '==', video.id), orderBy('timestamp', 'asc'));
+      const unsub = onSnapshot(q, (snap) => { setNotes(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
       return () => unsub();
   }, [user, video.id]);
 
@@ -687,7 +679,6 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
           const watchedSeconds = overrideSeconds ?? localSeconds;
           const currentDuration = safeNumber(videoRef.current?.duration, estimatedDuration);
           const watchedPercentValue = currentDuration > 0 ? Math.min(100, Math.round((watchedSeconds / currentDuration) * 100)) : 0;
-          setWatchedPercent(watchedPercentValue);
           onProgress?.(video.id, watchedPercentValue, watchedSeconds);
           try {
               await setDoc(viewRef, {
@@ -699,7 +690,7 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
                   watchedSeconds: increment(secondsToAdd),
                   estimatedDuration: currentDuration,
                   watchedPercent: watchedPercentValue,
-                  linkedExamId: video.linkedExamId || null,
+                  linkedExamId: video.linkedExamId || null
               }, { merge: true });
           } catch (e) { console.error("Sync error:", e); }
       };
@@ -712,9 +703,8 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
               localSeconds += 1;
               const currentDuration = safeNumber(videoRef.current?.duration, estimatedDuration);
               const currentPercent = currentDuration > 0 ? Math.min(100, Math.round((localSeconds / currentDuration) * 100)) : 0;
-              setWatchedPercent(currentPercent);
               onProgress?.(video.id, currentPercent, localSeconds);
-              if (localSeconds - lastSyncedSeconds >= 10) { syncToDatabase(localSeconds - lastSyncedSeconds); lastSyncedSeconds = localSeconds; }
+              if (localSeconds - lastSyncedSeconds >= 15) { syncToDatabase(localSeconds - lastSyncedSeconds); lastSyncedSeconds = localSeconds; }
           }
       }, 1000);
       return () => { clearInterval(timerInterval); const remaining = localSeconds - lastSyncedSeconds; if (remaining > 0) syncToDatabase(remaining); };
@@ -786,12 +776,10 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
                 )}
             </div>
             <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white p-2 rounded-full shadow-lg"><X size={24}/></button>
-            <div className="hidden md:flex items-center gap-2 bg-white/10 text-white px-4 py-2 rounded-full font-bold text-sm border border-white/10"><BarChart3 size={16}/> {watchedPercent}% مشاهدة</div>
         </div>
 
         <div className="w-full relative flex items-center justify-center bg-black overflow-hidden" style={{ height: showNotes ? '50vh' : '100%', md: { height: '100%' } }}>
           <div className="watermark-video">{userName} - {video.grade} — منصة النحاس</div>
-          <div className="absolute bottom-4 right-4 z-50 bg-black/50 text-white px-4 py-2 rounded-full text-sm font-bold border border-white/20">{watchedPercent}% مشاهدة</div>
           {videoId ? (
             <iframe className="w-full h-full" src={youtubeEmbedUrl} title="Video" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
           ) : (
@@ -930,7 +918,6 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   const [wmPositions, setWmPositions] = useState([]);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [activeBranchTab, setActiveBranchTab] = useState('الكل');
-  const [antiCheatLog, setAntiCheatLog] = useState(existingResult?.antiCheatLog || []);
 
   const fileDialogBypassRef = useRef(false);
   const stateRefs = useRef({ isSubmitted, showSubmitConfirm, isCheating });
@@ -1237,8 +1224,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     }
   });
 
-  const examEndTimeValue = exam?.endTime ? new Date(exam.endTime).getTime() : NaN;
-  const canReview = exam.id === 'custom_mistakes_exam' || Number.isNaN(examEndTimeValue) || Date.now() > examEndTimeValue;
+  const canReview = exam.id === 'custom_mistakes_exam' || Date.now() > new Date(exam.endTime).getTime();
 
   if (activeView === 'dashboard') {
     return (
@@ -1514,10 +1500,10 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
             <div className="bg-slate-50 p-6 md:p-8 rounded-2xl border border-slate-200 mb-8 shadow-inner text-center">
               <h3 className="text-2xl md:text-3xl font-bold text-slate-900 leading-loose font-['Cairo'] drop-shadow-sm">
-                {String(currentQObj.text || '').split('|').map((part, i) => (
+                {currentQObj.text.split('|').map((part, i) => (
                   <React.Fragment key={i}>
                     {part.trim()}
-                    {i !== String(currentQObj.text || '').split('|').length - 1 && <br />}
+                    {i !== currentQObj.text.split('|').length - 1 && <br />}
                   </React.Fragment>
                 ))}
               </h3>
@@ -1586,7 +1572,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
               </div>
             ) : (
               <div className="space-y-4">
-                {(Array.isArray(currentQObj.options) ? currentQObj.options : []).map((opt, idx) => {
+                {currentQObj.options?.map((opt, idx) => {
                   let optionClass = 'border-slate-200 hover:bg-slate-50 bg-white text-slate-700';
                   const isSelected = answers[currentQObj.id] === idx;
 
@@ -1781,7 +1767,18 @@ const QuestionBankManager = ({ adminGradeFilter }) => {
   const [questions, setQuestions] = useState([]);
   const [filters, setFilters] = useState({ grade: adminGradeFilter === 'all' ? '' : adminGradeFilter, branch: '', type: '' });
   const [form, setForm] = useState({ text: '', grade: adminGradeFilter === 'all' ? '3sec' : adminGradeFilter, branch: 'النحو', type: 'mcq', difficulty: 'medium', optionsText: '', correctIdx: 0, explanation: '', mark: 1, tags: '' });
-  useEffect(() => onSnapshot(query(collection(db, 'question_bank'), orderBy('createdAt', 'desc')), snap => setQuestions(snap.docs.map(d => ({ id: d.id, ...d.data() })))), []);
+
+  useEffect(() => {
+      const unsub = onSnapshot(collection(db, 'question_bank'), (snap) => {
+          const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          rows.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+          setQuestions(rows);
+      }, (error) => {
+          console.warn('question_bank listener blocked:', error?.message);
+          setQuestions([]);
+      });
+      return () => unsub();
+  }, []);
 
   const handleAddQuestion = async (e) => {
     e.preventDefault();
@@ -1789,9 +1786,17 @@ const QuestionBankManager = ({ adminGradeFilter }) => {
     if (!form.text.trim()) return alert('اكتب نص السؤال أولاً');
     if (form.type === 'mcq' && options.length < 2) return alert('أضف اختيارين على الأقل');
     await addDoc(collection(db, 'question_bank'), {
-      text: form.text.trim(), grade: form.grade, branch: form.branch, type: form.type, difficulty: form.difficulty,
-      options, correctIdx: safeNumber(form.correctIdx, 0), explanation: form.explanation,
-      mark: safeNumber(form.mark, form.type === 'essay' ? 10 : 1), tags: form.tags.split(',').map(t => t.trim()).filter(Boolean), createdAt: serverTimestamp()
+      text: form.text.trim(),
+      grade: form.grade,
+      branch: form.branch,
+      type: form.type,
+      difficulty: form.difficulty,
+      options,
+      correctIdx: safeNumber(form.correctIdx, 0),
+      explanation: form.explanation,
+      mark: safeNumber(form.mark, form.type === 'essay' ? 10 : 1),
+      tags: form.tags.split(',').map(t => t.trim()).filter(Boolean),
+      createdAt: serverTimestamp()
     });
     setForm(prev => ({ ...prev, text: '', optionsText: '', explanation: '', tags: '' }));
   };
@@ -1803,25 +1808,177 @@ const QuestionBankManager = ({ adminGradeFilter }) => {
     const grouped = {};
     selected.forEach(q => {
       grouped[q.branch] = grouped[q.branch] || { text: '', subQuestions: [] };
-      grouped[q.branch].subQuestions.push({ id: `qb_${q.id}_${Date.now()}_${Math.random().toString(36).slice(2,6)}`, text: q.text, options: q.options || [], correctIdx: q.correctIdx ?? 0, branch: q.branch, type: q.type || 'mcq', explanation: q.explanation || '', maxScore: getQuestionMaxScore(q) });
+      grouped[q.branch].subQuestions.push({
+        id: `qb_${q.id}_${Date.now()}_${Math.random().toString(36).slice(2,6)}`,
+        text: q.text,
+        options: q.options || [],
+        correctIdx: q.correctIdx ?? 0,
+        branch: q.branch,
+        type: q.type || 'mcq',
+        explanation: q.explanation || '',
+        maxScore: getQuestionMaxScore(q),
+        modelAnswer: q.modelAnswer || ''
+      });
     });
-    await addDoc(collection(db, 'exams'), { title: `امتحان مُولَّد من بنك الأسئلة - ${getGradeLabel(filters.grade || selected[0].grade)}`, grade: filters.grade || selected[0].grade, duration: Math.max(15, selected.length * 2), startTime: new Date().toISOString().slice(0,16), endTime: new Date(Date.now() + 7*24*60*60*1000).toISOString().slice(0,16), accessCode: Math.random().toString(36).slice(2, 7).toUpperCase(), isPremium: false, questions: Object.values(grouped), createdAt: serverTimestamp(), source: 'question_bank' });
+    await addDoc(collection(db, 'exams'), {
+      title: `امتحان مُولَّد من بنك الأسئلة - ${getGradeLabel(filters.grade || selected[0].grade)}`,
+      grade: filters.grade || selected[0].grade,
+      duration: Math.max(15, selected.length * 2),
+      startTime: new Date().toISOString().slice(0,16),
+      endTime: new Date(Date.now() + 7*24*60*60*1000).toISOString().slice(0,16),
+      accessCode: Math.random().toString(36).slice(2, 7).toUpperCase(),
+      isPremium: false,
+      questions: Object.values(grouped),
+      createdAt: serverTimestamp(),
+      source: 'question_bank'
+    });
     alert('تم إنشاء امتحان جديد من بنك الأسئلة بنجاح');
   };
 
   const visible = questions.filter(q => (!filters.grade || q.grade === filters.grade) && (!filters.branch || q.branch === filters.branch) && (!filters.type || q.type === filters.type));
-  return (<div className="space-y-6"><div className="glass-panel p-4 md:p-6 rounded-xl"><h2 className="text-xl font-bold mb-4 text-indigo-700 flex items-center gap-2"><Layers/> بنك الأسئلة</h2><form onSubmit={handleAddQuestion} className="grid gap-4"><div className="grid grid-cols-1 md:grid-cols-4 gap-4"><select className="border p-3 rounded" value={form.grade} onChange={e=>setForm({...form, grade:e.target.value})}><GradeOptions/></select><input className="border p-3 rounded" placeholder="الفرع مثل النحو أو الأدب" value={form.branch} onChange={e=>setForm({...form, branch:e.target.value})}/><select className="border p-3 rounded" value={form.type} onChange={e=>setForm({...form, type:e.target.value, mark: e.target.value === 'essay' ? 10 : 1})}><option value="mcq">اختياري</option><option value="essay">مقالي</option></select><select className="border p-3 rounded" value={form.difficulty} onChange={e=>setForm({...form, difficulty:e.target.value})}><option value="easy">سهل</option><option value="medium">متوسط</option><option value="hard">صعب</option></select></div><textarea className="border p-3 rounded h-24" placeholder="نص السؤال" value={form.text} onChange={e=>setForm({...form, text:e.target.value})}/>{form.type === 'mcq' && <textarea className="border p-3 rounded h-28 font-mono" placeholder="كل اختيار في سطر منفصل" value={form.optionsText} onChange={e=>setForm({...form, optionsText:e.target.value})}/>}<div className="grid grid-cols-1 md:grid-cols-3 gap-4">{form.type === 'mcq' && <input type="number" min="0" className="border p-3 rounded" placeholder="رقم الإجابة الصحيحة" value={form.correctIdx} onChange={e=>setForm({...form, correctIdx:e.target.value})}/>}<input type="number" min="1" className="border p-3 rounded" placeholder="درجة السؤال" value={form.mark} onChange={e=>setForm({...form, mark:e.target.value})}/><input className="border p-3 rounded" placeholder="tags مفصولة بفاصلة" value={form.tags} onChange={e=>setForm({...form, tags:e.target.value})}/></div><textarea className="border p-3 rounded h-20" placeholder="شرح الإجابة / قاعدة المراجعة الذكية" value={form.explanation} onChange={e=>setForm({...form, explanation:e.target.value})}/><div className="flex flex-col md:flex-row gap-3"><button className="bg-indigo-600 text-white py-3 px-6 rounded-xl font-bold">إضافة للسجل</button><button type="button" onClick={createExamFromBank} className="bg-emerald-600 text-white py-3 px-6 rounded-xl font-bold">توليد امتحان من الفلاتر الحالية</button></div></form></div><div className="glass-panel p-4 md:p-6 rounded-xl"><div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4"><select className="border p-3 rounded" value={filters.grade} onChange={e=>setFilters({...filters, grade:e.target.value})}><option value="">كل المراحل</option><GradeOptions/></select><input className="border p-3 rounded" placeholder="فلترة الفرع" value={filters.branch} onChange={e=>setFilters({...filters, branch:e.target.value})}/><select className="border p-3 rounded" value={filters.type} onChange={e=>setFilters({...filters, type:e.target.value})}><option value="">كل الأنواع</option><option value="mcq">اختياري</option><option value="essay">مقالي</option></select></div><div className="space-y-3 max-h-[500px] overflow-y-auto">{visible.map(q => <div key={q.id} className="bg-white border rounded-xl p-4"><div className="flex flex-wrap gap-2 mb-2"><span className="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded">{getGradeLabel(q.grade)}</span><span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded">{q.branch}</span><span className="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded">{q.type === 'essay' ? 'مقالي' : 'اختياري'}</span><span className="bg-emerald-100 text-emerald-700 text-xs px-2 py-1 rounded">{getQuestionMaxScore(q)} درجة</span></div><p className="font-bold text-slate-800">{q.text}</p>{q.explanation && <p className="text-xs text-slate-500 mt-2">شرح: {q.explanation}</p>}</div>)}{visible.length === 0 && <p className="text-slate-500 text-center py-8">لا توجد أسئلة مطابقة.</p>}</div></div></div>);
+
+  return (
+    <div className="space-y-6">
+      <div className="glass-panel p-4 md:p-6 rounded-xl">
+        <h2 className="text-xl font-bold mb-4 text-indigo-700 flex items-center gap-2"><Layers/> بنك الأسئلة</h2>
+        <form onSubmit={handleAddQuestion} className="grid gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <select className="border p-3 rounded" value={form.grade} onChange={e=>setForm({...form, grade:e.target.value})}><GradeOptions/></select>
+            <input className="border p-3 rounded" placeholder="الفرع مثل النحو أو الأدب" value={form.branch} onChange={e=>setForm({...form, branch:e.target.value})}/>
+            <select className="border p-3 rounded" value={form.type} onChange={e=>setForm({...form, type:e.target.value, mark: e.target.value === 'essay' ? 10 : 1})}>
+              <option value="mcq">اختياري</option><option value="essay">مقالي</option>
+            </select>
+            <select className="border p-3 rounded" value={form.difficulty} onChange={e=>setForm({...form, difficulty:e.target.value})}>
+              <option value="easy">سهل</option><option value="medium">متوسط</option><option value="hard">صعب</option>
+            </select>
+          </div>
+          <textarea className="border p-3 rounded h-24" placeholder="نص السؤال" value={form.text} onChange={e=>setForm({...form, text:e.target.value})}/>
+          {form.type === 'mcq' && <textarea className="border p-3 rounded h-28 font-mono" placeholder="كل اختيار في سطر منفصل" value={form.optionsText} onChange={e=>setForm({...form, optionsText:e.target.value})}/>}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {form.type === 'mcq' && <input type="number" min="0" className="border p-3 rounded" placeholder="رقم الإجابة الصحيحة" value={form.correctIdx} onChange={e=>setForm({...form, correctIdx:e.target.value})}/>}
+            <input type="number" min="1" className="border p-3 rounded" placeholder="درجة السؤال" value={form.mark} onChange={e=>setForm({...form, mark:e.target.value})}/>
+            <input className="border p-3 rounded" placeholder="tags مفصولة بفاصلة" value={form.tags} onChange={e=>setForm({...form, tags:e.target.value})}/>
+          </div>
+          <textarea className="border p-3 rounded h-20" placeholder="شرح الإجابة / قاعدة المراجعة الذكية" value={form.explanation} onChange={e=>setForm({...form, explanation:e.target.value})}/>
+          <div className="flex flex-col md:flex-row gap-3">
+            <button className="bg-indigo-600 text-white py-3 px-6 rounded-xl font-bold">إضافة للسجل</button>
+            <button type="button" onClick={createExamFromBank} className="bg-emerald-600 text-white py-3 px-6 rounded-xl font-bold">توليد امتحان من الفلاتر الحالية</button>
+          </div>
+        </form>
+      </div>
+      <div className="glass-panel p-4 md:p-6 rounded-xl">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <select className="border p-3 rounded" value={filters.grade} onChange={e=>setFilters({...filters, grade:e.target.value})}><option value="">كل المراحل</option><GradeOptions/></select>
+          <input className="border p-3 rounded" placeholder="فلترة الفرع" value={filters.branch} onChange={e=>setFilters({...filters, branch:e.target.value})}/>
+          <select className="border p-3 rounded" value={filters.type} onChange={e=>setFilters({...filters, type:e.target.value})}><option value="">كل الأنواع</option><option value="mcq">اختياري</option><option value="essay">مقالي</option></select>
+        </div>
+        <div className="space-y-3 max-h-[500px] overflow-y-auto">
+          {visible.map(q => <div key={q.id} className="bg-white border rounded-xl p-4">
+            <div className="flex flex-wrap gap-2 mb-2">
+              <span className="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded">{getGradeLabel(q.grade)}</span>
+              <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded">{q.branch}</span>
+              <span className="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded">{q.type === 'essay' ? 'مقالي' : 'اختياري'}</span>
+              <span className="bg-emerald-100 text-emerald-700 text-xs px-2 py-1 rounded">{getQuestionMaxScore(q)} درجة</span>
+            </div>
+            <p className="font-bold text-slate-800">{q.text}</p>
+            {q.explanation && <p className="text-xs text-slate-500 mt-2">شرح: {q.explanation}</p>}
+          </div>)}
+          {visible.length === 0 && <p className="text-slate-500 text-center py-8">لا توجد أسئلة مطابقة.</p>}
+        </div>
+      </div>
+    </div>
+  );
 };
 
 const AssignmentsManager = ({ adminGradeFilter }) => {
   const [assignments, setAssignments] = useState([]);
   const [submissions, setSubmissions] = useState([]);
   const [form, setForm] = useState({ title: '', grade: adminGradeFilter === 'all' ? '3sec' : adminGradeFilter, branch: 'التعبير', description: '', dueDate: '', totalMarks: 20, deliveryType: 'text_or_image' });
-  useEffect(() => onSnapshot(query(collection(db, 'assignments'), orderBy('createdAt', 'desc')), snap => setAssignments(snap.docs.map(d => ({ id: d.id, ...d.data() })))), []);
-  useEffect(() => onSnapshot(query(collection(db, 'assignment_submissions'), orderBy('submittedAt', 'desc')), snap => setSubmissions(snap.docs.map(d => ({ id: d.id, ...d.data() })))), []);
-  const createAssignment = async (e) => { e.preventDefault(); if (!form.title.trim()) return alert('اكتب عنوان الواجب'); await addDoc(collection(db, 'assignments'), { ...form, totalMarks: safeNumber(form.totalMarks, 20), createdAt: serverTimestamp(), status: 'active' }); setForm(prev => ({ ...prev, title: '', description: '' })); };
-  const reviewSubmission = async (submission) => { const scoreValue = prompt('أدخل الدرجة التي حصل عليها الطالب', submission.score ?? 0); if (scoreValue === null) return; const maxValue = prompt('ومن كام؟', submission.maxScore ?? submission.totalMarks ?? 20); if (maxValue === null) return; const feedback = prompt('تعليقك على الواجب', submission.feedback || ''); await updateDoc(doc(db, 'assignment_submissions', submission.id), { score: safeNumber(scoreValue, 0), maxScore: safeNumber(maxValue, submission.totalMarks ?? 20), feedback: feedback || '', reviewStatus: 'graded', gradedAt: serverTimestamp() }); alert('تم حفظ تصحيح الواجب'); };
-  return (<div className="space-y-6"><div className="glass-panel p-6 rounded-2xl"><h2 className="text-xl font-bold text-blue-700 mb-4 flex items-center gap-2"><FileCheck/> نظام الواجبات</h2><form onSubmit={createAssignment} className="grid gap-4"><div className="grid grid-cols-1 md:grid-cols-4 gap-4"><input className="border p-3 rounded md:col-span-2" placeholder="عنوان الواجب" value={form.title} onChange={e=>setForm({...form, title:e.target.value})} /><select className="border p-3 rounded" value={form.grade} onChange={e=>setForm({...form, grade:e.target.value})}><GradeOptions/></select><input className="border p-3 rounded" placeholder="الفرع" value={form.branch} onChange={e=>setForm({...form, branch:e.target.value})} /></div><textarea className="border p-3 rounded h-24" placeholder="وصف الواجب والتعليمات" value={form.description} onChange={e=>setForm({...form, description:e.target.value})}></textarea><div className="grid grid-cols-1 md:grid-cols-3 gap-4"><input type="datetime-local" className="border p-3 rounded" value={form.dueDate} onChange={e=>setForm({...form, dueDate:e.target.value})} /><input type="number" className="border p-3 rounded" value={form.totalMarks} onChange={e=>setForm({...form, totalMarks:e.target.value})} /><select className="border p-3 rounded" value={form.deliveryType} onChange={e=>setForm({...form, deliveryType:e.target.value})}><option value="text_or_image">نص أو صورة</option><option value="image_only">صورة فقط</option><option value="text_only">نص فقط</option></select></div><button className="bg-blue-600 text-white py-3 rounded-xl font-bold">نشر الواجب</button></form></div><div className="glass-panel p-6 rounded-2xl"><h3 className="font-bold mb-4 text-slate-800">التسليمات</h3><div className="space-y-3 max-h-[550px] overflow-y-auto">{submissions.map(item => <div key={item.id} className="bg-white border rounded-2xl p-4"><div className="flex flex-col md:flex-row justify-between gap-3"><div><p className="font-bold text-slate-800">{item.studentName} — {item.assignmentTitle}</p><p className="text-xs text-slate-500 mt-1">{item.branch} • {getGradeLabel(item.grade)}</p>{item.answerText && <p className="text-sm text-slate-700 bg-slate-50 p-3 rounded-xl mt-2 whitespace-pre-wrap">{item.answerText}</p>}{item.answerImage && <img src={item.answerImage} alt="assignment" className="w-40 h-40 object-cover rounded-xl border mt-2" />}</div><div className="flex flex-col gap-2 min-w-[180px]"><div className="text-xs bg-slate-100 px-3 py-2 rounded-xl text-center">{item.reviewStatus === 'graded' ? `تم التصحيح: ${item.score}/${item.maxScore}` : 'بانتظار التصحيح'}</div><button onClick={() => reviewSubmission(item)} className="bg-emerald-100 text-emerald-700 px-4 py-2 rounded-xl font-bold">تصحيح الواجب</button></div></div></div>)}{submissions.length === 0 && <p className="text-slate-500 text-center py-8">لا توجد تسليمات حتى الآن.</p>}</div></div></div>);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'assignments'), snap => {
+      const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      rows.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      setAssignments(rows);
+    }, error => { console.warn('assignments listener blocked:', error?.message); setAssignments([]); });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'assignment_submissions'), snap => {
+      const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      rows.sort((a, b) => (b.submittedAt?.seconds || 0) - (a.submittedAt?.seconds || 0));
+      setSubmissions(rows);
+    }, error => { console.warn('assignment_submissions listener blocked:', error?.message); setSubmissions([]); });
+    return () => unsub();
+  }, []);
+
+  const createAssignment = async (e) => {
+    e.preventDefault();
+    if (!form.title.trim()) return alert('اكتب عنوان الواجب');
+    await addDoc(collection(db, 'assignments'), { ...form, totalMarks: safeNumber(form.totalMarks, 20), createdAt: serverTimestamp(), status: 'active' });
+    setForm(prev => ({ ...prev, title: '', description: '' }));
+  };
+
+  const reviewSubmission = async (submission) => {
+    const scoreValue = prompt('أدخل الدرجة التي حصل عليها الطالب', submission.score ?? 0);
+    if (scoreValue === null) return;
+    const maxValue = prompt('ومن كام؟', submission.maxScore ?? submission.totalMarks ?? 20);
+    if (maxValue === null) return;
+    const feedback = prompt('تعليقك على الواجب', submission.feedback || '');
+    await updateDoc(doc(db, 'assignment_submissions', submission.id), {
+      score: safeNumber(scoreValue, 0),
+      maxScore: safeNumber(maxValue, submission.totalMarks ?? 20),
+      feedback: feedback || '',
+      reviewStatus: 'graded',
+      gradedAt: serverTimestamp()
+    });
+    alert('تم حفظ تصحيح الواجب');
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="glass-panel p-6 rounded-2xl">
+        <h2 className="text-xl font-bold text-blue-700 mb-4 flex items-center gap-2"><FileCheck/> نظام الواجبات</h2>
+        <form onSubmit={createAssignment} className="grid gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <input className="border p-3 rounded md:col-span-2" placeholder="عنوان الواجب" value={form.title} onChange={e=>setForm({...form, title:e.target.value})} />
+            <select className="border p-3 rounded" value={form.grade} onChange={e=>setForm({...form, grade:e.target.value})}><GradeOptions/></select>
+            <input className="border p-3 rounded" placeholder="الفرع" value={form.branch} onChange={e=>setForm({...form, branch:e.target.value})} />
+          </div>
+          <textarea className="border p-3 rounded h-24" placeholder="وصف الواجب والتعليمات" value={form.description} onChange={e=>setForm({...form, description:e.target.value})}></textarea>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <input type="datetime-local" className="border p-3 rounded" value={form.dueDate} onChange={e=>setForm({...form, dueDate:e.target.value})} />
+            <input type="number" className="border p-3 rounded" value={form.totalMarks} onChange={e=>setForm({...form, totalMarks:e.target.value})} />
+            <select className="border p-3 rounded" value={form.deliveryType} onChange={e=>setForm({...form, deliveryType:e.target.value})}>
+              <option value="text_or_image">نص أو صورة</option><option value="image_only">صورة فقط</option><option value="text_only">نص فقط</option>
+            </select>
+          </div>
+          <button className="bg-blue-600 text-white py-3 rounded-xl font-bold">نشر الواجب</button>
+        </form>
+      </div>
+      <div className="glass-panel p-6 rounded-2xl">
+        <h3 className="font-bold mb-4 text-slate-800">التسليمات</h3>
+        <div className="space-y-3 max-h-[550px] overflow-y-auto">
+          {submissions.map(item => <div key={item.id} className="bg-white border rounded-2xl p-4">
+            <div className="flex flex-col md:flex-row justify-between gap-3">
+              <div>
+                <p className="font-bold text-slate-800">{item.studentName} — {item.assignmentTitle}</p>
+                <p className="text-xs text-slate-500 mt-1">{item.branch} • {getGradeLabel(item.grade)}</p>
+                {item.answerText && <p className="text-sm text-slate-700 bg-slate-50 p-3 rounded-xl mt-2 whitespace-pre-wrap">{item.answerText}</p>}
+                {item.answerImage && <img src={item.answerImage} alt="assignment" className="w-40 h-40 object-cover rounded-xl border mt-2" />}
+              </div>
+              <div className="flex flex-col gap-2 min-w-[180px]">
+                <div className="text-xs bg-slate-100 px-3 py-2 rounded-xl text-center">{item.reviewStatus === 'graded' ? `تم التصحيح: ${item.score}/${item.maxScore}` : 'بانتظار التصحيح'}</div>
+                <button onClick={() => reviewSubmission(item)} className="bg-emerald-100 text-emerald-700 px-4 py-2 rounded-xl font-bold">تصحيح الواجب</button>
+              </div>
+            </div>
+          </div>)}
+          {submissions.length === 0 && <p className="text-slate-500 text-center py-8">لا توجد تسليمات حتى الآن.</p>}
+        </div>
+      </div>
+    </div>
+  );
 };
 
 const PerformanceOverview = ({ examResults = [], content = [] }) => {
@@ -1830,7 +1987,17 @@ const PerformanceOverview = ({ examResults = [], content = [] }) => {
     const avg = completed.length ? Math.round(completed.reduce((acc, item) => acc + safeNumber(item.percentage, item.total ? (item.score / item.total) * 100 : 0), 0) / completed.length) : 0;
     return { completed, avg };
   }, [examResults]);
-  return (<div className="glass-panel p-6 rounded-2xl"><h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-800"><BarChart3/> تحليل الأداء</h3><div className="grid grid-cols-1 md:grid-cols-3 gap-4"><div className="bg-white border rounded-2xl p-4 text-center"><p className="text-slate-500 text-sm">الاختبارات المكتملة</p><p className="text-3xl font-black text-blue-600">{metrics.completed.length}</p></div><div className="bg-white border rounded-2xl p-4 text-center"><p className="text-slate-500 text-sm">متوسط الأداء</p><p className="text-3xl font-black text-emerald-600">{metrics.avg}%</p></div><div className="bg-white border rounded-2xl p-4 text-center"><p className="text-slate-500 text-sm">محتوى متاح للمراجعة</p><p className="text-3xl font-black text-amber-600">{content.length}</p></div></div></div>);
+
+  return (
+    <div className="glass-panel p-6 rounded-2xl">
+      <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-800"><BarChart3/> تحليل الأداء</h3>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white border rounded-2xl p-4 text-center"><p className="text-slate-500 text-sm">الاختبارات المكتملة</p><p className="text-3xl font-black text-blue-600">{metrics.completed.length}</p></div>
+        <div className="bg-white border rounded-2xl p-4 text-center"><p className="text-slate-500 text-sm">متوسط الأداء</p><p className="text-3xl font-black text-emerald-600">{metrics.avg}%</p></div>
+        <div className="bg-white border rounded-2xl p-4 text-center"><p className="text-slate-500 text-sm">محتوى متاح للمراجعة</p><p className="text-3xl font-black text-amber-600">{content.length}</p></div>
+      </div>
+    </div>
+  );
 };
 
 const StudentAssignmentsPanel = ({ assignments = [], submissions = [], user, userData }) => {
@@ -1838,10 +2005,65 @@ const StudentAssignmentsPanel = ({ assignments = [], submissions = [], user, use
   const [answerText, setAnswerText] = useState('');
   const [answerImage, setAnswerImage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
   const uploadImage = (file) => { const reader = new FileReader(); reader.onloadend = () => setAnswerImage(reader.result); reader.readAsDataURL(file); };
-  const submitAssignment = async () => { if (!selectedAssignment) return; if (!answerText.trim() && !answerImage) return alert('أضف نص الإجابة أو صورة واحدة على الأقل'); setIsSubmitting(true); const existing = submissions.find(s => s.assignmentId === selectedAssignment.id); const payload = { assignmentId: selectedAssignment.id, assignmentTitle: selectedAssignment.title, grade: selectedAssignment.grade, branch: selectedAssignment.branch, studentId: user.uid, studentName: userData.name, answerText, answerImage, reviewStatus: 'submitted', totalMarks: safeNumber(selectedAssignment.totalMarks, 20), submittedAt: serverTimestamp() }; if (existing) await updateDoc(doc(db, 'assignment_submissions', existing.id), payload); else await addDoc(collection(db, 'assignment_submissions'), payload); setIsSubmitting(false); setSelectedAssignment(null); setAnswerText(''); setAnswerImage(''); alert('تم تسليم الواجب بنجاح'); };
-  return (<div className="space-y-6"><div className="glass-panel p-6 rounded-2xl"><h2 className="text-2xl font-bold text-slate-800 mb-4 flex items-center gap-2"><FileCheck/> الواجبات</h2><div className="grid grid-cols-1 md:grid-cols-2 gap-4">{assignments.map(item => { const sub = submissions.find(s => s.assignmentId === item.id); return <div key={item.id} className="bg-white border rounded-2xl p-4"><div className="flex flex-wrap gap-2 mb-2"><span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded">{item.branch}</span><span className="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded">{getGradeLabel(item.grade)}</span></div><h3 className="font-bold text-lg text-slate-800">{item.title}</h3><p className="text-sm text-slate-500 my-2">{item.description}</p><div className="flex items-center justify-between text-xs text-slate-500"><span>الدرجة: {item.totalMarks}</span><span>{sub ? (sub.reviewStatus === 'graded' ? `تم التصحيح: ${sub.score}/${sub.maxScore}` : 'تم التسليم') : 'لم يُسلَّم بعد'}</span></div><button onClick={() => setSelectedAssignment(item)} className="mt-3 w-full bg-emerald-100 text-emerald-700 py-2 rounded-xl font-bold">{sub ? 'تعديل / عرض التسليم' : 'ابدأ الواجب'}</button></div>; })}{assignments.length === 0 && <div className="col-span-full bg-white border rounded-2xl p-8 text-center text-slate-500">لا توجد واجبات متاحة حالياً.</div>}</div></div>{selectedAssignment && <div className="glass-panel p-6 rounded-2xl"><h3 className="text-xl font-bold mb-4">تسليم واجب: {selectedAssignment.title}</h3><textarea className="w-full border rounded-xl p-3 h-32 mb-3" placeholder="اكتب إجابتك هنا" value={answerText} onChange={e=>setAnswerText(e.target.value)}></textarea><input type="file" accept="image/*" onChange={e => e.target.files?.[0] && uploadImage(e.target.files[0])} className="mb-3" />{answerImage && <img src={answerImage} alt="submission" className="w-40 h-40 object-cover rounded-xl border mb-3" />}<div className="flex gap-3"><button onClick={submitAssignment} disabled={isSubmitting} className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold">{isSubmitting ? 'جارٍ الحفظ...' : 'تسليم الواجب'}</button><button onClick={() => setSelectedAssignment(null)} className="bg-slate-200 text-slate-700 px-6 py-3 rounded-xl font-bold">إلغاء</button></div></div>}</div>);
+
+  const submitAssignment = async () => {
+    if (!selectedAssignment) return;
+    if (!answerText.trim() && !answerImage) return alert('أضف نص الإجابة أو صورة واحدة على الأقل');
+    setIsSubmitting(true);
+    const existing = submissions.find(s => s.assignmentId === selectedAssignment.id);
+    const payload = {
+      assignmentId: selectedAssignment.id,
+      assignmentTitle: selectedAssignment.title,
+      grade: selectedAssignment.grade,
+      branch: selectedAssignment.branch,
+      studentId: user.uid,
+      studentName: userData.name,
+      answerText,
+      answerImage,
+      reviewStatus: 'submitted',
+      totalMarks: safeNumber(selectedAssignment.totalMarks, 20),
+      submittedAt: serverTimestamp()
+    };
+    if (existing) await updateDoc(doc(db, 'assignment_submissions', existing.id), payload);
+    else await addDoc(collection(db, 'assignment_submissions'), payload);
+    setIsSubmitting(false);
+    setSelectedAssignment(null);
+    setAnswerText('');
+    setAnswerImage('');
+    alert('تم تسليم الواجب بنجاح');
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="glass-panel p-6 rounded-2xl">
+        <h2 className="text-2xl font-bold text-slate-800 mb-4 flex items-center gap-2"><FileCheck/> الواجبات</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {assignments.map(item => {
+            const sub = submissions.find(s => s.assignmentId === item.id);
+            return <div key={item.id} className="bg-white border rounded-2xl p-4">
+              <div className="flex flex-wrap gap-2 mb-2"><span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded">{item.branch}</span><span className="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded">{getGradeLabel(item.grade)}</span></div>
+              <h3 className="font-bold text-lg text-slate-800">{item.title}</h3>
+              <p className="text-sm text-slate-500 my-2">{item.description}</p>
+              <div className="flex items-center justify-between text-xs text-slate-500"><span>الدرجة: {item.totalMarks}</span><span>{sub ? (sub.reviewStatus === 'graded' ? `تم التصحيح: ${sub.score}/${sub.maxScore}` : 'تم التسليم') : 'لم يُسلَّم بعد'}</span></div>
+              <button onClick={() => setSelectedAssignment(item)} className="mt-3 w-full bg-emerald-100 text-emerald-700 py-2 rounded-xl font-bold">{sub ? 'تعديل / عرض التسليم' : 'ابدأ الواجب'}</button>
+            </div>;
+          })}
+          {assignments.length === 0 && <div className="col-span-full bg-white border rounded-2xl p-8 text-center text-slate-500">لا توجد واجبات متاحة حالياً.</div>}
+        </div>
+      </div>
+      {selectedAssignment && <div className="glass-panel p-6 rounded-2xl">
+        <h3 className="text-xl font-bold mb-4">تسليم واجب: {selectedAssignment.title}</h3>
+        <textarea className="w-full border rounded-xl p-3 h-32 mb-3" placeholder="اكتب إجابتك هنا" value={answerText} onChange={e=>setAnswerText(e.target.value)}></textarea>
+        <input type="file" accept="image/*" onChange={e => e.target.files?.[0] && uploadImage(e.target.files[0])} className="mb-3" />
+        {answerImage && <img src={answerImage} alt="submission" className="w-40 h-40 object-cover rounded-xl border mb-3" />}
+        <div className="flex gap-3"><button onClick={submitAssignment} disabled={isSubmitting} className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold">{isSubmitting ? 'جارٍ الحفظ...' : 'تسليم الواجب'}</button><button onClick={() => setSelectedAssignment(null)} className="bg-slate-200 text-slate-700 px-6 py-3 rounded-xl font-bold">إلغاء</button></div>
+      </div>}
+    </div>
+  );
 };
+
 
 const AdminDashboard = ({ user }) => {
   const [activeTab, setActiveTab] = useState('users'); 
@@ -1888,8 +2110,6 @@ const AdminDashboard = ({ user }) => {
   const [subscriptionCodes, setSubscriptionCodes] = useState([]);
   const [codeGenCount, setCodeGenCount] = useState(10);
   const [codeGenDays, setCodeGenDays] = useState(30);
-  const [questionBankCount, setQuestionBankCount] = useState(0);
-  const [assignmentsCount, setAssignmentsCount] = useState(0);
 
   // تحديث حالة زر الرجوع للموبايل للأدمن
   useEffect(() => {
@@ -1976,8 +2196,6 @@ const AdminDashboard = ({ user }) => {
       const u = onSnapshot(q, s => setSubscriptionCodes(s.docs.map(d => ({id: d.id, ...d.data()}))));
       return u;
   }, []);
-  useEffect(() => onSnapshot(collection(db, 'question_bank'), snap => setQuestionBankCount(snap.size), (error) => { console.warn('Question bank counter blocked:', error?.message); setQuestionBankCount(0); }), []);
-  useEffect(() => onSnapshot(collection(db, 'assignments'), snap => setAssignmentsCount(snap.size), (error) => { console.warn('Assignments counter blocked:', error?.message); setAssignmentsCount(0); }), []);
 
   const handleApprove = async (id) => {
     await updateDoc(doc(db,'users',id), {status:'active'});
@@ -2517,7 +2735,7 @@ const AdminDashboard = ({ user }) => {
                               </div>
 
                               <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-100 flex-1 flex flex-col overflow-hidden">
-                                  <h3 className="font-bold text-lg mb-4 text-amber-800 flex items-center gap-2 border-b pb-2"><QrCode/> سجل واجبات (QR)</h3>
+                                  <h3 className="font-bold text-lg mb-4 text-amber-800 flex items-center gap-2 border-b pb-2"><QrCode/> سجل الواجبات</h3>
                                   <div className="flex-1 overflow-y-auto space-y-3 pr-2">
                                       {(() => {
                                           const sHw = hwResults.filter(r => r.studentId === viewingStudentProfile.id);
@@ -2556,7 +2774,7 @@ const AdminDashboard = ({ user }) => {
         <div className="glass-panel p-4 rounded-xl h-fit space-y-2 flex md:flex-col overflow-x-auto md:overflow-x-visible whitespace-nowrap scrollbar-hide">
           {['users', 'all_users', 'subscriptions', 'question_bank', 'assignments', 'exams', 'results', 'smart_hw', 'live', 'content', 'messages', 'auto_reply', 'quotes', 'settings'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 transition-all ${activeTab===tab?'bg-amber-100 text-amber-700 shadow-sm border-b-4 md:border-b-0 md:border-r-4 border-amber-500':'hover:bg-slate-50 text-slate-600'}`}>
-              {tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'question_bank' ? `بنك الأسئلة (${questionBankCount})` : tab === 'assignments' ? `الواجبات (${assignmentsCount})` : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : 'الإعدادات'}
+              {tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : 'الإعدادات'}
             </button>
           ))}
         </div>
@@ -2698,10 +2916,6 @@ const AdminDashboard = ({ user }) => {
               </div>
           )}
 
-          {activeTab === 'question_bank' && (<QuestionBankManager adminGradeFilter={adminGradeFilter} />)}
-
-          {activeTab === 'assignments' && (<AssignmentsManager adminGradeFilter={adminGradeFilter} />)}
-
           {activeTab === 'smart_hw' && (
               <div className="space-y-6">
                   <div className="glass-panel p-4 md:p-6 rounded-xl">
@@ -2772,6 +2986,10 @@ const AdminDashboard = ({ user }) => {
                   </div>
               </div>
           )}
+
+          {activeTab === 'question_bank' && <QuestionBankManager adminGradeFilter={adminGradeFilter} />}
+
+          {activeTab === 'assignments' && <AssignmentsManager adminGradeFilter={adminGradeFilter} />}
 
           {activeTab === 'exams' && (
               <div className="space-y-8">
@@ -3031,11 +3249,6 @@ const AdminDashboard = ({ user }) => {
                           )}
                           <select className="border p-3 rounded flex-1" value={newContent.grade} onChange={e=>setNewContent({...newContent, grade:e.target.value})}><GradeOptions/></select>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                          <input className="border p-3 rounded" placeholder="الفرع المرتبط (اختياري)" value={newContent.branch} onChange={e=>setNewContent({...newContent, branch:e.target.value})} />
-                          <input className="border p-3 rounded" placeholder="معرّف امتحان مرتبط بالفيديو" value={newContent.linkedExamId} onChange={e=>setNewContent({...newContent, linkedExamId:e.target.value})} />
-                          <input type="number" className="border p-3 rounded" placeholder="مدة الفيديو بالدقائق للربط 75%" value={newContent.estimatedDurationMinutes} onChange={e=>setNewContent({...newContent, estimatedDurationMinutes:e.target.value})} />
-                      </div>
 
                       <div className="flex items-center bg-amber-50 border border-amber-200 rounded-lg p-3">
                           <input type="checkbox" id="vipContent" className="w-5 h-5 ml-3" checked={newContent.isPremium} onChange={e=>setNewContent({...newContent, isPremium:e.target.checked})} />
@@ -3166,6 +3379,9 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   const [playingHtml, setPlayingHtml] = useState(null);
   const [examResults, setExamResults] = useState([]);
   const [hwResults, setHwResults] = useState([]); 
+  const [assignments, setAssignments] = useState([]);
+  const [assignmentSubmissions, setAssignmentSubmissions] = useState([]);
+  const [videoViews, setVideoViews] = useState([]);
   const [reviewingExam, setReviewingExam] = useState(null);
   const [mistakes, setMistakes] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -3177,9 +3393,6 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   
   const [subscriptionCodeInput, setSubscriptionCodeInput] = useState('');
   const [isCharging, setIsCharging] = useState(false);
-  const [assignments, setAssignments] = useState([]);
-  const [assignmentSubmissions, setAssignmentSubmissions] = useState([]);
-  const [videoProgressMap, setVideoProgressMap] = useState({});
 
   useEffect(() => {
       window.history.pushState({ tab: activeTab }, '');
@@ -3203,72 +3416,53 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
     const unsubContent = onSnapshot(query(collection(db, 'content'), where('grade', '==', userData.grade)), s => {
         const allContent = s.docs.map(d=>({id:d.id,...d.data()}));
-        const visibleContent = allContent.filter(c => {
-            const allowed = Array.isArray(c.allowedEmails) ? c.allowedEmails : [];
-            if (allowed.length === 0) return true;
-            return allowed.includes(user.email);
-        });
+        const visibleContent = allContent.filter(c => { if (!c.allowedEmails || c.allowedEmails.length === 0) return true; return c.allowedEmails.includes(user.email); });
         setContent(visibleContent);
-    }, (error) => {
-        console.warn('Content listener blocked:', error?.message);
-        setContent([]);
-    });
+    }, error => { console.warn('content listener blocked:', error?.message); setContent([]); });
 
-    const unsubLive = onSnapshot(collection(db, 'live_sessions'), s => {
-        const allSessions = s.docs.map(d=>({id:d.id, ...d.data()}));
-        const activeSessions = allSessions.filter(ls => ls.status === 'active' && ls.grade === userData.grade);
-        const visibleSessions = activeSessions.filter(ls => {
-            const allowed = Array.isArray(ls.allowedEmails) ? ls.allowedEmails : [];
-            if (allowed.length === 0) return true;
-            return allowed.includes(user.email);
-        });
+    const unsubLive = onSnapshot(query(collection(db, 'live_sessions'), where('status', '==', 'active'), where('grade', '==', userData.grade)), s => {
+        const activeSessions = s.docs.map(d=>({id:d.id, ...d.data()}));
+        const visibleSessions = activeSessions.filter(ls => { if (!ls.allowedEmails || ls.allowedEmails.length === 0) return true; return ls.allowedEmails.includes(user.email); });
         setLiveSessions(visibleSessions);
-    }, (error) => {
-        console.warn('Live sessions listener blocked:', error?.message);
-        setLiveSessions([]);
-    });
+    }, error => { console.warn('live_sessions listener blocked:', error?.message); setLiveSessions([]); });
 
-    const unsubExams = onSnapshot(query(collection(db, 'exams'), where('grade', '==', userData.grade)), s => setExams(s.docs.map(d=>({id:d.id,...d.data()}))), (error) => {
-        console.warn('Exams listener blocked:', error?.message);
-        setExams([]);
-    });
-    const unsubAssignments = onSnapshot(query(collection(db, 'assignments'), where('grade', '==', userData.grade)), s => setAssignments(s.docs.map(d=>({id:d.id,...d.data()}))), (error) => { console.warn('Assignments listener blocked:', error?.message); setAssignments([]); });
-    const unsubResults = onSnapshot(query(collection(db, 'exam_results'), where('studentId', '==', user.uid)), s => setExamResults(s.docs.map(d=>({id:d.id,...d.data()}))), (error) => {
-        console.warn('Exam results listener blocked:', error?.message);
-        setExamResults([]);
-    });
+    const unsubExams = onSnapshot(query(collection(db, 'exams'), where('grade', '==', userData.grade)), s => setExams(s.docs.map(d=>({id:d.id,...d.data()}))), error => { console.warn('exams listener blocked:', error?.message); setExams([]); });
+    const unsubResults = onSnapshot(query(collection(db, 'exam_results'), where('studentId', '==', user.uid)), s => {
+        const rows = s.docs.map(d=>({id:d.id,...d.data()}));
+        rows.sort((a,b) => (b.submittedAt?.seconds || 0) - (a.submittedAt?.seconds || 0));
+        setExamResults(rows);
+    }, error => { console.warn('exam_results listener blocked:', error?.message); setExamResults([]); });
     const unsubHwResults = onSnapshot(query(collection(db, 'homework_results'), where('studentId', '==', user.uid)), s => {
         const results = s.docs.map(d=>({id:d.id,...d.data()})); results.sort((a,b) => (b.submittedAt?.seconds || 0) - (a.submittedAt?.seconds || 0)); setHwResults(results);
-    }, (error) => {
-        console.warn('Homework results listener blocked:', error?.message);
-        setHwResults([]);
-    });
-    const unsubAssignmentSubs = onSnapshot(query(collection(db, 'assignment_submissions'), where('studentId', '==', user.uid)), s => setAssignmentSubmissions(s.docs.map(d=>({id:d.id,...d.data()}))), (error) => { console.warn('Assignment submissions listener blocked:', error?.message); setAssignmentSubmissions([]); });
-    const unsubVideoViews = onSnapshot(query(collection(db, 'video_views'), where('userId', '==', user.uid)), s => { const map = {}; s.docs.forEach(d => { const data = d.data(); map[data.videoId] = data; }); setVideoProgressMap(map); }, (error) => { console.warn('Video views listener blocked:', error?.message); setVideoProgressMap({}); });
+    }, error => { console.warn('homework_results listener blocked:', error?.message); setHwResults([]); });
     const unsubMistakes = onSnapshot(query(collection(db, 'student_mistakes'), where('userId', '==', user.uid)), s => {
-        const rows = s.docs.map(d => ({id: d.id, ...d.data()}));
-        rows.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
-        setMistakes(rows);
-    }, (error) => {
-        console.warn('Mistakes listener blocked:', error?.message);
-        setMistakes([]);
-    });
-    const unsubNotif = onSnapshot(collection(db, 'notifications'), s => {
-        const newNotifs = s.docs
-            .map(d => ({ id: d.id, ...d.data() }))
-            .filter(n => ['all', userData.grade].includes(n.grade))
-            .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
-            .slice(0, 10);
+        const rows = s.docs.map(d => ({id: d.id, ...d.data()})); rows.sort((a,b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)); setMistakes(rows);
+    }, error => { console.warn('student_mistakes listener blocked:', error?.message); setMistakes([]); });
+    const unsubNotif = onSnapshot(query(collection(db, 'notifications'), where('grade', 'in', ['all', userData.grade]), limit(10)), s => {
+        const newNotifs = s.docs.map(d => d.data()).sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
         setNotifications(newNotifs);
         if(newNotifs.length > 0) { setHasNewNotif(true); if(newNotifs[0].text) sendSystemNotification("تنبيه جديد 🔔", newNotifs[0].text); }
-    }, (error) => {
-        console.warn('Notifications listener blocked:', error?.message);
-        setNotifications([]);
-    });
+    }, error => { console.warn('notifications listener blocked:', error?.message); setNotifications([]); });
+
+    const unsubAssignments = onSnapshot(query(collection(db, 'assignments'), where('grade', '==', userData.grade)), s => {
+        const rows = s.docs.map(d=>({id:d.id,...d.data()}));
+        rows.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+        setAssignments(rows);
+    }, error => { console.warn('assignments listener blocked:', error?.message); setAssignments([]); });
+
+    const unsubAssignmentSubs = onSnapshot(query(collection(db, 'assignment_submissions'), where('studentId', '==', user.uid)), s => {
+        const rows = s.docs.map(d=>({id:d.id,...d.data()}));
+        rows.sort((a,b) => (b.submittedAt?.seconds || 0) - (a.submittedAt?.seconds || 0));
+        setAssignmentSubmissions(rows);
+    }, error => { console.warn('assignment_submissions listener blocked:', error?.message); setAssignmentSubmissions([]); });
+
+    const unsubVideoViews = onSnapshot(query(collection(db, 'video_views'), where('userId', '==', user.uid)), s => {
+        setVideoViews(s.docs.map(d=>({id:d.id,...d.data()})));
+    }, error => { console.warn('video_views listener blocked:', error?.message); setVideoViews([]); });
 
     setEditFormData({ name: userData.name, phone: userData.phone, parentPhone: userData.parentPhone, grade: userData.grade });
 
-    return () => { unsubContent(); unsubLive(); unsubExams(); unsubAssignments(); unsubResults(); unsubHwResults(); unsubAssignmentSubs(); unsubVideoViews(); unsubMistakes(); unsubNotif(); };
+    return () => { unsubContent(); unsubLive(); unsubExams(); unsubResults(); unsubHwResults(); unsubMistakes(); unsubNotif(); unsubAssignments(); unsubAssignmentSubs(); unsubVideoViews(); };
   }, [userData, user]);
 
   const isPremium = userData?.subscriptionStatus === 'premium' && (!userData.subscriptionExpiry || userData.subscriptionExpiry.toDate() > new Date());
@@ -3323,6 +3517,44 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
       }
   };
 
+  const getVideoWatchPercent = (videoItem) => {
+      const match = videoViews.find(v => v.videoId === videoItem.id);
+      if (!match) return 0;
+      if (safeNumber(match.watchedPercent, -1) >= 0) return safeNumber(match.watchedPercent, 0);
+      const durationSeconds = safeNumber(videoItem.durationSeconds, safeNumber(videoItem.estimatedDurationMinutes, 0) * 60);
+      return durationSeconds > 0 ? Math.min(100, Math.round((safeNumber(match.watchedSeconds, 0) / durationSeconds) * 100)) : 0;
+  };
+
+  const canOpenLinkedExam = (videoItem) => {
+      if (!videoItem?.linkedExamId) return false;
+      return getVideoWatchPercent(videoItem) >= 75;
+  };
+
+  const openLinkedExamFromVideo = (videoItem) => {
+      if (!videoItem?.linkedExamId) return;
+      if (!canOpenLinkedExam(videoItem)) {
+          return alert('امتحان الفيديو سيفتح بعد مشاهدة 75% من الفيديو.');
+      }
+      const linkedExam = exams.find(e => e.id === videoItem.linkedExamId);
+      if (!linkedExam) return alert('الامتحان المرتبط بهذا الفيديو غير موجود حالياً.');
+      startExamWithCode(linkedExam);
+  };
+
+  const handleVideoProgress = (videoId, percent, watchedSeconds) => {
+      setVideoViews(prev => {
+          const others = prev.filter(v => v.videoId !== videoId);
+          return [...others, { videoId, watchedPercent: percent, watchedSeconds }];
+      });
+  };
+
+  const handleJoinLive = (session) => {
+      if (session.passcode) {
+          const code = prompt('أدخل كود البث المباشر');
+          if (code !== session.passcode) return alert('الكود غير صحيح');
+      }
+      setActiveLiveView(session);
+  };
+
   const handleUpdateMyProfile = async (e) => {
       e.preventDefault();
 
@@ -3369,39 +3601,6 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   const filesAndLinks = content.filter(c => c.type === 'file' || c.type === 'link');
   const htmls = content.filter(c => c.type === 'html');
   const interactiveExams = content.filter(c => c.type === 'interactive_exam');
-  const assignmentStats = useMemo(() => ({
-    total: assignments.length,
-    submitted: assignmentSubmissions.length,
-    graded: assignmentSubmissions.filter(s => s.reviewStatus === 'graded').length,
-    pending: Math.max(assignments.length - assignmentSubmissions.length, 0)
-  }), [assignments, assignmentSubmissions]);
-
-  const getVideoWatchPercent = (video) => {
-    if (!video?.id) return 0;
-    return Math.max(0, Math.min(100, safeNumber(videoProgressMap?.[video.id]?.watchedPercent, 0)));
-  };
-
-  const canOpenLinkedExam = (video) => !!video?.linkedExamId && getVideoWatchPercent(video) >= 75;
-
-  const openLinkedExamFromVideo = (video) => {
-    if (!video?.linkedExamId) return;
-    if (!canOpenLinkedExam(video)) {
-      return alert(`يجب مشاهدة 75% من الفيديو أولاً. النسبة الحالية: ${getVideoWatchPercent(video)}%`);
-    }
-    const linkedExam = exams.find(e => e.id === video.linkedExamId);
-    if (!linkedExam) return alert('الامتحان المرتبط بهذا الفيديو غير موجود حالياً.');
-    startExamWithCode(linkedExam);
-  };
-
-  const handleJoinLive = (session) => {
-    if (!session) return;
-    if (session.passcode) {
-      const entered = prompt('هذا البث محمي برقم سري، أدخل الرقم السري:');
-      if (entered !== session.passcode) return alert('الرقم السري غير صحيح.');
-    }
-    setActiveLiveView(session);
-  };
-
 
   const startExamWithCode = async (exam) => {
     if (isBannedExam) return alert("أنت محظور من دخول الامتحانات.");
@@ -3411,9 +3610,9 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
         else if (previousResult.status === 'in_progress' || previousResult.status === 'cheated') { alert("لقد بدأت هذا الامتحان بالفعل وتم احتسابه عليك. لا يمكن الإعادة."); }
         return;
     }
-    const now = new Date(); const start = exam.startTime ? new Date(exam.startTime) : null; const end = exam.endTime ? new Date(exam.endTime) : null;
-    if (start && !Number.isNaN(start.getTime()) && now < start) return alert(`الامتحان لم يبدأ بعد. موعد البدء: ${start.toLocaleString('ar-EG')}`);
-    if (end && !Number.isNaN(end.getTime()) && now > end) return alert("عفواً، انتهى وقت الامتحان.");
+    const now = new Date(); const start = new Date(exam.startTime); const end = new Date(exam.endTime);
+    if (now < start) return alert(`الامتحان لم يبدأ بعد. موعد البدء: ${start.toLocaleString('ar-EG')}`);
+    if (now > end) return alert("عفواً، انتهى وقت الامتحان.");
     const code = prompt("أدخل كود الامتحان:");
     if (code === exam.accessCode) {
         try {
@@ -3425,7 +3624,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
   return (
     <div className="bg-slate-50 relative font-['Cairo'] min-h-screen block" dir="rtl">
-      {playingVideo && <SecureVideoPlayer video={playingVideo} user={user} userName={userData.name} onClose={() => setPlayingVideo(null)} onProgress={(videoId, percent, watchedSeconds) => setVideoProgressMap(prev => ({...prev, [videoId]: { ...(prev[videoId] || {}), watchedPercent: percent, watchedSeconds }}))} />}
+      {playingVideo && <SecureVideoPlayer video={playingVideo} user={user} userName={userData.name} onClose={() => setPlayingVideo(null)} onProgress={handleVideoProgress} />}
       {playingHtml && <InteractiveViewer content={playingHtml} user={userData} onClose={() => setPlayingHtml(null)} />}
       <FloatingArabicBackground />
       <ChatWidget user={user} />
@@ -3454,10 +3653,9 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
               <>
                 <div onClick={() => {setActiveTab('exams'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><ClipboardList/> الامتحانات</div>
                 <div onClick={() => {setActiveTab('interactive_exams'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='interactive_exams'?'bg-emerald-100 text-emerald-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-emerald-600'}`}><Sparkles/> امتحان تفاعلي</div>
-                <div onClick={() => {setActiveTab('smart_hw_results'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='smart_hw_results'?'bg-blue-100 text-blue-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-blue-600'}`}><QrCode/> سجل الواجبات (QR)</div>
+                <div onClick={() => {setActiveTab('assignments'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='assignments'?'bg-emerald-100 text-emerald-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-emerald-600'}`}><FileCheck/> الواجبات</div>
+                <div onClick={() => {setActiveTab('smart_hw_results'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='smart_hw_results'?'bg-blue-100 text-blue-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-blue-600'}`}><QrCode/> سجل الالواجبات</div>
                 <div onClick={() => {setActiveTab('mistakes_bank'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='mistakes_bank'?'bg-red-100 text-red-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-red-600'}`}><BrainCircuit/> بنك الأخطاء</div>
-                <div onClick={() => {setActiveTab('assignments'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='assignments'?'bg-blue-100 text-blue-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-blue-600'}`}><FileCheck/> الواجبات</div>
-                <div onClick={() => {setActiveTab('analytics'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='analytics'?'bg-emerald-100 text-emerald-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-emerald-600'}`}><BarChart3/> تحليلي</div>
               </>
           )}
           <button onClick={() => {setActiveTab('settings'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='settings'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><Settings/> ملفي الشخصي</button>
@@ -3515,7 +3713,6 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                     )}
                 </h2>
                 
-                <PerformanceOverview examResults={examResults} content={content} />
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
                     <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedContent && setActiveTab('videos')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}>
                         <h3 className="relative z-10 text-xl font-bold mb-2 text-blue-900 group-hover:text-blue-600 transition">المحاضرات</h3>
@@ -3533,16 +3730,13 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                         <h3 className="relative z-10 text-xl font-bold mb-2 text-slate-900 group-hover:text-slate-600 transition">الامتحانات</h3>
                         <p className="relative z-10 text-3xl font-black text-slate-600">{exams.length}</p><ClipboardList className="absolute -bottom-6 -left-6 text-slate-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
                     </motion.div>
-                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedExam && setActiveTab('smart_hw_results')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedExam ? 'opacity-50 grayscale' : ''}`}>
-                        <h3 className="relative z-10 text-xl font-bold mb-2 text-blue-900 group-hover:text-blue-600 transition">واجبات (QR)</h3>
-                        <p className="relative z-10 text-3xl font-black text-blue-600">{hwResults.length}</p><QrCode className="absolute -bottom-6 -left-6 text-blue-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
-                    </motion.div>
-                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> setActiveTab('assignments')} className="glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group">
-                        <h3 className="relative z-10 text-xl font-bold mb-2 text-emerald-900 group-hover:text-emerald-600 transition">الواجبات</h3>
-                        <p className="relative z-10 text-3xl font-black text-emerald-600">{assignmentStats.total}</p><FileCheck className="absolute -bottom-6 -left-6 text-emerald-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
+                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedExam && setActiveTab('assignments')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedExam ? 'opacity-50 grayscale' : ''}`}>
+                        <h3 className="relative z-10 text-xl font-bold mb-2 text-blue-900 group-hover:text-blue-600 transition">الواجبات</h3>
+                        <p className="relative z-10 text-3xl font-black text-blue-600">{assignments.length}</p><QrCode className="absolute -bottom-6 -left-6 text-blue-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
                     </motion.div>
                 </div>
                 <Leaderboard />
+                <PerformanceOverview examResults={examResults} content={content} />
             </div>
         )}
 
@@ -3635,17 +3829,27 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                              <PlayCircle className="mx-auto text-slate-300 w-16 h-16 mb-4"/>
                              <p className="text-slate-500 font-bold">لا توجد فيديوهات في هذا القسم حالياً.</p>
                          </div>
-                    ) : videos.filter(v => (v.videoSection || 'explanation') === videoSectionTab).map(v => (
-                        <div key={v.id} className="glass-card rounded-xl overflow-hidden relative group">
-                            <div className="h-48 bg-gradient-to-br from-slate-800 to-black flex items-center justify-center relative cursor-pointer" onClick={() => handlePremiumClick(() => setPlayingVideo(v))}>
+                    ) : videos.filter(v => (v.videoSection || 'explanation') === videoSectionTab).map(v => {
+                        const watchPercent = getVideoWatchPercent(v);
+                        return (
+                        <div key={v.id} className="glass-card rounded-xl overflow-hidden cursor-pointer relative group">
+                            <div className="h-48 bg-gradient-to-br from-slate-800 to-black flex items-center justify-center relative" onClick={() => handlePremiumClick(() => setPlayingVideo(v))}>
                                 {v.isPremium && !isPremium ? <Lock className="text-slate-400 w-16 h-16 opacity-80" /> : <PlayCircle className="text-white w-16 h-16 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/>}
                                 <span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(v.grade)}</span>
                                 {v.isPremium && <span className="absolute top-2 right-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-full font-bold flex items-center gap-1 shadow-md"><Crown size={12}/> VIP</span>}
-                                <span className="absolute bottom-2 right-2 bg-white/10 text-white text-xs px-2 py-1 rounded-full border border-white/10">{getVideoWatchPercent(v)}%</span>
                             </div>
-                            <div className="p-4 space-y-3"><h3 className={`font-bold text-lg ${v.isPremium && !isPremium ? 'text-slate-400' : 'text-slate-800'}`}>{v.title}</h3><div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden"><div className="bg-blue-600 h-2 rounded-full" style={{width: `${Math.min(100, getVideoWatchPercent(v))}%`}}></div></div>{v.linkedExamId && <button onClick={() => openLinkedExamFromVideo(v)} className={`w-full py-2 rounded-xl font-bold text-sm ${canOpenLinkedExam(v) ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-slate-100 text-slate-500'}`}>{canOpenLinkedExam(v) ? 'ابدأ امتحان الفيديو' : `شاهد 75% أولاً (${getVideoWatchPercent(v)}%)`}</button>}</div>
+                            <div className="p-4 space-y-3">
+                                <h3 className={`font-bold text-lg ${v.isPremium && !isPremium ? 'text-slate-400' : 'text-slate-800'}`}>{v.title}</h3>
+                                <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden"><div className="bg-emerald-500 h-2 rounded-full" style={{ width: `${watchPercent}%` }} /></div>
+                                <div className="flex items-center justify-between text-xs text-slate-500"><span>المشاهدة</span><span>{watchPercent}%</span></div>
+                                {v.linkedExamId && (
+                                  <button onClick={() => openLinkedExamFromVideo(v)} className={`w-full py-2 rounded-xl font-bold text-sm ${canOpenLinkedExam(v) ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+                                    {canOpenLinkedExam(v) ? 'فتح امتحان الفيديو' : 'يفتح عند 75% مشاهدة'}
+                                  </button>
+                                )}
+                            </div>
                         </div>
-                    ))}
+                    )})}
                 </div>
             </div>
         )}
@@ -3755,20 +3959,8 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
           </div>
         )}
 
-        {activeTab === 'assignments' && !isBannedExam && (<StudentAssignmentsPanel assignments={assignments} submissions={assignmentSubmissions} user={user} userData={userData} />)}
-
-        {activeTab === 'analytics' && (
-            <div className="space-y-6">
-                <PerformanceOverview examResults={examResults} content={content} />
-                <div className="glass-panel p-6 rounded-2xl">
-                    <h3 className="text-xl font-bold mb-4 text-slate-800 flex items-center gap-2"><Lamp/> التوصيات الذكية</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {getReviewRecommendations(examResults.filter(r => r.status === 'completed').reduce((acc, r) => { Object.entries(r.branchStats || {}).forEach(([k,v]) => { acc[k] = acc[k] || { earned:0, possible:0 }; acc[k].earned += safeNumber(v.earned); acc[k].possible += safeNumber(v.possible); }); return acc; }, {}), content).map((rec, idx) => (
-                            <div key={idx} className="bg-white border rounded-xl p-4 font-bold text-slate-700">{rec.title} — {rec.branch}</div>
-                        ))}
-                    </div>
-                </div>
-            </div>
+        {activeTab === 'assignments' && !isBannedExam && (
+            <StudentAssignmentsPanel assignments={assignments} submissions={assignmentSubmissions} user={user} userData={userData} />
         )}
 
         {activeTab === 'smart_hw_results' && !isBannedExam && (
