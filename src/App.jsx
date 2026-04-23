@@ -80,6 +80,23 @@ const getYouTubeID = (url) => {
     return (match && match[2].length === 11) ? match[2] : null;
 };
 
+const getQuestionsForExam = (examData) => {
+    if (!examData?.questions) return [];
+    const flat = [];
+    examData.questions.forEach((block) => {
+        const subQuestions = Array.isArray(block?.subQuestions) ? block.subQuestions : [];
+        subQuestions.forEach((q) => {
+            flat.push({
+                ...q,
+                blockText: block?.text || '',
+                branch: q?.branch || 'عام'
+            });
+        });
+    });
+    return flat;
+};
+
+
 const generatePDF = (type, data) => {
     if (!window.html2pdf) return alert("جاري تحميل نظام الطباعة... يرجى الانتظار ثوانٍ والمحاولة مرة أخرى.");
     const percentage = data.total > 0 ? Math.round((data.score / data.total) * 100) : 0;
@@ -1021,6 +1038,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
         studentId: user.uid,
         studentName: user.displayName,
         score: finalScore,
+        mcqScore: finalScore,
         total: mcqQuestions.length,
         answers,
         status: 'completed',
@@ -1648,6 +1666,8 @@ const AdminDashboard = ({ user }) => {
   const [examsList, setExamsList] = useState([]);
   const [examResults, setExamResults] = useState([]); 
   const [viewingResult, setViewingResult] = useState(null); 
+  const [essayScoreDrafts, setEssayScoreDrafts] = useState({});
+  const [essayMaxDrafts, setEssayMaxDrafts] = useState({});
   const [newAnnouncement, setNewAnnouncement] = useState(""); 
   const [showLeaderboard, setShowLeaderboard] = useState(true);
   const [announcements, setAnnouncements] = useState([]);
@@ -1831,6 +1851,67 @@ const AdminDashboard = ({ user }) => {
       alert("تم حذف جميع النتائج بنجاح.");
     }
   };
+
+  const getEssayDraftKey = (resultId, questionId) => `${resultId}__${questionId}`;
+
+  const handleSaveEssayGrade = async (resultDoc, question, questions) => {
+      const draftKey = getEssayDraftKey(resultDoc.id, question.id);
+      const rawScoreValue = essayScoreDrafts[draftKey] ?? resultDoc.essayScores?.[question.id] ?? '';
+      const rawMaxValue = essayMaxDrafts[draftKey] ?? resultDoc.essayMaxScores?.[question.id] ?? '';
+
+      const scoreValue = Number(rawScoreValue);
+      const maxValue = Number(rawMaxValue);
+
+      if (rawScoreValue === '' || rawMaxValue === '' || Number.isNaN(scoreValue) || Number.isNaN(maxValue)) {
+          return alert("من فضلك أدخل الدرجة والدرجة النهائية لهذا السؤال.");
+      }
+      if (maxValue <= 0) {
+          return alert("الدرجة النهائية يجب أن تكون أكبر من صفر.");
+      }
+      if (scoreValue < 0 || scoreValue > maxValue) {
+          return alert("درجة الطالب يجب أن تكون بين صفر والدرجة النهائية.");
+      }
+
+      const nextEssayScores = { ...(resultDoc.essayScores || {}), [question.id]: scoreValue };
+      const nextEssayMaxScores = { ...(resultDoc.essayMaxScores || {}), [question.id]: maxValue };
+
+      const mcqQuestions = questions.filter((q) => q.type !== 'essay');
+      const essayQuestions = questions.filter((q) => q.type === 'essay');
+
+      const fallbackMcqScore = mcqQuestions.reduce((sum, q) => (
+          resultDoc.answers?.[q.id] === q.correctIdx ? sum + 1 : sum
+      ), 0);
+      const mcqScore = typeof resultDoc.mcqScore === 'number' ? resultDoc.mcqScore : fallbackMcqScore;
+
+      const essayTotal = essayQuestions.reduce((sum, q) => sum + Number(nextEssayScores[q.id] || 0), 0);
+      const essayMaxTotal = essayQuestions.reduce((sum, q) => sum + Number(nextEssayMaxScores[q.id] || 0), 0);
+
+      const reviewedEssayCount = essayQuestions.filter((q) => (
+          nextEssayScores[q.id] !== undefined && nextEssayMaxScores[q.id] !== undefined
+      )).length;
+
+      const payload = {
+          essayScores: nextEssayScores,
+          essayMaxScores: nextEssayMaxScores,
+          reviewedEssayCount,
+          hasEssay: essayQuestions.length > 0,
+          score: mcqScore + essayTotal,
+          total: mcqQuestions.length + essayMaxTotal,
+          essayReviewedAt: serverTimestamp()
+      };
+
+      try {
+          await updateDoc(doc(db, 'exam_results', resultDoc.id), payload);
+          const nextViewingResult = { ...resultDoc, ...payload };
+          setViewingResult(nextViewingResult);
+          setExamResults((prev) => prev.map((res) => res.id === resultDoc.id ? nextViewingResult : res));
+          alert("تم حفظ تصحيح السؤال المقالي بنجاح.");
+      } catch (error) {
+          console.error("Error saving essay grade:", error);
+          alert("حدث خطأ أثناء حفظ التصحيح.");
+      }
+  };
+
 
   const sendWhatsAppToParent = (result) => {
       const student = activeUsersList.find(u => u.id === result.studentId);
@@ -2571,6 +2652,11 @@ const AdminDashboard = ({ user }) => {
                            })()}
                        </div>
                        <h3 className="font-bold text-lg mb-2">إجابات الطالب: {viewingResult.studentName}</h3>
+                       {viewingResult.hasEssay && (
+                           <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-xl font-bold text-sm">
+                               هذا الامتحان يحتوي على أسئلة مقالية، ويمكنك تصحيح كل سؤال يدويًا وتحديد الدرجة النهائية له من نفس الصفحة.
+                           </div>
+                       )}
                        <div className="space-y-4 mt-4">
                            {(() => {
                                const examData = examsList.find(e => e.id === viewingResult.examId);
@@ -2586,16 +2672,69 @@ const AdminDashboard = ({ user }) => {
                                                    <p className="font-bold mb-2 text-lg md:text-xl text-blue-900 font-sans pr-10">
                                                        {q.text.split('|').map((part, i) => (<React.Fragment key={i}>{part.trim()}{i !== q.text.split('|').length - 1 && <br />}</React.Fragment>))}
                                                    </p>
-                                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                                                       {q.options.map((opt, oIdx) => {
-                                                           const isCorrect = oIdx === q.correctIdx;
-                                                           const isSelected = viewingResult.answers[q.id] === oIdx;
-                                                           let style = "bg-gray-50 text-gray-500";
-                                                           if (isCorrect) style = "bg-green-100 text-green-800 border-green-500 border font-bold md:text-lg";
-                                                           if (isSelected && !isCorrect) style = "bg-red-100 text-red-800 border-red-500 border font-bold md:text-lg";
-                                                           return <div key={oIdx} className={`p-3 rounded font-sans font-bold ${style}`}>{opt}</div>
-                                                       })}
-                                                   </div>
+                                                   {q.type === 'essay' ? (
+                                                       <div className="space-y-4">
+                                                           <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                                                               <p className="font-bold text-slate-800 mb-2">إجابة الطالب النصية</p>
+                                                               <p className="whitespace-pre-wrap text-slate-700">
+                                                                   {typeof viewingResult.answers?.[q.id] === 'object'
+                                                                       ? (viewingResult.answers?.[q.id]?.text || 'لم يكتب الطالب إجابة نصية')
+                                                                       : (viewingResult.answers?.[q.id] || 'لم يكتب الطالب إجابة نصية')}
+                                                               </p>
+                                                           </div>
+                                                           {typeof viewingResult.answers?.[q.id] === 'object' && viewingResult.answers?.[q.id]?.image && (
+                                                               <div className="bg-white border border-slate-200 rounded-xl p-4">
+                                                                   <p className="font-bold text-slate-800 mb-3">الصورة المرفوعة</p>
+                                                                   <img src={viewingResult.answers[q.id].image} alt="إجابة مقالية" className="max-h-96 rounded-xl border border-slate-200 mx-auto" />
+                                                               </div>
+                                                           )}
+                                                           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                                                               <p className="font-bold text-amber-800 mb-3">تصحيح السؤال المقالي</p>
+                                                               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                                   <input
+                                                                       type="number"
+                                                                       min="0"
+                                                                       step="0.5"
+                                                                       className="border p-3 rounded-lg"
+                                                                       placeholder="درجة الطالب"
+                                                                       value={essayScoreDrafts[getEssayDraftKey(viewingResult.id, q.id)] ?? (viewingResult.essayScores?.[q.id] ?? '')}
+                                                                       onChange={(e) => setEssayScoreDrafts((prev) => ({ ...prev, [getEssayDraftKey(viewingResult.id, q.id)]: e.target.value }))}
+                                                                   />
+                                                                   <input
+                                                                       type="number"
+                                                                       min="0.5"
+                                                                       step="0.5"
+                                                                       className="border p-3 rounded-lg"
+                                                                       placeholder="من كام"
+                                                                       value={essayMaxDrafts[getEssayDraftKey(viewingResult.id, q.id)] ?? (viewingResult.essayMaxScores?.[q.id] ?? '')}
+                                                                       onChange={(e) => setEssayMaxDrafts((prev) => ({ ...prev, [getEssayDraftKey(viewingResult.id, q.id)]: e.target.value }))}
+                                                                   />
+                                                                   <button
+                                                                       onClick={() => handleSaveEssayGrade(viewingResult, q, questions)}
+                                                                       className="bg-amber-600 text-white px-4 py-3 rounded-lg font-bold hover:bg-amber-700 transition"
+                                                                   >
+                                                                       حفظ التصحيح
+                                                                   </button>
+                                                               </div>
+                                                               {(viewingResult.essayScores?.[q.id] !== undefined && viewingResult.essayMaxScores?.[q.id] !== undefined) && (
+                                                                   <p className="text-sm text-amber-900 mt-3 font-bold">
+                                                                       الدرجة المحفوظة: {viewingResult.essayScores[q.id]} / {viewingResult.essayMaxScores[q.id]}
+                                                                   </p>
+                                                               )}
+                                                           </div>
+                                                       </div>
+                                                   ) : (
+                                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                                                           {q.options.map((opt, oIdx) => {
+                                                               const isCorrect = oIdx === q.correctIdx;
+                                                               const isSelected = viewingResult.answers[q.id] === oIdx;
+                                                               let style = "bg-gray-50 text-gray-500";
+                                                               if (isCorrect) style = "bg-green-100 text-green-800 border-green-500 border font-bold md:text-lg";
+                                                               if (isSelected && !isCorrect) style = "bg-red-100 text-red-800 border-red-500 border font-bold md:text-lg";
+                                                               return <div key={oIdx} className={`p-3 rounded font-sans font-bold ${style}`}>{opt}</div>
+                                                           })}
+                                                       </div>
+                                                   )}
                                                </div>
                                            ))}
                                        </div>
@@ -2609,7 +2748,13 @@ const AdminDashboard = ({ user }) => {
                        <div className="min-w-[600px] space-y-2">
                            {examResults.map(res => (
                                <div key={res.id} className="flex justify-between items-center border p-3 rounded hover:bg-slate-50 transition bg-white/50">
-                                   <div><p className="font-bold">{res.studentName}</p><p className="text-xs text-slate-500">{res.status==='cheated'?'غش 🚫': res.status==='in_progress' ? 'قيد التنفيذ (لم يسلم) ⏳' : `درجة: ${res.score}/${res.total}`}</p></div>
+                                   <div>
+                                       <p className="font-bold flex items-center gap-2">
+                                           {res.studentName}
+                                           {res.hasEssay && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px] font-bold">مقالي</span>}
+                                       </p>
+                                       <p className="text-xs text-slate-500">{res.status==='cheated'?'غش 🚫': res.status==='in_progress' ? 'قيد التنفيذ (لم يسلم) ⏳' : `درجة: ${res.score}/${res.total}`}</p>
+                                   </div>
                                    <div className="flex gap-2">
                                       {res.status === 'completed' && <button onClick={()=>sendWhatsAppToParent(res)} className="bg-green-100 text-green-700 px-3 py-1 rounded text-xs font-bold flex items-center gap-1 hover:bg-green-200"><MessageCircle size={14}/><span className="hidden md:inline"> إرسال لولي الأمر</span></button>}
                                       <button onClick={()=>setViewingResult(res)} className="bg-blue-100 text-blue-600 px-3 py-1 rounded text-xs font-bold">التفاصيل</button>
