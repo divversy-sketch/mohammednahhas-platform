@@ -1334,6 +1334,19 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     setShowSubmitConfirm(false);
     const finalScore = calculateScore();
     const timeTaken = Math.round((Date.now() - startTime) / 1000);
+    const finalMetrics = calculateDetailedExamMetrics(exam, answers);
+    const finalBranchStats = Object.fromEntries(
+      Object.entries(finalMetrics.branchStats || {}).map(([branch, stat]) => [branch, {
+        earned: safeNumber(stat.earned, 0),
+        possible: safeNumber(stat.possible, 0),
+        answered: safeNumber(stat.answered, 0),
+        total: safeNumber(stat.total, 0),
+        correct: safeNumber(stat.correct, 0),
+        wrong: safeNumber(stat.wrong, 0),
+        essay: safeNumber(stat.essay, 0),
+        percentage: safeNumber(stat.possible, 0) > 0 ? Math.round((safeNumber(stat.earned, 0) / safeNumber(stat.possible, 0)) * 100) : 0
+      }])
+    );
 
     setScore(finalScore);
     setIsSubmitted(true);
@@ -1365,11 +1378,14 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
       const attemptRef = doc(db, 'exam_results', exam.attemptId);
       batch.set(attemptRef, {
         examId: exam.id,
+        examTitle: exam.title || '',
+        grade: exam.grade || '',
         studentId: user.uid,
-        studentName: user.displayName,
+        studentName: user.displayName || 'طالب',
         score: finalScore,
         mcqScore: finalScore,
         total: mcqQuestions.length,
+        totalPossible: finalMetrics.totalPossible || mcqQuestions.length,
         answers,
         status: 'completed',
         timeTaken,
@@ -1379,7 +1395,15 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
         startedFromVideo: !!exam.sourceVideoId,
         antiCheatWarnings,
         antiCheatLog,
-        percentage: mcqQuestions.length > 0 ? Math.round((finalScore / mcqQuestions.length) * 100) : 0,
+        branchStats: finalBranchStats,
+        weakBranches: Object.entries(finalBranchStats).map(([branch, stat]) => ({ branch, percentage: stat.percentage, wrong: stat.wrong, possible: stat.possible, earned: stat.earned })).sort((a,b) => a.percentage - b.percentage).slice(0, 3),
+        performanceAnalysis: {
+          percentage: finalMetrics.percentage || (mcqQuestions.length > 0 ? Math.round((finalScore / mcqQuestions.length) * 100) : 0),
+          totalScore: finalMetrics.totalScore || finalScore,
+          totalPossible: finalMetrics.totalPossible || mcqQuestions.length,
+          branchStats: finalBranchStats
+        },
+        percentage: finalMetrics.percentage || (mcqQuestions.length > 0 ? Math.round((finalScore / mcqQuestions.length) * 100) : 0),
         submittedAt: serverTimestamp()
       }, { merge: true });
     }
@@ -2364,49 +2388,77 @@ const AdminPerformanceAnalytics = ({ examResults = [], examsList = [], users = [
   const [studentSearch, setStudentSearch] = useState('');
 
   const analytics = useMemo(() => {
-    const examsById = Object.fromEntries(examsList.map(exam => [exam.id, exam]));
-    const usersById = Object.fromEntries(users.map(u => [u.id, u]));
+    const examsById = Object.fromEntries((examsList || []).map(exam => [exam.id, exam]));
+    const usersById = Object.fromEntries((users || []).map(u => [u.id, u]));
     const rowsByStudent = {};
     const branchTotals = {};
 
-    examResults
+    const getMetricsForResult = (result) => {
+      const savedBranchStats = result.performanceAnalysis?.branchStats || result.branchStats;
+      if (savedBranchStats && Object.keys(savedBranchStats).length > 0) {
+        const branchStats = Object.fromEntries(Object.entries(savedBranchStats).map(([branch, stat]) => [branch, {
+          earned: safeNumber(stat.earned, 0),
+          possible: safeNumber(stat.possible, 0),
+          answered: safeNumber(stat.answered, 0),
+          total: safeNumber(stat.total, 0),
+          correct: safeNumber(stat.correct, 0),
+          wrong: safeNumber(stat.wrong, 0),
+          essay: safeNumber(stat.essay, 0),
+        }]));
+        const totalScore = safeNumber(result.performanceAnalysis?.totalScore, Object.values(branchStats).reduce((a, s) => a + safeNumber(s.earned, 0), 0));
+        const totalPossible = safeNumber(result.performanceAnalysis?.totalPossible, Object.values(branchStats).reduce((a, s) => a + safeNumber(s.possible, 0), 0));
+        return { branchStats, totalScore, totalPossible, percentage: totalPossible > 0 ? Math.round((totalScore / totalPossible) * 100) : getResultPercentage(result) };
+      }
+
+      const exam = examsById[result.examId];
+      if (exam) return calculateDetailedExamMetrics(exam, result.answers || {}, result.essayGrades || result.essayScores || {});
+
+      return { branchStats: {}, totalScore: safeNumber(result.score, 0), totalPossible: safeNumber(result.totalPossible, safeNumber(result.total, 0)), percentage: getResultPercentage(result) };
+    };
+
+    (examResults || [])
       .filter(result => result.status === 'completed')
       .filter(result => selectedExamId === 'all' || result.examId === selectedExamId)
       .forEach(result => {
-        const exam = examsById[result.examId];
-        if (!exam) return;
+        const exam = examsById[result.examId] || {};
         const student = usersById[result.studentId] || {};
-        const grade = student.grade || exam.grade || result.grade;
+        const grade = result.grade || student.grade || exam.grade || 'غير محدد';
         if (adminGradeFilter !== 'all' && grade !== adminGradeFilter) return;
-        const metrics = calculateDetailedExamMetrics(exam, result.answers || {}, result.essayGrades || result.essayScores || {});
+
+        const metrics = getMetricsForResult(result);
         const key = result.studentId || result.studentName || result.id;
         if (!rowsByStudent[key]) {
           rowsByStudent[key] = {
             studentId: result.studentId,
-            studentName: result.studentName || student.name || 'طالب',
+            studentName: result.studentName || student.name || student.displayName || 'طالب',
             grade,
             examsCount: 0,
             totalScore: 0,
             totalPossible: 0,
-            branches: {}
+            branches: {},
+            lastExamTitle: result.examTitle || exam.title || 'امتحان'
           };
         }
         const row = rowsByStudent[key];
         row.examsCount += 1;
         row.totalScore += safeNumber(metrics.totalScore, safeNumber(result.score, 0));
-        row.totalPossible += safeNumber(metrics.totalPossible, safeNumber(result.total, 0));
+        row.totalPossible += safeNumber(metrics.totalPossible, safeNumber(result.totalPossible, safeNumber(result.total, 0)));
+        row.lastExamTitle = result.examTitle || exam.title || row.lastExamTitle;
+
         Object.entries(metrics.branchStats || {}).forEach(([branch, stat]) => {
-          row.branches[branch] = row.branches[branch] || { earned: 0, possible: 0, exams: 0, wrong: 0, total: 0 };
+          row.branches[branch] = row.branches[branch] || { earned: 0, possible: 0, exams: 0, wrong: 0, total: 0, correct: 0 };
           row.branches[branch].earned += safeNumber(stat.earned, 0);
           row.branches[branch].possible += safeNumber(stat.possible, 0);
           row.branches[branch].wrong += safeNumber(stat.wrong, 0);
+          row.branches[branch].correct += safeNumber(stat.correct, 0);
           row.branches[branch].total += safeNumber(stat.total, 0);
           row.branches[branch].exams += 1;
 
-          branchTotals[branch] = branchTotals[branch] || { earned: 0, possible: 0, wrong: 0, total: 0, students: new Set() };
+          branchTotals[branch] = branchTotals[branch] || { earned: 0, possible: 0, wrong: 0, correct: 0, total: 0, students: new Set() };
           branchTotals[branch].earned += safeNumber(stat.earned, 0);
           branchTotals[branch].possible += safeNumber(stat.possible, 0);
           branchTotals[branch].wrong += safeNumber(stat.wrong, 0);
+          branchTotals[branch].correct += safeNumber(stat.correct, 0);
           branchTotals[branch].total += safeNumber(stat.total, 0);
           branchTotals[branch].students.add(key);
         });
@@ -2431,6 +2483,7 @@ const AdminPerformanceAnalytics = ({ examResults = [], examsList = [], users = [
       branch,
       pct: stat.possible > 0 ? Math.round((stat.earned / stat.possible) * 100) : 0,
       wrong: stat.wrong,
+      correct: stat.correct,
       total: stat.total,
       studentsCount: stat.students.size
     })).sort((a,b) => a.pct - b.pct);
@@ -2451,7 +2504,7 @@ const AdminPerformanceAnalytics = ({ examResults = [], examsList = [], users = [
           <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
             <select className="border p-3 rounded-xl bg-white" value={selectedExamId} onChange={e=>setSelectedExamId(e.target.value)}>
               <option value="all">كل الامتحانات</option>
-              {examsList.map(exam => <option key={exam.id} value={exam.id}>{exam.title}</option>)}
+              {(examsList || []).map(exam => <option key={exam.id} value={exam.id}>{exam.title}</option>)}
             </select>
             <input className="border p-3 rounded-xl" placeholder="بحث باسم الطالب" value={studentSearch} onChange={e=>setStudentSearch(e.target.value)} />
           </div>
@@ -2472,7 +2525,7 @@ const AdminPerformanceAnalytics = ({ examResults = [], examsList = [], users = [
               <p className="text-xs text-slate-500 mt-2">{item.studentsCount} طالب • {item.wrong} خطأ</p>
             </div>
           ))}
-          {analytics.branchRows.length === 0 && <p className="text-slate-500 col-span-full text-center py-8">لا توجد نتائج كافية للتحليل بعد.</p>}
+          {analytics.branchRows.length === 0 && <p className="text-slate-500 col-span-full text-center py-8">لا توجد نتائج كافية للتحليل بعد. تأكد أن الطالب سلّم امتحانًا يحتوي على فروع مثل النحو/البلاغة/الأدب.</p>}
         </div>
       </div>
 
@@ -2484,7 +2537,7 @@ const AdminPerformanceAnalytics = ({ examResults = [], examsList = [], users = [
               <div className="flex flex-col md:flex-row justify-between gap-4">
                 <div>
                   <p className="font-black text-slate-800 text-lg">{row.studentName}</p>
-                  <p className="text-xs text-slate-500">{getGradeLabel(row.grade)} • {row.examsCount} امتحان</p>
+                  <p className="text-xs text-slate-500">{getGradeLabel(row.grade)} • {row.examsCount} امتحان • آخر امتحان: {row.lastExamTitle}</p>
                 </div>
                 <div className="text-center md:text-left">
                   <span className={`inline-flex px-4 py-2 rounded-full font-black border ${getGradeBadge(row.average).tone}`}>{row.average}% - {getGradeBadge(row.average).text}</span>
@@ -2493,9 +2546,9 @@ const AdminPerformanceAnalytics = ({ examResults = [], examsList = [], users = [
               <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
                 {row.weakestBranches.map(branch => (
                   <div key={branch.branch} className="bg-slate-50 rounded-xl p-3 border">
-                    <div className="flex justify-between text-sm font-bold"><span>{branch.branch}</span><span className={branch.pct < 50 ? 'text-red-600' : 'text-amber-600'}>{branch.pct}%</span></div>
-                    <div className="w-full h-2 bg-white rounded-full overflow-hidden mt-2"><div className="h-2 bg-red-400" style={{width: `${branch.pct}%`}} /></div>
-                    <p className="text-xs text-slate-500 mt-1">أخطاء: {branch.wrong}</p>
+                    <div className="flex justify-between text-sm font-bold"><span>{branch.branch}</span><span className={branch.pct < 50 ? 'text-red-600' : branch.pct < 70 ? 'text-amber-600' : 'text-emerald-600'}>{branch.pct}%</span></div>
+                    <div className="w-full h-2 bg-white rounded-full overflow-hidden mt-2"><div className={branch.pct < 50 ? 'h-2 bg-red-400' : branch.pct < 70 ? 'h-2 bg-amber-400' : 'h-2 bg-emerald-400'} style={{width: `${branch.pct}%`}} /></div>
+                    <p className="text-xs text-slate-500 mt-1">أخطاء: {branch.wrong} • صحيح: {branch.correct}</p>
                   </div>
                 ))}
                 {row.weakestBranches.length === 0 && <p className="text-sm text-slate-400">لا توجد فروع كافية لهذا الطالب.</p>}
@@ -3928,6 +3981,19 @@ const AdminDashboard = ({ user }) => {
 };
 
 const StudentDashboard = ({ user, userData, installPrompt }) => {
+  userData = userData || {
+    name: user?.displayName || user?.email?.split('@')?.[0] || 'طالب',
+    email: user?.email || '',
+    grade: '1sec',
+    phone: '',
+    parentPhone: '',
+    role: 'student',
+    status: 'pending',
+    subscriptionStatus: 'free',
+    subscriptionExpiry: null
+  };
+  userData.name = userData.name || user?.displayName || user?.email?.split('@')?.[0] || 'طالب';
+  userData.grade = userData.grade || '1sec';
   const [activeTab, setActiveTab] = useState('home');
   const [videoSectionTab, setVideoSectionTab] = useState('explanation');
   const [mobileMenu, setMobileMenu] = useState(false);
@@ -4279,7 +4345,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                 <Announcements />
                 <PWAInstallBox installPrompt={installPrompt} />
                 <h2 className="text-3xl font-bold text-slate-800 font-arabic flex flex-wrap items-center gap-2">
-                    منور يا <span className="text-amber-600">{userData.name.split(' ')[0]}</span> 👋 
+                    منور يا <span className="text-amber-600">{String(userData.name || 'طالب').split(' ')[0]}</span> 👋 
                     <span className="text-sm font-normal text-slate-500 bg-slate-200 px-3 py-1 rounded-full font-sans">{getGradeLabel(userData.grade)}</span>
                     {isPremium ? (
                         <span className="bg-amber-100 text-amber-700 text-xs px-3 py-1 rounded-full font-bold flex items-center gap-1 shadow-sm"><Crown size={14}/> حساب VIP</span>
@@ -4758,6 +4824,11 @@ const AuthPage = ({ onBack }) => {
     setLoading(true);
 
     if (isRegister) {
+        if (!formData.name.trim()) {
+            alert("من فضلك اكتب اسم الطالب.");
+            setLoading(false);
+            return;
+        }
         const validation = validateEgyptianPhones(formData.phone, formData.parentPhone);
         if (!validation.ok) {
             alert(validation.message);
@@ -4878,7 +4949,45 @@ export default function App() {
       if (u) {
         setLoading(true);
         const unsubUser = onSnapshot(doc(db, 'users', u.uid), (docSnap) => {
-          if (docSnap.exists()) { setUserData(docSnap.data()); }
+          if (docSnap.exists()) {
+            const dbUser = docSnap.data();
+            setUserData({
+              name: dbUser?.name || u.displayName || u.email?.split('@')?.[0] || 'طالب',
+              email: dbUser?.email || u.email || '',
+              grade: dbUser?.grade || '1sec',
+              phone: dbUser?.phone || '',
+              parentPhone: dbUser?.parentPhone || '',
+              role: dbUser?.role || 'student',
+              status: dbUser?.status || 'pending',
+              subscriptionStatus: dbUser?.subscriptionStatus || 'free',
+              subscriptionExpiry: dbUser?.subscriptionExpiry || null,
+              ...dbUser
+            });
+          } else {
+            setUserData({
+              name: u.displayName || u.email?.split('@')?.[0] || 'طالب',
+              email: u.email || '',
+              grade: '1sec',
+              phone: '',
+              parentPhone: '',
+              role: 'student',
+              status: 'pending',
+              subscriptionStatus: 'free',
+              subscriptionExpiry: null
+            });
+          }
+          setLoading(false);
+        }, (error) => {
+          console.warn('user profile listener blocked:', error?.message);
+          setUserData({
+            name: u.displayName || u.email?.split('@')?.[0] || 'طالب',
+            email: u.email || '',
+            grade: '1sec',
+            role: 'student',
+            status: 'pending',
+            subscriptionStatus: 'free',
+            subscriptionExpiry: null
+          });
           setLoading(false);
         });
         return () => unsubUser();
