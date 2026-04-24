@@ -230,6 +230,13 @@ const DesignSystemLoader = () => {
       .watermark-video { position: absolute; pointer-events: none; z-index: 9999; color: rgba(255, 255, 255, 0.4); font-weight: 900; font-size: 1.5rem; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); white-space: nowrap; animation: moveWatermark 25s linear infinite; }
       @keyframes moveWatermark { 0% { top: 10%; left: 10%; transform: rotate(-5deg); } 25% { top: 80%; left: 50%; transform: rotate(5deg); } 50% { top: 30%; left: 80%; transform: rotate(-5deg); } 75% { top: 70%; left: 10%; transform: rotate(5deg); } 100% { top: 10%; left: 10%; transform: rotate(-5deg); } }
       .no-select { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
+      @media (max-width: 768px) {
+        button, .mobile-touch-target { min-height: 44px; }
+        input, select, textarea { font-size: 16px !important; }
+        .glass-card:hover { transform: none; }
+        .student-mobile-grid { grid-template-columns: 1fr !important; }
+        .exam-mobile-actions { position: sticky; bottom: 0; background: rgba(255,255,255,0.96); backdrop-filter: blur(8px); padding: 0.75rem; border-top: 1px solid #e2e8f0; z-index: 30; }
+      }
     `}</style>
   );
 };
@@ -1165,13 +1172,13 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   }, []);
 
   const handleCheatingRef = useRef();
-  handleCheatingRef.current = async () => {
+  handleCheatingRef.current = async (eventType = 'focus_or_visibility_lost') => {
     const { isSubmitted, isCheating } = stateRefs.current;
     if (fileDialogBypassRef.current || isReviewMode || isSubmitted || isCheating) return;
 
     const nextWarning = antiCheatWarningsRef.current + 1;
     antiCheatWarningsRef.current = nextWarning;
-    const event = { type: 'focus_or_visibility_lost', warningNumber: nextWarning, at: new Date().toISOString() };
+    const event = { type: eventType, warningNumber: nextWarning, at: new Date().toISOString() };
     const nextLog = [...antiCheatLog, event];
     setAntiCheatWarnings(nextWarning);
     setAntiCheatLog(nextLog);
@@ -1219,20 +1226,47 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     const handleAntiCheat = () => {
       const { showSubmitConfirm, isSubmitted } = stateRefs.current;
       if (fileDialogBypassRef.current) return;
-      if (!showSubmitConfirm && !isSubmitted) handleCheatingRef.current();
+      if (!showSubmitConfirm && !isSubmitted) handleCheatingRef.current('focus_or_visibility_lost');
     };
 
     const handleVisibilityChange = () => {
       if (document.hidden && !fileDialogBypassRef.current) handleAntiCheat();
     };
 
-    const blockContextMenu = (e) => e.preventDefault();
+    const blockContextMenu = (e) => {
+      e.preventDefault();
+      if (!stateRefs.current.isSubmitted) handleCheatingRef.current('right_click_attempt');
+    };
+
+    const handleBlockedClipboard = (e) => {
+      if (fileDialogBypassRef.current || stateRefs.current.isSubmitted) return;
+      e.preventDefault();
+      handleCheatingRef.current(e.type === 'paste' ? 'paste_attempt' : 'copy_or_cut_attempt');
+    };
+
+    const handleExamKeyDown = (e) => {
+      if (fileDialogBypassRef.current || stateRefs.current.isSubmitted) return;
+      const key = String(e.key || '').toLowerCase();
+      if (key === 'printscreen' || ((e.ctrlKey || e.metaKey) && ['c','v','x','p','s','u'].includes(key))) {
+        e.preventDefault();
+        handleCheatingRef.current('blocked_keyboard_shortcut');
+      }
+    };
+
+    const handleFullScreenExit = () => {
+      if (!document.fullscreenElement && !stateRefs.current.isSubmitted) handleCheatingRef.current('fullscreen_exit');
+    };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("blur", handleAntiCheat);
     window.addEventListener("pagehide", handleAntiCheat);
     document.addEventListener('contextmenu', blockContextMenu);
+    document.addEventListener('copy', handleBlockedClipboard);
+    document.addEventListener('cut', handleBlockedClipboard);
+    document.addEventListener('paste', handleBlockedClipboard);
+    document.addEventListener('keydown', handleExamKeyDown);
+    document.addEventListener('fullscreenchange', handleFullScreenExit);
 
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
@@ -1240,6 +1274,11 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
       window.removeEventListener("blur", handleAntiCheat);
       window.removeEventListener("pagehide", handleAntiCheat);
       document.removeEventListener('contextmenu', blockContextMenu);
+      document.removeEventListener('copy', handleBlockedClipboard);
+      document.removeEventListener('cut', handleBlockedClipboard);
+      document.removeEventListener('paste', handleBlockedClipboard);
+      document.removeEventListener('keydown', handleExamKeyDown);
+      document.removeEventListener('fullscreenchange', handleFullScreenExit);
     };
   }, [isReviewMode, mcqQuestions.length, exam.attemptId, exam.id, exam.duration, startTime, user.uid, user.displayName]);
 
@@ -1336,6 +1375,8 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
         timeTaken,
         totalTime: exam.duration,
         hasEssay: essayQuestions.length > 0,
+        sourceVideoId: exam.sourceVideoId || null,
+        startedFromVideo: !!exam.sourceVideoId,
         antiCheatWarnings,
         antiCheatLog,
         percentage: mcqQuestions.length > 0 ? Math.round((finalScore / mcqQuestions.length) * 100) : 0,
@@ -1476,6 +1517,13 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
               <p className="text-4xl md:text-5xl font-black text-amber-50">{essayAnswered}/{essayQuestions.length}</p>
             </div>
           </div>
+
+          {!isSubmitted && (
+            <div className="mb-6 bg-slate-800/60 text-slate-200 p-4 rounded-2xl border border-slate-700 text-center font-bold flex flex-col md:flex-row items-center justify-between gap-3">
+              <span>وضع الأمان مفعل: يتم تسجيل الخروج من الصفحة، النسخ/اللصق، كليك يمين، والخروج من ملء الشاشة.</span>
+              <button onClick={() => document.documentElement.requestFullscreen?.().catch(() => {})} className="bg-amber-500 text-slate-900 px-4 py-2 rounded-xl font-black">تفعيل ملء الشاشة</button>
+            </div>
+          )}
 
           {antiCheatWarnings > 0 && !isSubmitted && (
             <div className="mb-6 bg-amber-900/30 text-amber-300 p-4 rounded-2xl border border-amber-700 text-center font-bold">
@@ -2310,6 +2358,157 @@ const StudentAssignmentsPanel = ({ assignments = [], submissions = [], user, use
 };
 
 
+
+const AdminPerformanceAnalytics = ({ examResults = [], examsList = [], users = [], adminGradeFilter = 'all' }) => {
+  const [selectedExamId, setSelectedExamId] = useState('all');
+  const [studentSearch, setStudentSearch] = useState('');
+
+  const analytics = useMemo(() => {
+    const examsById = Object.fromEntries(examsList.map(exam => [exam.id, exam]));
+    const usersById = Object.fromEntries(users.map(u => [u.id, u]));
+    const rowsByStudent = {};
+    const branchTotals = {};
+
+    examResults
+      .filter(result => result.status === 'completed')
+      .filter(result => selectedExamId === 'all' || result.examId === selectedExamId)
+      .forEach(result => {
+        const exam = examsById[result.examId];
+        if (!exam) return;
+        const student = usersById[result.studentId] || {};
+        const grade = student.grade || exam.grade || result.grade;
+        if (adminGradeFilter !== 'all' && grade !== adminGradeFilter) return;
+        const metrics = calculateDetailedExamMetrics(exam, result.answers || {}, result.essayGrades || result.essayScores || {});
+        const key = result.studentId || result.studentName || result.id;
+        if (!rowsByStudent[key]) {
+          rowsByStudent[key] = {
+            studentId: result.studentId,
+            studentName: result.studentName || student.name || 'طالب',
+            grade,
+            examsCount: 0,
+            totalScore: 0,
+            totalPossible: 0,
+            branches: {}
+          };
+        }
+        const row = rowsByStudent[key];
+        row.examsCount += 1;
+        row.totalScore += safeNumber(metrics.totalScore, safeNumber(result.score, 0));
+        row.totalPossible += safeNumber(metrics.totalPossible, safeNumber(result.total, 0));
+        Object.entries(metrics.branchStats || {}).forEach(([branch, stat]) => {
+          row.branches[branch] = row.branches[branch] || { earned: 0, possible: 0, exams: 0, wrong: 0, total: 0 };
+          row.branches[branch].earned += safeNumber(stat.earned, 0);
+          row.branches[branch].possible += safeNumber(stat.possible, 0);
+          row.branches[branch].wrong += safeNumber(stat.wrong, 0);
+          row.branches[branch].total += safeNumber(stat.total, 0);
+          row.branches[branch].exams += 1;
+
+          branchTotals[branch] = branchTotals[branch] || { earned: 0, possible: 0, wrong: 0, total: 0, students: new Set() };
+          branchTotals[branch].earned += safeNumber(stat.earned, 0);
+          branchTotals[branch].possible += safeNumber(stat.possible, 0);
+          branchTotals[branch].wrong += safeNumber(stat.wrong, 0);
+          branchTotals[branch].total += safeNumber(stat.total, 0);
+          branchTotals[branch].students.add(key);
+        });
+      });
+
+    const studentRows = Object.values(rowsByStudent).map(row => {
+      const branchRows = Object.entries(row.branches).map(([branch, stat]) => ({
+        branch,
+        pct: stat.possible > 0 ? Math.round((stat.earned / stat.possible) * 100) : 0,
+        ...stat
+      })).sort((a,b) => a.pct - b.pct);
+      return {
+        ...row,
+        average: row.totalPossible > 0 ? Math.round((row.totalScore / row.totalPossible) * 100) : 0,
+        weakestBranches: branchRows.slice(0, 3),
+        strongestBranch: [...branchRows].sort((a,b) => b.pct - a.pct)[0]
+      };
+    }).filter(row => !studentSearch.trim() || row.studentName.toLowerCase().includes(studentSearch.trim().toLowerCase()))
+      .sort((a,b) => a.average - b.average);
+
+    const branchRows = Object.entries(branchTotals).map(([branch, stat]) => ({
+      branch,
+      pct: stat.possible > 0 ? Math.round((stat.earned / stat.possible) * 100) : 0,
+      wrong: stat.wrong,
+      total: stat.total,
+      studentsCount: stat.students.size
+    })).sort((a,b) => a.pct - b.pct);
+
+    return { studentRows, branchRows };
+  }, [examResults, examsList, users, adminGradeFilter, selectedExamId, studentSearch]);
+
+  const riskStudents = analytics.studentRows.filter(row => row.average < 70).slice(0, 8);
+
+  return (
+    <div className="space-y-6">
+      <div className="glass-panel p-5 md:p-6 rounded-2xl">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
+          <div>
+            <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2"><BarChart3 className="text-blue-600"/> تحليل أداء الطلاب والفروع الضعيفة</h2>
+            <p className="text-sm text-slate-500 mt-1">اعرف بسرعة الطالب ناقص في أي فرع، وأي فرع محتاج شرح أو واجب إضافي.</p>
+          </div>
+          <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
+            <select className="border p-3 rounded-xl bg-white" value={selectedExamId} onChange={e=>setSelectedExamId(e.target.value)}>
+              <option value="all">كل الامتحانات</option>
+              {examsList.map(exam => <option key={exam.id} value={exam.id}>{exam.title}</option>)}
+            </select>
+            <input className="border p-3 rounded-xl" placeholder="بحث باسم الطالب" value={studentSearch} onChange={e=>setStudentSearch(e.target.value)} />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4"><p className="text-blue-600 text-sm font-bold">طلاب تم تحليلهم</p><p className="text-3xl font-black text-blue-900">{analytics.studentRows.length}</p></div>
+          <div className="bg-red-50 border border-red-100 rounded-2xl p-4"><p className="text-red-600 text-sm font-bold">طلاب يحتاجون متابعة</p><p className="text-3xl font-black text-red-900">{riskStudents.length}</p></div>
+          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4"><p className="text-amber-700 text-sm font-bold">أضعف فرع عام</p><p className="text-xl font-black text-amber-900">{analytics.branchRows[0]?.branch || 'لا يوجد'}</p></div>
+        </div>
+
+        <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><Target size={18}/> أضعف الفروع على مستوى الطلاب</h3>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
+          {analytics.branchRows.slice(0, 8).map(item => (
+            <div key={item.branch} className="bg-white border rounded-2xl p-4">
+              <div className="flex justify-between items-center mb-2"><span className="font-black text-slate-800">{item.branch}</span><span className={`text-sm font-bold px-2 py-1 rounded-full ${item.pct < 50 ? 'bg-red-100 text-red-700' : item.pct < 70 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{item.pct}%</span></div>
+              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-2 bg-blue-500 rounded-full" style={{width: `${item.pct}%`}} /></div>
+              <p className="text-xs text-slate-500 mt-2">{item.studentsCount} طالب • {item.wrong} خطأ</p>
+            </div>
+          ))}
+          {analytics.branchRows.length === 0 && <p className="text-slate-500 col-span-full text-center py-8">لا توجد نتائج كافية للتحليل بعد.</p>}
+        </div>
+      </div>
+
+      <div className="glass-panel p-5 md:p-6 rounded-2xl">
+        <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><Users size={18}/> تقرير كل طالب</h3>
+        <div className="space-y-3 max-h-[650px] overflow-y-auto">
+          {analytics.studentRows.map(row => (
+            <div key={row.studentId || row.studentName} className="bg-white border rounded-2xl p-4">
+              <div className="flex flex-col md:flex-row justify-between gap-4">
+                <div>
+                  <p className="font-black text-slate-800 text-lg">{row.studentName}</p>
+                  <p className="text-xs text-slate-500">{getGradeLabel(row.grade)} • {row.examsCount} امتحان</p>
+                </div>
+                <div className="text-center md:text-left">
+                  <span className={`inline-flex px-4 py-2 rounded-full font-black border ${getGradeBadge(row.average).tone}`}>{row.average}% - {getGradeBadge(row.average).text}</span>
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+                {row.weakestBranches.map(branch => (
+                  <div key={branch.branch} className="bg-slate-50 rounded-xl p-3 border">
+                    <div className="flex justify-between text-sm font-bold"><span>{branch.branch}</span><span className={branch.pct < 50 ? 'text-red-600' : 'text-amber-600'}>{branch.pct}%</span></div>
+                    <div className="w-full h-2 bg-white rounded-full overflow-hidden mt-2"><div className="h-2 bg-red-400" style={{width: `${branch.pct}%`}} /></div>
+                    <p className="text-xs text-slate-500 mt-1">أخطاء: {branch.wrong}</p>
+                  </div>
+                ))}
+                {row.weakestBranches.length === 0 && <p className="text-sm text-slate-400">لا توجد فروع كافية لهذا الطالب.</p>}
+              </div>
+            </div>
+          ))}
+          {analytics.studentRows.length === 0 && <p className="text-slate-500 text-center py-8">لا توجد بيانات مطابقة للفلاتر الحالية.</p>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const AdminDashboard = ({ user }) => {
   const [activeTab, setActiveTab] = useState('users'); 
   const [adminGradeFilter, setAdminGradeFilter] = useState('all'); 
@@ -2331,6 +2530,7 @@ const AdminDashboard = ({ user }) => {
   const [essayScoreDrafts, setEssayScoreDrafts] = useState({});
   const [essayMaxDrafts, setEssayMaxDrafts] = useState({});
   const [newAnnouncement, setNewAnnouncement] = useState(""); 
+  const [newStudentNotification, setNewStudentNotification] = useState({ text: '', grade: 'all' }); 
   const [showLeaderboard, setShowLeaderboard] = useState(true);
   const [announcements, setAnnouncements] = useState([]);
   
@@ -2630,6 +2830,19 @@ const AdminDashboard = ({ user }) => {
       await addDoc(collection(db, 'notifications'), { text: `تنبيه هام: ${newAnnouncement}`, grade: 'all', createdAt: serverTimestamp() });
       setNewAnnouncement("");
       alert("تم نشر الإعلان");
+  };
+
+  const handleSendStudentNotification = async (e) => {
+      e?.preventDefault?.();
+      if(!newStudentNotification.text.trim()) return alert('اكتب نص الإشعار أولاً');
+      await addDoc(collection(db, 'notifications'), {
+        text: newStudentNotification.text.trim(),
+        grade: newStudentNotification.grade || 'all',
+        createdAt: serverTimestamp(),
+        source: 'admin_manual'
+      });
+      setNewStudentNotification({ text: '', grade: newStudentNotification.grade || 'all' });
+      alert('تم إرسال الإشعار للطلاب');
   };
 
   const handleUpdateUser = async (e) => { 
@@ -3043,9 +3256,9 @@ const AdminDashboard = ({ user }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-4 md:p-6 relative z-10">
         <div className="glass-panel p-4 rounded-xl h-fit space-y-2 flex md:flex-col overflow-x-auto md:overflow-x-visible whitespace-nowrap scrollbar-hide">
-          {['users', 'all_users', 'subscriptions', 'question_bank', 'assignments', 'exams', 'results', 'smart_hw', 'live', 'content', 'messages', 'auto_reply', 'quotes', 'settings'].map(tab => (
+          {['users', 'all_users', 'subscriptions', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'smart_hw', 'live', 'content', 'notifications', 'messages', 'auto_reply', 'quotes', 'settings'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 transition-all ${activeTab===tab?'bg-amber-100 text-amber-700 shadow-sm border-b-4 md:border-b-0 md:border-r-4 border-amber-500':'hover:bg-slate-50 text-slate-600'}`}>
-              {tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : 'الإعدادات'}
+              {tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : 'الإعدادات'}
             </button>
           ))}
         </div>
@@ -3318,6 +3531,8 @@ const AdminDashboard = ({ user }) => {
                   </div>
               </div>
           )}
+
+          {activeTab === 'analytics' && <AdminPerformanceAnalytics examResults={examResults} examsList={examsList} users={activeUsersList} adminGradeFilter={adminGradeFilter} />}
 
           {activeTab === 'results' && (
              <div className="glass-panel p-4 md:p-6 rounded-xl">
@@ -3607,6 +3822,30 @@ const AdminDashboard = ({ user }) => {
               </div>
           )}
 
+
+          {activeTab === 'notifications' && (
+            <div className="glass-panel p-4 md:p-6 rounded-2xl space-y-6">
+              <div>
+                <h2 className="text-xl font-black text-slate-800 flex items-center gap-2"><Bell className="text-amber-600"/> إرسال إشعار للطلاب</h2>
+                <p className="text-sm text-slate-500 mt-1">الإشعار سيظهر داخل منصة الطالب، ولو الطالب مفعّل إشعارات المتصفح سيظهر له تنبيه أيضًا.</p>
+              </div>
+              <form onSubmit={handleSendStudentNotification} className="grid gap-4 bg-white border rounded-2xl p-4">
+                <select className="border p-3 rounded-xl" value={newStudentNotification.grade} onChange={e=>setNewStudentNotification({...newStudentNotification, grade:e.target.value})}>
+                  <option value="all">كل الطلاب</option>
+                  <GradeOptions />
+                </select>
+                <textarea className="border p-3 rounded-xl min-h-[120px]" placeholder="اكتب نص الإشعار... مثال: تم فتح امتحان فيديو جديد" value={newStudentNotification.text} onChange={e=>setNewStudentNotification({...newStudentNotification, text:e.target.value})} />
+                <button className="bg-amber-600 text-white py-3 rounded-xl font-bold hover:bg-amber-700 flex items-center justify-center gap-2"><Send size={18}/> إرسال الإشعار</button>
+              </form>
+              <div className="bg-slate-50 border rounded-2xl p-4">
+                <h3 className="font-bold text-slate-700 mb-3">آخر الإشعارات</h3>
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {announcements.length === 0 ? <p className="text-slate-400 text-sm">لا توجد تنبيهات عامة بعد.</p> : announcements.slice(0, 10).map(item => <div key={item.id} className="bg-white border rounded-xl p-3 text-sm text-slate-700">{item.text}</div>)}
+                </div>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'messages' && <div className="glass-panel p-4 md:p-6 rounded-xl"><h2 className="font-bold mb-4 font-arabic text-xl">الرسائل</h2>{messagesList.map(m=><div key={m.id} className="border-b p-4 bg-slate-50 mb-3 rounded-lg relative"><button onClick={()=>handleDeleteMessage(m.id)} className="absolute top-2 left-2 text-red-400 hover:bg-red-50 p-1 rounded"><Trash2 size={16}/></button><div className="mb-2"><p className="font-bold text-amber-800">{m.senderName} <span className="text-xs text-slate-500">({m.sender})</span></p><p className="text-sm text-slate-400">{m.createdAt?.toDate?m.createdAt.toDate().toLocaleString():'الآن'}</p></div><p className="text-slate-800 bg-white p-3 rounded-lg border border-slate-200 mb-3 text-sm md:text-base">{m.text}</p>{m.adminReply?<div className="bg-green-50 p-3 rounded-lg border border-green-200 text-sm"><span className="font-bold text-green-700">ردك: </span>{m.adminReply}</div>:<div className="flex flex-col md:flex-row gap-2"><input className="flex-1 border p-2 rounded text-sm w-full" placeholder="اكتب ردك..." value={replyTexts[m.id]||""} onChange={e=>setReplyTexts({...replyTexts,[m.id]:e.target.value})}/><button onClick={()=>handleReplyMessage(m.id)} className="bg-blue-600 text-white px-4 py-2 rounded text-sm w-full md:w-auto flex justify-center"><Reply size={16}/></button></div>}</div>)}</div>}
            
           {activeTab === 'auto_reply' && (
@@ -3860,7 +4099,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
       }
       const linkedExam = exams.find(e => e.id === videoItem.linkedExamId);
       if (!linkedExam) return alert('الامتحان المرتبط بهذا الفيديو غير موجود حالياً أو لم يتم نشره.');
-      startExamWithCode(linkedExam);
+      startExamWithCode(linkedExam, { skipCode: true, sourceVideoId: videoItem.id });
   };
 
   const handleVideoProgress = (videoId, percent, watchedSeconds) => {
@@ -3925,7 +4164,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   const htmls = content.filter(c => c.type === 'html');
   const interactiveExams = content.filter(c => c.type === 'interactive_exam');
 
-  const startExamWithCode = async (exam) => {
+  const startExamWithCode = async (exam, options = {}) => {
     if (isBannedExam) return alert("أنت محظور من دخول الامتحانات.");
     const previousResult = examResults.find(r => r.examId === exam.id);
     if (previousResult) {
@@ -3936,11 +4175,21 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
     const now = new Date(); const start = new Date(exam.startTime); const end = new Date(exam.endTime);
     if (now < start) return alert(`الامتحان لم يبدأ بعد. موعد البدء: ${start.toLocaleString('ar-EG')}`);
     if (now > end) return alert("عفواً، انتهى وقت الامتحان.");
-    const code = prompt("أدخل كود الامتحان:");
-    if (code === exam.accessCode) {
+    const code = options.skipCode ? exam.accessCode : prompt("أدخل كود الامتحان:");
+    if (options.skipCode || code === exam.accessCode) {
         try {
-            const attemptRef = await addDoc(collection(db, 'exam_results'), { examId: exam.id, studentId: user.uid, studentName: user.displayName, score: 0, total: 0, status: 'in_progress', submittedAt: serverTimestamp() });
-            setActiveExam({ ...exam, attemptId: attemptRef.id });
+            const attemptRef = await addDoc(collection(db, 'exam_results'), {
+              examId: exam.id,
+              studentId: user.uid,
+              studentName: user.displayName,
+              score: 0,
+              total: 0,
+              status: 'in_progress',
+              sourceVideoId: options.sourceVideoId || null,
+              startedFromVideo: !!options.skipCode,
+              submittedAt: serverTimestamp()
+            });
+            setActiveExam({ ...exam, attemptId: attemptRef.id, sourceVideoId: options.sourceVideoId || null });
         } catch (error) { console.error("Error creating attempt record:", error); alert("حدث خطأ أثناء بدء الامتحان. حاول مرة أخرى."); }
     } else { alert("كود خاطئ!"); }
   };
