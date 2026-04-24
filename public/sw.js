@@ -1,8 +1,11 @@
-// هذا الملف يخبر المتصفح أن المنصة يمكن أن تعمل كتطبيق
-self.addEventListener('install', (e) => {
-  console.log('[Service Worker] Installed');
+self.addEventListener('install', event => {
+  self.skipWaiting();
 });
 
-self.addEventListener('fetch', (e) => {
-  // ترك هذا فارغاً يكفي لتفعيل زر التثبيت
+self.addEventListener('activate', event => {
+  console.log('Service Worker Activated');
+});
+
+self.addEventListener('fetch', event => {
+  // simple pass-through
 });

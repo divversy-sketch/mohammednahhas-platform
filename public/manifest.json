@@ -3,17 +3,17 @@
   "name": "منصة النحاس التعليمية",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/3449/3449750.png",
+      "src": "/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/3449/3449750.png",
+      "src": "/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
   "display": "standalone",
   "theme_color": "#d97706",
   "background_color": "#f8fafc"
