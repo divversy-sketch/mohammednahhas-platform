@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getMessaging, getToken, onMessage, isSupported as isMessagingSupported } from 'firebase/messaging';
 import { 
   getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, 
   signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail 
@@ -41,6 +42,74 @@ try {
 } catch (error) { 
   console.error("Firebase Initialization Error:", error); 
 }
+
+const FIREBASE_VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY || '';
+
+const getBrowserMessaging = async () => {
+  try {
+    if (!app) return null;
+    const supported = await isMessagingSupported();
+    if (!supported) return null;
+    return getMessaging(app);
+  } catch (error) {
+    console.warn('Firebase Messaging is not available:', error?.message);
+    return null;
+  }
+};
+
+const savePushTokenForUser = async (user, userData = {}) => {
+  if (!user?.uid) throw new Error('لا يوجد مستخدم مسجل');
+  if (!('Notification' in window)) throw new Error('المتصفح لا يدعم الإشعارات');
+  if (!FIREBASE_VAPID_KEY) throw new Error('مفتاح VAPID غير موجود في إعدادات Vercel');
+
+  const permission = await Notification.requestPermission();
+  if (permission !== 'granted') throw new Error('لم يتم السماح بالإشعارات');
+
+  const messaging = await getBrowserMessaging();
+  if (!messaging) throw new Error('خدمة إشعارات Firebase غير متاحة على هذا الجهاز');
+
+  const registration = await navigator.serviceWorker.ready;
+  const token = await getToken(messaging, {
+    vapidKey: FIREBASE_VAPID_KEY,
+    serviceWorkerRegistration: registration
+  });
+
+  if (!token) throw new Error('تعذر إنشاء رمز الإشعارات');
+
+  const tokenId = `${user.uid}_${token.slice(-18).replace(/[^a-zA-Z0-9]/g, '')}`;
+  await setDoc(doc(db, 'push_tokens', tokenId), {
+    token,
+    userId: user.uid,
+    userName: user.displayName || userData.name || 'طالب',
+    email: user.email || userData.email || '',
+    grade: userData.grade || 'all',
+    platform: navigator.platform || '',
+    userAgent: navigator.userAgent || '',
+    enabled: true,
+    updatedAt: serverTimestamp(),
+    createdAt: serverTimestamp()
+  }, { merge: true });
+
+  return token;
+};
+
+const setupForegroundPushListener = async (onPayload) => {
+  const messaging = await getBrowserMessaging();
+  if (!messaging) return () => {};
+  return onMessage(messaging, (payload) => {
+    onPayload?.(payload);
+    const title = payload?.notification?.title || payload?.data?.title || 'تنبيه جديد';
+    const body = payload?.notification?.body || payload?.data?.body || payload?.data?.text || '';
+    try {
+      if (Notification.permission === 'granted') {
+        new Notification(title, { body, icon: '/icons/icon-192.png', badge: '/icons/icon-192.png' });
+      }
+    } catch (error) {
+      console.warn('Foreground notification failed:', error?.message);
+    }
+  });
+};
+
 
 const formatWatchTime = (totalSeconds) => {
     if (!totalSeconds || totalSeconds < 0) return 'أقل من ثانية';
@@ -2591,7 +2660,7 @@ const AdminDashboard = ({ user }) => {
   const [essayScoreDrafts, setEssayScoreDrafts] = useState({});
   const [essayMaxDrafts, setEssayMaxDrafts] = useState({});
   const [newAnnouncement, setNewAnnouncement] = useState(""); 
-  const [newStudentNotification, setNewStudentNotification] = useState({ text: '', grade: 'all' }); 
+  const [newStudentNotification, setNewStudentNotification] = useState({ title: '', text: '', grade: 'all', clickUrl: '/' }); 
   const [showLeaderboard, setShowLeaderboard] = useState(true);
   const [announcements, setAnnouncements] = useState([]);
   
@@ -2896,14 +2965,19 @@ const AdminDashboard = ({ user }) => {
   const handleSendStudentNotification = async (e) => {
       e?.preventDefault?.();
       if(!newStudentNotification.text.trim()) return alert('اكتب نص الإشعار أولاً');
+      const title = newStudentNotification.title?.trim() || 'تنبيه من منصة النحاس';
       await addDoc(collection(db, 'notifications'), {
+        title,
         text: newStudentNotification.text.trim(),
+        body: newStudentNotification.text.trim(),
         grade: newStudentNotification.grade || 'all',
+        clickUrl: newStudentNotification.clickUrl || '/',
+        pushStatus: 'pending',
         createdAt: serverTimestamp(),
         source: 'admin_manual'
       });
-      setNewStudentNotification({ text: '', grade: newStudentNotification.grade || 'all' });
-      alert('تم إرسال الإشعار للطلاب');
+      setNewStudentNotification({ title: '', text: '', grade: newStudentNotification.grade || 'all', clickUrl: '/' });
+      alert('تم حفظ الإشعار وسيتم إرساله كتطبيق/موبايل للطلاب المفعّلين للإشعارات بعد تفعيل Cloud Function');
   };
 
   const handleUpdateUser = async (e) => { 
@@ -3891,11 +3965,18 @@ const AdminDashboard = ({ user }) => {
                 <p className="text-sm text-slate-500 mt-1">الإشعار سيظهر داخل منصة الطالب، ولو الطالب مفعّل إشعارات المتصفح سيظهر له تنبيه أيضًا.</p>
               </div>
               <form onSubmit={handleSendStudentNotification} className="grid gap-4 bg-white border rounded-2xl p-4">
-                <select className="border p-3 rounded-xl" value={newStudentNotification.grade} onChange={e=>setNewStudentNotification({...newStudentNotification, grade:e.target.value})}>
-                  <option value="all">كل الطلاب</option>
-                  <GradeOptions />
-                </select>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <input className="border p-3 rounded-xl" placeholder="عنوان الإشعار مثل: امتحان جديد" value={newStudentNotification.title} onChange={e=>setNewStudentNotification({...newStudentNotification, title:e.target.value})} />
+                  <select className="border p-3 rounded-xl" value={newStudentNotification.grade} onChange={e=>setNewStudentNotification({...newStudentNotification, grade:e.target.value})}>
+                    <option value="all">كل الطلاب</option>
+                    <GradeOptions />
+                  </select>
+                </div>
                 <textarea className="border p-3 rounded-xl min-h-[120px]" placeholder="اكتب نص الإشعار... مثال: تم فتح امتحان فيديو جديد" value={newStudentNotification.text} onChange={e=>setNewStudentNotification({...newStudentNotification, text:e.target.value})} />
+                <input className="border p-3 rounded-xl" placeholder="رابط الفتح داخل المنصة / اتركه /" value={newStudentNotification.clickUrl} onChange={e=>setNewStudentNotification({...newStudentNotification, clickUrl:e.target.value})} />
+                <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-xl text-sm font-bold">
+                  ملاحظة: الإشعار سيظهر داخل المنصة فورًا، وسيصل Push للموبايل والكمبيوتر للطلاب الذين فعّلوا الإشعارات بعد تركيب Cloud Function.
+                </div>
                 <button className="bg-amber-600 text-white py-3 rounded-xl font-bold hover:bg-amber-700 flex items-center justify-center gap-2"><Send size={18}/> إرسال الإشعار</button>
               </form>
               <div className="bg-slate-50 border rounded-2xl p-4">
@@ -4022,6 +4103,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [hasNewNotif, setHasNewNotif] = useState(false);
+  const [pushStatus, setPushStatus] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported');
   const [editFormData, setEditFormData] = useState({ name: '', phone: '', parentPhone: '', grade: '' });
   const [showFocusMode, setShowFocusMode] = useState(false);
   const [scanningHwId, setScanningHwId] = useState(null);
@@ -4074,9 +4156,13 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
         const rows = s.docs.map(d => ({id: d.id, ...d.data()})); rows.sort((a,b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)); setMistakes(rows);
     }, error => { console.warn('student_mistakes listener blocked:', error?.message); setMistakes([]); });
     const unsubNotif = onSnapshot(query(collection(db, 'notifications'), where('grade', 'in', ['all', userData.grade]), limit(10)), s => {
-        const newNotifs = s.docs.map(d => d.data()).sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+        const newNotifs = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
         setNotifications(newNotifs);
-        if(newNotifs.length > 0) { setHasNewNotif(true); if(newNotifs[0].text) sendSystemNotification("تنبيه جديد 🔔", newNotifs[0].text); }
+        if(newNotifs.length > 0) {
+          setHasNewNotif(true);
+          const latest = newNotifs[0];
+          if(latest.text) sendSystemNotification(latest.title || "تنبيه جديد 🔔", latest.text);
+        }
     }, error => { console.warn('notifications listener blocked:', error?.message); setNotifications([]); });
 
     const unsubAssignments = onSnapshot(query(collection(db, 'assignments'), where('grade', '==', userData.grade)), s => {
@@ -4099,6 +4185,31 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
     return () => { unsubContent(); unsubLive(); unsubExams(); unsubResults(); unsubHwResults(); unsubMistakes(); unsubNotif(); unsubAssignments(); unsubAssignmentSubs(); unsubVideoViews(); };
   }, [userData, user]);
+
+
+  useEffect(() => {
+    let unsubscribe = null;
+    setupForegroundPushListener((payload) => {
+      const title = payload?.notification?.title || payload?.data?.title || 'تنبيه جديد';
+      const body = payload?.notification?.body || payload?.data?.body || payload?.data?.text || '';
+      setNotifications(prev => [{ id: `push_${Date.now()}`, title, text: body, createdAt: { toDate: () => new Date() } }, ...prev].slice(0, 20));
+      setHasNewNotif(true);
+    }).then(unsub => { unsubscribe = unsub; });
+    return () => { if (typeof unsubscribe === 'function') unsubscribe(); };
+  }, []);
+
+  const enableMobilePushNotifications = async () => {
+    try {
+      setPushStatus('loading');
+      await savePushTokenForUser(user, userData);
+      setPushStatus('granted');
+      alert('تم تفعيل إشعارات الموبايل والكمبيوتر بنجاح ✅');
+    } catch (error) {
+      console.error('Push enable failed:', error);
+      setPushStatus(typeof Notification !== 'undefined' ? Notification.permission : 'denied');
+      alert(error?.message || 'تعذر تفعيل الإشعارات');
+    }
+  };
 
   const isPremium = userData?.subscriptionStatus === 'premium' && (!userData.subscriptionExpiry || userData.subscriptionExpiry.toDate() > new Date());
   
@@ -4326,11 +4437,25 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
             </div>
             {showNotifications && (
                 <div className="absolute top-12 left-0 w-80 glass-panel rounded-xl shadow-xl border border-white/50 p-4 z-50 max-h-96 overflow-y-auto">
-                    <h3 className="font-bold mb-3 text-sm text-slate-500">الإشعارات</h3>
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                        <h3 className="font-bold text-sm text-slate-500">الإشعارات</h3>
+                        <span className={`text-[10px] px-2 py-1 rounded-full font-bold ${pushStatus === 'granted' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                          {pushStatus === 'granted' ? 'Push مفعل' : 'Push غير مفعل'}
+                        </span>
+                    </div>
+                    {pushStatus !== 'granted' && (
+                      <button onClick={enableMobilePushNotifications} className="w-full mb-3 bg-amber-600 text-white py-2 rounded-xl text-xs font-bold hover:bg-amber-700">
+                        تفعيل إشعارات الموبايل والكمبيوتر
+                      </button>
+                    )}
                     {notifications.length === 0 ? <p className="text-xs text-slate-400">لا توجد إشعارات جديدة</p> : (
                         <div className="space-y-3">
                             {notifications.map((n, i) => (
-                                <div key={i} className="text-sm bg-slate-50/50 p-2 rounded border-l-4 border-amber-500">{n.text}<div className="text-[10px] text-slate-400 mt-1">{n.createdAt?.toDate().toLocaleDateString()}</div></div>
+                                <div key={n.id || i} className="text-sm bg-slate-50/50 p-2 rounded border-l-4 border-amber-500">
+                                  {n.title && <div className="font-black text-slate-800 mb-1">{n.title}</div>}
+                                  <div>{n.text || n.body}</div>
+                                  <div className="text-[10px] text-slate-400 mt-1">{n.createdAt?.toDate?.().toLocaleDateString?.() || 'الآن'}</div>
+                                </div>
                             ))}
                         </div>
                     )}
