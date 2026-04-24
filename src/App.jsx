@@ -1396,7 +1396,15 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
         antiCheatWarnings,
         antiCheatLog,
         branchStats: finalBranchStats,
-        weakBranches: Object.entries(finalBranchStats).map(([branch, stat]) => ({ branch, percentage: stat.percentage, wrong: stat.wrong, possible: stat.possible, earned: stat.earned })).sort((a,b) => a.percentage - b.percentage).slice(0, 3),
+        weakBranches: Object.entries(finalBranchStats).map(([branch, stat]) => ({
+          branch,
+          percentage: stat.percentage,
+          wrong: stat.wrong,
+          correct: stat.correct,
+          total: stat.total,
+          possible: stat.possible,
+          earned: stat.earned
+        })).sort((a,b) => a.percentage - b.percentage),
         performanceAnalysis: {
           percentage: finalMetrics.percentage || (mcqQuestions.length > 0 ? Math.round((finalScore / mcqQuestions.length) * 100) : 0),
           totalScore: finalMetrics.totalScore || finalScore,
@@ -2473,7 +2481,7 @@ const AdminPerformanceAnalytics = ({ examResults = [], examsList = [], users = [
       return {
         ...row,
         average: row.totalPossible > 0 ? Math.round((row.totalScore / row.totalPossible) * 100) : 0,
-        weakestBranches: branchRows.slice(0, 3),
+        weakestBranches: branchRows,
         strongestBranch: [...branchRows].sort((a,b) => b.pct - a.pct)[0]
       };
     }).filter(row => !studentSearch.trim() || row.studentName.toLowerCase().includes(studentSearch.trim().toLowerCase()))
@@ -2543,7 +2551,7 @@ const AdminPerformanceAnalytics = ({ examResults = [], examsList = [], users = [
                   <span className={`inline-flex px-4 py-2 rounded-full font-black border ${getGradeBadge(row.average).tone}`}>{row.average}% - {getGradeBadge(row.average).text}</span>
                 </div>
               </div>
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {row.weakestBranches.map(branch => (
                   <div key={branch.branch} className="bg-slate-50 rounded-xl p-3 border">
                     <div className="flex justify-between text-sm font-bold"><span>{branch.branch}</span><span className={branch.pct < 50 ? 'text-red-600' : branch.pct < 70 ? 'text-amber-600' : 'text-emerald-600'}>{branch.pct}%</span></div>
