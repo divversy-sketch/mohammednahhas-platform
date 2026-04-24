@@ -288,6 +288,8 @@ const safeNumber = (value, fallback = 0) => {
     return Number.isFinite(num) ? num : fallback;
 };
 
+const VIDEO_EXAM_UNLOCK_PERCENT = 75;
+
 const getQuestionMaxScore = (q) => safeNumber(q?.maxScore ?? q?.mark ?? q?.points, q?.type === 'essay' ? 10 : 1);
 
 const extractAllQuestions = (exam) => (exam?.questions || []).flatMap(block =>
@@ -2689,10 +2691,21 @@ const AdminDashboard = ({ user }) => {
         ? newContent.allowedEmails.split(',').map(email => email.trim()) 
         : [];
 
+      if (!newContent.title.trim()) return alert('اكتب عنوان المحتوى أولاً.');
+      if (!newContent.url.trim()) return alert('أضف رابط المحتوى أو ارفع ملفاً.');
+      if (newContent.type === 'video' && newContent.linkedExamId && safeNumber(newContent.estimatedDurationMinutes, 0) <= 0) {
+          return alert('مهم: أدخل مدة الفيديو بالدقائق حتى يتم فتح امتحان الفيديو بعد مشاهدة 75% بدقة، خصوصًا مع YouTube.');
+      }
+
       const contentData = { 
           ...newContent, 
-          file: newContent.url, 
+          title: newContent.title.trim(),
+          url: newContent.url.trim(),
+          file: newContent.url.trim(), 
           allowedEmails: allowedEmailsArray,
+          linkedExamId: newContent.type === 'video' ? (newContent.linkedExamId || '') : '',
+          estimatedDurationMinutes: newContent.type === 'video' ? safeNumber(newContent.estimatedDurationMinutes, 0) : 0,
+          videoExamUnlockPercent: newContent.type === 'video' && newContent.linkedExamId ? VIDEO_EXAM_UNLOCK_PERCENT : 0,
           createdAt: new Date() 
       };
       
@@ -3524,6 +3537,41 @@ const AdminDashboard = ({ user }) => {
                           <select className="border p-3 rounded flex-1" value={newContent.grade} onChange={e=>setNewContent({...newContent, grade:e.target.value})}><GradeOptions/></select>
                       </div>
 
+                      {newContent.type === 'video' && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-blue-50 border border-blue-200 rounded-xl p-4">
+                              <div>
+                                  <label className="block text-sm font-bold text-blue-800 mb-1">ربط الفيديو بامتحان</label>
+                                  <select
+                                      className="border p-3 rounded w-full bg-white"
+                                      value={newContent.linkedExamId || ''}
+                                      onChange={(e) => setNewContent({ ...newContent, linkedExamId: e.target.value })}
+                                  >
+                                      <option value="">بدون امتحان مرتبط</option>
+                                      {examsList
+                                          .filter(exam => !newContent.grade || exam.grade === newContent.grade)
+                                          .map(exam => (
+                                              <option key={exam.id} value={exam.id}>{exam.title}</option>
+                                          ))}
+                                  </select>
+                              </div>
+                              <div>
+                                  <label className="block text-sm font-bold text-blue-800 mb-1">مدة الفيديو بالدقائق</label>
+                                  <input
+                                      type="number"
+                                      min="1"
+                                      className="border p-3 rounded w-full bg-white"
+                                      placeholder="مثال: 30"
+                                      value={newContent.estimatedDurationMinutes || ''}
+                                      onChange={(e) => setNewContent({ ...newContent, estimatedDurationMinutes: e.target.value })}
+                                  />
+                              </div>
+                              <div className="md:col-span-2 bg-white/70 border border-blue-100 rounded-xl p-3 text-xs text-blue-800 font-bold leading-relaxed">
+                                  عند ربط الفيديو بامتحان لن يظهر زر دخول الامتحان للطالب إلا بعد مشاهدة {VIDEO_EXAM_UNLOCK_PERCENT}% من الفيديو.
+                                  مع فيديوهات YouTube يجب إدخال مدة الفيديو يدويًا حتى يتم حساب النسبة بشكل صحيح.
+                              </div>
+                          </div>
+                      )}
+
                       <div className="flex items-center bg-amber-50 border border-amber-200 rounded-lg p-3">
                           <input type="checkbox" id="vipContent" className="w-5 h-5 ml-3" checked={newContent.isPremium} onChange={e=>setNewContent({...newContent, isPremium:e.target.checked})} />
                           <label htmlFor="vipContent" className="font-bold text-amber-800 text-sm flex items-center gap-1 cursor-pointer"><Crown size={18}/> محتوى VIP (مغلق ومخصص للمشتركين فقط)</label>
@@ -3801,16 +3849,17 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
   const canOpenLinkedExam = (videoItem) => {
       if (!videoItem?.linkedExamId) return false;
-      return getVideoWatchPercent(videoItem) >= 75;
+      return getVideoWatchPercent(videoItem) >= VIDEO_EXAM_UNLOCK_PERCENT;
   };
 
   const openLinkedExamFromVideo = (videoItem) => {
       if (!videoItem?.linkedExamId) return;
-      if (!canOpenLinkedExam(videoItem)) {
-          return alert('امتحان الفيديو سيفتح بعد مشاهدة 75% من الفيديو.');
+      const watchPercent = getVideoWatchPercent(videoItem);
+      if (watchPercent < VIDEO_EXAM_UNLOCK_PERCENT) {
+          return alert(`امتحان الفيديو سيفتح بعد مشاهدة ${VIDEO_EXAM_UNLOCK_PERCENT}% من الفيديو. شاهدت الآن ${watchPercent}%.`);
       }
       const linkedExam = exams.find(e => e.id === videoItem.linkedExamId);
-      if (!linkedExam) return alert('الامتحان المرتبط بهذا الفيديو غير موجود حالياً.');
+      if (!linkedExam) return alert('الامتحان المرتبط بهذا الفيديو غير موجود حالياً أو لم يتم نشره.');
       startExamWithCode(linkedExam);
   };
 
@@ -4191,9 +4240,28 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                                 <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden"><div className="bg-emerald-500 h-2 rounded-full" style={{ width: `${watchPercent}%` }} /></div>
                                 <div className="flex items-center justify-between text-xs text-slate-500"><span>المشاهدة</span><span>{watchPercent}%</span></div>
                                 {v.linkedExamId && (
-                                  <button onClick={() => openLinkedExamFromVideo(v)} className={`w-full py-2 rounded-xl font-bold text-sm ${canOpenLinkedExam(v) ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
-                                    {canOpenLinkedExam(v) ? 'فتح امتحان الفيديو' : 'يفتح عند 75% مشاهدة'}
-                                  </button>
+                                  <div className="space-y-2">
+                                    {watchPercent >= VIDEO_EXAM_UNLOCK_PERCENT ? (
+                                      <button
+                                        onClick={() => openLinkedExamFromVideo(v)}
+                                        className="w-full py-2 rounded-xl font-bold text-sm bg-emerald-600 text-white hover:bg-emerald-700 shadow"
+                                      >
+                                        ابدأ امتحان الفيديو الآن
+                                      </button>
+                                    ) : (
+                                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
+                                        <p className="text-xs font-bold text-slate-600">
+                                          شاهد {Math.max(0, VIDEO_EXAM_UNLOCK_PERCENT - watchPercent)}% إضافية لفتح امتحان الفيديو
+                                        </p>
+                                        <button
+                                          onClick={() => handlePremiumClick(() => setPlayingVideo(v))}
+                                          className="mt-2 w-full py-2 rounded-xl font-bold text-sm bg-blue-100 text-blue-700 hover:bg-blue-200"
+                                        >
+                                          استكمال مشاهدة الفيديو
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
                                 )}
                             </div>
                         </div>
