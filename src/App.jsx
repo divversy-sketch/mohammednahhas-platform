@@ -5404,6 +5404,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   userData.name = userData.name || user?.displayName || user?.email?.split('@')?.[0] || 'طالب';
   userData.grade = userData.grade || '1sec';
   const [activeTab, setActiveTab] = useState('home');
+  const [showStudentMessageComposer, setShowStudentMessageComposer] = useState(false);
   const [videoSectionTab, setVideoSectionTab] = useState('explanation');
   const [mobileMenu, setMobileMenu] = useState(false);
   const [content, setContent] = useState([]);
@@ -5777,6 +5778,36 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   return (
     <div className="bg-slate-50 relative font-['Cairo'] min-h-screen block" dir="rtl">
       <StudentAdminMessagePopup user={user} userData={userData} />
+
+      <button
+        onClick={() => setShowStudentMessageComposer(true)}
+        className="fixed bottom-24 left-5 z-[9998] bg-amber-600 text-white px-4 py-3 rounded-full shadow-2xl hover:bg-amber-700 transition flex items-center gap-2 font-black"
+        title="مراسلة الإدارة"
+      >
+        <MessageCircle size={22}/>
+        <span className="hidden md:inline">مراسلة الإدارة</span>
+      </button>
+
+      {showStudentMessageComposer && (
+        <div className="fixed inset-0 z-[99999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto border-t-8 border-amber-500">
+            <div className="bg-slate-900 text-white p-4 flex items-center justify-between">
+              <h2 className="font-black text-xl flex items-center gap-2"><MessageCircle className="text-amber-400"/> مراسلة الإدارة</h2>
+              <button onClick={() => setShowStudentMessageComposer(false)} className="bg-white/10 hover:bg-white/20 rounded-full p-2">
+                <X size={22}/>
+              </button>
+            </div>
+            <div className="p-5">
+              <StudentMessagesPanel
+                user={user}
+                userData={userData}
+                compact={true}
+                onAfterReply={() => {}}
+              />
+            </div>
+          </div>
+        </div>
+      )}
       {playingVideo && <SecureVideoPlayer video={playingVideo} user={user} userName={userData.name} onClose={() => setPlayingVideo(null)} onProgress={handleVideoProgress} />}
       {playingHtml && <InteractiveViewer content={playingHtml} user={userData} onClose={() => setPlayingHtml(null)} />}
       <FloatingArabicBackground />
