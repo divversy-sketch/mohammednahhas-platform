@@ -149,6 +149,38 @@ const getYouTubeID = (url) => {
     return (match && match[2].length === 11) ? match[2] : null;
 };
 
+
+const renderBracketHighlightedText = (text = '') => {
+    const source = String(text || '');
+    if (!source) return null;
+
+    return source.split(/(\[[^\]]+\])/g).map((part, idx) => {
+        const isHighlighted = /^\[[^\]]+\]$/.test(part);
+        const cleanPart = isHighlighted ? part.slice(1, -1) : part;
+
+        const renderedLines = cleanPart.split('\n').map((line, lineIdx, arr) => (
+            <React.Fragment key={`${idx}-${lineIdx}`}>
+                {line}
+                {lineIdx !== arr.length - 1 && <br />}
+            </React.Fragment>
+        ));
+
+        if (!isHighlighted) {
+            return <React.Fragment key={idx}>{renderedLines}</React.Fragment>;
+        }
+
+        return (
+            <mark
+                key={idx}
+                className="bg-yellow-200 text-yellow-950 px-2 py-1 rounded-lg border border-yellow-400 shadow-sm font-black"
+                title="موضع السؤال داخل القطعة"
+            >
+                {renderedLines}
+            </mark>
+        );
+    });
+};
+
 const getQuestionsForExam = (examData) => {
     if (!examData?.questions) return [];
     const flat = [];
@@ -1836,7 +1868,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
           {currentQObj?.blockText && currentQObj.blockText.trim().length > 0 && (
             <div className="flex-1 w-full bg-white p-6 md:p-10 overflow-y-auto rounded-3xl shadow-sm border border-slate-200">
               <h3 className="font-bold text-blue-900 mb-6 flex items-center gap-2 text-xl border-b border-blue-100 pb-4 font-['Cairo']"><FileText size={24} /> نص المراجعة / القراءة:</h3>
-              <p className="whitespace-pre-line leading-loose text-lg md:text-xl font-bold text-slate-700 font-['Cairo']">{currentQObj.blockText}</p>
+              <div className="leading-loose text-lg md:text-xl font-bold text-slate-700 font-['Cairo']">{renderBracketHighlightedText(currentQObj.blockText)}</div>
             </div>
           )}
 
