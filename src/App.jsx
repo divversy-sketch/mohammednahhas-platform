@@ -2291,6 +2291,8 @@ const AdminStudentMessaging = ({ users = [], adminGradeFilter = 'all' }) => {
       lastMessage: textValue.trim(),
       lastSender: 'admin',
       unreadForStudent: increment(1),
+      forcePopup: true,
+      needsStudentAction: true,
       updatedAt: serverTimestamp()
     }, { merge: true });
 
@@ -2420,6 +2422,8 @@ const StudentMessagesPanel = ({ user, userData, compact = false, onAfterReply = 
     try {
       await setDoc(doc(db, 'student_chats', studentId), {
         unreadForStudent: 0,
+        forcePopup: false,
+        needsStudentAction: false,
         lastStudentSeenAt: serverTimestamp()
       }, { merge: true });
       if (onAfterReply) onAfterReply();
@@ -2440,6 +2444,8 @@ const StudentMessagesPanel = ({ user, userData, compact = false, onAfterReply = 
         lastSender: 'student',
         unreadForAdmin: increment(1),
         unreadForStudent: 0,
+        forcePopup: false,
+        needsStudentAction: false,
         lastStudentSeenAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       }, { merge: true });
@@ -2508,7 +2514,7 @@ const StudentAdminMessagePopup = ({ user, userData }) => {
   const hasUnreadAdminMessage =
     chatState &&
     chatState.lastSender === 'admin' &&
-    safeNumber(chatState.unreadForStudent, 0) > 0 &&
+    (safeNumber(chatState.unreadForStudent, 0) > 0 || chatState.forcePopup || chatState.needsStudentAction) &&
     !dismissed;
 
   if (!hasUnreadAdminMessage) return null;
@@ -5438,7 +5444,6 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
       window.addEventListener('popstate', handlePopState);
       return () => window.removeEventListener('popstate', handlePopState);
 
-      <StudentAdminMessagePopup user={user} userData={userData} />
   }, [activeTab]);
 
   useEffect(() => {
@@ -5771,6 +5776,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
   return (
     <div className="bg-slate-50 relative font-['Cairo'] min-h-screen block" dir="rtl">
+      <StudentAdminMessagePopup user={user} userData={userData} />
       {playingVideo && <SecureVideoPlayer video={playingVideo} user={user} userName={userData.name} onClose={() => setPlayingVideo(null)} onProgress={handleVideoProgress} />}
       {playingHtml && <InteractiveViewer content={playingHtml} user={userData} onClose={() => setPlayingHtml(null)} />}
       <FloatingArabicBackground />
