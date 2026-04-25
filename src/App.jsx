@@ -5223,8 +5223,8 @@ const AdminDashboard = ({ user }) => {
             </div>
           )}
 
-          {activeTab === 'messages' && <div className="glass-panel p-4 md:p-6 rounded-xl"><h2 className="font-bold mb-4 font-arabic text-xl">الرسائل</h2>{messagesList.map(m=><div key={m.id} className="border-b p-4 bg-slate-50 mb-3 rounded-lg relative"><button onClick={()=>handleDeleteMessage(m.id)} className="absolute top-2 left-2 text-red-400 hover:bg-red-50 p-1 rounded"><Trash2 size={16}/></button><div className="mb-2"><p className="font-bold text-amber-800">{m.senderName} <span className="text-xs text-slate-500">({m.sender})</span></p><p className="text-sm text-slate-400">{m.createdAt?.toDate?m.createdAt.toDate().toLocaleString():'الآن'}</p></div><p className="text-slate-800 bg-white p-3 rounded-lg border border-slate-200 mb-3 text-sm md:text-base">{m.text}</p>{m.adminReply?<div className="bg-green-50 p-3 rounded-lg border border-green-200 text-sm"><span className="font-bold text-green-700">ردك: </span>{m.adminReply}</div>:<div className="flex flex-col md:flex-row gap-2"><input className="flex-1 border p-2 rounded text-sm w-full" placeholder="اكتب ردك..." value={replyTexts[m.id]||""} onChange={e=>setReplyTexts({...replyTexts,[m.id]:e.target.value})}/><button onClick={()=>handleReplyMessage(m.id)} className="bg-blue-600 text-white px-4 py-2 rounded text-sm w-full md:w-auto flex justify-center"><Reply size={16}/></button></div>}</div>)}</div>}
-           
+          {activeTab === 'messages' && <StudentMessagesPanel user={user} userData={userData} />}
+
           {activeTab === 'auto_reply' && (
               <div className="glass-panel p-4 md:p-6 rounded-xl">
                   <h2 className="font-bold mb-4 flex items-center gap-2 font-arabic text-xl"><Bot /> إعدادات الرد الآلي</h2>
