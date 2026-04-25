@@ -4495,11 +4495,10 @@ const AdminDashboard = ({ user }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-4 md:p-6 relative z-10">
         <div className="glass-panel p-4 rounded-xl h-fit space-y-2 flex md:flex-col overflow-x-auto md:overflow-x-visible whitespace-nowrap scrollbar-hide">
-          {['dashboard', 'users', 'all_users', 'subscriptions', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'smart_hw', 'live', 'content', 'notifications', 'messages', 'auto_reply', 'quotes', 'settings'].map(tab => (
+          {['dashboard', 'users', 'all_users', 'subscriptions', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'smart_hw', 'live', 'content', 'notifications', 'student-messages', 'messages', 'auto_reply', 'quotes', 'settings'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 transition-all ${activeTab===tab?'bg-amber-100 text-amber-700 shadow-sm border-b-4 md:border-b-0 md:border-r-4 border-amber-500':'hover:bg-slate-50 text-slate-600'}`}>
-              {tab === 'dashboard' ? 'Dashboard' : tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : 'الإعدادات'}
+              {tab === 'dashboard' ? 'Dashboard' : tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'student-messages' ? 'رسائل الطلاب' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : 'الإعدادات'}
             </button>
-              <button onClick={() => setActiveTab('student-messages')} className={`px-4 py-2 rounded-xl font-bold transition flex items-center gap-2 ${activeTab === 'student-messages' ? 'bg-amber-600 text-white' : 'bg-white text-slate-700 hover:bg-amber-50'}`}><MessageCircle size={18}/> رسائل الطلاب</button>
           ))}
         </div>
 
