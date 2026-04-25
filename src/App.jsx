@@ -5191,7 +5191,7 @@ const AdminDashboard = ({ user }) => {
           )}
 
 
-          {activeTab === 'student-messages' && <AdminStudentMessaging users={users} adminGradeFilter={adminGradeFilter} />}
+          {activeTab === 'student-messages' && <AdminStudentMessaging users={activeUsersList} adminGradeFilter={adminGradeFilter} />}
 
           {activeTab === 'notifications' && (
             <div className="glass-panel p-4 md:p-6 rounded-2xl space-y-6">
@@ -6345,9 +6345,12 @@ class AppErrorBoundary extends React.Component {
         <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-6 font-['Cairo']" dir="rtl">
           <div className="max-w-lg w-full bg-white text-slate-900 rounded-3xl p-8 shadow-2xl border-t-8 border-red-500 text-center">
             <AlertTriangle className="mx-auto text-red-500 mb-4" size={64}/>
-            <h1 className="text-2xl font-black mb-2">حصل خطأ في عرض الصفحة</h1>
-            <p className="text-slate-600 mb-4">بدل الشاشة البيضاء، ظهر لك هذا التنبيه حتى لا ينهار الموقع بالكامل.</p>
-            <code className="block bg-slate-100 text-red-700 p-3 rounded-xl text-sm mb-6 break-all text-left" dir="ltr">{this.state.message}</code>
+            <h1 className="text-2xl font-black mb-2">هذا الجزء تحت الصيانة حاليًا</h1>
+            <p className="text-slate-600 mb-4">نقوم بتحديث هذا الجزء من المنصة الآن. برجاء إعادة تحميل الصفحة أو المحاولة بعد قليل.</p>
+            <details className="bg-slate-100 text-slate-600 p-3 rounded-xl text-sm mb-6 text-right">
+              <summary className="cursor-pointer font-bold">تفاصيل تقنية للإدارة</summary>
+              <code className="block text-red-700 mt-2 break-all text-left" dir="ltr">{this.state.message}</code>
+            </details>
             <button onClick={() => window.location.reload()} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-800">إعادة تحميل الصفحة</button>
           </div>
         </div>
