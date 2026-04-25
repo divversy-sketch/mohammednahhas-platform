@@ -3164,6 +3164,8 @@ const AdminPerformanceAnalytics = ({ examResults = [], examsList = [], users = [
 };
 
 const AdminDashboard = ({ user }) => {
+  const [adminReviewExamData, setAdminReviewExamData] = useState(null);
+  const [adminReviewResult, setAdminReviewResult] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard'); 
   const [adminGradeFilter, setAdminGradeFilter] = useState('all'); 
   const [pendingUsers, setPendingUsers] = useState([]);
@@ -3450,6 +3452,45 @@ const AdminDashboard = ({ user }) => {
   const handleDeleteExam = async (id) => { if(window.confirm("حذف الامتحان؟")) await deleteDoc(doc(db, 'exams', id)); };
   const handleDeleteAnnouncement = async (id) => { if(window.confirm("حذف الإعلان؟")) await deleteDoc(doc(db, 'announcements', id)); };
   const handleDeleteResult = async (resultId) => { if(window.confirm("حذف النتيجة؟")) await deleteDoc(doc(db, 'exam_results', resultId)); };
+
+  const openAdminResultReview = async (result) => {
+    try {
+      let examData = null;
+
+      if (result.examId) {
+        const cachedExam = examsList.find(e => e.id === result.examId);
+        if (cachedExam) {
+          examData = cachedExam;
+        } else {
+          const examSnap = await getDoc(doc(db, 'exams', result.examId));
+          if (examSnap.exists()) examData = { id: examSnap.id, ...examSnap.data() };
+        }
+      }
+
+      if (!examData) {
+        return alert('لم يتم العثور على الامتحان الأصلي لهذه النتيجة. قد يكون الامتحان محذوفًا.');
+      }
+
+      const reviewExam = {
+        ...examData,
+        attemptId: result.id,
+        title: `${examData.title || result.examTitle || 'مراجعة امتحان'} - مراجعة الأدمن`,
+        endTime: examData.endTime || new Date(Date.now() - 1000).toISOString()
+      };
+
+      const reviewUser = {
+        uid: result.studentId,
+        displayName: result.studentName || 'طالب',
+        email: result.studentEmail || ''
+      };
+
+      setAdminReviewExamData({ exam: reviewExam, user: reviewUser });
+      setAdminReviewResult(result);
+    } catch (error) {
+      console.error('open admin result review error:', error);
+      alert('تعذر فتح مراجعة الامتحان.');
+    }
+  };
 
   const openFullExamEditor = (exam) => {
     const hasResults = examResults.some(r => r.examId === exam.id);
@@ -4186,6 +4227,19 @@ const AdminDashboard = ({ user }) => {
           </div>
       )}
 
+
+      {adminReviewExamData && adminReviewResult && (
+        <ExamRunner
+          exam={adminReviewExamData.exam}
+          user={adminReviewExamData.user}
+          existingResult={adminReviewResult}
+          isReviewMode={true}
+          onClose={() => {
+            setAdminReviewExamData(null);
+            setAdminReviewResult(null);
+          }}
+        />
+      )}
 
       {editingFullExam && (
         <div className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -4974,6 +5028,7 @@ const AdminDashboard = ({ user }) => {
                                       )}
                                       {res.status === 'completed' && <button onClick={()=>sendWhatsAppToParent(res)} className="bg-green-100 text-green-700 px-3 py-1 rounded text-xs font-bold flex items-center gap-1 hover:bg-green-200"><MessageCircle size={14}/><span className="hidden md:inline"> إرسال لولي الأمر</span></button>}
                                       <button onClick={()=>setViewingResult(res)} className="bg-blue-100 text-blue-600 px-3 py-1 rounded text-xs font-bold">التفاصيل</button>
+                                      <button onClick={()=>openAdminResultReview(res)} className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded text-xs font-bold flex items-center gap-1"><Eye size={14}/> مراجعة الامتحان</button>
                                       <button onClick={()=>handleDeleteResult(res.id)} className="bg-amber-100 text-amber-600 px-3 py-1 rounded text-xs font-bold">إعادة</button>
                                    </div>
                                </div>
