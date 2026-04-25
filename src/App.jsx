@@ -2397,7 +2397,8 @@ const AdminStudentMessaging = ({ users = [], adminGradeFilter = 'all' }) => {
   );
 };
 
-const StudentMessagesPanel = ({ user, userData }) => {
+
+const StudentMessagesPanel = ({ user, userData, compact = false, onAfterReply = null }) => {
   const [messages, setMessages] = useState([]);
   const [reply, setReply] = useState('');
   const studentId = user?.uid;
@@ -2407,10 +2408,25 @@ const StudentMessagesPanel = ({ user, userData }) => {
     const qRef = query(collection(db, `student_chats/${studentId}/messages`), orderBy('createdAt', 'asc'));
     const unsub = onSnapshot(qRef, (snap) => {
       setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setDoc(doc(db, 'student_chats', studentId), { unreadForStudent: 0 }, { merge: true }).catch(() => {});
-    }, (error) => { console.warn('student messages listener blocked:', error?.message); setMessages([]); });
+    }, (error) => {
+      console.warn('student messages listener blocked:', error?.message);
+      setMessages([]);
+    });
     return () => unsub();
   }, [studentId]);
+
+  const markSeen = async () => {
+    if (!studentId) return;
+    try {
+      await setDoc(doc(db, 'student_chats', studentId), {
+        unreadForStudent: 0,
+        lastStudentSeenAt: serverTimestamp()
+      }, { merge: true });
+      if (onAfterReply) onAfterReply();
+    } catch (error) {
+      console.warn('mark seen failed:', error);
+    }
+  };
 
   const sendReply = async () => {
     if (!reply.trim() || !studentId) return;
@@ -2423,8 +2439,11 @@ const StudentMessagesPanel = ({ user, userData }) => {
         lastMessage: reply.trim(),
         lastSender: 'student',
         unreadForAdmin: increment(1),
+        unreadForStudent: 0,
+        lastStudentSeenAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       }, { merge: true });
+
       await addDoc(collection(db, `student_chats/${studentId}/messages`), {
         text: reply.trim(),
         senderId: studentId,
@@ -2435,6 +2454,7 @@ const StudentMessagesPanel = ({ user, userData }) => {
         readByAdmin: false
       });
       setReply('');
+      if (onAfterReply) onAfterReply();
     } catch (error) {
       console.error('student reply error:', error);
       alert('تعذر إرسال الرسالة. حاول مرة أخرى.');
@@ -2442,9 +2462,9 @@ const StudentMessagesPanel = ({ user, userData }) => {
   };
 
   return (
-    <div className="glass-panel rounded-2xl p-4 md:p-6">
-      <h2 className="text-2xl font-black text-slate-800 mb-4 flex items-center gap-2"><MessageCircle className="text-amber-600"/> رسائل الإدارة</h2>
-      <div className="bg-slate-50 rounded-2xl p-4 min-h-[420px] max-h-[520px] overflow-y-auto space-y-3 border">
+    <div className={`${compact ? '' : 'glass-panel rounded-2xl p-4 md:p-6'}`}>
+      {!compact && <h2 className="text-2xl font-black text-slate-800 mb-4 flex items-center gap-2"><MessageCircle className="text-amber-600"/> رسائل الإدارة</h2>}
+      <div className={`bg-slate-50 rounded-2xl p-4 ${compact ? 'min-h-[260px] max-h-[360px]' : 'min-h-[420px] max-h-[520px]'} overflow-y-auto space-y-3 border`}>
         {messages.map(m => (
           <div key={m.id} className={`flex ${m.senderRole === 'student' ? 'justify-start' : 'justify-end'}`}>
             <div className={`max-w-[85%] rounded-2xl p-3 shadow-sm ${m.senderRole === 'student' ? 'bg-white border text-slate-800 rounded-tr-none' : 'bg-amber-600 text-white rounded-tl-none'}`}>
@@ -2458,6 +2478,65 @@ const StudentMessagesPanel = ({ user, userData }) => {
       <div className="mt-4 flex flex-col md:flex-row gap-3">
         <input className="flex-1 border rounded-xl p-3" placeholder="اكتب ردك للإدارة..." value={reply} onChange={e=>setReply(e.target.value)} onKeyDown={e=>{ if(e.key === 'Enter') sendReply(); }} />
         <button onClick={sendReply} className="bg-amber-600 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2"><Send size={18}/> إرسال</button>
+        <button onClick={markSeen} className="bg-slate-200 text-slate-700 px-5 py-3 rounded-xl font-bold hover:bg-slate-300">تم الاطلاع</button>
+      </div>
+    </div>
+  );
+};
+
+const StudentAdminMessagePopup = ({ user, userData }) => {
+  const [chatState, setChatState] = useState(null);
+  const [dismissed, setDismissed] = useState(false);
+  const studentId = user?.uid;
+
+  useEffect(() => {
+    if (!studentId) return;
+    const unsub = onSnapshot(doc(db, 'student_chats', studentId), (snap) => {
+      if (snap.exists()) {
+        setChatState({ id: snap.id, ...snap.data() });
+        setDismissed(false);
+      } else {
+        setChatState(null);
+      }
+    }, (error) => {
+      console.warn('student chat popup listener blocked:', error?.message);
+      setChatState(null);
+    });
+    return () => unsub();
+  }, [studentId]);
+
+  const hasUnreadAdminMessage =
+    chatState &&
+    chatState.lastSender === 'admin' &&
+    safeNumber(chatState.unreadForStudent, 0) > 0 &&
+    !dismissed;
+
+  if (!hasUnreadAdminMessage) return null;
+
+  return (
+    <div className="fixed inset-0 z-[99999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl border-t-8 border-amber-500 overflow-hidden">
+        <div className="bg-slate-900 text-white p-5 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-black flex items-center gap-2"><MessageCircle className="text-amber-400"/> رسالة مهمة من الإدارة</h2>
+            <p className="text-slate-300 text-sm mt-1">يرجى قراءة الرسالة قبل متابعة استخدام المنصة.</p>
+          </div>
+          <span className="bg-red-600 text-white text-xs px-3 py-1 rounded-full font-black animate-pulse">جديدة</span>
+        </div>
+
+        <div className="p-5">
+          <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl p-4 mb-4">
+            <p className="font-black mb-1">آخر رسالة:</p>
+            <p className="font-bold whitespace-pre-wrap">{chatState.lastMessage}</p>
+          </div>
+
+          <StudentMessagesPanel
+            user={user}
+            userData={userData}
+            compact={true}
+            onAfterReply={() => setDismissed(true)}
+          />
+        </div>
       </div>
     </div>
   );
@@ -5358,6 +5437,8 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
       };
       window.addEventListener('popstate', handlePopState);
       return () => window.removeEventListener('popstate', handlePopState);
+
+      <StudentAdminMessagePopup user={user} userData={userData} />
   }, [activeTab]);
 
   useEffect(() => {
