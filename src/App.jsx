@@ -1177,22 +1177,25 @@ const InteractiveViewer = ({ content, user, onClose }) => {
 const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult = null }) => {
   const [activeView, setActiveView] = useState(isReviewMode || existingResult ? 'dashboard' : 'questions');
   const [currentQIndex, setCurrentQIndex] = useState(0);
-  const [answers, setAnswers] = useState(existingResult?.answers || {});
+  const [answers, setAnswers] = useState(existingResult?.answers || exam.resumeData?.answers || {});
   const [flagged, setFlagged] = useState({});
-  const [timeLeft, setTimeLeft] = useState(exam.duration * 60);
+  const [timeLeft, setTimeLeft] = useState(safeNumber(existingResult?.remainingTime ?? exam.resumeData?.remainingTime, exam.duration * 60));
   const [isCheating, setIsCheating] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(isReviewMode || existingResult !== null);
   const [score, setScore] = useState(existingResult?.score || 0);
-  const [startTime] = useState(Date.now());
+  const [startTime, setStartTime] = useState(Date.now());
   const [wmPositions, setWmPositions] = useState([]);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [activeBranchTab, setActiveBranchTab] = useState('الكل');
-  const [antiCheatWarnings, setAntiCheatWarnings] = useState(existingResult?.antiCheatWarnings || 0);
-  const [antiCheatLog, setAntiCheatLog] = useState(existingResult?.antiCheatLog || []);
+  const [antiCheatWarnings, setAntiCheatWarnings] = useState(existingResult?.antiCheatWarnings || exam.resumeData?.antiCheatWarnings || 0);
+  const [antiCheatLog, setAntiCheatLog] = useState(existingResult?.antiCheatLog || exam.resumeData?.antiCheatLog || []);
+
+  const [showAntiCheatChoice, setShowAntiCheatChoice] = useState(false);
+  const [securityLockReason, setSecurityLockReason] = useState('');
 
   const fileDialogBypassRef = useRef(false);
-  const antiCheatWarningsRef = useRef(existingResult?.antiCheatWarnings || 0);
-  const stateRefs = useRef({ isSubmitted, showSubmitConfirm, isCheating });
+  const antiCheatWarningsRef = useRef(existingResult?.antiCheatWarnings || exam.resumeData?.antiCheatWarnings || 0);
+  const stateRefs = useRef({ isSubmitted, showSubmitConfirm, isCheating, showAntiCheatChoice });
 
   const shuffleArray = (array) => {
     const arr = [...array];
@@ -1242,8 +1245,8 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   }, [activeBranchTab, isSubmitted]);
 
   useEffect(() => {
-    stateRefs.current = { isSubmitted, showSubmitConfirm, isCheating };
-  }, [isSubmitted, showSubmitConfirm, isCheating]);
+    stateRefs.current = { isSubmitted, showSubmitConfirm, isCheating, showAntiCheatChoice };
+  }, [isSubmitted, showSubmitConfirm, isCheating, showAntiCheatChoice]);
 
   useEffect(() => {
     if (isReviewMode) return;
@@ -1272,6 +1275,72 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     return () => window.removeEventListener('focus', restoreBypass);
   }, []);
 
+  const saveExamProgress = async (extra = {}) => {
+    if (!exam.attemptId || exam.id === 'custom_mistakes_exam') return;
+    try {
+      await setDoc(doc(db, 'exam_results', exam.attemptId), {
+        examId: exam.id,
+        studentId: user.uid,
+        studentName: user.displayName,
+        answers,
+        remainingTime: timeLeft,
+        currentQIndex,
+        totalTime: exam.duration,
+        status: extra.status || 'in_progress',
+        antiCheatWarnings: antiCheatWarningsRef.current,
+        antiCheatLog,
+        lastSavedAt: serverTimestamp(),
+        ...extra
+      }, { merge: true });
+    } catch (e) {
+      console.warn('Could not save exam progress:', e?.message);
+    }
+  };
+
+  const continueAfterSecurityWarning = async () => {
+    setShowAntiCheatChoice(false);
+    setSecurityLockReason('');
+    await saveExamProgress({ status: 'in_progress', securityDecision: 'continue', continuedAt: serverTimestamp() });
+  };
+
+  const restartAfterSecurityWarning = async () => {
+    const restartEvent = { type: 'student_restart_after_security_warning', warningNumber: antiCheatWarningsRef.current, at: new Date().toISOString() };
+    const nextLog = [...antiCheatLog, restartEvent];
+    setAnswers({});
+    setFlagged({});
+    setCurrentQIndex(0);
+    setScore(0);
+    setTimeLeft(exam.duration * 60);
+    setStartTime(Date.now());
+    setAntiCheatWarnings(0);
+    antiCheatWarningsRef.current = 0;
+    setAntiCheatLog(nextLog);
+    setShowAntiCheatChoice(false);
+    setSecurityLockReason('');
+    if (exam.attemptId && exam.id !== 'custom_mistakes_exam') {
+      try {
+        await setDoc(doc(db, 'exam_results', exam.attemptId), {
+          examId: exam.id,
+          studentId: user.uid,
+          studentName: user.displayName,
+          answers: {},
+          remainingTime: exam.duration * 60,
+          currentQIndex: 0,
+          score: 0,
+          total: 0,
+          status: 'in_progress',
+          antiCheatWarnings: 0,
+          antiCheatLog: nextLog,
+          restartCount: increment(1),
+          restartedAfterSecurityAt: serverTimestamp(),
+          lastSavedAt: serverTimestamp()
+        }, { merge: true });
+      } catch (e) {
+        console.warn('Could not restart attempt:', e?.message);
+      }
+    }
+  };
+
   const handleCheatingRef = useRef();
   handleCheatingRef.current = async (eventType = 'focus_or_visibility_lost') => {
     const { isSubmitted, isCheating } = stateRefs.current;
@@ -1285,32 +1354,20 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     setAntiCheatLog(nextLog);
 
     if (nextWarning < 3) {
-      alert(`تنبيه رقم ${nextWarning}: تم رصد خروج أو فقدان تركيز من صفحة الامتحان. عند التكرار للمرة الثالثة سيتم إنهاء الامتحان.`);
+      alert(`تنبيه رقم ${nextWarning}: تم رصد حركة غير آمنة داخل الامتحان. عند التكرار للمرة الثالثة سيتم إيقاف المحاولة مؤقتًا لحين مراجعة الأدمن، والأدمن وحده يقرر السماح بالاستكمال أو إعادة الامتحان.`);
+      await saveExamProgress({ antiCheatWarnings: nextWarning, antiCheatLog: nextLog });
       return;
     }
 
-    setIsCheating(true);
-    setIsSubmitted(true);
-    setActiveView('dashboard');
-
-    const timeTaken = Math.round((Date.now() - startTime) / 1000);
-    if (exam.attemptId) {
-      await setDoc(doc(db, 'exam_results', exam.attemptId), {
-        examId: exam.id,
-        studentId: user.uid,
-        studentName: user.displayName,
-        score: 0,
-        total: mcqQuestions.length,
-        status: 'cheated',
-        timeTaken,
-        totalTime: exam.duration,
-        antiCheatWarnings: nextWarning,
-        antiCheatLog: nextLog,
-        submittedAt: serverTimestamp()
-      }, { merge: true });
-    }
-
-    await updateDoc(doc(db, 'users', user.uid), { status: 'banned_exam' });
+    setSecurityLockReason(eventType);
+    setShowAntiCheatChoice(true);
+    await saveExamProgress({
+      status: 'security_hold',
+      antiCheatWarnings: nextWarning,
+      antiCheatLog: nextLog,
+      securityHoldAt: serverTimestamp(),
+      securityReason: eventType
+    });
   };
 
   useEffect(() => {
@@ -1325,8 +1382,8 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     };
 
     const handleAntiCheat = () => {
-      const { showSubmitConfirm, isSubmitted } = stateRefs.current;
-      if (fileDialogBypassRef.current) return;
+      const { showSubmitConfirm, isSubmitted, showAntiCheatChoice } = stateRefs.current;
+      if (fileDialogBypassRef.current || showAntiCheatChoice) return;
       if (!showSubmitConfirm && !isSubmitted) handleCheatingRef.current('focus_or_visibility_lost');
     };
 
@@ -1336,7 +1393,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
     const blockContextMenu = (e) => {
       e.preventDefault();
-      if (!stateRefs.current.isSubmitted) handleCheatingRef.current('right_click_attempt');
+      if (!stateRefs.current.isSubmitted && !stateRefs.current.showAntiCheatChoice) handleCheatingRef.current('right_click_attempt');
     };
 
     const handleBlockedClipboard = (e) => {
@@ -1355,7 +1412,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     };
 
     const handleFullScreenExit = () => {
-      if (!document.fullscreenElement && !stateRefs.current.isSubmitted) handleCheatingRef.current('fullscreen_exit');
+      if (!document.fullscreenElement && !stateRefs.current.isSubmitted && !stateRefs.current.showAntiCheatChoice) handleCheatingRef.current('fullscreen_exit');
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -1381,7 +1438,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
       document.removeEventListener('keydown', handleExamKeyDown);
       document.removeEventListener('fullscreenchange', handleFullScreenExit);
     };
-  }, [isReviewMode, mcqQuestions.length, exam.attemptId, exam.id, exam.duration, startTime, user.uid, user.displayName]);
+  }, [isReviewMode, mcqQuestions.length, exam.attemptId, exam.id, exam.duration, startTime, user.uid, user.displayName, showAntiCheatChoice]);
 
   useEffect(() => {
     if (isReviewMode || isSubmitted) return;
@@ -1394,8 +1451,20 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   }, [timeLeft, isSubmitted, isCheating, isReviewMode]);
 
   const handleAnswer = (qId, value) => {
-    if (!isReviewMode && !isSubmitted) {
-      setAnswers((prev) => ({ ...prev, [qId]: value }));
+    if (!isReviewMode && !isSubmitted && !showAntiCheatChoice) {
+      setAnswers((prev) => {
+        const nextAnswers = { ...prev, [qId]: value };
+        if (exam.attemptId && exam.id !== 'custom_mistakes_exam') {
+          setDoc(doc(db, 'exam_results', exam.attemptId), {
+            answers: nextAnswers,
+            remainingTime: timeLeft,
+            currentQIndex,
+            status: 'in_progress',
+            lastSavedAt: serverTimestamp()
+          }, { merge: true }).catch((e) => console.warn('answer autosave blocked:', e?.message));
+        }
+        return nextAnswers;
+      });
     }
   };
 
@@ -1767,6 +1836,27 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
               {user.displayName} - {user.email}
             </div>
           ))}
+        </div>
+      )}
+
+      {showAntiCheatChoice && (
+        <div className="fixed inset-0 z-[10000] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-7 max-w-lg w-full shadow-2xl text-center border-t-8 border-red-500">
+            <ShieldAlert className="w-16 h-16 text-red-500 mx-auto mb-4" />
+            <h3 className="text-2xl font-black mb-2 text-slate-900">تم إيقاف المحاولة مؤقتًا</h3>
+            <p className="text-slate-600 mb-5 font-bold leading-relaxed">
+              تم رصد أكثر من مخالفة أمان أثناء الامتحان. تم حفظ إجاباتك والوقت المتبقي، ولن يتم تصفيرك تلقائيًا.
+            </p>
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-right text-sm text-red-800 mb-6 space-y-2">
+              <p><b>القرار الآن عند الأدمن فقط:</b></p>
+              <p>يمكن للأدمن من لوحة النتائج أن يسمح لك باستكمال الامتحان بنفس الإجابات والوقت المتبقي.</p>
+              <p>أو يسمح بإعادة الامتحان من البداية إذا رأى أن الحالة تستحق ذلك.</p>
+              <p className="font-black">نظام الأمان سيظل نشطًا بنفس الصرامة بعد السماح.</p>
+            </div>
+            <button onClick={onClose} className="bg-slate-900 text-white py-3 px-8 rounded-xl font-bold hover:bg-slate-800 shadow-md transition">
+              العودة للمنصة وانتظار قرار الأدمن
+            </button>
+          </div>
         </div>
       )}
 
@@ -2158,6 +2248,222 @@ const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
 };
 
 
+
+const AdminStudentMessaging = ({ users = [], adminGradeFilter = 'all' }) => {
+  const [conversations, setConversations] = useState([]);
+  const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [targetMode, setTargetMode] = useState('student');
+  const [targetGrade, setTargetGrade] = useState(adminGradeFilter === 'all' ? '3sec' : adminGradeFilter);
+  const [messageText, setMessageText] = useState('');
+  const [threadMessages, setThreadMessages] = useState([]);
+
+  const students = useMemo(() => (users || [])
+    .filter(u => u.role !== 'admin')
+    .filter(u => adminGradeFilter === 'all' || u.grade === adminGradeFilter)
+    .sort((a, b) => String(a.name || a.displayName || '').localeCompare(String(b.name || b.displayName || ''), 'ar')), [users, adminGradeFilter]);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'student_chats'), (snap) => {
+      const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      rows.sort((a, b) => (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0));
+      setConversations(rows);
+    }, (error) => { console.warn('student_chats listener blocked:', error?.message); setConversations([]); });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedStudentId) { setThreadMessages([]); return; }
+    const qRef = query(collection(db, `student_chats/${selectedStudentId}/messages`), orderBy('createdAt', 'asc'));
+    const unsub = onSnapshot(qRef, (snap) => {
+      setThreadMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setDoc(doc(db, 'student_chats', selectedStudentId), { unreadForAdmin: 0 }, { merge: true }).catch(() => {});
+    }, (error) => { console.warn('student chat messages blocked:', error?.message); setThreadMessages([]); });
+    return () => unsub();
+  }, [selectedStudentId]);
+
+  const sendToStudent = async (student, textValue) => {
+    if (!student?.id || !textValue.trim()) return;
+    await setDoc(doc(db, 'student_chats', student.id), {
+      studentId: student.id,
+      studentName: student.name || student.displayName || student.email || 'طالب',
+      studentEmail: student.email || '',
+      grade: student.grade || '',
+      lastMessage: textValue.trim(),
+      lastSender: 'admin',
+      unreadForStudent: increment(1),
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+
+    await addDoc(collection(db, `student_chats/${student.id}/messages`), {
+      text: textValue.trim(),
+      senderId: 'admin',
+      senderRole: 'admin',
+      senderName: 'الإدارة',
+      createdAt: serverTimestamp(),
+      readByStudent: false,
+      readByAdmin: true
+    });
+  };
+
+  const sendMessage = async () => {
+    if (!messageText.trim()) return alert('اكتب نص الرسالة أولاً.');
+    let targets = [];
+    if (targetMode === 'student') {
+      const student = students.find(s => s.id === selectedStudentId);
+      if (!student) return alert('اختار طالب أولاً.');
+      targets = [student];
+    } else if (targetMode === 'grade') {
+      targets = students.filter(s => s.grade === targetGrade);
+      if (targets.length === 0) return alert('لا يوجد طلاب في هذا الصف.');
+    } else {
+      targets = students;
+      if (targets.length === 0) return alert('لا يوجد طلاب.');
+    }
+    if (targets.length > 20 && !window.confirm(`سيتم إرسال الرسالة إلى ${targets.length} طالب. هل أنت متأكد؟`)) return;
+    try {
+      await Promise.all(targets.map(student => sendToStudent(student, messageText)));
+      setMessageText('');
+      alert(`تم إرسال الرسالة إلى ${targets.length} طالب.`);
+    } catch (error) {
+      console.error('send student message error:', error);
+      alert('تعذر إرسال الرسالة. راجع صلاحيات Firestore.');
+    }
+  };
+
+  const selectedConversation = conversations.find(c => (c.studentId || c.id) === selectedStudentId);
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="lg:col-span-1 glass-panel rounded-2xl p-4">
+        <h2 className="font-black text-xl text-slate-800 mb-4 flex items-center gap-2"><MessageCircle className="text-amber-600"/> رسائل الطلاب</h2>
+        <div className="space-y-3 mb-5 bg-amber-50 border border-amber-100 rounded-2xl p-3">
+          <select className="w-full border rounded-xl p-3" value={targetMode} onChange={e => setTargetMode(e.target.value)}>
+            <option value="student">طالب محدد</option>
+            <option value="grade">صف كامل</option>
+            <option value="all">كل الطلاب</option>
+          </select>
+          {targetMode === 'student' && (
+            <select className="w-full border rounded-xl p-3" value={selectedStudentId} onChange={e => setSelectedStudentId(e.target.value)}>
+              <option value="">اختار الطالب</option>
+              {students.map(s => <option key={s.id} value={s.id}>{s.name || s.displayName || s.email} - {getGradeLabel(s.grade)}</option>)}
+            </select>
+          )}
+          {targetMode === 'grade' && (
+            <select className="w-full border rounded-xl p-3" value={targetGrade} onChange={e => setTargetGrade(e.target.value)}><GradeOptions/></select>
+          )}
+          <textarea className="w-full border rounded-xl p-3 min-h-[100px]" placeholder="اكتب رسالتك..." value={messageText} onChange={e => setMessageText(e.target.value)} />
+          <button onClick={sendMessage} className="w-full bg-amber-600 text-white py-3 rounded-xl font-bold hover:bg-amber-700 transition flex items-center justify-center gap-2"><Send size={18}/> إرسال</button>
+        </div>
+        <h3 className="font-bold text-slate-700 mb-2">المحادثات</h3>
+        <div className="space-y-2 max-h-[520px] overflow-y-auto">
+          {conversations.filter(c => adminGradeFilter === 'all' || c.grade === adminGradeFilter).map(c => (
+            <button key={c.id} onClick={() => setSelectedStudentId(c.studentId || c.id)} className={`w-full text-right p-3 rounded-xl border transition ${selectedStudentId === (c.studentId || c.id) ? 'bg-amber-100 border-amber-300' : 'bg-white hover:bg-slate-50'}`}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-bold text-slate-800 truncate">{c.studentName || c.studentEmail || 'طالب'}</span>
+                {safeNumber(c.unreadForAdmin, 0) > 0 && <span className="bg-red-600 text-white text-xs px-2 py-1 rounded-full">{c.unreadForAdmin}</span>}
+              </div>
+              <p className="text-xs text-slate-500 truncate mt-1">{c.lastMessage || 'لا توجد رسائل'}</p>
+            </button>
+          ))}
+          {conversations.length === 0 && <p className="text-center text-slate-400 py-6 text-sm">لا توجد محادثات بعد.</p>}
+        </div>
+      </div>
+      <div className="lg:col-span-2 glass-panel rounded-2xl p-4 flex flex-col min-h-[680px]">
+        {selectedStudentId ? (
+          <>
+            <div className="border-b pb-3 mb-3">
+              <h3 className="font-black text-xl text-slate-800">{selectedConversation?.studentName || students.find(s=>s.id===selectedStudentId)?.name || 'محادثة طالب'}</h3>
+              <p className="text-xs text-slate-500">{selectedConversation?.studentEmail || students.find(s=>s.id===selectedStudentId)?.email || ''}</p>
+            </div>
+            <div className="flex-1 overflow-y-auto bg-slate-50 rounded-2xl p-4 space-y-3">
+              {threadMessages.map(m => (
+                <div key={m.id} className={`flex ${m.senderRole === 'admin' ? 'justify-start' : 'justify-end'}`}>
+                  <div className={`max-w-[80%] rounded-2xl p-3 shadow-sm ${m.senderRole === 'admin' ? 'bg-amber-600 text-white rounded-tr-none' : 'bg-white text-slate-800 border rounded-tl-none'}`}>
+                    <p className="whitespace-pre-wrap text-sm font-bold">{m.text}</p>
+                    <p className={`text-[10px] mt-1 ${m.senderRole === 'admin' ? 'text-amber-100' : 'text-slate-400'}`}>{m.senderName || (m.senderRole === 'admin' ? 'الإدارة' : 'الطالب')}</p>
+                  </div>
+                </div>
+              ))}
+              {threadMessages.length === 0 && <p className="text-center text-slate-400 py-10">ابدأ المحادثة مع الطالب.</p>}
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-center text-slate-400">
+            <div><MessageSquare size={64} className="mx-auto mb-4 opacity-40"/><p className="font-bold">اختار طالب من القائمة أو أرسل رسالة جماعية.</p></div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const StudentMessagesPanel = ({ user, userData }) => {
+  const [messages, setMessages] = useState([]);
+  const [reply, setReply] = useState('');
+  const studentId = user?.uid;
+
+  useEffect(() => {
+    if (!studentId) return;
+    const qRef = query(collection(db, `student_chats/${studentId}/messages`), orderBy('createdAt', 'asc'));
+    const unsub = onSnapshot(qRef, (snap) => {
+      setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setDoc(doc(db, 'student_chats', studentId), { unreadForStudent: 0 }, { merge: true }).catch(() => {});
+    }, (error) => { console.warn('student messages listener blocked:', error?.message); setMessages([]); });
+    return () => unsub();
+  }, [studentId]);
+
+  const sendReply = async () => {
+    if (!reply.trim() || !studentId) return;
+    try {
+      await setDoc(doc(db, 'student_chats', studentId), {
+        studentId,
+        studentName: userData?.name || user?.displayName || user?.email || 'طالب',
+        studentEmail: user?.email || '',
+        grade: userData?.grade || '',
+        lastMessage: reply.trim(),
+        lastSender: 'student',
+        unreadForAdmin: increment(1),
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      await addDoc(collection(db, `student_chats/${studentId}/messages`), {
+        text: reply.trim(),
+        senderId: studentId,
+        senderRole: 'student',
+        senderName: userData?.name || user?.displayName || 'طالب',
+        createdAt: serverTimestamp(),
+        readByStudent: true,
+        readByAdmin: false
+      });
+      setReply('');
+    } catch (error) {
+      console.error('student reply error:', error);
+      alert('تعذر إرسال الرسالة. حاول مرة أخرى.');
+    }
+  };
+
+  return (
+    <div className="glass-panel rounded-2xl p-4 md:p-6">
+      <h2 className="text-2xl font-black text-slate-800 mb-4 flex items-center gap-2"><MessageCircle className="text-amber-600"/> رسائل الإدارة</h2>
+      <div className="bg-slate-50 rounded-2xl p-4 min-h-[420px] max-h-[520px] overflow-y-auto space-y-3 border">
+        {messages.map(m => (
+          <div key={m.id} className={`flex ${m.senderRole === 'student' ? 'justify-start' : 'justify-end'}`}>
+            <div className={`max-w-[85%] rounded-2xl p-3 shadow-sm ${m.senderRole === 'student' ? 'bg-white border text-slate-800 rounded-tr-none' : 'bg-amber-600 text-white rounded-tl-none'}`}>
+              <p className="whitespace-pre-wrap text-sm font-bold">{m.text}</p>
+              <p className={`text-[10px] mt-1 ${m.senderRole === 'student' ? 'text-slate-400' : 'text-amber-100'}`}>{m.senderRole === 'student' ? 'أنت' : 'الإدارة'}</p>
+            </div>
+          </div>
+        ))}
+        {messages.length === 0 && <p className="text-center text-slate-400 py-20 font-bold">لا توجد رسائل بعد.</p>}
+      </div>
+      <div className="mt-4 flex flex-col md:flex-row gap-3">
+        <input className="flex-1 border rounded-xl p-3" placeholder="اكتب ردك للإدارة..." value={reply} onChange={e=>setReply(e.target.value)} onKeyDown={e=>{ if(e.key === 'Enter') sendReply(); }} />
+        <button onClick={sendReply} className="bg-amber-600 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2"><Send size={18}/> إرسال</button>
+      </div>
+    </div>
+  );
+};
+
+
 const QuestionBankManager = ({ adminGradeFilter }) => {
   const [questions, setQuestions] = useState([]);
   const [filters, setFilters] = useState({ grade: adminGradeFilter === 'all' ? '' : adminGradeFilter, branch: '', type: '' });
@@ -2492,6 +2798,192 @@ const StudentAssignmentsPanel = ({ assignments = [], submissions = [], user, use
 
 
 
+
+const AdminProDashboard = ({ users = [], exams = [], results = [], content = [], subscriptionCodes = [], liveSessions = [], hwResults = [], adminGradeFilter = 'all' }) => {
+  const filteredUsers = useMemo(() => users.filter(u => adminGradeFilter === 'all' || u.grade === adminGradeFilter), [users, adminGradeFilter]);
+  const filteredResults = useMemo(() => results.filter(r => {
+    if (adminGradeFilter === 'all') return true;
+    const student = users.find(u => u.id === r.studentId);
+    return r.grade === adminGradeFilter || student?.grade === adminGradeFilter;
+  }), [results, users, adminGradeFilter]);
+
+  const dashboard = useMemo(() => {
+    const completed = filteredResults.filter(r => r.status === 'completed');
+    const securityHolds = filteredResults.filter(r => r.status === 'security_hold');
+    const avg = completed.length
+      ? Math.round(completed.reduce((sum, r) => sum + getResultPercentage(r), 0) / completed.length)
+      : 0;
+
+    const branchMap = {};
+    completed.forEach(result => {
+      const stats = result.performanceAnalysis?.branchStats || result.branchStats || {};
+      Object.entries(stats).forEach(([branch, s]) => {
+        branchMap[branch] = branchMap[branch] || { earned: 0, possible: 0, wrong: 0, correct: 0, count: 0 };
+        branchMap[branch].earned += safeNumber(s.earned, 0);
+        branchMap[branch].possible += safeNumber(s.possible, 0);
+        branchMap[branch].wrong += safeNumber(s.wrong, 0);
+        branchMap[branch].correct += safeNumber(s.correct, 0);
+        branchMap[branch].count += 1;
+      });
+    });
+
+    const branches = Object.entries(branchMap).map(([branch, s]) => ({
+      branch,
+      pct: s.possible > 0 ? Math.round((s.earned / s.possible) * 100) : 0,
+      wrong: s.wrong,
+      correct: s.correct,
+      count: s.count
+    })).sort((a, b) => a.pct - b.pct);
+
+    const studentScores = {};
+    completed.forEach(r => {
+      const key = r.studentId || r.studentName || r.id;
+      studentScores[key] = studentScores[key] || { name: r.studentName || 'طالب', score: 0, possible: 0, exams: 0 };
+      studentScores[key].score += safeNumber(r.performanceAnalysis?.totalScore, safeNumber(r.score, 0));
+      studentScores[key].possible += safeNumber(r.performanceAnalysis?.totalPossible, safeNumber(r.totalPossible, safeNumber(r.total, 0)));
+      studentScores[key].exams += 1;
+    });
+
+    const students = Object.values(studentScores).map(s => ({
+      ...s,
+      pct: s.possible > 0 ? Math.round((s.score / s.possible) * 100) : 0
+    }));
+
+    const topStudents = [...students].sort((a,b) => b.pct - a.pct).slice(0, 5);
+    const needsFollowUp = [...students].filter(s => s.pct < 70).sort((a,b) => a.pct - b.pct).slice(0, 6);
+
+    const monthly = {};
+    completed.forEach(r => {
+      const d = r.submittedAt?.toDate ? r.submittedAt.toDate() : (r.submittedAt ? new Date(r.submittedAt) : null);
+      const label = d && !Number.isNaN(d.getTime()) ? `${d.getMonth()+1}/${d.getDate()}` : 'غير محدد';
+      monthly[label] = monthly[label] || { count: 0, totalPct: 0 };
+      monthly[label].count += 1;
+      monthly[label].totalPct += getResultPercentage(r);
+    });
+    const trend = Object.entries(monthly).slice(-8).map(([label, v]) => ({ label, avg: v.count ? Math.round(v.totalPct / v.count) : 0, count: v.count }));
+
+    return {
+      completedCount: completed.length,
+      securityHolds,
+      avg,
+      branches,
+      topStudents,
+      needsFollowUp,
+      trend
+    };
+  }, [filteredResults]);
+
+  const premiumUsers = filteredUsers.filter(u => u.subscriptionStatus === 'premium');
+  const activeCodes = subscriptionCodes.filter(c => !c.used);
+  const usedCodes = subscriptionCodes.filter(c => c.used);
+
+  const StatCard = ({ title, value, icon, hint, tone = 'bg-white' }) => (
+    <div className={`${tone} border border-white/70 rounded-3xl p-5 shadow-sm`}>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold text-slate-500">{title}</p>
+          <p className="text-3xl font-black text-slate-900 mt-1">{value}</p>
+          {hint && <p className="text-xs text-slate-500 mt-2">{hint}</p>}
+        </div>
+        <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-lg">{icon}</div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-amber-900 text-white p-6 rounded-3xl shadow-xl overflow-hidden relative">
+        <div className="absolute -left-16 -top-16 w-48 h-48 rounded-full bg-amber-400/20 blur-3xl"></div>
+        <div className="relative z-10">
+          <h2 className="text-3xl font-black flex items-center gap-3"><BarChart3 className="text-amber-300"/> Dashboard احترافي</h2>
+          <p className="text-slate-300 mt-2">نظرة سريعة على المنصة، أداء الطلاب، الاشتراكات، وحالات الأمان.</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <StatCard title="الطلاب النشطون" value={filteredUsers.length} icon={<Users size={22}/>} hint="حسب فلتر المرحلة الحالي" tone="bg-blue-50" />
+        <StatCard title="متوسط التحصيل" value={`${dashboard.avg}%`} icon={<Target size={22}/>} hint={`${dashboard.completedCount} نتيجة مكتملة`} tone="bg-emerald-50" />
+        <StatCard title="حالات تحتاج قرار أمني" value={dashboard.securityHolds.length} icon={<ShieldAlert size={22}/>} hint="محاولات موقوفة بسبب تنبيهات" tone="bg-red-50" />
+        <StatCard title="اشتراكات VIP" value={premiumUsers.length} icon={<Crown size={22}/>} hint={`${activeCodes.length} كود متاح • ${usedCodes.length} مستخدم`} tone="bg-amber-50" />
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="xl:col-span-2 glass-panel p-5 rounded-3xl">
+          <h3 className="font-black text-slate-800 mb-4 flex items-center gap-2"><Layers size={20}/> أضعف الفروع حاليًا</h3>
+          <div className="space-y-3">
+            {dashboard.branches.slice(0, 8).map(branch => (
+              <div key={branch.branch} className="bg-white rounded-2xl p-4 border">
+                <div className="flex justify-between mb-2 font-bold">
+                  <span>{branch.branch}</span>
+                  <span className={branch.pct < 50 ? 'text-red-600' : branch.pct < 70 ? 'text-amber-600' : 'text-emerald-600'}>{branch.pct}%</span>
+                </div>
+                <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                  <div className={branch.pct < 50 ? 'h-3 bg-red-500' : branch.pct < 70 ? 'h-3 bg-amber-500' : 'h-3 bg-emerald-500'} style={{ width: `${branch.pct}%` }} />
+                </div>
+                <p className="text-xs text-slate-500 mt-2">أخطاء: {branch.wrong} • صحيح: {branch.correct} • ظهر في {branch.count} نتيجة</p>
+              </div>
+            ))}
+            {dashboard.branches.length === 0 && <p className="text-center text-slate-500 py-8">لا توجد بيانات فروع كافية بعد.</p>}
+          </div>
+        </div>
+
+        <div className="glass-panel p-5 rounded-3xl">
+          <h3 className="font-black text-slate-800 mb-4 flex items-center gap-2"><Trophy size={20}/> أفضل الطلاب</h3>
+          <div className="space-y-3">
+            {dashboard.topStudents.map((s, i) => (
+              <div key={i} className="flex items-center justify-between bg-white border rounded-2xl p-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-black">{i+1}</div>
+                  <div>
+                    <p className="font-bold text-slate-800">{s.name}</p>
+                    <p className="text-xs text-slate-500">{s.exams} امتحان</p>
+                  </div>
+                </div>
+                <span className="font-black text-emerald-600">{s.pct}%</span>
+              </div>
+            ))}
+            {dashboard.topStudents.length === 0 && <p className="text-center text-slate-500 py-8">لا توجد نتائج مكتملة بعد.</p>}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div className="glass-panel p-5 rounded-3xl">
+          <h3 className="font-black text-slate-800 mb-4 flex items-center gap-2"><AlertTriangle size={20}/> طلاب يحتاجون متابعة</h3>
+          <div className="space-y-3">
+            {dashboard.needsFollowUp.map((s, i) => (
+              <div key={i} className="bg-white border border-red-100 rounded-2xl p-4 flex justify-between items-center">
+                <div>
+                  <p className="font-black text-slate-800">{s.name}</p>
+                  <p className="text-xs text-slate-500">{s.exams} امتحان • يحتاج خطة مراجعة</p>
+                </div>
+                <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full font-black">{s.pct}%</span>
+              </div>
+            ))}
+            {dashboard.needsFollowUp.length === 0 && <p className="text-center text-slate-500 py-8">لا يوجد طلاب أقل من 70% حسب الفلتر الحالي.</p>}
+          </div>
+        </div>
+
+        <div className="glass-panel p-5 rounded-3xl">
+          <h3 className="font-black text-slate-800 mb-4 flex items-center gap-2"><ActivityIcon/> تطور متوسط النتائج</h3>
+          <div className="flex items-end gap-3 h-64 bg-white rounded-2xl border p-4 overflow-x-auto">
+            {dashboard.trend.map((item, i) => (
+              <div key={i} className="flex flex-col items-center justify-end gap-2 min-w-[48px] h-full">
+                <span className="text-xs font-bold text-slate-600">{item.avg}%</span>
+                <div className="w-8 bg-blue-500 rounded-t-xl" style={{ height: `${Math.max(8, item.avg * 1.8)}px` }}></div>
+                <span className="text-[10px] text-slate-400">{item.label}</span>
+              </div>
+            ))}
+            {dashboard.trend.length === 0 && <p className="m-auto text-slate-500">لا توجد نتائج كافية لرسم الاتجاه.</p>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ActivityIcon = () => <BarChart3 size={20}/>;
+
 const AdminPerformanceAnalytics = ({ examResults = [], examsList = [], users = [], adminGradeFilter = 'all' }) => {
   const [selectedExamId, setSelectedExamId] = useState('all');
   const [studentSearch, setStudentSearch] = useState('');
@@ -2672,7 +3164,7 @@ const AdminPerformanceAnalytics = ({ examResults = [], examsList = [], users = [
 };
 
 const AdminDashboard = ({ user }) => {
-  const [activeTab, setActiveTab] = useState('users'); 
+  const [activeTab, setActiveTab] = useState('dashboard'); 
   const [adminGradeFilter, setAdminGradeFilter] = useState('all'); 
   const [pendingUsers, setPendingUsers] = useState([]);
   const [activeUsersList, setActiveUsersList] = useState([]);
@@ -2709,6 +3201,56 @@ const AdminDashboard = ({ user }) => {
 
   const [editingExamTime, setEditingExamTime] = useState(null);
   const [newEndTime, setNewEndTime] = useState('');
+
+  const [editingFullExam, setEditingFullExam] = useState(null);
+  const [examEditMode, setExamEditMode] = useState('direct');
+  const [recalculateAfterExamEdit, setRecalculateAfterExamEdit] = useState(true);
+  const [examEditDraft, setExamEditDraft] = useState({
+    title: '', grade: '3sec', duration: 60, startTime: '', endTime: '',
+    accessCode: '', isPremium: false, questionsText: ''
+  });
+
+  const examEditQuestionsPreview = useMemo(() => {
+    try {
+      const blocks = JSON.parse(examEditDraft.questionsText || '[]');
+      if (!Array.isArray(blocks)) return [];
+      return blocks.flatMap((block, blockIndex) =>
+        (Array.isArray(block?.subQuestions) ? block.subQuestions : []).map((q, questionIndex) => ({
+          ...q,
+          blockIndex,
+          questionIndex,
+          blockText: block?.text || ''
+        }))
+      );
+    } catch (error) {
+      return [];
+    }
+  }, [examEditDraft.questionsText]);
+
+  const updateQuestionInExamDraft = (blockIndex, questionIndex, updates) => {
+    try {
+      const blocks = JSON.parse(examEditDraft.questionsText || '[]');
+      if (!Array.isArray(blocks) || !blocks[blockIndex]?.subQuestions?.[questionIndex]) return;
+      blocks[blockIndex].subQuestions[questionIndex] = {
+        ...blocks[blockIndex].subQuestions[questionIndex],
+        ...updates
+      };
+      setExamEditDraft(prev => ({
+        ...prev,
+        questionsText: JSON.stringify(blocks, null, 2)
+      }));
+    } catch (error) {
+      alert('لا يمكن تعديل الأسئلة الآن لأن صيغة الأسئلة غير سليمة.');
+    }
+  };
+
+  const [editingFullContent, setEditingFullContent] = useState(null);
+  const [contentEditMode, setContentEditMode] = useState('direct');
+  const [contentEditDraft, setContentEditDraft] = useState({
+    title: '', url: '', type: 'video', videoSection: 'explanation',
+    grade: '3sec', isPremium: false, isPublic: false, allowedEmailsText: '',
+    linkedExamId: '', estimatedDurationMinutes: '', branch: ''
+  });
 
   const [smartHomeworks, setSmartHomeworks] = useState([]);
   const [newSmartHw, setNewSmartHw] = useState({ title: '', answerKey: '', grade: '3sec', bookName: '' });
@@ -2859,12 +3401,328 @@ const AdminDashboard = ({ user }) => {
       if(window.confirm("حذف هذا الكود؟")) await deleteDoc(doc(db, 'subscription_codes', id));
   };
 
+  const copyUnusedSubscriptionCodes = async () => {
+      const unused = subscriptionCodes.filter(c => !c.used).map(c => `${c.code} - ${c.days} يوم`).join('\n');
+      if (!unused) return alert('لا توجد أكواد غير مستخدمة للنسخ.');
+      await navigator.clipboard.writeText(unused);
+      alert('تم نسخ الأكواد غير المستخدمة.');
+  };
+
+  const exportSubscriptionCodesCSV = () => {
+      const rows = [['code','days','status','usedBy','usedAt']];
+      subscriptionCodes.forEach(c => {
+          rows.push([
+              c.code || '',
+              c.days || '',
+              c.used ? 'used' : 'unused',
+              c.usedBy || '',
+              c.usedAt?.toDate ? c.usedAt.toDate().toLocaleString('ar-EG') : ''
+          ]);
+      });
+      const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `subscription_codes_${new Date().toISOString().slice(0,10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+  };
+
+  const extendPremiumForAll = async () => {
+      const days = prompt('كم يوم تريد إضافتها لكل طلاب VIP الحاليين؟', '7');
+      if (!days || Number.isNaN(Number(days))) return;
+      if (!window.confirm(`سيتم إضافة ${days} يوم لكل طلاب VIP الحاليين. هل أنت متأكد؟`)) return;
+      const batch = writeBatch(db);
+      activeUsersList.filter(u => u.subscriptionStatus === 'premium').forEach(u => {
+          let expiry = u.subscriptionExpiry?.toDate ? u.subscriptionExpiry.toDate() : new Date();
+          if (expiry < new Date()) expiry = new Date();
+          expiry.setDate(expiry.getDate() + Number(days));
+          batch.update(doc(db, 'users', u.id), { subscriptionExpiry: expiry, subscriptionStatus: 'premium' });
+      });
+      await batch.commit();
+      alert('تم تمديد اشتراكات VIP الحالية.');
+  };
+
+
   const handleDeleteUser = async (id) => { if(window.confirm("حذف نهائي؟")) await deleteDoc(doc(db,'users',id)); };
   const handleDeleteMessage = async (id) => { if(window.confirm("حذف الرسالة؟")) await deleteDoc(doc(db,'messages',id)); };
   const handleDeleteExam = async (id) => { if(window.confirm("حذف الامتحان؟")) await deleteDoc(doc(db, 'exams', id)); };
   const handleDeleteAnnouncement = async (id) => { if(window.confirm("حذف الإعلان؟")) await deleteDoc(doc(db, 'announcements', id)); };
   const handleDeleteResult = async (resultId) => { if(window.confirm("حذف النتيجة؟")) await deleteDoc(doc(db, 'exam_results', resultId)); };
-  
+
+  const openFullExamEditor = (exam) => {
+    const hasResults = examResults.some(r => r.examId === exam.id);
+    setEditingFullExam({ ...exam, hasResults });
+    setExamEditMode(hasResults ? 'clone' : 'direct');
+    setRecalculateAfterExamEdit(hasResults);
+    setExamEditDraft({
+      title: exam.title || '',
+      grade: exam.grade || '3sec',
+      duration: safeNumber(exam.duration, 60),
+      startTime: exam.startTime || '',
+      endTime: exam.endTime || '',
+      accessCode: exam.accessCode || '',
+      isPremium: !!exam.isPremium,
+      questionsText: JSON.stringify(exam.questions || [], null, 2)
+    });
+  };
+
+
+  const recalculateExamResultsAfterAnswerEdit = async (examId, updatedExam) => {
+    const resultsQuery = query(collection(db, 'exam_results'), where('examId', '==', examId));
+    const snap = await getDocs(resultsQuery);
+
+    if (snap.empty) {
+      alert('تم تعديل الامتحان، ولا توجد نتائج قديمة لإعادة تصحيحها.');
+      return { updated: 0 };
+    }
+
+    let updatedCount = 0;
+    let batch = writeBatch(db);
+    let batchOps = 0;
+
+    for (const resultDoc of snap.docs) {
+      const result = resultDoc.data();
+      const answers = result.answers || {};
+      const essayGrades = result.essayGrades || result.essayScores || result.manualEssayGrades || {};
+
+      const metrics = calculateDetailedExamMetrics(updatedExam, answers, essayGrades);
+      const branchRows = Object.entries(metrics.branchStats || {}).map(([branch, data]) => {
+        const pct = data.possible > 0 ? Math.round((safeNumber(data.earned, 0) / safeNumber(data.possible, 1)) * 100) : 0;
+        return {
+          branch,
+          earned: safeNumber(data.earned, 0),
+          possible: safeNumber(data.possible, 0),
+          percentage: pct,
+          correct: safeNumber(data.correct, 0),
+          wrong: safeNumber(data.wrong, 0),
+          answered: safeNumber(data.answered, 0),
+          total: safeNumber(data.total, 0),
+          essay: safeNumber(data.essay, 0)
+        };
+      }).sort((a, b) => a.percentage - b.percentage);
+
+      const weakBranches = branchRows.filter(b => b.percentage < 70);
+      const mcqScore = metrics.questions
+        .filter(q => q.type !== 'essay')
+        .reduce((sum, q) => sum + (answers[q.id] === q.correctIdx ? getQuestionMaxScore(q) : 0), 0);
+
+      batch.update(resultDoc.ref, {
+        score: metrics.totalScore,
+        mcqScore,
+        total: metrics.totalPossible,
+        percentage: metrics.percentage,
+        branchStats: metrics.branchStats,
+        branchAnalysis: branchRows,
+        weakBranches,
+        performanceAnalysis: {
+          percentage: metrics.percentage,
+          totalScore: metrics.totalScore,
+          totalPossible: metrics.totalPossible,
+          weakBranches,
+          recalculatedBecause: 'exam_answers_edited',
+          recalculatedAt: new Date().toISOString()
+        },
+        examTitle: updatedExam.title,
+        examVersionAtRecalculation: safeNumber(updatedExam.version, 1) + 1,
+        recalculatedAt: serverTimestamp(),
+        recalculatedByAdmin: true
+      });
+
+      updatedCount += 1;
+      batchOps += 1;
+
+      if (batchOps >= 450) {
+        await batch.commit();
+        batch = writeBatch(db);
+        batchOps = 0;
+      }
+    }
+
+    if (batchOps > 0) await batch.commit();
+
+    return { updated: updatedCount };
+  };
+
+  const saveFullExamEdit = async (e) => {
+    e?.preventDefault?.();
+    if (!editingFullExam) return;
+    if (!examEditDraft.title.trim()) return alert('اكتب عنوان الامتحان.');
+    if (!examEditDraft.accessCode.trim()) return alert('اكتب كود الامتحان.');
+    if (!examEditDraft.startTime || !examEditDraft.endTime) return alert('حدد وقت البداية والنهاية.');
+
+    let parsedQuestions = [];
+    try {
+      parsedQuestions = JSON.parse(examEditDraft.questionsText || '[]');
+      if (!Array.isArray(parsedQuestions)) throw new Error('questions must be array');
+    } catch (err) {
+      return alert('صيغة الأسئلة غير صحيحة. يجب أن تكون JSON Array. لو مش متأكد، لا تعدل جزء الأسئلة.');
+    }
+
+    const payload = {
+      title: examEditDraft.title.trim(),
+      grade: examEditDraft.grade,
+      duration: safeNumber(examEditDraft.duration, 60),
+      startTime: examEditDraft.startTime,
+      endTime: examEditDraft.endTime,
+      accessCode: examEditDraft.accessCode.trim(),
+      isPremium: !!examEditDraft.isPremium,
+      questions: parsedQuestions,
+      updatedAt: serverTimestamp()
+    };
+
+    if (examEditMode === 'direct') {
+      if (editingFullExam.hasResults && !window.confirm('هذا الامتحان له نتائج سابقة. التعديل المباشر قد يغير شكل المراجعة والتحليل للنتائج القديمة. هل تريد التعديل المباشر فعلاً؟')) return;
+      await updateDoc(doc(db, 'exams', editingFullExam.id), {
+        ...payload,
+        version: increment(1),
+        lastEditMode: 'direct',
+        answersLastEditedAt: serverTimestamp()
+      });
+
+      if (editingFullExam.hasResults && recalculateAfterExamEdit) {
+        const recalc = await recalculateExamResultsAfterAnswerEdit(editingFullExam.id, { ...editingFullExam, ...payload });
+        alert(`تم تعديل الامتحان مباشرة وإعادة تصحيح ${recalc.updated} نتيجة قديمة تلقائيًا.`);
+      } else {
+        alert('تم تعديل الامتحان مباشرة.');
+      }
+    } else {
+      await addDoc(collection(db, 'exams'), {
+        ...payload,
+        title: payload.title.includes('نسخة') ? payload.title : `${payload.title} - نسخة جديدة`,
+        originalExamId: editingFullExam.id,
+        clonedFrom: editingFullExam.id,
+        version: safeNumber(editingFullExam.version, 1) + 1,
+        createdAt: serverTimestamp(),
+        source: 'clone_edit'
+      });
+      alert('تم إنشاء نسخة جديدة من الامتحان بنجاح. النتائج القديمة محفوظة كما هي.');
+    }
+
+    setEditingFullExam(null);
+  };
+
+  const openFullContentEditor = (item) => {
+    const allowedEmailsText = Array.isArray(item.allowedEmails) ? item.allowedEmails.join(', ') : (item.allowedEmails || '');
+    setEditingFullContent(item);
+    setContentEditMode('direct');
+    setContentEditDraft({
+      title: item.title || '',
+      url: item.url || item.file || '',
+      type: item.type || 'video',
+      videoSection: item.videoSection || 'explanation',
+      grade: item.grade || '3sec',
+      isPremium: !!item.isPremium,
+      isPublic: !!item.isPublic,
+      allowedEmailsText,
+      linkedExamId: item.linkedExamId || '',
+      estimatedDurationMinutes: item.estimatedDurationMinutes || '',
+      branch: item.branch || ''
+    });
+  };
+
+  const saveFullContentEdit = async (e) => {
+    e?.preventDefault?.();
+    if (!editingFullContent) return;
+    if (!contentEditDraft.title.trim()) return alert('اكتب عنوان المحتوى.');
+    if (!contentEditDraft.url.trim()) return alert('أدخل رابط المحتوى.');
+    if (contentEditDraft.type === 'video' && contentEditDraft.linkedExamId && safeNumber(contentEditDraft.estimatedDurationMinutes, 0) <= 0) {
+      return alert('لو الفيديو مربوط بامتحان لازم تكتب مدة الفيديو بالدقائق.');
+    }
+
+    const allowedEmails = contentEditDraft.allowedEmailsText
+      ? contentEditDraft.allowedEmailsText.split(',').map(e => e.trim()).filter(Boolean)
+      : [];
+
+    const payload = {
+      title: contentEditDraft.title.trim(),
+      url: contentEditDraft.url.trim(),
+      file: contentEditDraft.url.trim(),
+      type: contentEditDraft.type,
+      videoSection: contentEditDraft.type === 'video' ? contentEditDraft.videoSection : '',
+      grade: contentEditDraft.grade,
+      isPremium: !!contentEditDraft.isPremium,
+      isPublic: !!contentEditDraft.isPublic,
+      allowedEmails,
+      branch: contentEditDraft.branch || '',
+      linkedExamId: contentEditDraft.type === 'video' ? (contentEditDraft.linkedExamId || '') : '',
+      estimatedDurationMinutes: contentEditDraft.type === 'video' ? safeNumber(contentEditDraft.estimatedDurationMinutes, 0) : 0,
+      videoExamUnlockPercent: contentEditDraft.type === 'video' && contentEditDraft.linkedExamId ? VIDEO_EXAM_UNLOCK_PERCENT : 0,
+      updatedAt: serverTimestamp()
+    };
+
+    if (contentEditMode === 'direct') {
+      await updateDoc(doc(db, 'content', editingFullContent.id), { ...payload, version: increment(1), lastEditMode: 'direct' });
+      alert('تم تعديل المحتوى مباشرة.');
+    } else {
+      await addDoc(collection(db, 'content'), {
+        ...payload,
+        title: payload.title.includes('نسخة') ? payload.title : `${payload.title} - نسخة جديدة`,
+        originalContentId: editingFullContent.id,
+        clonedFrom: editingFullContent.id,
+        version: safeNumber(editingFullContent.version, 1) + 1,
+        createdAt: serverTimestamp(),
+        source: 'clone_edit'
+      });
+      alert('تم إنشاء نسخة جديدة من المحتوى.');
+    }
+
+    setEditingFullContent(null);
+  };
+
+  const handleApproveSecurityContinue = async (result) => {
+    if (!result?.id) return;
+    if (!window.confirm(`السماح للطالب ${result.studentName || ''} باستكمال الامتحان بنفس الإجابات والوقت المتبقي؟`)) return;
+    const payload = {
+      status: 'in_progress',
+      adminDecision: 'continue',
+      adminSecurityAction: 'continue',
+      securityReleased: true,
+      adminApprovedBy: user.email || user.uid,
+      adminApprovedAt: serverTimestamp(),
+      antiCheatLog: [
+        ...(result.antiCheatLog || []),
+        { type: 'admin_allowed_continue', at: new Date().toISOString(), admin: user.email || user.uid }
+      ]
+    };
+    await updateDoc(doc(db, 'exam_results', result.id), payload);
+    const updated = { ...result, ...payload };
+    setExamResults(prev => prev.map(r => r.id === result.id ? updated : r));
+    if (viewingResult?.id === result.id) setViewingResult(updated);
+    alert('تم السماح للطالب باستكمال الامتحان. عندما يدخل نفس الامتحان سيكمل من نفس الإجابات والوقت المتبقي.');
+  };
+
+  const handleApproveSecurityRestart = async (result) => {
+    if (!result?.id) return;
+    if (!window.confirm(`السماح للطالب ${result.studentName || ''} بإعادة الامتحان من البداية؟ سيتم مسح الإجابات الحالية وإرجاع الوقت كاملًا.`)) return;
+    const fullSeconds = safeNumber(result.totalTime, 60) * 60;
+    const payload = {
+      status: 'in_progress',
+      adminDecision: 'restart',
+      adminSecurityAction: 'restart',
+      securityReleased: true,
+      answers: {},
+      remainingTime: fullSeconds,
+      currentQIndex: 0,
+      score: 0,
+      total: 0,
+      antiCheatWarnings: 0,
+      restartCount: increment(1),
+      adminApprovedBy: user.email || user.uid,
+      adminApprovedAt: serverTimestamp(),
+      antiCheatLog: [
+        ...(result.antiCheatLog || []),
+        { type: 'admin_allowed_restart', at: new Date().toISOString(), admin: user.email || user.uid }
+      ]
+    };
+    await updateDoc(doc(db, 'exam_results', result.id), payload);
+    const updated = { ...result, ...payload, restartCount: safeNumber(result.restartCount, 0) + 1 };
+    setExamResults(prev => prev.map(r => r.id === result.id ? updated : r));
+    if (viewingResult?.id === result.id) setViewingResult(updated);
+    alert('تم السماح للطالب بإعادة الامتحان من البداية. عندما يدخل نفس الامتحان سيبدأ بمحاولة جديدة.');
+  };
+
   const handleDeleteAllResults = async () => {
     if(window.confirm("تحذير خطير: سيتم حذف جميع نتائج الامتحانات لكل الطلاب. هل أنت متأكد؟")) {
       const batch = writeBatch(db);
@@ -3328,6 +4186,220 @@ const AdminDashboard = ({ user }) => {
           </div>
       )}
 
+
+      {editingFullExam && (
+        <div className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-5xl max-h-[92vh] overflow-y-auto p-6 shadow-2xl">
+            <div className="flex justify-between items-center mb-5 border-b pb-3">
+              <h3 className="text-2xl font-black text-slate-800 flex items-center gap-2"><Edit size={22}/> تعديل الامتحان بالكامل</h3>
+              <button onClick={() => setEditingFullExam(null)} className="text-slate-400 hover:text-red-600"><X size={26}/></button>
+            </div>
+
+            {editingFullExam.hasResults && (
+              <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-2xl text-sm font-bold leading-relaxed">
+                هذا الامتحان له نتائج طلاب سابقة. عند تعديل الإجابات الصحيحة يمكنك إعادة تصحيح نتائج الطلاب تلقائيًا بناءً على الإجابات الجديدة.
+              </div>
+            )}
+
+            {editingFullExam.hasResults && examEditMode === 'direct' && (
+              <label className="mb-4 flex items-start gap-3 bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-2xl font-bold cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={recalculateAfterExamEdit}
+                  onChange={e => setRecalculateAfterExamEdit(e.target.checked)}
+                />
+                <span>
+                  إعادة تصحيح نتائج الطلاب القديمة تلقائيًا بعد حفظ التعديل
+                  <span className="block text-xs font-normal mt-1 text-emerald-700">
+                    استخدم هذا الخيار عند تعديل الإجابة الصحيحة أو درجة السؤال. سيعاد حساب الدرجة والفروع والتحليل لكل طالب حل الامتحان.
+                  </span>
+                </span>
+              </label>
+            )}
+
+            <form onSubmit={saveFullExamEdit} className="grid gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <label className="bg-slate-50 border rounded-xl p-3 flex items-center gap-2 font-bold">
+                  <input type="radio" checked={examEditMode === 'direct'} onChange={() => setExamEditMode('direct')} />
+                  تعديل مباشر
+                </label>
+                <label className="bg-slate-50 border rounded-xl p-3 flex items-center gap-2 font-bold">
+                  <input type="radio" checked={examEditMode === 'clone'} onChange={() => setExamEditMode('clone')} />
+                  إنشاء نسخة جديدة آمنة
+                </label>
+                <label className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-2 font-bold text-amber-800">
+                  <input type="checkbox" checked={examEditDraft.isPremium} onChange={e => setExamEditDraft({...examEditDraft, isPremium: e.target.checked})} />
+                  VIP فقط
+                </label>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <input className="border p-3 rounded-xl" placeholder="عنوان الامتحان" value={examEditDraft.title} onChange={e => setExamEditDraft({...examEditDraft, title: e.target.value})} />
+                <select className="border p-3 rounded-xl" value={examEditDraft.grade} onChange={e => setExamEditDraft({...examEditDraft, grade: e.target.value})}><GradeOptions/></select>
+                <input type="number" className="border p-3 rounded-xl" placeholder="المدة بالدقائق" value={examEditDraft.duration} onChange={e => setExamEditDraft({...examEditDraft, duration: e.target.value})} />
+                <input className="border p-3 rounded-xl" placeholder="كود الامتحان" value={examEditDraft.accessCode} onChange={e => setExamEditDraft({...examEditDraft, accessCode: e.target.value})} />
+                <input type="datetime-local" className="border p-3 rounded-xl" value={examEditDraft.startTime} onChange={e => setExamEditDraft({...examEditDraft, startTime: e.target.value})} />
+                <input type="datetime-local" className="border p-3 rounded-xl" value={examEditDraft.endTime} onChange={e => setExamEditDraft({...examEditDraft, endTime: e.target.value})} />
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div>
+                    <label className="block font-black text-slate-800 mb-1">تصحيح الإجابات من داخل المنصة</label>
+                    <p className="text-xs text-slate-500">غيّر الإجابة الصحيحة أو درجة السؤال من هنا بدون كتابة كود. المادة/النص والامتحان يظلوا كما هم إلا لو عدلتهم بنفسك.</p>
+                  </div>
+                  <span className="bg-white border px-3 py-1 rounded-full text-xs font-bold text-slate-600">{examEditQuestionsPreview.length} سؤال</span>
+                </div>
+
+                <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                  {examEditQuestionsPreview.length === 0 ? (
+                    <div className="bg-white border border-dashed rounded-xl p-5 text-center text-slate-400 font-bold">
+                      لا يمكن عرض محرر الأسئلة لأن صيغة الأسئلة غير مقروءة.
+                    </div>
+                  ) : examEditQuestionsPreview.map((q, idx) => (
+                    <div key={`${q.blockIndex}-${q.questionIndex}-${q.id || idx}`} className="bg-white border rounded-xl p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+                        <div className="flex-1 min-w-[220px]">
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            <span className="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded font-bold">سؤال {idx + 1}</span>
+                            <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded font-bold">{q.branch || 'عام'}</span>
+                            <span className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded font-bold">{q.type === 'essay' ? 'مقالي' : 'اختياري'}</span>
+                          </div>
+                          <p className="font-bold text-slate-800 leading-relaxed">{String(q.text || '').replaceAll('|', ' / ')}</p>
+                        </div>
+                      </div>
+
+                      {q.type === 'essay' ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <label className="block">
+                            <span className="text-xs font-bold text-slate-500">درجة السؤال المقالي من</span>
+                            <input
+                              type="number"
+                              min="0"
+                              className="w-full border rounded-xl p-3 mt-1"
+                              value={q.maxScore ?? q.mark ?? 10}
+                              onChange={e => updateQuestionInExamDraft(q.blockIndex, q.questionIndex, { maxScore: safeNumber(e.target.value, 10), mark: safeNumber(e.target.value, 10) })}
+                            />
+                          </label>
+                          <label className="block">
+                            <span className="text-xs font-bold text-slate-500">نموذج إجابة مختصر</span>
+                            <input
+                              className="w-full border rounded-xl p-3 mt-1"
+                              value={q.modelAnswer || ''}
+                              onChange={e => updateQuestionInExamDraft(q.blockIndex, q.questionIndex, { modelAnswer: e.target.value })}
+                              placeholder="اختياري"
+                            />
+                          </label>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <label className="block">
+                            <span className="text-xs font-bold text-slate-500">الإجابة الصحيحة</span>
+                            <select
+                              className="w-full border rounded-xl p-3 mt-1"
+                              value={q.correctIdx ?? 0}
+                              onChange={e => updateQuestionInExamDraft(q.blockIndex, q.questionIndex, { correctIdx: safeNumber(e.target.value, 0) })}
+                            >
+                              {(Array.isArray(q.options) ? q.options : []).map((opt, optIdx) => (
+                                <option key={optIdx} value={optIdx}>{optIdx + 1} - {opt}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="block">
+                            <span className="text-xs font-bold text-slate-500">درجة السؤال</span>
+                            <input
+                              type="number"
+                              min="0"
+                              className="w-full border rounded-xl p-3 mt-1"
+                              value={q.maxScore ?? q.mark ?? 1}
+                              onChange={e => updateQuestionInExamDraft(q.blockIndex, q.questionIndex, { maxScore: safeNumber(e.target.value, 1), mark: safeNumber(e.target.value, 1) })}
+                            />
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <details className="bg-white border rounded-2xl p-4">
+                  <summary className="cursor-pointer font-bold text-slate-700">تعديل متقدم للأسئلة بصيغة JSON</summary>
+                  <p className="text-xs text-slate-500 my-2">استخدمه فقط لو عايز تعدل نص السؤال أو الاختيارات أو الفروع بشكل متقدم.</p>
+                  <textarea className="w-full border rounded-xl p-3 min-h-[320px] font-mono text-xs text-left direction-ltr" dir="ltr" value={examEditDraft.questionsText} onChange={e => setExamEditDraft({...examEditDraft, questionsText: e.target.value})} />
+                </details>
+              </div>
+
+              <div className="flex flex-col md:flex-row gap-3">
+                <button type="submit" className="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-black hover:bg-emerald-700">حفظ</button>
+                <button type="button" onClick={() => setEditingFullExam(null)} className="flex-1 bg-slate-200 text-slate-700 py-3 rounded-xl font-black hover:bg-slate-300">إلغاء</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {editingFullContent && (
+        <div className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[92vh] overflow-y-auto p-6 shadow-2xl">
+            <div className="flex justify-between items-center mb-5 border-b pb-3">
+              <h3 className="text-2xl font-black text-slate-800 flex items-center gap-2"><Edit size={22}/> تعديل المحتوى بالكامل</h3>
+              <button onClick={() => setEditingFullContent(null)} className="text-slate-400 hover:text-red-600"><X size={26}/></button>
+            </div>
+
+            <form onSubmit={saveFullContentEdit} className="grid gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <label className="bg-slate-50 border rounded-xl p-3 flex items-center gap-2 font-bold">
+                  <input type="radio" checked={contentEditMode === 'direct'} onChange={() => setContentEditMode('direct')} />
+                  تعديل مباشر
+                </label>
+                <label className="bg-slate-50 border rounded-xl p-3 flex items-center gap-2 font-bold">
+                  <input type="radio" checked={contentEditMode === 'clone'} onChange={() => setContentEditMode('clone')} />
+                  إنشاء نسخة جديدة
+                </label>
+                <label className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-2 font-bold text-amber-800">
+                  <input type="checkbox" checked={contentEditDraft.isPremium} onChange={e => setContentEditDraft({...contentEditDraft, isPremium: e.target.checked})} />
+                  VIP فقط
+                </label>
+              </div>
+
+              <input className="border p-3 rounded-xl" placeholder="العنوان" value={contentEditDraft.title} onChange={e => setContentEditDraft({...contentEditDraft, title: e.target.value})} />
+              <input className="border p-3 rounded-xl" placeholder="الرابط / رابط الفيديو / رابط الملف" value={contentEditDraft.url} onChange={e => setContentEditDraft({...contentEditDraft, url: e.target.value})} />
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <select className="border p-3 rounded-xl" value={contentEditDraft.type} onChange={e => setContentEditDraft({...contentEditDraft, type: e.target.value})}>
+                  <option value="video">فيديو مدمج</option><option value="file">ملف PDF</option><option value="html">HTML تفاعلي</option><option value="interactive_exam">امتحان تفاعلي</option><option value="link">رابط خارجي</option>
+                </select>
+                <select className="border p-3 rounded-xl" value={contentEditDraft.grade} onChange={e => setContentEditDraft({...contentEditDraft, grade: e.target.value})}><GradeOptions/></select>
+                <input className="border p-3 rounded-xl" placeholder="الفرع" value={contentEditDraft.branch} onChange={e => setContentEditDraft({...contentEditDraft, branch: e.target.value})} />
+              </div>
+
+              {contentEditDraft.type === 'video' && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-blue-50 border border-blue-200 rounded-2xl p-4">
+                  <select className="border p-3 rounded-xl bg-white" value={contentEditDraft.videoSection} onChange={e => setContentEditDraft({...contentEditDraft, videoSection: e.target.value})}>
+                    <option value="explanation">شرح الدرس</option><option value="exercises">حل التدريبات</option><option value="reviews">مراجعة نهائية</option>
+                  </select>
+                  <select className="border p-3 rounded-xl bg-white" value={contentEditDraft.linkedExamId} onChange={e => setContentEditDraft({...contentEditDraft, linkedExamId: e.target.value})}>
+                    <option value="">بدون امتحان مرتبط</option>
+                    {examsList.filter(exam => !contentEditDraft.grade || exam.grade === contentEditDraft.grade).map(exam => <option key={exam.id} value={exam.id}>{exam.title}</option>)}
+                  </select>
+                  <input type="number" min="1" className="border p-3 rounded-xl bg-white" placeholder="مدة الفيديو بالدقائق" value={contentEditDraft.estimatedDurationMinutes} onChange={e => setContentEditDraft({...contentEditDraft, estimatedDurationMinutes: e.target.value})} />
+                </div>
+              )}
+
+              <textarea className="border p-3 rounded-xl min-h-[80px]" placeholder="إيميلات مسموحة مفصولة بفاصلة، أو اتركها فارغة للجميع" value={contentEditDraft.allowedEmailsText} onChange={e => setContentEditDraft({...contentEditDraft, allowedEmailsText: e.target.value})} />
+              <label className="flex items-center gap-2 bg-slate-50 border rounded-xl p-3 font-bold"><input type="checkbox" checked={contentEditDraft.isPublic} onChange={e => setContentEditDraft({...contentEditDraft, isPublic: e.target.checked})}/> يظهر للزوار في الصفحة الرئيسية</label>
+
+              <div className="flex flex-col md:flex-row gap-3">
+                <button type="submit" className="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-black hover:bg-emerald-700">حفظ</button>
+                <button type="button" onClick={() => setEditingFullContent(null)} className="flex-1 bg-slate-200 text-slate-700 py-3 rounded-xl font-black hover:bg-slate-300">إلغاء</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {viewingStudentProfile && (
           <div className="fixed inset-0 z-[1000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 md:p-8">
               <div className="bg-slate-50 rounded-3xl w-full max-w-6xl h-full md:h-[90vh] shadow-2xl flex flex-col relative overflow-hidden border border-slate-300">
@@ -3423,14 +4495,17 @@ const AdminDashboard = ({ user }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-4 md:p-6 relative z-10">
         <div className="glass-panel p-4 rounded-xl h-fit space-y-2 flex md:flex-col overflow-x-auto md:overflow-x-visible whitespace-nowrap scrollbar-hide">
-          {['users', 'all_users', 'subscriptions', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'smart_hw', 'live', 'content', 'notifications', 'messages', 'auto_reply', 'quotes', 'settings'].map(tab => (
+          {['dashboard', 'users', 'all_users', 'subscriptions', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'smart_hw', 'live', 'content', 'notifications', 'messages', 'auto_reply', 'quotes', 'settings'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 transition-all ${activeTab===tab?'bg-amber-100 text-amber-700 shadow-sm border-b-4 md:border-b-0 md:border-r-4 border-amber-500':'hover:bg-slate-50 text-slate-600'}`}>
-              {tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : 'الإعدادات'}
+              {tab === 'dashboard' ? 'Dashboard' : tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : 'الإعدادات'}
             </button>
+              <button onClick={() => setActiveTab('student-messages')} className={`px-4 py-2 rounded-xl font-bold transition flex items-center gap-2 ${activeTab === 'student-messages' ? 'bg-amber-600 text-white' : 'bg-white text-slate-700 hover:bg-amber-50'}`}><MessageCircle size={18}/> رسائل الطلاب</button>
           ))}
         </div>
 
         <div className="md:col-span-3 w-full overflow-hidden">
+          {activeTab === 'dashboard' && <AdminProDashboard users={activeUsersList} exams={examsList} results={examResults} content={contentList} subscriptionCodes={subscriptionCodes} liveSessions={activeLiveSessions} hwResults={hwResults} adminGradeFilter={adminGradeFilter} />}
+
           {activeTab === 'users' && <div className="glass-panel p-4 md:p-6 rounded-xl"><h2 className="font-bold mb-4 font-arabic text-xl">طلبات الانضمام</h2>{filteredPendingUsers.map(u=><div key={u.id} className="border p-4 mb-2 rounded-lg flex flex-col md:flex-row gap-3 justify-between bg-white/50 backdrop-blur-sm"><div><p className="font-bold">{u.name}</p><p className="text-sm">{u.grade}</p></div><div className="flex gap-2"><button onClick={()=>handleApprove(u.id)} className="bg-green-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-green-500/50 transition flex-1"><Check className="mx-auto"/></button><button onClick={()=>handleReject(u.id)} className="bg-red-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-red-500/50 transition flex-1"><X className="mx-auto"/></button></div></div>)}</div>}
 
           {activeTab === 'all_users' && (
@@ -3516,54 +4591,98 @@ const AdminDashboard = ({ user }) => {
 
           {activeTab === 'subscriptions' && (
               <div className="space-y-6">
-                  <div className="glass-panel p-4 md:p-6 rounded-xl border-t-4 border-amber-500">
-                      <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-amber-700"><Key/> توليد أكواد اشتراكات (كروت شحن)</h2>
-                      <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 mb-6">
-                          <p className="text-sm text-amber-800 font-bold mb-4">هذه الأكواد يمكن طباعتها وبيعها للطلاب لتفعيل باقة VIP لديهم فوراً عند إدخال الكود.</p>
-                          <div className="flex flex-col md:flex-row gap-4">
-                              <div className="flex-1">
-                                  <label className="block text-xs font-bold text-slate-600 mb-1">عدد الأكواد المطلوبة</label>
-                                  <input type="number" className="w-full border p-3 rounded-lg" value={codeGenCount} onChange={e=>setCodeGenCount(e.target.value)} />
-                              </div>
-                              <div className="flex-1">
-                                  <label className="block text-xs font-bold text-slate-600 mb-1">مدة الاشتراك (بالأيام)</label>
-                                  <input type="number" className="w-full border p-3 rounded-lg" value={codeGenDays} onChange={e=>setCodeGenDays(e.target.value)} />
-                              </div>
-                              <div className="flex items-end">
-                                  <button onClick={generateSubscriptionCodes} className="w-full md:w-auto bg-amber-600 text-white px-8 py-3 rounded-lg font-bold shadow-lg hover:bg-amber-700 transition">توليد الأكواد</button>
+                  {(() => {
+                    const unusedCodes = subscriptionCodes.filter(c => !c.used);
+                    const usedCodesList = subscriptionCodes.filter(c => c.used);
+                    const premiumStudents = filteredActiveUsers.filter(u => u.subscriptionStatus === 'premium');
+                    const expiringSoon = premiumStudents.filter(u => {
+                      const d = u.subscriptionExpiry?.toDate ? u.subscriptionExpiry.toDate() : null;
+                      return d && d > new Date() && (d.getTime() - Date.now()) / (1000*60*60*24) <= 7;
+                    });
+                    return (
+                      <>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4"><p className="text-sm font-bold text-amber-700">أكواد متاحة</p><p className="text-3xl font-black text-amber-900">{unusedCodes.length}</p></div>
+                          <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4"><p className="text-sm font-bold text-emerald-700">أكواد مستخدمة</p><p className="text-3xl font-black text-emerald-900">{usedCodesList.length}</p></div>
+                          <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4"><p className="text-sm font-bold text-blue-700">طلاب VIP</p><p className="text-3xl font-black text-blue-900">{premiumStudents.length}</p></div>
+                          <div className="bg-red-50 border border-red-100 rounded-2xl p-4"><p className="text-sm font-bold text-red-700">ينتهي خلال 7 أيام</p><p className="text-3xl font-black text-red-900">{expiringSoon.length}</p></div>
+                        </div>
+
+                        <div className="glass-panel p-4 md:p-6 rounded-xl border-t-4 border-amber-500">
+                          <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-4">
+                            <div>
+                              <h2 className="text-xl font-bold flex items-center gap-2 text-amber-700"><Key/> نظام الاشتراكات وكروت الشحن</h2>
+                              <p className="text-sm text-slate-500 mt-1">ولّد أكواد، انسخها، صدّرها CSV، وراقب الطلاب المشتركين.</p>
+                            </div>
+                            <div className="flex flex-col md:flex-row gap-2">
+                              <button onClick={copyUnusedSubscriptionCodes} className="bg-blue-600 text-white px-4 py-2 rounded-xl font-bold flex items-center justify-center gap-2"><ClipboardList size={16}/> نسخ الأكواد الجديدة</button>
+                              <button onClick={exportSubscriptionCodesCSV} className="bg-slate-800 text-white px-4 py-2 rounded-xl font-bold flex items-center justify-center gap-2"><Download size={16}/> تصدير CSV</button>
+                              <button onClick={extendPremiumForAll} className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold flex items-center justify-center gap-2"><Crown size={16}/> تمديد VIP</button>
+                            </div>
+                          </div>
+
+                          <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 mb-6">
+                              <p className="text-sm text-amber-800 font-bold mb-4">هذه الأكواد يمكن طباعتها أو إرسالها للطلاب لتفعيل باقة VIP فورًا عند إدخال الكود من صفحة الاشتراك.</p>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                  <div>
+                                      <label className="block text-xs font-bold text-slate-600 mb-1">عدد الأكواد المطلوبة</label>
+                                      <input type="number" min="1" className="w-full border p-3 rounded-lg" value={codeGenCount} onChange={e=>setCodeGenCount(e.target.value)} />
+                                  </div>
+                                  <div>
+                                      <label className="block text-xs font-bold text-slate-600 mb-1">مدة الاشتراك بالأيام</label>
+                                      <input type="number" min="1" className="w-full border p-3 rounded-lg" value={codeGenDays} onChange={e=>setCodeGenDays(e.target.value)} />
+                                  </div>
+                                  <div className="flex items-end">
+                                      <button onClick={generateSubscriptionCodes} className="w-full bg-amber-600 text-white px-8 py-3 rounded-lg font-bold shadow-lg hover:bg-amber-700 transition">توليد الأكواد</button>
+                                  </div>
                               </div>
                           </div>
-                      </div>
-                      
-                      <div className="overflow-x-auto">
-                          <table className="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm text-sm whitespace-nowrap">
-                              <thead className="bg-slate-800 text-white">
-                                  <tr>
-                                      <th className="p-3 text-right">الكود</th>
-                                      <th className="p-3 text-center">المدة</th>
-                                      <th className="p-3 text-center">الحالة</th>
-                                      <th className="p-3 text-right">استخدم بواسطة</th>
-                                      <th className="p-3 text-center">إجراء</th>
-                                  </tr>
-                              </thead>
-                              <tbody>
-                                  {subscriptionCodes.map((code, idx) => (
-                                      <tr key={code.id} className={`border-b ${code.used ? 'bg-red-50 opacity-60' : 'hover:bg-slate-50'}`}>
-                                          <td className="p-3 font-mono font-bold text-blue-700">{code.code}</td>
-                                          <td className="p-3 text-center font-bold">{code.days} يوم</td>
-                                          <td className="p-3 text-center">
-                                              {code.used ? <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">مُستخدم</span> : <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">جديد (صالح)</span>}
-                                          </td>
-                                          <td className="p-3 text-slate-600">{code.usedBy || '-'}</td>
-                                          <td className="p-3 text-center">
-                                              <button onClick={() => handleDeleteCode(code.id)} className="text-red-500 hover:bg-red-100 p-2 rounded"><Trash2 size={16}/></button>
-                                          </td>
+
+                          {expiringSoon.length > 0 && (
+                            <div className="mb-6 bg-red-50 border border-red-200 rounded-2xl p-4">
+                              <h3 className="font-black text-red-700 mb-3 flex items-center gap-2"><AlertTriangle size={18}/> اشتراكات قربت تنتهي</h3>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                {expiringSoon.map(s => <div key={s.id} className="bg-white rounded-xl p-3 border"><p className="font-bold">{s.name || s.email}</p><p className="text-xs text-red-600">ينتهي: {s.subscriptionExpiry?.toDate?.().toLocaleDateString('ar-EG')}</p></div>)}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="overflow-x-auto">
+                              <table className="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm text-sm whitespace-nowrap">
+                                  <thead className="bg-slate-800 text-white">
+                                      <tr>
+                                          <th className="p-3 text-right">الكود</th>
+                                          <th className="p-3 text-center">المدة</th>
+                                          <th className="p-3 text-center">الحالة</th>
+                                          <th className="p-3 text-right">استخدم بواسطة</th>
+                                          <th className="p-3 text-center">تاريخ الاستخدام</th>
+                                          <th className="p-3 text-center">إجراء</th>
                                       </tr>
-                                  ))}
-                              </tbody>
-                          </table>
-                      </div>
-                  </div>
+                                  </thead>
+                                  <tbody>
+                                      {subscriptionCodes.map((code) => (
+                                          <tr key={code.id} className={`border-b ${code.used ? 'bg-red-50 opacity-70' : 'hover:bg-slate-50'}`}>
+                                              <td className="p-3 font-mono font-black text-blue-700 select-all">{code.code}</td>
+                                              <td className="p-3 text-center font-bold">{code.days} يوم</td>
+                                              <td className="p-3 text-center">
+                                                  {code.used ? <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">مُستخدم</span> : <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">جديد</span>}
+                                              </td>
+                                              <td className="p-3 text-slate-600">{code.usedBy || '-'}</td>
+                                              <td className="p-3 text-center text-slate-500">{code.usedAt?.toDate ? code.usedAt.toDate().toLocaleString('ar-EG') : '-'}</td>
+                                              <td className="p-3 text-center">
+                                                  <button onClick={() => navigator.clipboard.writeText(code.code)} className="text-blue-600 hover:bg-blue-100 p-2 rounded ml-1"><ClipboardList size={16}/></button>
+                                                  <button onClick={() => handleDeleteCode(code.id)} className="text-red-500 hover:bg-red-100 p-2 rounded"><Trash2 size={16}/></button>
+                                              </td>
+                                          </tr>
+                                      ))}
+                                      {subscriptionCodes.length === 0 && <tr><td colSpan="6" className="p-8 text-center text-slate-500">لم يتم توليد أي أكواد بعد.</td></tr>}
+                                  </tbody>
+                              </table>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
               </div>
           )}
 
@@ -3688,6 +4807,7 @@ const AdminDashboard = ({ user }) => {
                                           <p className="text-xs text-slate-400">كود: {exam.accessCode}</p>
                                       </div>
                                       <div className="flex gap-2">
+                                          <button onClick={() => openFullExamEditor(exam)} className="text-emerald-600 p-2 bg-emerald-100 rounded-lg hover:bg-emerald-200" title="تعديل كامل / نسخة جديدة"><Edit size={18}/></button>
                                           <button onClick={() => { setEditingExamTime(exam); setNewEndTime(exam.endTime); }} className="text-blue-600 p-2 bg-blue-100 rounded-lg hover:bg-blue-200" title="تمديد الوقت"><Calendar size={18}/></button>
                                           <button onClick={()=>handleDeleteExam(exam.id)} className="text-red-600 p-2 bg-red-100 rounded-lg hover:bg-red-200" title="حذف"><Trash2 size={18}/></button>
                                       </div>
@@ -3725,6 +4845,16 @@ const AdminDashboard = ({ user }) => {
                            })()}
                        </div>
                        <h3 className="font-bold text-lg mb-2">إجابات الطالب: {viewingResult.studentName}</h3>
+                       {viewingResult.status === 'security_hold' && (
+                         <div className="mb-4 bg-red-50 border border-red-200 text-red-800 p-4 rounded-xl">
+                           <p className="font-black mb-2 flex items-center gap-2"><ShieldAlert size={18}/> هذه المحاولة موقوفة أمنيًا وتحتاج قرار الأدمن</p>
+                           <p className="text-sm font-bold mb-3">يمكنك السماح للطالب بالاستكمال من نفس الإجابات والوقت المتبقي، أو السماح بإعادة الامتحان من البداية.</p>
+                           <div className="flex flex-col md:flex-row gap-2">
+                             <button onClick={() => handleApproveSecurityContinue(viewingResult)} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-700">السماح بالاستكمال</button>
+                             <button onClick={() => handleApproveSecurityRestart(viewingResult)} className="bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-amber-700">السماح بالإعادة من البداية</button>
+                           </div>
+                         </div>
+                       )}
                        {viewingResult.hasEssay && (
                            <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-xl font-bold text-sm">
                                هذا الامتحان يحتوي على أسئلة مقالية، ويمكنك تصحيح كل سؤال يدويًا وتحديد الدرجة النهائية له من نفس الصفحة.
@@ -3826,9 +4956,23 @@ const AdminDashboard = ({ user }) => {
                                            {res.studentName}
                                            {res.hasEssay && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px] font-bold">مقالي</span>}
                                        </p>
-                                       <p className="text-xs text-slate-500">{res.status==='cheated'?'غش 🚫': res.status==='in_progress' ? 'قيد التنفيذ (لم يسلم) ⏳' : `درجة: ${res.score}/${res.total}`}</p>
+                                       <p className="text-xs text-slate-500">
+                                           {res.status==='security_hold'
+                                             ? 'موقوف أمنيًا في انتظار قرار الأدمن 🛡️'
+                                             : res.status==='cheated'
+                                               ? 'غش 🚫'
+                                               : res.status==='in_progress'
+                                                 ? 'قيد التنفيذ (لم يسلم) ⏳'
+                                                 : `درجة: ${res.score}/${res.total}`}
+                                       </p>
                                    </div>
-                                   <div className="flex gap-2">
+                                   <div className="flex gap-2 flex-wrap justify-end">
+                                      {res.status === 'security_hold' && (
+                                        <>
+                                          <button onClick={()=>handleApproveSecurityContinue(res)} className="bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-blue-700">السماح بالاستكمال</button>
+                                          <button onClick={()=>handleApproveSecurityRestart(res)} className="bg-amber-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-amber-700">السماح بالإعادة</button>
+                                        </>
+                                      )}
                                       {res.status === 'completed' && <button onClick={()=>sendWhatsAppToParent(res)} className="bg-green-100 text-green-700 px-3 py-1 rounded text-xs font-bold flex items-center gap-1 hover:bg-green-200"><MessageCircle size={14}/><span className="hidden md:inline"> إرسال لولي الأمر</span></button>}
                                       <button onClick={()=>setViewingResult(res)} className="bg-blue-100 text-blue-600 px-3 py-1 rounded text-xs font-bold">التفاصيل</button>
                                       <button onClick={()=>handleDeleteResult(res.id)} className="bg-amber-100 text-amber-600 px-3 py-1 rounded text-xs font-bold">إعادة</button>
@@ -3981,7 +5125,10 @@ const AdminDashboard = ({ user }) => {
                                       {c.type === 'html' && <span className="text-[10px] bg-purple-100 text-purple-600 px-2 py-0.5 rounded">HTML</span>}
                                       {c.type === 'link' && <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded">رابط خارجي</span>}
                                   </div>
-                                  <div className="flex gap-2"><button onClick={() => handleDeleteContent(c.id)} className="text-red-500 hover:bg-red-50 p-2 rounded"><Trash2 size={18}/></button></div>
+                                  <div className="flex gap-2">
+                                      <button onClick={() => openFullContentEditor(c)} className="text-emerald-600 hover:bg-emerald-50 p-2 rounded" title="تعديل كامل / نسخة جديدة"><Edit size={18}/></button>
+                                      <button onClick={() => handleDeleteContent(c.id)} className="text-red-500 hover:bg-red-50 p-2 rounded"><Trash2 size={18}/></button>
+                                  </div>
                               </div>
                           ))}
                       </div>
@@ -3989,6 +5136,8 @@ const AdminDashboard = ({ user }) => {
               </div>
           )}
 
+
+          {activeTab === 'student-messages' && <AdminStudentMessaging users={users} adminGradeFilter={adminGradeFilter} />}
 
           {activeTab === 'notifications' && (
             <div className="glass-panel p-4 md:p-6 rounded-2xl space-y-6">
@@ -4277,7 +5426,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
           const batch = writeBatch(db);
           batch.update(doc(db, 'users', user.uid), { subscriptionStatus: 'premium', subscriptionExpiry: newExpiry });
-          batch.update(doc(db, 'subscription_codes', codeDoc.id), { used: true, usedBy: user.displayName });
+          batch.update(doc(db, 'subscription_codes', codeDoc.id), { used: true, usedBy: user.displayName, usedById: user.uid, usedAt: serverTimestamp() });
           
           await batch.commit();
           alert(`تم شحن الكود بنجاح! تم تفعيل اشتراكك لمدة ${days} يوم.`);
@@ -4385,9 +5534,83 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
     if (isBannedExam) return alert("أنت محظور من دخول الامتحانات.");
     const previousResult = examResults.find(r => r.examId === exam.id);
     if (previousResult) {
-        if (previousResult.status === 'completed') { alert(`أنت امتحنت الامتحان ده قبل كده وجبت ${previousResult.score}.`); } 
-        else if (previousResult.status === 'in_progress' || previousResult.status === 'cheated') { alert("لقد بدأت هذا الامتحان بالفعل وتم احتسابه عليك. لا يمكن الإعادة."); }
-        return;
+        if (previousResult.status === 'completed') {
+          alert(`أنت امتحنت الامتحان ده قبل كده وجبت ${previousResult.score}.`);
+          return;
+        }
+        if (previousResult.status === 'security_hold') {
+          if (previousResult.adminDecision === 'continue') {
+            setActiveExam({ ...exam, attemptId: previousResult.id, resumeData: previousResult, sourceVideoId: previousResult.sourceVideoId || options.sourceVideoId || null });
+            return;
+          }
+          if (previousResult.adminDecision === 'restart') {
+            const freshResume = { answers: {}, remainingTime: exam.duration * 60, antiCheatWarnings: 0, antiCheatLog: previousResult.antiCheatLog || [] };
+            await setDoc(doc(db, 'exam_results', previousResult.id), {
+              answers: {},
+              remainingTime: exam.duration * 60,
+              currentQIndex: 0,
+              score: 0,
+              total: 0,
+              status: 'in_progress',
+              adminDecision: 'restart_consumed',
+              antiCheatWarnings: 0,
+              restartedByAdminDecisionAt: serverTimestamp(),
+              sourceVideoId: previousResult.sourceVideoId || options.sourceVideoId || null
+            }, { merge: true });
+            setActiveExam({ ...exam, attemptId: previousResult.id, resumeData: freshResume, sourceVideoId: previousResult.sourceVideoId || options.sourceVideoId || null });
+            return;
+          }
+          alert('تم إيقاف محاولتك مؤقتًا بسبب تنبيهات الأمان. تواصل مع الأدمن ليقرر السماح بالاستكمال أو إعادة الامتحان.');
+          return;
+        }
+
+        if (previousResult.status === 'in_progress') {
+          if (previousResult.adminDecision === 'continue') {
+            setActiveExam({ ...exam, attemptId: previousResult.id, resumeData: previousResult, sourceVideoId: previousResult.sourceVideoId || options.sourceVideoId || null });
+            return;
+          }
+          if (previousResult.adminDecision === 'restart') {
+            const freshResume = { answers: {}, remainingTime: exam.duration * 60, antiCheatWarnings: 0, antiCheatLog: previousResult.antiCheatLog || [] };
+            await setDoc(doc(db, 'exam_results', previousResult.id), {
+              answers: {},
+              remainingTime: exam.duration * 60,
+              currentQIndex: 0,
+              score: 0,
+              total: 0,
+              adminDecision: 'restart_consumed',
+              antiCheatWarnings: 0,
+              restartedByAdminDecisionAt: serverTimestamp(),
+              sourceVideoId: previousResult.sourceVideoId || options.sourceVideoId || null
+            }, { merge: true });
+            setActiveExam({ ...exam, attemptId: previousResult.id, resumeData: freshResume, sourceVideoId: previousResult.sourceVideoId || options.sourceVideoId || null });
+            return;
+          }
+          const resume = window.confirm('لديك محاولة غير مكتملة لهذا الامتحان. اضغط OK للاستكمال بنفس الإجابات والوقت المتبقي، أو Cancel لإعادة الامتحان من البداية.');
+          if (resume) {
+            setActiveExam({ ...exam, attemptId: previousResult.id, resumeData: previousResult, sourceVideoId: previousResult.sourceVideoId || options.sourceVideoId || null });
+          } else {
+            await setDoc(doc(db, 'exam_results', previousResult.id), {
+              answers: {},
+              remainingTime: exam.duration * 60,
+              currentQIndex: 0,
+              score: 0,
+              total: 0,
+              status: 'in_progress',
+              antiCheatWarnings: 0,
+              antiCheatLog: [...(previousResult.antiCheatLog || []), { type: 'student_restart_before_resume', at: new Date().toISOString() }],
+              restartCount: increment(1),
+              restartedAt: serverTimestamp(),
+              sourceVideoId: previousResult.sourceVideoId || options.sourceVideoId || null
+            }, { merge: true });
+            setActiveExam({ ...exam, attemptId: previousResult.id, resumeData: { answers: {}, remainingTime: exam.duration * 60, antiCheatWarnings: 0, antiCheatLog: [] }, sourceVideoId: previousResult.sourceVideoId || options.sourceVideoId || null });
+          }
+          return;
+        }
+
+        if (previousResult.status === 'cheated') {
+          alert('هذه المحاولة مسجلة كمخالفة أمان. لا يمكن إعادة الامتحان أو استكماله إلا إذا سمح الأدمن من لوحة النتائج.');
+          return;
+        }
     }
     const now = new Date(); const start = new Date(exam.startTime); const end = new Date(exam.endTime);
     if (now < start) return alert(`الامتحان لم يبدأ بعد. موعد البدء: ${start.toLocaleString('ar-EG')}`);
