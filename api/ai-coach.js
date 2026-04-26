@@ -1,211 +1,133 @@
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+// api/ai-coach.js
 
-function safeTrim(value, max = 14000) {
-  return String(value ?? "").slice(0, max);
-}
-
-function schemaForMode(mode) {
-  if (mode === "generate_exam") {
-    return `{
-      "summary": "ملخص",
-      "exam": {
-        "title": "عنوان الامتحان",
-        "duration": 25,
-        "questions": [
-          {
-            "text": "قطعة أو تعليمات ويمكن استخدام [تمييز]",
-            "subQuestions": [
-              {
-                "id": "q1",
-                "text": "نص السؤال",
-                "type": "mcq",
-                "branch": "الفرع",
-                "difficulty": "سهل",
-                "options": ["اختيار 1", "اختيار 2", "اختيار 3", "اختيار 4"],
-                "correctIdx": 0,
-                "explanation": "شرح فكرة السؤال والتصويب",
-                "maxScore": 1,
-                "tags": ["مهارة"]
-              }
-            ]
-          }
-        ]
-      }
-    }`;
-  }
-
-  if (mode === "student_chat") {
-    return `{
-      "summary": "ملخص",
-      "answer": "رد مباشر للطالب بالعربية المصرية",
-      "studyPlan": ["خطوة 1", "خطوة 2"]
-    }`;
-  }
-
-  return `{
-    "summary": "ملخص قصير",
-    "explanation": "شرح السؤال أو التحليل",
-    "mistakeReason": "سبب الخطأ المحتمل",
-    "studyPlan": ["خطوة 1", "خطوة 2", "خطوة 3"],
-    "quickExercises": ["تدريب 1", "تدريب 2"]
-  }`;
-}
+const GEMINI_MODEL = "gemini-1.5-flash";
 
 function buildPrompt(body) {
   const mode = body?.mode || "general";
-  const base = `
-أنت مدرب ومصحح عربي ذكي لمنصة تعليمية للأستاذ محمد النحاس.
-اكتب بالعربية المصرية الواضحة.
-التزم بالمرحلة الدراسية المطلوبة ولا تخرج عنها.
-رجّع JSON فقط بدون Markdown.
-الشكل المطلوب:
-${schemaForMode(mode)}
-`;
 
   if (mode === "generate_exam") {
-    return `${base}
+    return `
+أنت مدرس ذكي.
 
-المطلوب: بناء امتحان تفاعلي في صورة JSON للمنصة.
-الموضوع/الفرع: ${safeTrim(body.topic, 700)}
-الصف/مرحلة الطالب: ${safeTrim(body.grade, 100)}
-الفروع المطلوبة: ${safeTrim(body.branches, 500)}
-عدد الاختياري المطلوب: ${Number(body.mcqCount || 18)}
-المدة: ${Number(body.duration || 25)} دقيقة
-تعليمات إضافية: ${safeTrim(body.instructions, 1000)}
+المطلوب:
+إنشاء امتحان JSON.
 
-شروط:
-- عدد الأسئلة بين 15 و20 سؤال اختيار من متعدد.
-- الصعوبة موزعة: سهل، متوسط، صعب، صعب جدا.
-- لا تضع أي سؤال خارج مرحلة الطالب.
-- كل سؤال له 4 اختيارات.
-- correctIdx رقم من 0 إلى 3.
-- كل سؤال له explanation واضح للتصويب.
-- استخدم [ ] لتظليل الكلمات المهمة عند الحاجة.
+الموضوع: ${body.topic}
+الصف: ${body.grade}
+
+الشروط:
+- 15 إلى 20 سؤال
+- اختياري (4 اختيارات)
+- مستويات مختلفة
+- correctIdx من 0 لـ 3
+- شرح لكل سؤال
+
+ارجع JSON فقط بالشكل ده:
+
+{
+  "exam": {
+    "title": "امتحان",
+    "questions": [
+      {
+        "text": "سؤال",
+        "options": ["A","B","C","D"],
+        "correctIdx": 0,
+        "explanation": "شرح"
+      }
+    ]
+  }
+}
 `;
   }
 
   if (mode === "student_chat") {
-    return `${base}
+    return `
+أنت مدرب ذكي.
 
-رد على الطالب كمدرب ذكي.
-اسم الطالب: ${safeTrim(body.studentName, 200)}
-الصف: ${safeTrim(body.grade, 100)}
-سؤال الطالب: ${safeTrim(body.question, 2500)}
-آخر النتائج:
-${safeTrim(JSON.stringify(body.recentResults || [], null, 2), 6000)}
-آخر المحادثة:
-${safeTrim(JSON.stringify(body.chatHistory || [], null, 2), 4000)}
+سؤال الطالب:
+${body.question}
+
+الصف:
+${body.grade}
+
+ارجع JSON فقط:
+
+{
+  "answer": "رد واضح",
+  "studyPlan": ["خطوة1","خطوة2"]
+}
 `;
   }
 
-  return `${base}
-حلل البيانات:
-${safeTrim(JSON.stringify(body, null, 2), 14000)}
+  return `
+حلل وارجع JSON:
+
+{
+  "explanation": "شرح",
+  "studyPlan": []
+}
 `;
-}
-
-function parseJSON(text) {
-  const raw = String(text || "").trim();
-  try { return JSON.parse(raw); } catch (e) {}
-  const match = raw.match(/\{[\s\S]*\}/);
-  if (match) {
-    try { return JSON.parse(match[0]); } catch (e) {}
-  }
-  return { summary: "تم إنشاء تحليل.", explanation: raw.slice(0, 2000), studyPlan: [], quickExercises: [] };
-}
-
-async function callOpenAI(prompt) {
-  if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY missing in runtime");
-
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: OPENAI_MODEL,
-      temperature: 0.35,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: "You are a strict JSON-only Arabic educational assistant." },
-        { role: "user", content: prompt }
-      ]
-    })
-  });
-
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const msg = data?.error?.message || `OpenAI HTTP ${res.status}`;
-    throw new Error(msg);
-  }
-  return parseJSON(data?.choices?.[0]?.message?.content || "{}");
 }
 
 async function callGemini(prompt) {
-  if (!process.env.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY missing in runtime");
+  const key = process.env.GEMINI_API_KEY;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${process.env.GEMINI_API_KEY}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.35, responseMimeType: "application/json" }
-    })
-  });
+  if (!key) throw new Error("Gemini key missing");
 
-  const data = await res.json().catch(() => ({}));
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [{ text: prompt }],
+          },
+        ],
+      }),
+    }
+  );
+
+  const data = await res.json();
+
   if (!res.ok) {
-    const msg = data?.error?.message || `Gemini HTTP ${res.status}`;
-    throw new Error(msg);
+    throw new Error(data?.error?.message || "Gemini error");
   }
-  const txt = data?.candidates?.[0]?.content?.parts?.map(p => p.text).join("\\n") || "{}";
-  return parseJSON(txt);
+
+  const text =
+    data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { raw: text };
+  }
 }
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(200).json({
       ok: true,
-      message: "AI endpoint exists. Use POST from the platform.",
-      method: req.method,
-      envCheck: "/api/ai-check"
+      message: "Use POST",
     });
   }
 
-  const prompt = buildPrompt(req.body || {});
-  const providerErrors = {};
+  try {
+    const prompt = buildPrompt(req.body);
+    const result = await callGemini(prompt);
 
-  if (process.env.OPENAI_API_KEY) {
-    try {
-      const analysis = await callOpenAI(prompt);
-      return res.status(200).json({ ok: true, provider: "openai", analysis });
-    } catch (error) {
-      providerErrors.openai = error.message;
-      console.warn("OpenAI failed:", error.message);
-    }
-  } else {
-    providerErrors.openai = "OPENAI_API_KEY missing in runtime";
+    return res.status(200).json({
+      ok: true,
+      provider: "gemini",
+      data: result,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      ok: false,
+      error: error.message,
+    });
   }
-
-  if (process.env.GEMINI_API_KEY) {
-    try {
-      const analysis = await callGemini(prompt);
-      return res.status(200).json({ ok: true, provider: "gemini", analysis });
-    } catch (error) {
-      providerErrors.gemini = error.message;
-      console.warn("Gemini failed:", error.message);
-    }
-  } else {
-    providerErrors.gemini = "GEMINI_API_KEY missing in runtime";
-  }
-
-  return res.status(500).json({
-    ok: false,
-    error: "AI لم يعمل لأن مزودي الذكاء الاصطناعي فشلوا. راجع details.",
-    details: providerErrors,
-    envCheck: "/api/ai-check"
-  });
 }
