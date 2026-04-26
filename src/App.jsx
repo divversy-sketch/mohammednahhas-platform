@@ -2323,6 +2323,140 @@ const AIQuickHealthCheck = () => {
   );
 };
 
+
+
+const getTodayKey = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+};
+
+const AIUsageBadge = ({ user }) => {
+  const [usage, setUsage] = useState(null);
+  useEffect(() => {
+    if (!user?.uid) return;
+    const ref = doc(db, 'ai_usage', `${user.uid}_${getTodayKey()}`);
+    return onSnapshot(ref, (snap) => setUsage(snap.exists() ? snap.data() : { count: 0 }), () => setUsage({ count: 0 }));
+  }, [user?.uid]);
+
+  const count = safeNumber(usage?.count, 0);
+  const limitNum = 10;
+  return (
+    <div className="inline-flex items-center gap-2 bg-fuchsia-50 border border-fuchsia-100 text-fuchsia-700 px-3 py-2 rounded-xl text-xs font-black">
+      <Sparkles size={14}/> استخدام AI اليوم: {count}/{limitNum}
+    </div>
+  );
+};
+
+const AIExamHistoryPanel = ({ user, userData }) => {
+  const [rows, setRows] = useState([]);
+  useEffect(() => {
+    if (!user?.uid) return;
+    const qRef = query(collection(db, 'ai_exam_results'), where('userId', '==', user.uid));
+    const unsub = onSnapshot(qRef, (snap) => {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      list.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      setRows(list);
+    }, () => setRows([]));
+    return () => unsub();
+  }, [user?.uid]);
+
+  if (!rows.length) return null;
+
+  return (
+    <div className="glass-panel rounded-2xl p-5 border-t-4 border-fuchsia-600">
+      <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2 mb-4"><History className="text-fuchsia-600"/> سجل امتحانات AI</h2>
+      <div className="space-y-3">
+        {rows.slice(0, 8).map(r => (
+          <div key={r.id} className="bg-white border rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div>
+              <h3 className="font-black text-slate-800">{r.title || 'امتحان AI'}</h3>
+              <p className="text-xs text-slate-500">{r.topic || r.branch || 'عام'} • {getGradeLabel(r.grade || userData?.grade)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-slate-500 font-bold">النتيجة</p>
+              <p className="text-2xl font-black text-fuchsia-700">{safeNumber(r.score, 0)}/{safeNumber(r.total, 0)} - {safeNumber(r.percentage, 0)}%</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const AdminAIUsageAnalytics = ({ users = [] }) => {
+  const [results, setResults] = useState([]);
+  const [usage, setUsage] = useState([]);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'ai_exam_results'), (snap) => {
+      const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      rows.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      setResults(rows);
+    }, () => setResults([]));
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'ai_usage'), (snap) => {
+      const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      rows.sort((a,b) => (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0));
+      setUsage(rows);
+    }, () => setUsage([]));
+    return () => unsub();
+  }, []);
+
+  const stats = useMemo(() => {
+    const totalAttempts = results.length;
+    const avg = totalAttempts ? Math.round(results.reduce((s,r)=>s+safeNumber(r.percentage,0),0) / totalAttempts) : 0;
+    const branchMap = {};
+    results.forEach(r => {
+      const key = r.branch || r.topic || 'عام';
+      branchMap[key] = (branchMap[key] || 0) + 1;
+    });
+    const branches = Object.entries(branchMap).sort((a,b)=>b[1]-a[1]).slice(0, 8);
+    const todayUsage = usage.filter(u => String(u.dateKey || '').includes(getTodayKey())).reduce((s,u)=>s+safeNumber(u.count,0),0);
+    return { totalAttempts, avg, branches, todayUsage };
+  }, [results, usage]);
+
+  return (
+    <div className="glass-panel rounded-2xl p-5 border-t-4 border-fuchsia-600">
+      <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2 mb-4"><BarChart3 className="text-fuchsia-600"/> تحليلات AI للأدمن</h2>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        <div className="bg-fuchsia-50 border border-fuchsia-100 rounded-2xl p-4"><p className="text-xs font-bold text-fuchsia-600">امتحانات AI</p><p className="text-3xl font-black text-fuchsia-800">{stats.totalAttempts}</p></div>
+        <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4"><p className="text-xs font-bold text-blue-600">متوسط النتائج</p><p className="text-3xl font-black text-blue-800">{stats.avg}%</p></div>
+        <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4"><p className="text-xs font-bold text-amber-600">استخدام اليوم</p><p className="text-3xl font-black text-amber-800">{stats.todayUsage}</p></div>
+        <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4"><p className="text-xs font-bold text-emerald-600">أكثر فرع مطلوب</p><p className="text-lg font-black text-emerald-800">{stats.branches[0]?.[0] || 'لا يوجد'}</p></div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white border rounded-2xl p-4">
+          <h3 className="font-black text-slate-800 mb-3">أكثر الفروع طلبًا في AI</h3>
+          <div className="space-y-2">
+            {stats.branches.map(([branch, count]) => (
+              <div key={branch} className="flex justify-between bg-slate-50 rounded-xl p-3 font-bold"><span>{branch}</span><span className="text-fuchsia-700">{count}</span></div>
+            ))}
+            {!stats.branches.length && <p className="text-center text-slate-400 py-5 font-bold">لا توجد بيانات بعد.</p>}
+          </div>
+        </div>
+
+        <div className="bg-white border rounded-2xl p-4">
+          <h3 className="font-black text-slate-800 mb-3">آخر امتحانات AI</h3>
+          <div className="space-y-2 max-h-[360px] overflow-auto">
+            {results.slice(0, 10).map(r => (
+              <div key={r.id} className="bg-slate-50 rounded-xl p-3">
+                <p className="font-black text-slate-800">{r.studentName || 'طالب'} - {r.title || 'امتحان AI'}</p>
+                <p className="text-xs text-slate-500">{r.topic || r.branch || 'عام'} • {safeNumber(r.percentage,0)}%</p>
+              </div>
+            ))}
+            {!results.length && <p className="text-center text-slate-400 py-5 font-bold">لا توجد محاولات بعد.</p>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
 const AIInteractiveExamModal = ({ user, userData, onClose }) => {
   const [topic, setTopic] = useState('');
   const [branch, setBranch] = useState('');
@@ -2337,6 +2471,17 @@ const AIInteractiveExamModal = ({ user, userData, onClose }) => {
     setFinished(false);
     setAnswers({});
     try {
+      const todayKey = getTodayKey();
+      const usageRef = doc(db, 'ai_usage', `${user.uid}_${todayKey}`);
+      const usageSnap = await getDoc(usageRef);
+      const currentCount = safeNumber(usageSnap.data()?.count, 0);
+      const dailyLimit = userData?.subscription?.active ? 20 : 5;
+      if (currentCount >= dailyLimit) {
+        alert(`وصلت للحد اليومي لاستخدام AI (${dailyLimit} مرات). جرب بكرة أو فعل VIP.`);
+        setLoading(false);
+        return;
+      }
+
       const res = await fetch('/api/ai-coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2385,8 +2530,22 @@ const AIInteractiveExamModal = ({ user, userData, onClose }) => {
         }));
       }
 
+      await setDoc(doc(db, 'ai_usage', `${user.uid}_${getTodayKey()}`), {
+        userId: user.uid,
+        studentName: userData?.name || user?.displayName || user?.email || 'طالب',
+        grade: userData?.grade || '',
+        dateKey: getTodayKey(),
+        count: increment(1),
+        lastTopic: topic || branch,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
       setExam({
+        id: `ai_exam_${Date.now()}`,
         title: generatedExam?.title || `امتحان AI - ${topic || branch}`,
+        topic: topic || branch,
+        branch: branch || topic,
+        grade: userData?.grade || '',
         questions: flat.slice(0, 20)
       });
     } catch (error) {
@@ -2416,6 +2575,7 @@ const AIInteractiveExamModal = ({ user, userData, onClose }) => {
           <div>
             <h2 className="font-black text-xl md:text-2xl flex items-center gap-2"><Sparkles className="text-fuchsia-400"/> امتحان AI تفاعلي</h2>
             <p className="text-xs text-slate-300 mt-1">امتحان مخصص حسب مرحلتك: {getGradeLabel(userData?.grade)}</p>
+            <div className="mt-2"><AIUsageBadge user={user} /></div>
           </div>
           <button onClick={onClose} className="bg-white/10 hover:bg-white/20 rounded-full p-2"><X size={22}/></button>
         </div>
@@ -2444,7 +2604,28 @@ const AIInteractiveExamModal = ({ user, userData, onClose }) => {
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => { setExam(null); setAnswers({}); setFinished(false); }} className="bg-slate-200 text-slate-700 px-4 py-2 rounded-xl font-bold">امتحان جديد</button>
-                  <button onClick={() => setFinished(true)} className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-black">إنهاء وعرض النتيجة</button>
+                  <button onClick={async () => {
+                    setFinished(true);
+                    try {
+                      if (exam?.questions?.length) {
+                        await addDoc(collection(db, 'ai_exam_results'), {
+                          userId: user.uid,
+                          studentName: userData?.name || user?.displayName || user?.email || 'طالب',
+                          grade: userData?.grade || '',
+                          title: exam.title,
+                          topic: exam.topic || '',
+                          branch: exam.branch || '',
+                          score: score.correct,
+                          total: score.total,
+                          percentage: score.pct,
+                          answers,
+                          createdAt: serverTimestamp()
+                        });
+                      }
+                    } catch (e) {
+                      console.warn('save ai exam result failed:', e?.message);
+                    }
+                  }} className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-black">إنهاء وحفظ النتيجة</button>
                 </div>
               </div>
 
@@ -4095,10 +4276,11 @@ const MobileStudentBottomNav = ({ activeTab, setActiveTab, onMessageClick }) => 
     { key: 'videos', label: 'المحاضرات', icon: PlayCircle },
     { key: 'exams', label: 'الامتحانات', icon: ClipboardList },
     { key: 'interactive_exams', label: 'AI امتحان', icon: Sparkles },
-    { key: 'messages', label: 'الرسائل', icon: MessageCircle }
+    { key: 'logout', label: 'خروج', icon: LogOut }
   ];
 
   const handleClick = (key) => {
+    if (key === 'logout') return signOut(auth);
     if (key === 'messages' && typeof onMessageClick === 'function') return onMessageClick();
     setActiveTab?.(key);
   };
@@ -6528,9 +6710,9 @@ const AdminDashboard = ({ user }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-4 md:p-6 relative z-10">
         <div className="glass-panel p-4 rounded-xl h-fit space-y-2 flex md:flex-col overflow-x-auto md:overflow-x-visible whitespace-nowrap scrollbar-hide">
-          {['dashboard', 'users', 'all_users', 'subscriptions', 'payments', 'security_center', 'app_convert', 'ai_lab', 'ai_insights', 'leaderboard', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'question-analytics', 'smart_hw', 'live', 'content', 'notifications', 'student-messages', 'messages', 'auto_reply', 'quotes', 'settings'].map(tab => (
+          {['dashboard', 'users', 'all_users', 'subscriptions', 'payments', 'security_center', 'ai_analytics', 'app_convert', 'ai_lab', 'ai_insights', 'leaderboard', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'question-analytics', 'smart_hw', 'live', 'content', 'notifications', 'student-messages', 'messages', 'auto_reply', 'quotes', 'settings'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 transition-all ${activeTab===tab?'bg-amber-100 text-amber-700 shadow-sm border-b-4 md:border-b-0 md:border-r-4 border-amber-500':'hover:bg-slate-50 text-slate-600'}`}>
-              {tab === 'dashboard' ? 'Dashboard' : tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'payments' ? 'طلبات الدفع' : tab === 'security_center' ? 'مركز الحماية' : tab === 'app_convert' ? 'تحويل App' : tab === 'ai_lab' ? 'AI Lab' : tab === 'ai_insights' ? 'AI Insights' : tab === 'leaderboard' ? 'لوحة الشرف' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'question-analytics' ? 'تحليل الأسئلة' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'student-messages' ? 'رسائل الطلاب' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : 'الإعدادات'}
+              {tab === 'dashboard' ? 'Dashboard' : tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'payments' ? 'طلبات الدفع' : tab === 'security_center' ? 'مركز الحماية' : tab === 'ai_analytics' ? 'تحليلات AI' : tab === 'app_convert' ? 'تحويل App' : tab === 'ai_lab' ? 'AI Lab' : tab === 'ai_insights' ? 'AI Insights' : tab === 'leaderboard' ? 'لوحة الشرف' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'question-analytics' ? 'تحليل الأسئلة' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'student-messages' ? 'رسائل الطلاب' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : 'الإعدادات'}
             </button>
           ))}
         </div>
@@ -7035,7 +7217,12 @@ const AdminDashboard = ({ user }) => {
             <AdvancedAntiCheatInsights examResults={examResults} />
           )}
 
-          {activeTab === 'app_convert' && (
+          
+          {activeTab === 'ai_analytics' && (
+            <AdminAIUsageAnalytics users={activeUsersList} />
+          )}
+
+{activeTab === 'app_convert' && (
             <AppConversionGuidePanel />
           )}
 
@@ -7849,6 +8036,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                 />
                 <AIStudentChatCoach user={user} userData={userData} examResults={examResults} />
                 <PaymentRequestStudentPanel user={user} userData={userData} />
+                <AIExamHistoryPanel user={user} userData={userData} />
                 <AISmartRecommendations userResults={examResults} content={content} exams={exams} userData={userData} />
                 <LeaderboardPanel examResults={examResults} users={[userData ? { ...userData, id: user?.uid } : {}]} currentUserId={user?.uid} gradeFilter={userData?.grade || 'all'} />
                 {liveSessions.length > 0 && (
