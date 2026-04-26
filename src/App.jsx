@@ -1747,6 +1747,13 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
               <div className="space-y-2">
                 {performanceInsights.map((note, idx) => <div key={idx} className="bg-slate-900/60 border border-slate-700 rounded-xl p-3 text-slate-200 text-sm font-bold">{note}</div>)}
               </div>
+              <div className="mt-5">
+                <RealAIBox
+                  title="تحليل AI شامل بعد الامتحان"
+                  compact={true}
+                  payload={buildExamAIPayload({ exam, answers, metrics: detailedMetrics, user })}
+                />
+              </div>
             </div>
           )}
 
@@ -1980,12 +1987,22 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
               <h3 className="text-2xl md:text-3xl font-bold text-slate-900 leading-loose font-['Cairo'] drop-shadow-sm">
                 {String(currentQObj.text || '').split('|').map((part, i) => (
                   <React.Fragment key={i}>
-                    {part.trim()}
+                    {renderBracketHighlightedText(part.trim())}
                     {i !== String(currentQObj.text || '').split('|').length - 1 && <br />}
                   </React.Fragment>
                 ))}
               </h3>
             </div>
+
+            {isSubmitted && (
+              <div className="mb-6">
+                <RealAIBox
+                  title="شرح AI لهذا السؤال"
+                  compact={true}
+                  payload={buildQuestionAIPayload({ exam, question: currentQObj, answers, user, result: existingResult })}
+                />
+              </div>
+            )}
 
             {currentQObj.type === 'essay' ? (
               <div className="space-y-4">
@@ -2266,6 +2283,166 @@ const PlatformPerformanceBooster = () => {
 
 
 
+
+
+
+
+const RealAIBox = ({ title = 'AI الحقيقي', payload = {}, compact = false }) => {
+  const [loadingAI, setLoadingAI] = useState(false);
+  const [aiResult, setAiResult] = useState(null);
+  const [aiError, setAiError] = useState('');
+
+  const askAI = async () => {
+    setLoadingAI(true);
+    setAiError('');
+    try {
+      const res = await fetch('/api/ai-coach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || 'تعذر تشغيل الذكاء الاصطناعي الآن.');
+      }
+
+      setAiResult(data.analysis);
+    } catch (error) {
+      console.error('Real AI error:', error);
+      setAiError(error.message || 'حدث خطأ أثناء تشغيل AI.');
+    } finally {
+      setLoadingAI(false);
+    }
+  };
+
+  return (
+    <div className={`${compact ? 'bg-white border' : 'glass-panel border'} rounded-2xl p-4 md:p-5 border-fuchsia-200`}>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+        <div>
+          <h3 className="font-black text-xl text-slate-800 flex items-center gap-2">
+            <Sparkles className="text-fuchsia-600"/> {title}
+          </h3>
+          <p className="text-xs text-slate-500 mt-1">شرح ذكي، سبب الخطأ، وخطة مذاكرة مخصصة من AI خارجي آمن عبر Vercel Backend.</p>
+        </div>
+        <button
+          onClick={askAI}
+          disabled={loadingAI}
+          className="bg-fuchsia-600 text-white px-5 py-3 rounded-xl font-black hover:bg-fuchsia-700 disabled:opacity-50"
+        >
+          {loadingAI ? 'جاري التحليل...' : 'تشغيل AI'}
+        </button>
+      </div>
+
+      {aiError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm font-bold mb-3">
+          {aiError}
+        </div>
+      )}
+
+      {aiResult && (
+        <div className="space-y-3">
+          {aiResult.summary && (
+            <div className="bg-fuchsia-50 border border-fuchsia-100 rounded-xl p-3">
+              <p className="text-xs font-bold text-fuchsia-600 mb-1">ملخص ذكي</p>
+              <p className="font-bold text-slate-800 leading-relaxed">{aiResult.summary}</p>
+            </div>
+          )}
+
+          {aiResult.explanation && (
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+              <p className="text-xs font-bold text-blue-600 mb-1">شرح السؤال / الفكرة</p>
+              <p className="font-bold text-slate-800 leading-relaxed whitespace-pre-wrap">{aiResult.explanation}</p>
+            </div>
+          )}
+
+          {aiResult.mistakeReason && (
+            <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+              <p className="text-xs font-bold text-amber-600 mb-1">سبب الخطأ المحتمل</p>
+              <p className="font-bold text-slate-800 leading-relaxed whitespace-pre-wrap">{aiResult.mistakeReason}</p>
+            </div>
+          )}
+
+          {Array.isArray(aiResult.studyPlan) && aiResult.studyPlan.length > 0 && (
+            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
+              <p className="text-xs font-bold text-emerald-600 mb-2">خطة مذاكرة</p>
+              <ol className="list-decimal list-inside space-y-1 text-sm font-bold text-slate-800">
+                {aiResult.studyPlan.map((step, idx) => <li key={idx}>{step}</li>)}
+              </ol>
+            </div>
+          )}
+
+          {Array.isArray(aiResult.quickExercises) && aiResult.quickExercises.length > 0 && (
+            <div className="bg-slate-50 border rounded-xl p-3">
+              <p className="text-xs font-bold text-slate-600 mb-2">تدريبات سريعة مقترحة</p>
+              <ul className="list-disc list-inside space-y-1 text-sm font-bold text-slate-700">
+                {aiResult.quickExercises.map((item, idx) => <li key={idx}>{item}</li>)}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const buildQuestionAIPayload = ({ exam, question, answers, user, result = null }) => {
+  const studentAnswer = answers?.[question?.id];
+  const isEssay = question?.type === 'essay';
+  const correctAnswer = !isEssay && Array.isArray(question?.options) ? question.options[question.correctIdx] : (question?.modelAnswer || question?.answer || '');
+  const chosenAnswer = !isEssay && Array.isArray(question?.options) ? question.options[studentAnswer] : (typeof studentAnswer === 'object' ? studentAnswer?.text : studentAnswer);
+
+  return {
+    mode: 'question_explain',
+    language: 'ar-EG',
+    examTitle: exam?.title || '',
+    studentName: user?.displayName || '',
+    question: {
+      text: question?.text || '',
+      branch: question?.branch || '',
+      type: question?.type || 'mcq',
+      options: question?.options || [],
+      correctAnswer,
+      chosenAnswer,
+      explanation: question?.explanation || '',
+      blockText: question?.blockText || ''
+    },
+    resultSummary: result ? {
+      score: result.score,
+      total: result.total,
+      percentage: getResultPercentage(result)
+    } : null
+  };
+};
+
+const buildExamAIPayload = ({ exam, answers, metrics, user }) => {
+  const questions = extractAllQuestions(exam).slice(0, 80).map(q => {
+    const ans = answers?.[q.id];
+    return {
+      text: q.text,
+      branch: q.branch,
+      type: q.type || 'mcq',
+      options: q.options || [],
+      correctAnswer: q.type !== 'essay' && Array.isArray(q.options) ? q.options[q.correctIdx] : (q.modelAnswer || ''),
+      chosenAnswer: q.type !== 'essay' && Array.isArray(q.options) ? q.options[ans] : (typeof ans === 'object' ? ans?.text : ans),
+      isCorrect: q.type !== 'essay' ? ans === q.correctIdx : null
+    };
+  });
+
+  return {
+    mode: 'exam_review',
+    language: 'ar-EG',
+    examTitle: exam?.title || '',
+    studentName: user?.displayName || '',
+    metrics: {
+      percentage: metrics?.percentage,
+      totalScore: metrics?.totalScore,
+      totalPossible: metrics?.totalPossible,
+      branchStats: metrics?.branchStats || {}
+    },
+    questions
+  };
+};
 
 
 const AdvancedAIStudentCoach = ({ userResults = [], exams = [], content = [], userData = null }) => {
@@ -6826,6 +7003,22 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
             <div className="space-y-8">
                 <StudentSmartPerformanceReport userResults={examResults} content={content} />
                 <AdvancedAIStudentCoach userResults={examResults} exams={exams} content={content} userData={userData} />
+                <RealAIBox
+                  title="AI خارجي شامل للطالب"
+                  payload={{
+                    mode: 'student_home_plan',
+                    language: 'ar-EG',
+                    studentName: userData?.name || user?.displayName || '',
+                    grade: userData?.grade || '',
+                    recentResults: (examResults || []).slice(0, 8).map(r => ({
+                      examTitle: r.examTitle,
+                      score: r.score,
+                      total: r.total,
+                      percentage: getResultPercentage(r),
+                      branchAnalysis: r.branchAnalysis || r.branchStats || {}
+                    }))
+                  }}
+                />
                 <AISmartRecommendations userResults={examResults} content={content} exams={exams} userData={userData} />
                 <LeaderboardPanel examResults={examResults} users={[userData ? { ...userData, id: user?.uid } : {}]} currentUserId={user?.uid} gradeFilter={userData?.grade || 'all'} />
                 {liveSessions.length > 0 && (
