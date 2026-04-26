@@ -116,7 +116,8 @@ function parseJSON(text) {
 }
 
 async function callOpenAI(prompt) {
-  if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is missing");
+  if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY missing in runtime");
+
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -133,13 +134,18 @@ async function callOpenAI(prompt) {
       ]
     })
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data?.error?.message || "OpenAI request failed");
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = data?.error?.message || `OpenAI HTTP ${res.status}`;
+    throw new Error(msg);
+  }
   return parseJSON(data?.choices?.[0]?.message?.content || "{}");
 }
 
 async function callGemini(prompt) {
-  if (!process.env.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is missing");
+  if (!process.env.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY missing in runtime");
+
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${process.env.GEMINI_API_KEY}`;
   const res = await fetch(url, {
     method: "POST",
@@ -149,8 +155,12 @@ async function callGemini(prompt) {
       generationConfig: { temperature: 0.35, responseMimeType: "application/json" }
     })
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data?.error?.message || "Gemini request failed");
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = data?.error?.message || `Gemini HTTP ${res.status}`;
+    throw new Error(msg);
+  }
   const txt = data?.candidates?.[0]?.content?.parts?.map(p => p.text).join("\\n") || "{}";
   return parseJSON(txt);
 }
@@ -160,27 +170,42 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       message: "AI endpoint exists. Use POST from the platform.",
-      method: req.method
+      method: req.method,
+      envCheck: "/api/ai-check"
     });
   }
 
-  try {
-    const prompt = buildPrompt(req.body || {});
-    let provider = "openai";
-    let analysis;
+  const prompt = buildPrompt(req.body || {});
+  const providerErrors = {};
+
+  if (process.env.OPENAI_API_KEY) {
     try {
-      analysis = await callOpenAI(prompt);
-    } catch (openAIError) {
-      provider = "gemini";
-      console.warn("OpenAI failed, using Gemini:", openAIError.message);
-      analysis = await callGemini(prompt);
+      const analysis = await callOpenAI(prompt);
+      return res.status(200).json({ ok: true, provider: "openai", analysis });
+    } catch (error) {
+      providerErrors.openai = error.message;
+      console.warn("OpenAI failed:", error.message);
     }
-    return res.status(200).json({ ok: true, provider, analysis });
-  } catch (error) {
-    console.error("AI API error:", error);
-    return res.status(500).json({
-      ok: false,
-      error: "AI غير متصل حاليًا. راجع مفاتيح OPENAI_API_KEY أو GEMINI_API_KEY في Vercel ثم اعمل Redeploy."
-    });
+  } else {
+    providerErrors.openai = "OPENAI_API_KEY missing in runtime";
   }
+
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      const analysis = await callGemini(prompt);
+      return res.status(200).json({ ok: true, provider: "gemini", analysis });
+    } catch (error) {
+      providerErrors.gemini = error.message;
+      console.warn("Gemini failed:", error.message);
+    }
+  } else {
+    providerErrors.gemini = "GEMINI_API_KEY missing in runtime";
+  }
+
+  return res.status(500).json({
+    ok: false,
+    error: "AI لم يعمل لأن مزودي الذكاء الاصطناعي فشلوا. راجع details.",
+    details: providerErrors,
+    envCheck: "/api/ai-check"
+  });
 }
