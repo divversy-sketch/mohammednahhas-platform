@@ -2266,6 +2266,319 @@ const PlatformPerformanceBooster = () => {
 
 
 
+
+
+const AdvancedAIStudentCoach = ({ userResults = [], exams = [], content = [], userData = null }) => {
+  userResults = Array.isArray(userResults) ? userResults : [];
+  exams = Array.isArray(exams) ? exams : [];
+  content = Array.isArray(content) ? content : [];
+
+  const analysis = useMemo(() => {
+    const completed = userResults
+      .filter(r => r.status === 'completed')
+      .sort((a, b) => (b.submittedAt?.seconds || 0) - (a.submittedAt?.seconds || 0));
+
+    const branchMap = {};
+    const tagMap = {};
+    const questionMistakes = [];
+    const timeline = completed.slice(0, 8).reverse().map(r => ({
+      title: r.examTitle || 'امتحان',
+      pct: getResultPercentage(r)
+    }));
+
+    completed.forEach(result => {
+      const exam = exams.find(e => e.id === result.examId);
+      const questions = exam ? extractAllQuestions(exam) : [];
+
+      const branchRows = Array.isArray(result.branchAnalysis)
+        ? result.branchAnalysis
+        : Object.entries(result.branchStats || {}).map(([branch, data]) => ({
+            branch,
+            percentage: data.possible > 0 ? Math.round((safeNumber(data.earned, 0) / safeNumber(data.possible, 1)) * 100) : 0,
+            wrong: safeNumber(data.wrong, 0),
+            correct: safeNumber(data.correct, 0)
+          }));
+
+      branchRows.forEach(row => {
+        const branch = row.branch || 'عام';
+        branchMap[branch] = branchMap[branch] || { branch, totalPct: 0, count: 0, wrong: 0, correct: 0 };
+        branchMap[branch].totalPct += safeNumber(row.percentage, 0);
+        branchMap[branch].count += 1;
+        branchMap[branch].wrong += safeNumber(row.wrong, 0);
+        branchMap[branch].correct += safeNumber(row.correct, 0);
+      });
+
+      questions.forEach(q => {
+        if (q.type === 'essay') return;
+        const ans = result.answers?.[q.id];
+        if (ans === undefined || ans === null || ans === '') return;
+        if (ans !== q.correctIdx) {
+          const tags = Array.isArray(q.tags) && q.tags.length
+            ? q.tags
+            : [q.skill, q.lesson, q.topic, q.branch].filter(Boolean);
+
+          tags.forEach(tag => {
+            const key = String(tag || '').trim();
+            if (!key) return;
+            tagMap[key] = tagMap[key] || { tag: key, wrong: 0, branch: q.branch || 'عام', examples: [] };
+            tagMap[key].wrong += 1;
+            if (tagMap[key].examples.length < 3) {
+              tagMap[key].examples.push(q.text || 'سؤال');
+            }
+          });
+
+          questionMistakes.push({
+            examTitle: result.examTitle || exam?.title || 'امتحان',
+            branch: q.branch || 'عام',
+            text: q.text || '',
+            correct: Array.isArray(q.options) ? q.options[q.correctIdx] : '',
+            chosen: Array.isArray(q.options) ? q.options[ans] : '',
+            tags
+          });
+        }
+      });
+    });
+
+    const branches = Object.values(branchMap)
+      .map(b => ({ ...b, avg: b.count ? Math.round(b.totalPct / b.count) : 0 }))
+      .sort((a, b) => a.avg - b.avg);
+
+    const tags = Object.values(tagMap).sort((a, b) => b.wrong - a.wrong);
+
+    const latest = completed[0];
+    const latestPct = latest ? getResultPercentage(latest) : 0;
+    const previous = completed[1] ? getResultPercentage(completed[1]) : null;
+    const trendDirection = previous === null ? 'unknown' : latestPct > previous ? 'up' : latestPct < previous ? 'down' : 'same';
+
+    const recommendations = [];
+
+    branches.slice(0, 3).forEach(b => {
+      const relatedVideo = content.find(c =>
+        (c.type === 'video' || c.videoSection) &&
+        ((c.branch || '').includes(b.branch) || (c.title || '').includes(b.branch))
+      );
+
+      const relatedExam = exams.find(e =>
+        e.grade === userData?.grade &&
+        ((e.title || '').includes(b.branch))
+      );
+
+      recommendations.push({
+        level: b.avg < 50 ? 'عاجل' : b.avg < 70 ? 'مهم' : 'متابعة',
+        title: `خطة علاج فرع ${b.branch}`,
+        reason: `متوسطك في هذا الفرع ${b.avg}% مع ${b.wrong} أخطاء تقريبًا.`,
+        steps: [
+          'راجع القاعدة الأساسية للفرع لمدة 15 دقيقة.',
+          relatedVideo ? `شاهد فيديو: ${relatedVideo.title}` : 'شاهد شرحًا قصيرًا لهذا الفرع.',
+          relatedExam ? `حل امتحان تدريبي: ${relatedExam.title}` : 'حل 10 أسئلة تدريبية على نفس الفرع.',
+          'راجع الأخطاء فقط بعد الحل ولا تعيد الامتحان كاملًا.'
+        ]
+      });
+    });
+
+    tags.slice(0, 3).forEach(t => {
+      recommendations.push({
+        level: t.wrong >= 3 ? 'دقيق' : 'ملاحظة',
+        title: `أنت تحتاج تركيزًا في: ${t.tag}`,
+        reason: `تكرر الخطأ في هذا الجزء ${t.wrong} مرة.`,
+        steps: [
+          `راجع أمثلة على ${t.tag}.`,
+          'اكتب سبب الخطأ في ورقة صغيرة.',
+          'حل 5 أسئلة قصيرة على نفس النقطة.'
+        ]
+      });
+    });
+
+    if (!recommendations.length) {
+      recommendations.push({
+        level: 'ابدأ',
+        title: 'ابدأ بتكوين بيانات أداء',
+        reason: 'لم يتم العثور على نتائج كافية لتحليل دقيق.',
+        steps: ['حل امتحان قصير.', 'راجع النتيجة.', 'سيتم بناء خطة ذكية بعد ظهور نتائجك.']
+      });
+    }
+
+    return {
+      completed,
+      latestPct,
+      previous,
+      trendDirection,
+      branches,
+      tags,
+      questionMistakes: questionMistakes.slice(0, 8),
+      timeline,
+      recommendations: recommendations.slice(0, 8)
+    };
+  }, [userResults, exams, content, userData]);
+
+  const trendText = analysis.trendDirection === 'up'
+    ? 'مستواك يتحسن'
+    : analysis.trendDirection === 'down'
+      ? 'فيه انخفاض بسيط محتاج متابعة'
+      : analysis.trendDirection === 'same'
+        ? 'مستواك ثابت'
+        : 'ابدأ بحل امتحان لتكوين تحليل';
+
+  return (
+    <div className="glass-panel rounded-2xl p-5 border-t-4 border-fuchsia-600">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
+        <div>
+          <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2">
+            <Sparkles className="text-fuchsia-600"/> المدرب الذكي AI
+          </h2>
+          <p className="text-sm text-slate-500 mt-1">تحليل ذكي لأخطاء الطالب حسب الفروع والنقاط المتكررة بدون تكلفة إضافية.</p>
+        </div>
+        <div className="bg-fuchsia-50 border border-fuchsia-100 rounded-2xl px-4 py-3">
+          <p className="text-xs font-bold text-fuchsia-600">حالة الطالب</p>
+          <p className="font-black text-fuchsia-800">{trendText}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-5">
+        <div className="bg-white border rounded-2xl p-4">
+          <p className="text-xs font-bold text-slate-500">آخر نتيجة</p>
+          <p className="text-3xl font-black text-fuchsia-700">{analysis.latestPct || 0}%</p>
+        </div>
+        <div className="bg-white border rounded-2xl p-4">
+          <p className="text-xs font-bold text-slate-500">عدد الامتحانات</p>
+          <p className="text-3xl font-black text-blue-700">{analysis.completed.length}</p>
+        </div>
+        <div className="bg-white border rounded-2xl p-4">
+          <p className="text-xs font-bold text-slate-500">أضعف فرع</p>
+          <p className="text-lg font-black text-red-700">{analysis.branches[0]?.branch || 'لا يوجد'}</p>
+        </div>
+        <div className="bg-white border rounded-2xl p-4">
+          <p className="text-xs font-bold text-slate-500">أكثر نقطة تكرارًا</p>
+          <p className="text-lg font-black text-amber-700">{analysis.tags[0]?.tag || 'لا يوجد'}</p>
+        </div>
+      </div>
+
+      {analysis.timeline.length > 0 && (
+        <div className="bg-slate-50 border rounded-2xl p-4 mb-5">
+          <h3 className="font-black text-slate-800 mb-3">منحنى الأداء</h3>
+          <div className="flex items-end gap-2 h-32">
+            {analysis.timeline.map((item, idx) => (
+              <div key={idx} className="flex-1 flex flex-col items-center justify-end gap-1">
+                <div className="w-full bg-fuchsia-500 rounded-t-xl" style={{ height: `${Math.max(8, item.pct)}%` }} title={item.title}></div>
+                <span className="text-[10px] font-bold text-slate-500">{item.pct}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <h3 className="font-black text-slate-800 mb-3">خطة علاج ذكية</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
+        {analysis.recommendations.map((rec, idx) => (
+          <div key={idx} className="bg-white border rounded-2xl p-4">
+            <div className="flex justify-between gap-3 mb-2">
+              <h4 className="font-black text-slate-800">{rec.title}</h4>
+              <span className={`text-xs px-3 py-1 rounded-full font-black ${rec.level === 'عاجل' ? 'bg-red-100 text-red-700' : rec.level === 'مهم' ? 'bg-amber-100 text-amber-700' : 'bg-fuchsia-100 text-fuchsia-700'}`}>{rec.level}</span>
+            </div>
+            <p className="text-sm text-slate-600 mb-3">{rec.reason}</p>
+            <ol className="space-y-1 text-sm text-slate-700 list-decimal list-inside">
+              {rec.steps.map((s, i) => <li key={i}>{s}</li>)}
+            </ol>
+          </div>
+        ))}
+      </div>
+
+      {analysis.questionMistakes.length > 0 && (
+        <details className="bg-red-50 border border-red-100 rounded-2xl p-4">
+          <summary className="cursor-pointer font-black text-red-700">أمثلة من أخطائك المتكررة</summary>
+          <div className="mt-3 space-y-2">
+            {analysis.questionMistakes.map((m, idx) => (
+              <div key={idx} className="bg-white border rounded-xl p-3 text-sm">
+                <p className="font-bold text-slate-800">{String(m.text).replaceAll('|', ' / ')}</p>
+                <p className="text-xs text-slate-500 mt-1">الفرع: {m.branch} • الامتحان: {m.examTitle}</p>
+                {m.correct && <p className="text-xs text-emerald-700 mt-1">الصحيح: {m.correct}</p>}
+                {m.chosen && <p className="text-xs text-red-700 mt-1">اختيارك: {m.chosen}</p>}
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+    </div>
+  );
+};
+
+const AdminAIInsightsPanel = ({ examResults = [], examsList = [], content = [] }) => {
+  const insights = useMemo(() => {
+    const completed = (examResults || []).filter(r => r.status === 'completed');
+    const branchMap = {};
+    const examMap = {};
+
+    completed.forEach(r => {
+      examMap[r.examId] = examMap[r.examId] || { examId: r.examId, title: r.examTitle || 'امتحان', attempts: 0, avg: 0 };
+      examMap[r.examId].attempts += 1;
+      examMap[r.examId].avg += getResultPercentage(r);
+
+      const rows = Array.isArray(r.branchAnalysis)
+        ? r.branchAnalysis
+        : Object.entries(r.branchStats || {}).map(([branch, data]) => ({
+            branch,
+            percentage: data.possible > 0 ? Math.round((safeNumber(data.earned, 0) / safeNumber(data.possible, 1)) * 100) : 0,
+            wrong: safeNumber(data.wrong, 0)
+          }));
+
+      rows.forEach(b => {
+        branchMap[b.branch] = branchMap[b.branch] || { branch: b.branch, total: 0, count: 0, wrong: 0 };
+        branchMap[b.branch].total += safeNumber(b.percentage, 0);
+        branchMap[b.branch].count += 1;
+        branchMap[b.branch].wrong += safeNumber(b.wrong, 0);
+      });
+    });
+
+    const branches = Object.values(branchMap).map(b => ({
+      ...b,
+      avg: b.count ? Math.round(b.total / b.count) : 0
+    })).sort((a,b) => a.avg - b.avg);
+
+    const exams = Object.values(examMap).map(e => ({
+      ...e,
+      avg: e.attempts ? Math.round(e.avg / e.attempts) : 0
+    })).sort((a,b) => a.avg - b.avg);
+
+    return { branches, exams, totalAttempts: completed.length };
+  }, [examResults]);
+
+  return (
+    <div className="glass-panel rounded-2xl p-5 border-t-4 border-fuchsia-600">
+      <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2 mb-4"><BrainCircuit className="text-fuchsia-600"/> AI Insights للأدمن</h2>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+        <div className="bg-fuchsia-50 border border-fuchsia-100 rounded-2xl p-4"><p className="text-xs font-bold text-fuchsia-600">محاولات مكتملة</p><p className="text-3xl font-black text-fuchsia-800">{insights.totalAttempts}</p></div>
+        <div className="bg-red-50 border border-red-100 rounded-2xl p-4"><p className="text-xs font-bold text-red-600">أضعف فرع عام</p><p className="text-xl font-black text-red-800">{insights.branches[0]?.branch || 'لا يوجد'}</p></div>
+        <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4"><p className="text-xs font-bold text-amber-600">أصعب امتحان</p><p className="text-lg font-black text-amber-800">{insights.exams[0]?.title || 'لا يوجد'}</p></div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white border rounded-2xl p-4">
+          <h3 className="font-black text-slate-800 mb-3">الفروع التي تحتاج إعادة شرح</h3>
+          <div className="space-y-2">
+            {insights.branches.slice(0, 8).map(b => (
+              <div key={b.branch} className="flex justify-between items-center bg-slate-50 rounded-xl p-3">
+                <span className="font-bold">{b.branch}</span>
+                <span className="font-black text-red-600">{b.avg}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="bg-white border rounded-2xl p-4">
+          <h3 className="font-black text-slate-800 mb-3">امتحانات تحتاج مراجعة</h3>
+          <div className="space-y-2">
+            {insights.exams.slice(0, 8).map(e => (
+              <div key={e.examId} className="flex justify-between items-center bg-slate-50 rounded-xl p-3">
+                <span className="font-bold">{e.title}</span>
+                <span className="font-black text-amber-600">{e.avg}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const SmartSubscriptionManager = ({ users = [], adminGradeFilter = 'all' }) => {
   const [codes, setCodes] = useState([]);
   const [plan, setPlan] = useState('monthly');
@@ -5232,9 +5545,9 @@ const AdminDashboard = ({ user }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-4 md:p-6 relative z-10">
         <div className="glass-panel p-4 rounded-xl h-fit space-y-2 flex md:flex-col overflow-x-auto md:overflow-x-visible whitespace-nowrap scrollbar-hide">
-          {['dashboard', 'users', 'all_users', 'subscriptions', 'leaderboard', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'question-analytics', 'smart_hw', 'live', 'content', 'notifications', 'student-messages', 'messages', 'auto_reply', 'quotes', 'settings'].map(tab => (
+          {['dashboard', 'users', 'all_users', 'subscriptions', 'ai_insights', 'leaderboard', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'question-analytics', 'smart_hw', 'live', 'content', 'notifications', 'student-messages', 'messages', 'auto_reply', 'quotes', 'settings'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 transition-all ${activeTab===tab?'bg-amber-100 text-amber-700 shadow-sm border-b-4 md:border-b-0 md:border-r-4 border-amber-500':'hover:bg-slate-50 text-slate-600'}`}>
-              {tab === 'dashboard' ? 'Dashboard' : tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'leaderboard' ? 'لوحة الشرف' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'question-analytics' ? 'تحليل الأسئلة' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'student-messages' ? 'رسائل الطلاب' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : 'الإعدادات'}
+              {tab === 'dashboard' ? 'Dashboard' : tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'ai_insights' ? 'AI Insights' : tab === 'leaderboard' ? 'لوحة الشرف' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'question-analytics' ? 'تحليل الأسئلة' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'student-messages' ? 'رسائل الطلاب' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : 'الإعدادات'}
             </button>
           ))}
         </div>
@@ -5728,7 +6041,12 @@ const AdminDashboard = ({ user }) => {
 
           
           
-          {activeTab === 'leaderboard' && (
+          
+          {activeTab === 'ai_insights' && (
+            <AdminAIInsightsPanel examResults={examResults} examsList={examsList} content={content} />
+          )}
+
+{activeTab === 'leaderboard' && (
             <LeaderboardPanel examResults={examResults} users={activeUsersList} gradeFilter={adminGradeFilter} />
           )}
 
@@ -6507,6 +6825,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
         {activeTab === 'home' && (
             <div className="space-y-8">
                 <StudentSmartPerformanceReport userResults={examResults} content={content} />
+                <AdvancedAIStudentCoach userResults={examResults} exams={exams} content={content} userData={userData} />
                 <AISmartRecommendations userResults={examResults} content={content} exams={exams} userData={userData} />
                 <LeaderboardPanel examResults={examResults} users={[userData ? { ...userData, id: user?.uid } : {}]} currentUserId={user?.uid} gradeFilter={userData?.grade || 'all'} />
                 {liveSessions.length > 0 && (
