@@ -20,7 +20,7 @@ import {
   Users, PenTool, Code, Sparkles, Lamp, Ban, Shield, RefreshCw, Link as LinkIcon, 
   History, Camera, QrCode, FileCheck, MousePointerClick, BarChart3, Layers,
   BrainCircuit, Headphones, DownloadCloud, PenLine, Play, Pause, SkipForward, 
-  Target, AlertCircle, Crown, CreditCard, Key
+  Target, AlertCircle, Crown, CreditCard, Key, Wand2, WalletCards, Smartphone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -2299,6 +2299,210 @@ const PlatformPerformanceBooster = () => {
 
 
 
+
+const AIQuickHealthCheck = () => {
+  const [status, setStatus] = useState(null);
+  const checkAI = async () => {
+    setStatus('checking');
+    try {
+      const res = await fetch('/api/ai-coach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'student_chat', question: 'اختبار تشغيل سريع', recentResults: [] })
+      });
+      const data = await res.json().catch(() => ({}));
+      setStatus(res.ok && data.ok ? 'ok' : 'bad');
+    } catch {
+      setStatus('bad');
+    }
+  };
+  return (
+    <button onClick={checkAI} className={`text-xs px-3 py-2 rounded-xl font-bold ${status === 'ok' ? 'bg-emerald-100 text-emerald-700' : status === 'bad' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'}`}>
+      {status === 'checking' ? 'فحص AI...' : status === 'ok' ? 'AI يعمل ✅' : status === 'bad' ? 'AI لا يعمل - راجع API' : 'فحص AI'}
+    </button>
+  );
+};
+
+const AIInteractiveExamModal = ({ user, userData, onClose }) => {
+  const [topic, setTopic] = useState('');
+  const [branch, setBranch] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [exam, setExam] = useState(null);
+  const [answers, setAnswers] = useState({});
+  const [finished, setFinished] = useState(false);
+
+  const generateExam = async () => {
+    if (!topic.trim() && !branch.trim()) return alert('اكتب عايز تمتحن في إيه أو أي فرع.');
+    setLoading(true);
+    setFinished(false);
+    setAnswers({});
+    try {
+      const res = await fetch('/api/ai-coach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'generate_exam',
+          language: 'ar-EG',
+          topic: topic.trim() || branch.trim(),
+          grade: userData?.grade || '1prep',
+          branches: branch.trim() || topic.trim(),
+          mcqCount: 18,
+          essayCount: 0,
+          duration: 25,
+          difficultyMix: ['easy', 'medium', 'hard', 'very_hard'],
+          instructions: 'اكتب امتحان اختيار من متعدد فقط من 15 إلى 20 سؤال متعدد المستويات: سهل، متوسط، صعب، صعب جدا. التزم بمرحلة الطالب الدراسية ولا تخرج عنها.'
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) throw new Error(data.error || 'تعذر توليد الامتحان الآن.');
+
+      const generatedExam = data.analysis?.exam || data.analysis;
+      const blocks = Array.isArray(generatedExam?.questions) ? generatedExam.questions : [];
+      let flat = blocks.flatMap((block, bi) =>
+        (Array.isArray(block.subQuestions) ? block.subQuestions : []).map((q, qi) => ({
+          ...q,
+          id: q.id || `ai_${bi}_${qi}_${Date.now()}`,
+          blockText: block.text || '',
+          branch: q.branch || branch || 'عام',
+          type: q.type || 'mcq',
+          options: Array.isArray(q.options) && q.options.length >= 2 ? q.options : ['اختيار 1', 'اختيار 2', 'اختيار 3', 'اختيار 4'],
+          correctIdx: safeNumber(q.correctIdx, 0),
+          difficulty: q.difficulty || ['سهل','متوسط','صعب','صعب جدًا'][qi % 4],
+          explanation: q.explanation || 'راجع فكرة السؤال جيدًا.'
+        }))
+      );
+
+      if (flat.length === 0 && Array.isArray(data.analysis?.questions)) {
+        flat = data.analysis.questions.map((q, qi) => ({
+          ...q,
+          id: q.id || `ai_${qi}_${Date.now()}`,
+          branch: q.branch || branch || 'عام',
+          type: q.type || 'mcq',
+          options: q.options || ['اختيار 1', 'اختيار 2', 'اختيار 3', 'اختيار 4'],
+          correctIdx: safeNumber(q.correctIdx, 0),
+          difficulty: q.difficulty || ['سهل','متوسط','صعب','صعب جدًا'][qi % 4],
+          explanation: q.explanation || 'راجع فكرة السؤال جيدًا.'
+        }));
+      }
+
+      setExam({
+        title: generatedExam?.title || `امتحان AI - ${topic || branch}`,
+        questions: flat.slice(0, 20)
+      });
+    } catch (error) {
+      console.error('AI interactive exam error:', error);
+      alert(error.message || 'تعذر توليد الامتحان.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const chooseAnswer = (q, idx) => {
+    if (finished) return;
+    setAnswers(prev => ({ ...prev, [q.id]: idx }));
+  };
+
+  const score = useMemo(() => {
+    if (!exam?.questions?.length) return { correct: 0, total: 0, pct: 0 };
+    const correct = exam.questions.reduce((sum, q) => sum + (answers[q.id] === q.correctIdx ? 1 : 0), 0);
+    const total = exam.questions.length;
+    return { correct, total, pct: total ? Math.round((correct / total) * 100) : 0 };
+  }, [exam, answers]);
+
+  return (
+    <div className="fixed inset-0 z-[100000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3" dir="rtl">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-6xl max-h-[94vh] overflow-y-auto border-t-8 border-fuchsia-600">
+        <div className="bg-slate-900 text-white p-4 flex items-center justify-between sticky top-0 z-20">
+          <div>
+            <h2 className="font-black text-xl md:text-2xl flex items-center gap-2"><Sparkles className="text-fuchsia-400"/> امتحان AI تفاعلي</h2>
+            <p className="text-xs text-slate-300 mt-1">امتحان مخصص حسب مرحلتك: {getGradeLabel(userData?.grade)}</p>
+          </div>
+          <button onClick={onClose} className="bg-white/10 hover:bg-white/20 rounded-full p-2"><X size={22}/></button>
+        </div>
+
+        <div className="p-4 md:p-6">
+          {!exam && (
+            <div className="bg-fuchsia-50 border border-fuchsia-100 rounded-3xl p-5 mb-5">
+              <h3 className="font-black text-slate-800 mb-3">اكتب عايز تمتحن في إيه</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <input className="border rounded-xl p-3 md:col-span-2" placeholder="مثال: النحو - البلاغة - القراءة - الاستعارة..." value={topic} onChange={e=>setTopic(e.target.value)} />
+                <input className="border rounded-xl p-3" placeholder="فرع معين اختياري" value={branch} onChange={e=>setBranch(e.target.value)} />
+              </div>
+              <div className="mt-3"><AIQuickHealthCheck /></div>
+              <button disabled={loading} onClick={generateExam} className="mt-4 bg-fuchsia-600 text-white px-6 py-3 rounded-xl font-black hover:bg-fuchsia-700 disabled:opacity-50">
+                {loading ? 'AI بيجهز الامتحان...' : 'توليد امتحان 15 - 20 سؤال'}
+              </button>
+            </div>
+          )}
+
+          {exam && (
+            <div>
+              <div className="flex flex-col md:flex-row justify-between md:items-center gap-3 mb-5 bg-slate-50 border rounded-2xl p-4">
+                <div>
+                  <h3 className="font-black text-slate-800 text-xl">{exam.title}</h3>
+                  <p className="text-sm text-slate-500">{exam.questions.length} سؤال • مستويات متعددة</p>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => { setExam(null); setAnswers({}); setFinished(false); }} className="bg-slate-200 text-slate-700 px-4 py-2 rounded-xl font-bold">امتحان جديد</button>
+                  <button onClick={() => setFinished(true)} className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-black">إنهاء وعرض النتيجة</button>
+                </div>
+              </div>
+
+              {finished && (
+                <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 mb-5 text-center">
+                  <p className="text-sm font-bold text-emerald-700">نتيجتك</p>
+                  <p className="text-4xl font-black text-emerald-800">{score.correct}/{score.total} - {score.pct}%</p>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                {exam.questions.map((q, i) => {
+                  const chosen = answers[q.id];
+                  const answered = chosen !== undefined;
+                  const isCorrect = answered && chosen === q.correctIdx;
+                  return (
+                    <div key={q.id} className="border rounded-2xl p-4 bg-white">
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        <span className="bg-slate-100 text-slate-700 px-2 py-1 rounded-full text-xs font-bold">سؤال {i+1}</span>
+                        <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-bold">{q.branch}</span>
+                        <span className="bg-fuchsia-100 text-fuchsia-700 px-2 py-1 rounded-full text-xs font-bold">{q.difficulty}</span>
+                      </div>
+                      {q.blockText && <div className="bg-slate-50 border rounded-xl p-3 mb-3 font-bold leading-loose">{renderBracketHighlightedText(q.blockText)}</div>}
+                      <h4 className="font-black text-slate-900 text-lg mb-3 leading-relaxed">{renderBracketHighlightedText(q.text)}</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {q.options.map((opt, idx) => {
+                          const selected = chosen === idx;
+                          const correct = q.correctIdx === idx;
+                          const show = answered || finished;
+                          return (
+                            <button key={idx} onClick={() => chooseAnswer(q, idx)} className={`text-right border rounded-xl p-3 font-bold transition ${
+                              show && correct ? 'bg-emerald-50 border-emerald-300 text-emerald-800' :
+                              show && selected && !correct ? 'bg-red-50 border-red-300 text-red-800' :
+                              selected ? 'bg-fuchsia-50 border-fuchsia-300 text-fuchsia-800' : 'bg-white hover:bg-slate-50'
+                            }`}>
+                              {idx+1}. {opt}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {answered && (
+                        <div className={`mt-3 rounded-xl p-3 text-sm font-bold ${isCorrect ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'}`}>
+                          {isCorrect ? 'إجابة صحيحة ✅' : `إجابة غير صحيحة ❌ — التصويب: ${q.options[q.correctIdx]}`}
+                          <p className="mt-2 text-slate-700">شرح الفكرة: {q.explanation}</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const PaymentRequestStudentPanel = ({ user, userData }) => {
   const [method, setMethod] = useState('vodafone_cash');
   const [plan, setPlan] = useState('monthly');
@@ -2905,7 +3109,7 @@ const RealAIBox = ({ title = 'AI الحقيقي', payload = {}, compact = false 
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
-        throw new Error(data.error || 'تعذر تشغيل الذكاء الاصطناعي الآن.');
+        throw new Error(data.error || 'AI غير متصل حاليًا. تأكد من وجود فولدر api في جذر المشروع ومن مفاتيح OPENAI_API_KEY أو GEMINI_API_KEY في Vercel ثم اعمل Redeploy.');
       }
 
       setAiResult(data.analysis);
@@ -2924,7 +3128,8 @@ const RealAIBox = ({ title = 'AI الحقيقي', payload = {}, compact = false 
           <h3 className="font-black text-xl text-slate-800 flex items-center gap-2">
             <Sparkles className="text-fuchsia-600"/> {title}
           </h3>
-          <p className="text-xs text-slate-500 mt-1">شرح ذكي، سبب الخطأ، وخطة مذاكرة مخصصة من AI خارجي آمن عبر Vercel Backend.</p>
+          <p className="text-xs text-slate-500 mt-1">شرح ذكي، سبب الخطأ، وخطة مذاكرة مخصصة من AI</p>
+          <div className="mt-2"><AIQuickHealthCheck /></div>
         </div>
         <button
           onClick={askAI}
@@ -3886,11 +4091,11 @@ const StudentSmartPerformanceReport = ({ userResults = [], content = [] }) => {
 
 const MobileStudentBottomNav = ({ activeTab, setActiveTab, onMessageClick }) => {
   const items = [
-    { key: 'dashboard', label: 'الرئيسية', icon: Layout },
-    { key: 'content', label: 'المحاضرات', icon: PlayCircle },
+    { key: 'home', label: 'الرئيسية', icon: Layout },
+    { key: 'videos', label: 'المحاضرات', icon: PlayCircle },
     { key: 'exams', label: 'الامتحانات', icon: ClipboardList },
-    { key: 'messages', label: 'الرسائل', icon: MessageCircle },
-    { key: 'profile', label: 'الحساب', icon: User }
+    { key: 'interactive_exams', label: 'AI امتحان', icon: Sparkles },
+    { key: 'messages', label: 'الرسائل', icon: MessageCircle }
   ];
 
   const handleClick = (key) => {
@@ -7143,6 +7348,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   const [activeExam, setActiveExam] = useState(null);
   const [playingVideo, setPlayingVideo] = useState(null);
   const [playingHtml, setPlayingHtml] = useState(null);
+  const [showAIInteractiveExam, setShowAIInteractiveExam] = useState(false);
   const [examResults, setExamResults] = useState([]);
   const [hwResults, setHwResults] = useState([]); 
   const [assignments, setAssignments] = useState([]);
@@ -7541,8 +7747,8 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
       )}
       {playingVideo && <SecureVideoPlayer video={playingVideo} user={user} userName={userData.name} onClose={() => setPlayingVideo(null)} onProgress={handleVideoProgress} />}
       {playingHtml && <InteractiveViewer content={playingHtml} user={userData} onClose={() => setPlayingHtml(null)} />}
+      {showAIInteractiveExam && <AIInteractiveExamModal user={user} userData={userData} onClose={() => setShowAIInteractiveExam(false)} />}
       <FloatingArabicBackground />
-      <ChatWidget user={user} />
       
       <aside className={`fixed top-0 bottom-0 right-0 z-40 bg-white/95 backdrop-blur-xl w-72 p-6 shadow-xl transition-transform duration-300 ${mobileMenu ? 'translate-x-0' : 'translate-x-full md:translate-x-0'} border-l border-slate-200 flex flex-col`}>
         <div className="flex items-center justify-between mb-10 px-2">
@@ -7626,7 +7832,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                 <StudentSmartPerformanceReport userResults={examResults} content={content} />
                 <AdvancedAIStudentCoach userResults={examResults} exams={exams} content={content} userData={userData} />
                 <RealAIBox
-                  title="AI خارجي شامل للطالب"
+                  title="AI شامل للطالب"
                   payload={{
                     mode: 'student_home_plan',
                     language: 'ar-EG',
@@ -7939,6 +8145,18 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
         {activeTab === 'interactive_exams' && !isBannedExam && (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                <motion.div whileHover={{y:-5}} className="glass-card rounded-xl overflow-hidden cursor-pointer relative border-2 border-fuchsia-300" onClick={() => setShowAIInteractiveExam(true)}>
+                    <div className="h-48 bg-gradient-to-br from-fuchsia-600 via-purple-700 to-slate-900 flex items-center justify-center relative group">
+                        <Sparkles className="text-white w-20 h-20 opacity-90 group-hover:scale-110 transition drop-shadow-lg"/>
+                        <span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(userData?.grade)}</span>
+                        <span className="absolute top-2 right-2 bg-fuchsia-500 text-white text-xs px-2 py-1 rounded-full font-bold flex items-center gap-1 shadow-md">AI</span>
+                    </div>
+                    <div className="p-4">
+                        <h3 className="font-black text-lg text-slate-800">امتحان AI مخصص</h3>
+                        <p className="text-xs text-slate-500 mt-1">اكتب الفرع وAI يولد لك 15-20 سؤال مناسب لمرحلتك.</p>
+                        <button className="mt-3 w-full font-bold py-2 rounded-lg transition shadow-sm bg-fuchsia-100 text-fuchsia-700 hover:bg-fuchsia-200">ابدأ امتحان AI</button>
+                    </div>
+                </motion.div>
                 {interactiveExams.map(h => (
                     <motion.div whileHover={{y:-5}} key={h.id} className="glass-card rounded-xl overflow-hidden cursor-pointer relative" onClick={() => handlePremiumClick(() => setPlayingHtml(h))}>
                         <div className="h-48 bg-gradient-to-br from-emerald-600 to-teal-900 flex items-center justify-center relative group">
@@ -8068,6 +8286,7 @@ const LandingPage = ({ onAuthClick, installPrompt }) => {
   const [publicContent, setPublicContent] = useState([]);
   const [playingVideo, setPlayingVideo] = useState(null); 
   const [playingHtml, setPlayingHtml] = useState(null);
+  const [showAIInteractiveExam, setShowAIInteractiveExam] = useState(false);
   
   useEffect(() => { const u = onSnapshot(query(collection(db, 'content'), where('isPublic', '==', true)), s => setPublicContent(s.docs.map(d=>d.data()))); return u; }, []);
   const openFacebook = () => window.open("https://www.facebook.com/share/17aiUQWKf5/", "_blank");
