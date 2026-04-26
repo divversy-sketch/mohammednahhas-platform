@@ -2251,6 +2251,134 @@ const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
 
 
 
+
+const PlatformPerformanceBooster = () => {
+  useEffect(() => {
+    if (import.meta.env.PROD) console.debug = () => {};
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(() => {
+        try { sessionStorage.setItem('platform_warmup', String(Date.now())); } catch(e) {}
+      });
+    }
+  }, []);
+  return null;
+};
+
+const LeaderboardPanel = ({ examResults = [], users = [], currentUserId = null, gradeFilter = 'all' }) => {
+  const rows = useMemo(() => {
+    const map = {};
+    (examResults || []).filter(r => r.status === 'completed').forEach(r => {
+      const id = r.studentId || r.userId || r.uid;
+      if (!id) return;
+      const userInfo = (users || []).find(u => u.id === id || u.uid === id) || {};
+      if (gradeFilter !== 'all' && userInfo.grade && userInfo.grade !== gradeFilter) return;
+      map[id] = map[id] || {
+        userId: id,
+        name: r.studentName || userInfo.name || userInfo.email || 'طالب',
+        grade: userInfo.grade || r.grade || '',
+        exams: 0,
+        totalPct: 0,
+        bestPct: 0
+      };
+      const pct = getResultPercentage(r);
+      map[id].exams += 1;
+      map[id].totalPct += pct;
+      map[id].bestPct = Math.max(map[id].bestPct, pct);
+    });
+    return Object.values(map).map(x => ({
+      ...x,
+      avgPct: x.exams ? Math.round(x.totalPct / x.exams) : 0,
+      points: Math.round((x.exams ? x.totalPct / x.exams : 0) + Math.min(x.exams * 2, 20) + x.bestPct * 0.2)
+    })).sort((a,b) => b.points - a.points).slice(0, 50);
+  }, [examResults, users, gradeFilter]);
+
+  const myRank = currentUserId ? rows.findIndex(r => r.userId === currentUserId) + 1 : 0;
+
+  return (
+    <div className="glass-panel rounded-2xl p-5 border-t-4 border-yellow-500">
+      <div className="flex justify-between items-center mb-5">
+        <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2"><Trophy className="text-yellow-500"/> لوحة الشرف</h2>
+        {myRank > 0 && <span className="bg-yellow-100 text-yellow-700 px-4 py-2 rounded-full font-black">ترتيبك #{myRank}</span>}
+      </div>
+      <div className="space-y-3">
+        {rows.slice(0, 10).map((row, idx) => (
+          <div key={row.userId} className={`flex items-center justify-between gap-3 p-4 rounded-2xl border ${row.userId === currentUserId ? 'bg-yellow-50 border-yellow-300' : 'bg-white border-slate-100'}`}>
+            <div className="flex items-center gap-3">
+              <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-black text-white ${idx === 0 ? 'bg-yellow-500' : idx === 1 ? 'bg-slate-400' : idx === 2 ? 'bg-orange-500' : 'bg-slate-700'}`}>{idx + 1}</div>
+              <div>
+                <p className="font-black text-slate-800">{row.name}</p>
+                <p className="text-xs text-slate-500">{getGradeLabel(row.grade)} • {row.exams} امتحان</p>
+              </div>
+            </div>
+            <div className="text-left">
+              <p className="text-2xl font-black text-yellow-600">{row.points}</p>
+              <p className="text-xs text-slate-500">متوسط {row.avgPct}%</p>
+            </div>
+          </div>
+        ))}
+        {rows.length === 0 && <p className="text-center py-10 text-slate-400 font-bold">لا توجد نتائج كافية بعد.</p>}
+      </div>
+    </div>
+  );
+};
+
+const AISmartRecommendations = ({ userResults = [], content = [], exams = [], userData = null }) => {
+  userResults = Array.isArray(userResults) ? userResults : [];
+  content = Array.isArray(content) ? content : [];
+  exams = Array.isArray(exams) ? exams : [];
+
+  const recommendations = useMemo(() => {
+    const completed = userResults.filter(r => r.status === 'completed');
+    const branches = {};
+    completed.forEach(r => {
+      const branchRows = Array.isArray(r.branchAnalysis) ? r.branchAnalysis : Object.entries(r.branchStats || {}).map(([branch, data]) => ({
+        branch,
+        percentage: data.possible > 0 ? Math.round((safeNumber(data.earned, 0) / safeNumber(data.possible, 1)) * 100) : 0,
+        wrong: safeNumber(data.wrong, 0)
+      }));
+      branchRows.forEach(b => {
+        branches[b.branch] = branches[b.branch] || { branch: b.branch, total: 0, count: 0, wrong: 0 };
+        branches[b.branch].total += safeNumber(b.percentage, 0);
+        branches[b.branch].count += 1;
+        branches[b.branch].wrong += safeNumber(b.wrong, 0);
+      });
+    });
+
+    const weak = Object.values(branches).map(b => ({...b, avg: b.count ? Math.round(b.total / b.count) : 0})).sort((a,b)=>a.avg-b.avg).slice(0,4);
+    const out = weak.map(b => {
+      const relatedVideo = content.find(c => (c.type === 'video' || c.videoSection) && ((c.branch || '').includes(b.branch) || (c.title || '').includes(b.branch)));
+      const relatedExam = exams.find(e => e.grade === userData?.grade && (e.title || '').includes(b.branch));
+      return {
+        priority: b.avg < 50 ? 'عاجل' : b.avg < 70 ? 'مهم' : 'مراجعة',
+        title: `راجع فرع ${b.branch}`,
+        reason: `متوسطك في هذا الفرع ${b.avg}% وعدد الأخطاء ${b.wrong}.`,
+        action: relatedVideo ? `شاهد: ${relatedVideo.title}` : relatedExam ? `حل امتحان: ${relatedExam.title}` : 'راجع الدرس ثم حل تدريب قصير.'
+      };
+    });
+
+    if (!out.length) out.push({ priority: 'ابدأ', title: 'ابدأ أول اختبار', reason: 'لسه مفيش بيانات كافية.', action: 'حل امتحان قصير حتى تظهر توصيات دقيقة.' });
+    return out;
+  }, [userResults, content, exams, userData]);
+
+  return (
+    <div className="glass-panel rounded-2xl p-5 border-t-4 border-purple-600">
+      <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2 mb-4"><Sparkles className="text-purple-600"/> توصيات ذكية AI</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {recommendations.map((r, i) => (
+          <div key={i} className="bg-white border rounded-2xl p-4">
+            <div className="flex justify-between gap-3 mb-2">
+              <h3 className="font-black text-slate-800">{r.title}</h3>
+              <span className={`text-xs px-3 py-1 rounded-full font-black ${r.priority === 'عاجل' ? 'bg-red-100 text-red-700' : 'bg-purple-100 text-purple-700'}`}>{r.priority}</span>
+            </div>
+            <p className="text-sm text-slate-600 mb-3">{r.reason}</p>
+            <div className="bg-purple-50 text-purple-800 rounded-xl p-3 text-sm font-bold">{r.action}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const AdminQuestionDeepAnalytics = ({ examsList = [], examResults = [] }) => {
   const [selectedExamId, setSelectedExamId] = useState('');
 
@@ -2408,6 +2536,8 @@ const AdminQuestionDeepAnalytics = ({ examsList = [], examResults = [] }) => {
 };
 
 const StudentSmartPerformanceReport = ({ userResults = [], content = [] }) => {
+  userResults = Array.isArray(userResults) ? userResults : [];
+  content = Array.isArray(content) ? content : [];
   const completed = useMemo(() => (userResults || []).filter(r => r.status === 'completed').sort((a,b) => (b.submittedAt?.seconds || 0) - (a.submittedAt?.seconds || 0)), [userResults]);
   const latest = completed[0];
 
@@ -4928,9 +5058,9 @@ const AdminDashboard = ({ user }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-4 md:p-6 relative z-10">
         <div className="glass-panel p-4 rounded-xl h-fit space-y-2 flex md:flex-col overflow-x-auto md:overflow-x-visible whitespace-nowrap scrollbar-hide">
-          {['dashboard', 'users', 'all_users', 'subscriptions', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'question-analytics', 'smart_hw', 'live', 'content', 'notifications', 'student-messages', 'messages', 'auto_reply', 'quotes', 'settings'].map(tab => (
+          {['dashboard', 'users', 'all_users', 'subscriptions', 'leaderboard', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'question-analytics', 'smart_hw', 'live', 'content', 'notifications', 'student-messages', 'messages', 'auto_reply', 'quotes', 'settings'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 transition-all ${activeTab===tab?'bg-amber-100 text-amber-700 shadow-sm border-b-4 md:border-b-0 md:border-r-4 border-amber-500':'hover:bg-slate-50 text-slate-600'}`}>
-              {tab === 'dashboard' ? 'Dashboard' : tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'question-analytics' ? 'تحليل الأسئلة' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'student-messages' ? 'رسائل الطلاب' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : 'الإعدادات'}
+              {tab === 'dashboard' ? 'Dashboard' : tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'leaderboard' ? 'لوحة الشرف' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'question-analytics' ? 'تحليل الأسئلة' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'student-messages' ? 'رسائل الطلاب' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : 'الإعدادات'}
             </button>
           ))}
         </div>
@@ -5419,7 +5549,12 @@ const AdminDashboard = ({ user }) => {
           )}
 
           
-          {activeTab === 'question-analytics' && (
+          
+          {activeTab === 'leaderboard' && (
+            <LeaderboardPanel examResults={examResults} users={activeUsersList} gradeFilter={adminGradeFilter} />
+          )}
+
+{activeTab === 'question-analytics' && (
             <AdminQuestionDeepAnalytics examsList={examsList} examResults={examResults} />
           )}
 
@@ -6193,7 +6328,9 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
         {activeTab === 'home' && (
             <div className="space-y-8">
-                <StudentSmartPerformanceReport userResults={results} content={content} />
+                <StudentSmartPerformanceReport userResults={examResults} content={content} />
+                <AISmartRecommendations userResults={examResults} content={content} exams={exams} userData={userData} />
+                <LeaderboardPanel examResults={examResults} users={[userData ? { ...userData, id: user?.uid } : {}]} currentUserId={user?.uid} gradeFilter={userData?.grade || 'all'} />
                 {liveSessions.length > 0 && (
                     <div className="bg-white border border-red-100 text-slate-800 p-4 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm">
                         <div>
@@ -6867,6 +7004,7 @@ export default function App() {
     <AppErrorBoundary>
     <AnimatePresence mode='wait'>
       <DesignSystemLoader />
+      <PlatformPerformanceBooster />
       <MobileExamHelperStyles />
       {!user ? (
         viewMode === 'landing' ? <LandingPage key="landing" onAuthClick={() => setViewMode('auth')} installPrompt={deferredPrompt ? handleInstallClick : null} /> : <AuthPage key="auth" onBack={() => setViewMode('landing')} />
