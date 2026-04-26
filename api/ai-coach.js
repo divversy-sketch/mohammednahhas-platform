@@ -34,6 +34,7 @@ function schemaForMode(mode) {
       }
     }`;
   }
+
   if (mode === "student_chat") {
     return `{
       "summary": "ملخص",
@@ -41,6 +42,7 @@ function schemaForMode(mode) {
       "studyPlan": ["خطوة 1", "خطوة 2"]
     }`;
   }
+
   return `{
     "summary": "ملخص قصير",
     "explanation": "شرح السؤال أو التحليل",
@@ -153,7 +155,7 @@ async function callGemini(prompt) {
   return parseJSON(txt);
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(200).json({
       ok: true,
@@ -178,7 +180,7 @@ module.exports = async function handler(req, res) {
     console.error("AI API error:", error);
     return res.status(500).json({
       ok: false,
-      error: "AI غير متصل حاليًا. تأكد من فولدر api في جذر المشروع ومن مفاتيح OPENAI_API_KEY أو GEMINI_API_KEY في Vercel ثم اعمل Redeploy."
+      error: "AI غير متصل حاليًا. راجع مفاتيح OPENAI_API_KEY أو GEMINI_API_KEY في Vercel ثم اعمل Redeploy."
     });
   }
-};
+}
