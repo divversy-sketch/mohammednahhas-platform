@@ -2006,6 +2006,14 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
             {currentQObj.type === 'essay' ? (
               <div className="space-y-4">
+                {isSubmitted && (
+                  <AIEssayCorrectorBox
+                    exam={exam}
+                    question={currentQObj}
+                    answer={answers[currentQObj.id]}
+                    studentName={user?.displayName || ''}
+                  />
+                )}
                 {!isSubmitted ? (
                   <>
                     <textarea
@@ -2285,6 +2293,599 @@ const PlatformPerformanceBooster = () => {
 
 
 
+
+
+
+
+
+
+const PaymentRequestStudentPanel = ({ user, userData }) => {
+  const [method, setMethod] = useState('vodafone_cash');
+  const [plan, setPlan] = useState('monthly');
+  const [amount, setAmount] = useState('');
+  const [transactionRef, setTransactionRef] = useState('');
+  const [note, setNote] = useState('');
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const planDays = plan === 'monthly' ? 30 : plan === 'quarter' ? 90 : plan === 'yearly' ? 365 : 30;
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    const qRef = query(collection(db, 'payment_requests'), where('userId', '==', user.uid));
+    const unsub = onSnapshot(qRef, (snap) => {
+      const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      rows.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      setRequests(rows);
+    }, (error) => {
+      console.warn('payment requests listener blocked:', error?.message);
+      setRequests([]);
+    });
+    return () => unsub();
+  }, [user?.uid]);
+
+  const submitRequest = async () => {
+    if (!transactionRef.trim()) return alert('اكتب رقم العملية أو آخر 4 أرقام.');
+    if (!amount || safeNumber(amount, 0) <= 0) return alert('اكتب المبلغ المدفوع.');
+
+    setLoading(true);
+    try {
+      await addDoc(collection(db, 'payment_requests'), {
+        userId: user.uid,
+        studentName: userData?.name || user?.displayName || user?.email || 'طالب',
+        studentEmail: user?.email || '',
+        grade: userData?.grade || '',
+        method,
+        plan,
+        durationDays: planDays,
+        amount: safeNumber(amount, 0),
+        transactionRef: transactionRef.trim(),
+        note: note.trim(),
+        status: 'pending',
+        createdAt: serverTimestamp(),
+        reviewedAt: null,
+        reviewedBy: ''
+      });
+      setAmount('');
+      setTransactionRef('');
+      setNote('');
+      alert('تم إرسال طلب التفعيل للإدارة. سيتم المراجعة قريبًا.');
+    } catch (error) {
+      console.error('payment request error:', error);
+      alert('تعذر إرسال طلب الدفع. راجع الاتصال أو الصلاحيات.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="glass-panel rounded-2xl p-5 border-t-4 border-emerald-600">
+      <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2 mb-4"><CreditCard className="text-emerald-600"/> طلب تفعيل اشتراك</h2>
+
+      <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 mb-4 text-sm text-emerald-800 font-bold leading-relaxed">
+        بعد الدفع خارج المنصة، اكتب رقم العملية هنا وسيتم تفعيل اشتراكك بعد مراجعة الإدارة.
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+        <select className="border rounded-xl p-3" value={method} onChange={e=>setMethod(e.target.value)}>
+          <option value="vodafone_cash">Vodafone Cash</option>
+          <option value="instapay">InstaPay</option>
+          <option value="bank_transfer">تحويل بنكي</option>
+          <option value="manual">دفع يدوي</option>
+        </select>
+
+        <select className="border rounded-xl p-3" value={plan} onChange={e=>setPlan(e.target.value)}>
+          <option value="monthly">شهري - 30 يوم</option>
+          <option value="quarter">3 شهور - 90 يوم</option>
+          <option value="yearly">سنوي - 365 يوم</option>
+        </select>
+
+        <input className="border rounded-xl p-3" type="number" placeholder="المبلغ المدفوع" value={amount} onChange={e=>setAmount(e.target.value)} />
+        <input className="border rounded-xl p-3" placeholder="رقم العملية / آخر 4 أرقام" value={transactionRef} onChange={e=>setTransactionRef(e.target.value)} />
+      </div>
+
+      <textarea className="w-full border rounded-xl p-3 mb-3" placeholder="ملاحظة اختيارية للإدارة..." value={note} onChange={e=>setNote(e.target.value)} />
+
+      <button disabled={loading} onClick={submitRequest} className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-black hover:bg-emerald-700 disabled:opacity-50">
+        {loading ? 'جاري الإرسال...' : 'إرسال طلب التفعيل'}
+      </button>
+
+      {requests.length > 0 && (
+        <div className="mt-5">
+          <h3 className="font-black text-slate-800 mb-2">طلباتي السابقة</h3>
+          <div className="space-y-2">
+            {requests.slice(0, 5).map(req => (
+              <div key={req.id} className="bg-white border rounded-xl p-3 flex justify-between items-center gap-3">
+                <div>
+                  <p className="font-bold text-slate-800">{req.method} - {req.amount} جنيه</p>
+                  <p className="text-xs text-slate-500">رقم العملية: {req.transactionRef}</p>
+                </div>
+                <span className={`text-xs px-3 py-1 rounded-full font-black ${req.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : req.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {req.status === 'approved' ? 'تم التفعيل' : req.status === 'rejected' ? 'مرفوض' : 'قيد المراجعة'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const AdminPaymentRequestsPanel = ({ users = [] }) => {
+  const [requests, setRequests] = useState([]);
+  const [filter, setFilter] = useState('pending');
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'payment_requests'), (snap) => {
+      const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      rows.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      setRequests(rows);
+    }, (error) => {
+      console.warn('payment requests admin listener blocked:', error?.message);
+      setRequests([]);
+    });
+    return () => unsub();
+  }, []);
+
+  const approveRequest = async (req) => {
+    if (!window.confirm(`تفعيل اشتراك ${req.studentName} لمدة ${req.durationDays || 30} يوم؟`)) return;
+
+    try {
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + safeNumber(req.durationDays, 30));
+
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'payment_requests', req.id), {
+        status: 'approved',
+        reviewedAt: serverTimestamp(),
+        approvedAt: serverTimestamp()
+      });
+      batch.set(doc(db, 'users', req.userId), {
+        subscription: {
+          active: true,
+          plan: req.plan || 'manual',
+          source: 'payment_request',
+          expiresAt,
+          activatedAt: serverTimestamp(),
+          lastPaymentRequestId: req.id
+        },
+        isVIP: true,
+        vipUntil: expiresAt,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      await batch.commit();
+      alert('تم تفعيل الاشتراك بنجاح.');
+    } catch (error) {
+      console.error('approve payment request error:', error);
+      alert('تعذر تفعيل الاشتراك. راجع الصلاحيات.');
+    }
+  };
+
+  const rejectRequest = async (req) => {
+    const reason = window.prompt('سبب الرفض؟', 'بيانات الدفع غير واضحة');
+    if (reason === null) return;
+    await updateDoc(doc(db, 'payment_requests', req.id), {
+      status: 'rejected',
+      rejectReason: reason,
+      reviewedAt: serverTimestamp()
+    });
+  };
+
+  const filtered = requests.filter(r => filter === 'all' || r.status === filter);
+
+  return (
+    <div className="glass-panel rounded-2xl p-5 border-t-4 border-emerald-600">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
+        <div>
+          <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2"><WalletCards className="text-emerald-600"/> طلبات الدفع والتفعيل</h2>
+          <p className="text-sm text-slate-500">مراجعة مدفوعات الطلاب وتفعيل الاشتراك مباشرة.</p>
+        </div>
+        <select className="border rounded-xl p-3" value={filter} onChange={e=>setFilter(e.target.value)}>
+          <option value="pending">قيد المراجعة</option>
+          <option value="approved">مفعلة</option>
+          <option value="rejected">مرفوضة</option>
+          <option value="all">الكل</option>
+        </select>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4"><p className="text-xs font-bold text-amber-600">قيد المراجعة</p><p className="text-3xl font-black text-amber-700">{requests.filter(r=>r.status==='pending').length}</p></div>
+        <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4"><p className="text-xs font-bold text-emerald-600">مفعلة</p><p className="text-3xl font-black text-emerald-700">{requests.filter(r=>r.status==='approved').length}</p></div>
+        <div className="bg-red-50 border border-red-100 rounded-2xl p-4"><p className="text-xs font-bold text-red-600">مرفوضة</p><p className="text-3xl font-black text-red-700">{requests.filter(r=>r.status==='rejected').length}</p></div>
+        <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4"><p className="text-xs font-bold text-blue-600">إجمالي مبالغ مفعلة</p><p className="text-3xl font-black text-blue-700">{requests.filter(r=>r.status==='approved').reduce((s,r)=>s+safeNumber(r.amount,0),0)}</p></div>
+      </div>
+
+      <div className="space-y-3">
+        {filtered.map(req => (
+          <div key={req.id} className="bg-white border rounded-2xl p-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div>
+                <h3 className="font-black text-slate-800">{req.studentName}</h3>
+                <p className="text-xs text-slate-500">{req.studentEmail} • {getGradeLabel(req.grade)}</p>
+                <p className="text-sm text-slate-700 mt-2"><b>الطريقة:</b> {req.method} | <b>المبلغ:</b> {req.amount} | <b>العملية:</b> {req.transactionRef}</p>
+                {req.note && <p className="text-sm text-slate-500 mt-1">ملاحظة: {req.note}</p>}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {req.status === 'pending' && (
+                  <>
+                    <button onClick={() => approveRequest(req)} className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold">تفعيل</button>
+                    <button onClick={() => rejectRequest(req)} className="bg-red-100 text-red-700 px-4 py-2 rounded-xl font-bold">رفض</button>
+                  </>
+                )}
+                <span className={`px-3 py-2 rounded-xl text-xs font-black ${req.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : req.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {req.status === 'approved' ? 'مفعل' : req.status === 'rejected' ? 'مرفوض' : 'انتظار'}
+                </span>
+              </div>
+            </div>
+          </div>
+        ))}
+        {filtered.length === 0 && <p className="text-center text-slate-400 py-10 font-bold">لا توجد طلبات في هذا القسم.</p>}
+      </div>
+    </div>
+  );
+};
+
+const AdvancedAntiCheatInsights = ({ examResults = [] }) => {
+  const risky = useMemo(() => {
+    return (examResults || [])
+      .map(r => {
+        const warnings = safeNumber(r.antiCheatWarnings, 0);
+        const logCount = Array.isArray(r.antiCheatLog) ? r.antiCheatLog.length : 0;
+        const risk = warnings * 25 + logCount * 10 + (r.status === 'security_hold' ? 40 : 0) + (r.status === 'cheated' ? 70 : 0);
+        return { ...r, risk: Math.min(100, risk) };
+      })
+      .filter(r => r.risk > 0)
+      .sort((a,b)=>b.risk-a.risk)
+      .slice(0, 30);
+  }, [examResults]);
+
+  return (
+    <div className="glass-panel rounded-2xl p-5 border-t-4 border-red-600">
+      <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2 mb-4"><ShieldAlert className="text-red-600"/> Anti-cheat Risk Center</h2>
+      <div className="space-y-3">
+        {risky.map(r => (
+          <div key={r.id} className="bg-white border rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div>
+              <h3 className="font-black text-slate-800">{r.studentName || 'طالب'}</h3>
+              <p className="text-xs text-slate-500">{r.examTitle || 'امتحان'} • تحذيرات: {safeNumber(r.antiCheatWarnings,0)}</p>
+            </div>
+            <div className="min-w-[180px]">
+              <div className="flex justify-between text-xs font-bold mb-1"><span>Risk</span><span>{r.risk}%</span></div>
+              <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                <div className={`${r.risk >= 70 ? 'bg-red-600' : r.risk >= 40 ? 'bg-amber-500' : 'bg-emerald-500'} h-full`} style={{width:`${r.risk}%`}}></div>
+              </div>
+            </div>
+          </div>
+        ))}
+        {risky.length === 0 && <p className="text-center text-slate-400 py-10 font-bold">لا توجد مخاطر غش مسجلة.</p>}
+      </div>
+    </div>
+  );
+};
+
+const AppConversionGuidePanel = () => (
+  <div className="glass-panel rounded-2xl p-5 border-t-4 border-sky-600">
+    <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2 mb-4"><Smartphone className="text-sky-600"/> تجهيز APK و iOS</h2>
+    <div className="space-y-3 text-sm font-bold text-slate-700 leading-relaxed">
+      <p>هذه الخطوة لا تغير المنصة، لكنها تجهزها للتحويل لتطبيق Android و iOS باستخدام Capacitor.</p>
+      <div className="bg-slate-900 text-slate-100 rounded-2xl p-4 font-mono text-left overflow-auto" dir="ltr">
+        npm install @capacitor/core @capacitor/cli<br/>
+        npx cap init NahhasPlatform com.nahhas.platform --web-dir=dist<br/>
+        npm run build<br/>
+        npx cap add android<br/>
+        npx cap copy<br/>
+        npx cap open android
+      </div>
+      <p>لـ iOS ستحتاج جهاز Mac ثم:</p>
+      <div className="bg-slate-900 text-slate-100 rounded-2xl p-4 font-mono text-left overflow-auto" dir="ltr">
+        npx cap add ios<br/>
+        npx cap copy<br/>
+        npx cap open ios
+      </div>
+    </div>
+  </div>
+);
+
+
+const AIQuestionGeneratorPanel = ({ userData = null, onAddQuestions = null }) => {
+  const [topic, setTopic] = useState('');
+  const [branch, setBranch] = useState('نحو');
+  const [grade, setGrade] = useState(userData?.grade || '3sec');
+  const [count, setCount] = useState(5);
+  const [difficulty, setDifficulty] = useState('medium');
+  const [loading, setLoading] = useState(false);
+  const [generated, setGenerated] = useState([]);
+
+  const generateQuestions = async () => {
+    if (!topic.trim()) return alert('اكتب موضوع أو درس الأسئلة.');
+    setLoading(true);
+    try {
+      const res = await fetch('/api/ai-coach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'generate_questions',
+          language: 'ar-EG',
+          topic,
+          branch,
+          grade,
+          count: safeNumber(count, 5),
+          difficulty
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'تعذر توليد الأسئلة.');
+      const questions = Array.isArray(data.analysis?.questions) ? data.analysis.questions : [];
+      setGenerated(questions.map((q, idx) => ({
+        id: `ai_${Date.now()}_${idx}`,
+        text: q.text || '',
+        type: q.type || 'mcq',
+        branch: q.branch || branch,
+        options: q.options || ['أ', 'ب', 'ج', 'د'],
+        correctIdx: safeNumber(q.correctIdx, 0),
+        explanation: q.explanation || '',
+        maxScore: safeNumber(q.maxScore, 1),
+        tags: q.tags || []
+      })));
+    } catch (error) {
+      console.error('AI generate questions error:', error);
+      alert(error.message || 'تعذر توليد الأسئلة.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copyJSON = async () => {
+    await navigator.clipboard?.writeText(JSON.stringify(generated, null, 2));
+    alert('تم نسخ الأسئلة بصيغة JSON.');
+  };
+
+  return (
+    <div className="glass-panel rounded-2xl p-5 border-t-4 border-cyan-600">
+      <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2 mb-4"><Wand2 className="text-cyan-600"/> AI مولد الأسئلة</h2>
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-4">
+        <input className="border rounded-xl p-3 md:col-span-2" placeholder="اكتب الدرس أو الموضوع..." value={topic} onChange={e=>setTopic(e.target.value)} />
+        <input className="border rounded-xl p-3" placeholder="الفرع" value={branch} onChange={e=>setBranch(e.target.value)} />
+        <select className="border rounded-xl p-3" value={grade} onChange={e=>setGrade(e.target.value)}><GradeOptions/></select>
+        <select className="border rounded-xl p-3" value={difficulty} onChange={e=>setDifficulty(e.target.value)}>
+          <option value="easy">سهل</option>
+          <option value="medium">متوسط</option>
+          <option value="hard">صعب</option>
+        </select>
+        <input type="number" min="1" max="20" className="border rounded-xl p-3" value={count} onChange={e=>setCount(e.target.value)} />
+      </div>
+      <button disabled={loading} onClick={generateQuestions} className="bg-cyan-600 text-white px-6 py-3 rounded-xl font-black hover:bg-cyan-700 disabled:opacity-50">
+        {loading ? 'جاري التوليد...' : 'توليد الأسئلة'}
+      </button>
+
+      {generated.length > 0 && (
+        <div className="mt-5 space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <button onClick={copyJSON} className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl font-bold">نسخ JSON</button>
+            {onAddQuestions && <button onClick={() => onAddQuestions(generated)} className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold">إضافة للامتحان الحالي</button>}
+          </div>
+          {generated.map((q, idx) => (
+            <div key={q.id} className="bg-white border rounded-2xl p-4">
+              <div className="flex gap-2 mb-2">
+                <span className="bg-cyan-100 text-cyan-700 text-xs px-2 py-1 rounded-full font-bold">سؤال {idx+1}</span>
+                <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full font-bold">{q.branch}</span>
+              </div>
+              <p className="font-black text-slate-800 mb-3">{q.text}</p>
+              {q.type !== 'essay' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {q.options.map((opt, i) => (
+                    <div key={i} className={`border rounded-xl p-2 text-sm font-bold ${i === q.correctIdx ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50'}`}>
+                      {i+1}. {opt}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {q.explanation && <p className="text-xs text-slate-500 mt-3">الشرح: {q.explanation}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const AIEssayCorrectorBox = ({ exam, question, answer, studentName = '' }) => {
+  const [loading, setLoading] = useState(false);
+  const [correction, setCorrection] = useState(null);
+
+  const runCorrection = async () => {
+    const answerText = typeof answer === 'object' ? answer?.text : answer;
+    if (!answerText || !String(answerText).trim()) return alert('لا توجد إجابة نصية لتصحيحها.');
+    setLoading(true);
+    try {
+      const res = await fetch('/api/ai-coach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'essay_correct',
+          language: 'ar-EG',
+          examTitle: exam?.title || '',
+          studentName,
+          question: {
+            text: question?.text || '',
+            branch: question?.branch || '',
+            modelAnswer: question?.modelAnswer || question?.answer || question?.explanation || '',
+            maxScore: getQuestionMaxScore(question)
+          },
+          studentAnswer: answerText
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'تعذر تصحيح المقالي.');
+      setCorrection(data.analysis);
+    } catch (error) {
+      console.error('AI essay correction error:', error);
+      alert(error.message || 'تعذر تصحيح المقالي.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div>
+          <h4 className="font-black text-purple-800 flex items-center gap-2"><PenTool size={18}/> تصحيح AI للمقالي</h4>
+          <p className="text-xs text-purple-600">اقتراح درجة وملاحظات، والقرار النهائي يظل للأدمن.</p>
+        </div>
+        <button disabled={loading} onClick={runCorrection} className="bg-purple-600 text-white px-4 py-2 rounded-xl font-bold disabled:opacity-50">
+          {loading ? 'جاري التصحيح...' : 'تصحيح AI'}
+        </button>
+      </div>
+
+      {correction && (
+        <div className="mt-3 bg-white border rounded-xl p-3 space-y-2">
+          <p className="font-black text-slate-800">الدرجة المقترحة: <span className="text-purple-700">{correction.suggestedScore ?? '-'}</span> / {getQuestionMaxScore(question)}</p>
+          {correction.feedback && <p className="text-sm text-slate-700"><b>ملاحظات:</b> {correction.feedback}</p>}
+          {Array.isArray(correction.strengths) && correction.strengths.length > 0 && <p className="text-sm text-emerald-700"><b>نقاط قوة:</b> {correction.strengths.join('، ')}</p>}
+          {Array.isArray(correction.improvements) && correction.improvements.length > 0 && <p className="text-sm text-amber-700"><b>يحتاج تحسين:</b> {correction.improvements.join('، ')}</p>}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const AIExamBuilderPanel = ({ userData = null }) => {
+  const [topic, setTopic] = useState('');
+  const [grade, setGrade] = useState(userData?.grade || '3sec');
+  const [branches, setBranches] = useState('نحو، قراءة، بلاغة');
+  const [mcqCount, setMcqCount] = useState(10);
+  const [essayCount, setEssayCount] = useState(2);
+  const [duration, setDuration] = useState(30);
+  const [loading, setLoading] = useState(false);
+  const [examDraft, setExamDraft] = useState(null);
+
+  const buildExam = async () => {
+    if (!topic.trim()) return alert('اكتب موضوع الامتحان.');
+    setLoading(true);
+    try {
+      const res = await fetch('/api/ai-coach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'generate_exam',
+          language: 'ar-EG',
+          topic,
+          grade,
+          branches,
+          mcqCount: safeNumber(mcqCount, 10),
+          essayCount: safeNumber(essayCount, 2),
+          duration: safeNumber(duration, 30)
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'تعذر بناء الامتحان.');
+      setExamDraft(data.analysis?.exam || data.analysis);
+    } catch (error) {
+      console.error('AI exam builder error:', error);
+      alert(error.message || 'تعذر بناء الامتحان.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copyExamJSON = async () => {
+    await navigator.clipboard?.writeText(JSON.stringify(examDraft, null, 2));
+    alert('تم نسخ الامتحان.');
+  };
+
+  return (
+    <div className="glass-panel rounded-2xl p-5 border-t-4 border-rose-600">
+      <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2 mb-4"><ClipboardList className="text-rose-600"/> AI بناء امتحان كامل</h2>
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-4">
+        <input className="border rounded-xl p-3 md:col-span-2" placeholder="موضوع الامتحان..." value={topic} onChange={e=>setTopic(e.target.value)} />
+        <select className="border rounded-xl p-3" value={grade} onChange={e=>setGrade(e.target.value)}><GradeOptions/></select>
+        <input className="border rounded-xl p-3" placeholder="الفروع" value={branches} onChange={e=>setBranches(e.target.value)} />
+        <input type="number" className="border rounded-xl p-3" placeholder="اختياري" value={mcqCount} onChange={e=>setMcqCount(e.target.value)} />
+        <input type="number" className="border rounded-xl p-3" placeholder="مقالي" value={essayCount} onChange={e=>setEssayCount(e.target.value)} />
+      </div>
+      <div className="flex flex-wrap gap-3">
+        <input type="number" className="border rounded-xl p-3 w-40" placeholder="المدة" value={duration} onChange={e=>setDuration(e.target.value)} />
+        <button disabled={loading} onClick={buildExam} className="bg-rose-600 text-white px-6 py-3 rounded-xl font-black hover:bg-rose-700 disabled:opacity-50">{loading ? 'جاري البناء...' : 'بناء الامتحان'}</button>
+      </div>
+
+      {examDraft && (
+        <div className="mt-5 bg-white border rounded-2xl p-4">
+          <div className="flex justify-between items-center gap-3 mb-3">
+            <h3 className="font-black text-slate-800">{examDraft.title || 'امتحان AI'}</h3>
+            <button onClick={copyExamJSON} className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl font-bold">نسخ JSON</button>
+          </div>
+          <pre className="bg-slate-900 text-slate-100 rounded-xl p-4 text-xs overflow-auto max-h-[420px]" dir="ltr">{JSON.stringify(examDraft, null, 2)}</pre>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const AIStudentChatCoach = ({ user, userData, examResults = [] }) => {
+  const [messages, setMessages] = useState([
+    { role: 'assistant', text: 'أهلًا 👋 أنا المدرب الذكي. اسألني عن أي سؤال أو خطة مذاكرة أو سبب ضعفك في فرع معين.' }
+  ]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const send = async () => {
+    if (!input.trim()) return;
+    const nextMessages = [...messages, { role: 'user', text: input.trim() }];
+    setMessages(nextMessages);
+    setInput('');
+    setLoading(true);
+    try {
+      const res = await fetch('/api/ai-coach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'student_chat',
+          language: 'ar-EG',
+          studentName: userData?.name || user?.displayName || '',
+          grade: userData?.grade || '',
+          question: input.trim(),
+          chatHistory: nextMessages.slice(-8),
+          recentResults: (examResults || []).slice(0, 5).map(r => ({
+            examTitle: r.examTitle,
+            percentage: getResultPercentage(r),
+            branchAnalysis: r.branchAnalysis || r.branchStats || {}
+          }))
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'تعذر رد AI.');
+      const answer = data.analysis?.answer || data.analysis?.summary || data.analysis?.explanation || 'تم.';
+      setMessages(prev => [...prev, { role: 'assistant', text: answer }]);
+    } catch (error) {
+      setMessages(prev => [...prev, { role: 'assistant', text: 'تعذر تشغيل المدرب الذكي الآن. جرّب بعد قليل.' }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="glass-panel rounded-2xl p-5 border-t-4 border-sky-600">
+      <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2 mb-4"><Bot className="text-sky-600"/> شات المدرب الذكي</h2>
+      <div className="bg-slate-50 border rounded-2xl p-4 max-h-[460px] overflow-y-auto space-y-3 mb-3">
+        {messages.map((m, idx) => (
+          <div key={idx} className={`flex ${m.role === 'user' ? 'justify-start' : 'justify-end'}`}>
+            <div className={`max-w-[85%] rounded-2xl p-3 text-sm font-bold ${m.role === 'user' ? 'bg-white border text-slate-800' : 'bg-sky-600 text-white'}`}>
+              {m.text}
+            </div>
+          </div>
+        ))}
+        {loading && <p className="text-center text-slate-400 font-bold">AI يكتب الآن...</p>}
+      </div>
+      <div className="flex flex-col md:flex-row gap-2">
+        <input className="flex-1 border rounded-xl p-3" placeholder="اسأل المدرب الذكي..." value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{ if(e.key === 'Enter') send(); }} />
+        <button onClick={send} className="bg-sky-600 text-white px-6 py-3 rounded-xl font-black">إرسال</button>
+      </div>
+    </div>
+  );
+};
 
 
 const RealAIBox = ({ title = 'AI الحقيقي', payload = {}, compact = false }) => {
@@ -5722,9 +6323,9 @@ const AdminDashboard = ({ user }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-4 md:p-6 relative z-10">
         <div className="glass-panel p-4 rounded-xl h-fit space-y-2 flex md:flex-col overflow-x-auto md:overflow-x-visible whitespace-nowrap scrollbar-hide">
-          {['dashboard', 'users', 'all_users', 'subscriptions', 'ai_insights', 'leaderboard', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'question-analytics', 'smart_hw', 'live', 'content', 'notifications', 'student-messages', 'messages', 'auto_reply', 'quotes', 'settings'].map(tab => (
+          {['dashboard', 'users', 'all_users', 'subscriptions', 'payments', 'security_center', 'app_convert', 'ai_lab', 'ai_insights', 'leaderboard', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'question-analytics', 'smart_hw', 'live', 'content', 'notifications', 'student-messages', 'messages', 'auto_reply', 'quotes', 'settings'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 transition-all ${activeTab===tab?'bg-amber-100 text-amber-700 shadow-sm border-b-4 md:border-b-0 md:border-r-4 border-amber-500':'hover:bg-slate-50 text-slate-600'}`}>
-              {tab === 'dashboard' ? 'Dashboard' : tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'ai_insights' ? 'AI Insights' : tab === 'leaderboard' ? 'لوحة الشرف' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'question-analytics' ? 'تحليل الأسئلة' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'student-messages' ? 'رسائل الطلاب' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : 'الإعدادات'}
+              {tab === 'dashboard' ? 'Dashboard' : tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'payments' ? 'طلبات الدفع' : tab === 'security_center' ? 'مركز الحماية' : tab === 'app_convert' ? 'تحويل App' : tab === 'ai_lab' ? 'AI Lab' : tab === 'ai_insights' ? 'AI Insights' : tab === 'leaderboard' ? 'لوحة الشرف' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'question-analytics' ? 'تحليل الأسئلة' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'student-messages' ? 'رسائل الطلاب' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : 'الإعدادات'}
             </button>
           ))}
         </div>
@@ -6219,7 +6820,28 @@ const AdminDashboard = ({ user }) => {
           
           
           
-          {activeTab === 'ai_insights' && (
+          
+          
+          {activeTab === 'payments' && (
+            <AdminPaymentRequestsPanel users={activeUsersList} />
+          )}
+
+          {activeTab === 'security_center' && (
+            <AdvancedAntiCheatInsights examResults={examResults} />
+          )}
+
+          {activeTab === 'app_convert' && (
+            <AppConversionGuidePanel />
+          )}
+
+{activeTab === 'ai_lab' && (
+            <div className="space-y-6">
+              <AIQuestionGeneratorPanel />
+              <AIExamBuilderPanel />
+            </div>
+          )}
+
+{activeTab === 'ai_insights' && (
             <AdminAIInsightsPanel examResults={examResults} examsList={examsList} content={content} />
           )}
 
@@ -7019,6 +7641,8 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                     }))
                   }}
                 />
+                <AIStudentChatCoach user={user} userData={userData} examResults={examResults} />
+                <PaymentRequestStudentPanel user={user} userData={userData} />
                 <AISmartRecommendations userResults={examResults} content={content} exams={exams} userData={userData} />
                 <LeaderboardPanel examResults={examResults} users={[userData ? { ...userData, id: user?.uid } : {}]} currentUserId={user?.uid} gradeFilter={userData?.grade || 'all'} />
                 {liveSessions.length > 0 && (
