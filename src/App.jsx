@@ -3023,18 +3023,9 @@ const LiveSessionsStudentPanel = ({ user, userData }) => {
 };
 
 const AIUsageBadge = ({ user }) => {
-  const [usage, setUsage] = useState(null);
-  useEffect(() => {
-    if (!user?.uid) return;
-    const ref = doc(db, 'ai_usage', `${user.uid}_${getTodayKey()}`);
-    return onSnapshot(ref, (snap) => setUsage(snap.exists() ? snap.data() : { count: 0 }), () => setUsage({ count: 0 }));
-  }, [user?.uid]);
-
-  const count = safeNumber(usage?.count, 0);
-  const limitNum = 10;
   return (
-    <div className="inline-flex items-center gap-2 bg-fuchsia-50 border border-fuchsia-100 text-fuchsia-700 px-3 py-2 rounded-xl text-xs font-black">
-      <Sparkles size={14}/> استخدام AI اليوم: {count}/{limitNum}
+    <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-100 text-emerald-700 px-3 py-2 rounded-xl text-xs font-black">
+      <Sparkles size={14}/> استخدام AI: غير محدود
     </div>
   );
 };
@@ -3158,49 +3149,18 @@ const AIInteractiveExamModal = ({ user, userData, onClose }) => {
   const [finished, setFinished] = useState(false);
 
   const generateExam = async () => {
-    if (!topic.trim() && !branch.trim()) return alert('اكتب اسم الدرس أو الفرع الذي تريد الامتحان فيه.');
-    if (!topic.trim() && ['نحو','بلاغة','قراءة','نصوص'].includes(branch.trim())) {
-      return alert('اكتب اسم الدرس بالتحديد، مثل: اسم التفضيل، كان وأخواتها، التشبيه، النصوص...');
-    }
+    if (!topic.trim() && !branch.trim()) return alert('اكتب أي درس عايز تمتحن فيه، مثل: اسم الفاعل، اسم التفضيل، التشبيه، القراءة المتحررة...');
     setLoading(true);
     setFinished(false);
     setAnswers({});
     try {
-      const todayKey = getTodayKey();
-      const usageRef = doc(db, 'ai_usage', `${user.uid}_${todayKey}`);
-      const usageSnap = await getDoc(usageRef);
-      const currentCount = safeNumber(usageSnap.data()?.count, 0);
-
-      // إصلاح VIP:
-      // بعض الحسابات تخزن الاشتراك بصيغ مختلفة، فمش صح نعتمد على userData.subscription.active فقط.
-      const now = Date.now();
-      const subscription = userData?.subscription || {};
-      const expiryRaw = userData?.subscriptionExpiry || subscription?.expiryDate || subscription?.expiresAt || subscription?.endDate || userData?.vipUntil;
-      const expiryMs = expiryRaw?.toDate ? expiryRaw.toDate().getTime() : (expiryRaw ? new Date(expiryRaw).getTime() : 0);
-      const isVIP = Boolean(
-        subscription?.active ||
-        userData?.isVIP ||
-        userData?.vip ||
-        userData?.role === 'vip' ||
-        userData?.plan === 'vip' ||
-        userData?.subscriptionStatus === 'active' ||
-        userData?.subscriptionType === 'vip' ||
-        (Number.isFinite(expiryMs) && expiryMs > now)
-      );
-
-      const dailyLimit = isVIP ? 50 : 5;
-      if (currentCount >= dailyLimit) {
-        alert(`وصلت للحد اليومي لاستخدام AI (${dailyLimit} مرات). ${isVIP ? 'أعد المحاولة غدًا.' : 'جرب بكرة أو فعل VIP.'}`);
-        setLoading(false);
-        return;
-      }
-
       const res = await fetch('/api/ai-coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: 'generate_exam',
           language: 'ar-EG',
+          lesson: topic.trim() || branch.trim(),
           topic: topic.trim() || branch.trim(),
           grade: userData?.grade || '1prep',
           branches: branch.trim() || topic.trim(),
@@ -3208,7 +3168,7 @@ const AIInteractiveExamModal = ({ user, userData, onClose }) => {
           essayCount: 0,
           duration: 25,
           difficultyMix: ['easy', 'medium', 'hard', 'very_hard'],
-          instructions: 'اكتب امتحان اختيار من متعدد فقط من 15 إلى 20 سؤال متعدد المستويات: سهل، متوسط، صعب، صعب جدا. التزم بمرحلة الطالب الدراسية ولا تخرج عنها.'
+          instructions: 'استخدم Gemini فقط. أنشئ أسئلة حقيقية عن الدرس الذي كتبه الطالب تحديدًا، ولا تستخدم fallback أو أسئلة عامة.'
         })
       });
       const data = await res.json().catch(() => ({}));
@@ -3236,7 +3196,7 @@ const AIInteractiveExamModal = ({ user, userData, onClose }) => {
             blockText: item.text || '',
             branch: q.branch || branch || item.branch || 'عام',
             type: q.type || 'mcq',
-            options: Array.isArray(q.options) && q.options.length >= 2 ? q.options.slice(0, 4) : ['اختيار 1', 'اختيار 2', 'اختيار 3', 'اختيار 4'],
+            options: Array.isArray(q.options) ? q.options.slice(0, 4) : [],
             correctIdx: safeNumber(q.correctIdx, 0),
             difficulty: q.difficulty || ['سهل','متوسط','صعب','صعب جدًا'][qi % 4],
             explanation: q.explanation || 'راجع فكرة السؤال جيدًا.'
@@ -3249,7 +3209,7 @@ const AIInteractiveExamModal = ({ user, userData, onClose }) => {
           blockText: item.blockText || '',
           branch: item.branch || branch || 'عام',
           type: item.type || 'mcq',
-          options: Array.isArray(item.options) && item.options.length >= 2 ? item.options.slice(0, 4) : ['اختيار 1', 'اختيار 2', 'اختيار 3', 'اختيار 4'],
+          options: Array.isArray(item.options) ? item.options.slice(0, 4) : [],
           correctIdx: safeNumber(item.correctIdx, 0),
           difficulty: item.difficulty || ['سهل','متوسط','صعب','صعب جدًا'][bi % 4],
           explanation: item.explanation || 'راجع فكرة السؤال جيدًا.'
@@ -3266,18 +3226,6 @@ const AIInteractiveExamModal = ({ user, userData, onClose }) => {
       if (flat.length === 0) {
         throw new Error('AI رجّع الامتحان بدون أسئلة صالحة. جرّب فرع أو موضوع أوضح.');
       }
-
-      await setDoc(doc(db, 'ai_usage', `${user.uid}_${getTodayKey()}`), {
-        userId: user.uid,
-        studentName: userData?.name || user?.displayName || user?.email || 'طالب',
-        grade: userData?.grade || '',
-        dateKey: getTodayKey(),
-        count: increment(1),
-        lastTopic: topic || branch,
-        isVIP,
-        dailyLimit,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
 
       setExam({
         id: `ai_exam_${Date.now()}`,
