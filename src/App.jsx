@@ -4344,29 +4344,42 @@ const AdvancedAIStudentCoach = ({ userResults = [], exams = [], content = [], us
 };
 
 const AdminAIInsightsPanel = ({ examResults = [], examsList = [], content = [] }) => {
+  const safeResults = Array.isArray(examResults) ? examResults : [];
+  const safeExams = Array.isArray(examsList) ? examsList : [];
+  const safeContent = Array.isArray(content) ? content : [];
+
   const insights = useMemo(() => {
-    const completed = (examResults || []).filter(r => r.status === 'completed');
+    const completed = safeResults.filter(r => r && r.status === 'completed');
     const branchMap = {};
     const examMap = {};
+    const gradeMap = {};
 
     completed.forEach(r => {
-      examMap[r.examId] = examMap[r.examId] || { examId: r.examId, title: r.examTitle || 'امتحان', attempts: 0, avg: 0 };
-      examMap[r.examId].attempts += 1;
-      examMap[r.examId].avg += getResultPercentage(r);
+      const pct = getResultPercentage(r);
+      const examTitle = r.examTitle || safeExams.find(e => e.id === r.examId)?.title || 'امتحان';
+      examMap[r.examId || examTitle] = examMap[r.examId || examTitle] || { examId: r.examId || examTitle, title: examTitle, attempts: 0, avg: 0 };
+      examMap[r.examId || examTitle].attempts += 1;
+      examMap[r.examId || examTitle].avg += pct;
+
+      const grade = r.grade || 'غير محدد';
+      gradeMap[grade] = gradeMap[grade] || { grade, attempts: 0, avg: 0 };
+      gradeMap[grade].attempts += 1;
+      gradeMap[grade].avg += pct;
 
       const rows = Array.isArray(r.branchAnalysis)
         ? r.branchAnalysis
         : Object.entries(r.branchStats || {}).map(([branch, data]) => ({
             branch,
-            percentage: data.possible > 0 ? Math.round((safeNumber(data.earned, 0) / safeNumber(data.possible, 1)) * 100) : 0,
-            wrong: safeNumber(data.wrong, 0)
+            percentage: data?.possible > 0 ? Math.round((safeNumber(data?.earned, 0) / safeNumber(data?.possible, 1)) * 100) : safeNumber(data?.percentage, 0),
+            wrong: safeNumber(data?.wrong, 0)
           }));
 
       rows.forEach(b => {
-        branchMap[b.branch] = branchMap[b.branch] || { branch: b.branch, total: 0, count: 0, wrong: 0 };
-        branchMap[b.branch].total += safeNumber(b.percentage, 0);
-        branchMap[b.branch].count += 1;
-        branchMap[b.branch].wrong += safeNumber(b.wrong, 0);
+        const branch = b?.branch || 'عام';
+        branchMap[branch] = branchMap[branch] || { branch, total: 0, count: 0, wrong: 0 };
+        branchMap[branch].total += safeNumber(b?.percentage, 0);
+        branchMap[branch].count += 1;
+        branchMap[branch].wrong += safeNumber(b?.wrong, 0);
       });
     });
 
@@ -4380,42 +4393,81 @@ const AdminAIInsightsPanel = ({ examResults = [], examsList = [], content = [] }
       avg: e.attempts ? Math.round(e.avg / e.attempts) : 0
     })).sort((a,b) => a.avg - b.avg);
 
-    return { branches, exams, totalAttempts: completed.length };
-  }, [examResults]);
+    const grades = Object.values(gradeMap).map(g => ({
+      ...g,
+      avg: g.attempts ? Math.round(g.avg / g.attempts) : 0
+    })).sort((a,b) => a.avg - b.avg);
+
+    return { branches, exams, grades, totalAttempts: completed.length };
+  }, [safeResults, safeExams]);
+
+  const aiRecommendations = useMemo(() => {
+    const weak = insights.branches.slice(0, 5);
+    if (!weak.length) return [];
+    return weak.map(item => {
+      const related = safeContent.find(c => (c?.branch || '').trim() === item.branch || (c?.title || '').includes(item.branch));
+      return {
+        branch: item.branch,
+        avg: item.avg,
+        action: related?.title ? `راجع أو أعد شرح: ${related.title}` : `أضف مراجعة مركزة على فرع ${item.branch}`
+      };
+    });
+  }, [insights.branches, safeContent]);
 
   return (
     <div className="glass-panel rounded-2xl p-5 border-t-4 border-fuchsia-600">
-      <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2 mb-4"><BrainCircuit className="text-fuchsia-600"/> AI Insights للأدمن</h2>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+        <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2"><BrainCircuit className="text-fuchsia-600"/> AI Insights للأدمن</h2>
+        <span className="text-xs bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-100 rounded-full px-3 py-1 font-bold">تحليل آمن بدون كراش</span>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
         <div className="bg-fuchsia-50 border border-fuchsia-100 rounded-2xl p-4"><p className="text-xs font-bold text-fuchsia-600">محاولات مكتملة</p><p className="text-3xl font-black text-fuchsia-800">{insights.totalAttempts}</p></div>
         <div className="bg-red-50 border border-red-100 rounded-2xl p-4"><p className="text-xs font-bold text-red-600">أضعف فرع عام</p><p className="text-xl font-black text-red-800">{insights.branches[0]?.branch || 'لا يوجد'}</p></div>
         <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4"><p className="text-xs font-bold text-amber-600">أصعب امتحان</p><p className="text-lg font-black text-amber-800">{insights.exams[0]?.title || 'لا يوجد'}</p></div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-white border rounded-2xl p-4">
-          <h3 className="font-black text-slate-800 mb-3">الفروع التي تحتاج إعادة شرح</h3>
-          <div className="space-y-2">
-            {insights.branches.slice(0, 8).map(b => (
-              <div key={b.branch} className="flex justify-between items-center bg-slate-50 rounded-xl p-3">
-                <span className="font-bold">{b.branch}</span>
-                <span className="font-black text-red-600">{b.avg}%</span>
-              </div>
-            ))}
+      {insights.totalAttempts === 0 ? (
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-8 text-center text-slate-500 font-bold">
+          لا توجد نتائج مكتملة كافية للتحليل حتى الآن. بعد أول امتحانات مكتملة ستظهر التحليلات هنا تلقائيًا.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="bg-white border rounded-2xl p-4">
+            <h3 className="font-black text-slate-800 mb-3">الفروع التي تحتاج إعادة شرح</h3>
+            <div className="space-y-2">
+              {insights.branches.slice(0, 8).map(b => (
+                <div key={b.branch} className="flex justify-between items-center bg-slate-50 rounded-xl p-3">
+                  <span className="font-bold">{b.branch}</span>
+                  <span className="font-black text-red-600">{b.avg}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="bg-white border rounded-2xl p-4">
+            <h3 className="font-black text-slate-800 mb-3">امتحانات تحتاج مراجعة</h3>
+            <div className="space-y-2">
+              {insights.exams.slice(0, 8).map(e => (
+                <div key={e.examId} className="flex justify-between items-center bg-slate-50 rounded-xl p-3">
+                  <span className="font-bold">{e.title}</span>
+                  <span className="font-black text-amber-600">{e.avg}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="bg-white border rounded-2xl p-4 lg:col-span-2">
+            <h3 className="font-black text-slate-800 mb-3">اقتراحات عملية من البيانات</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {aiRecommendations.map((r, i) => (
+                <div key={i} className="bg-fuchsia-50 border border-fuchsia-100 rounded-xl p-3">
+                  <p className="font-black text-fuchsia-800">{r.branch} - متوسط {r.avg}%</p>
+                  <p className="text-sm text-slate-700 mt-1">{r.action}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-        <div className="bg-white border rounded-2xl p-4">
-          <h3 className="font-black text-slate-800 mb-3">امتحانات تحتاج مراجعة</h3>
-          <div className="space-y-2">
-            {insights.exams.slice(0, 8).map(e => (
-              <div key={e.examId} className="flex justify-between items-center bg-slate-50 rounded-xl p-3">
-                <span className="font-bold">{e.title}</span>
-                <span className="font-black text-amber-600">{e.avg}%</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 };
@@ -7409,9 +7461,9 @@ const AdminDashboard = ({ user }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-4 md:p-6 relative z-10">
         <div className="glass-panel p-4 rounded-xl h-fit space-y-2 flex md:flex-col overflow-x-auto md:overflow-x-visible whitespace-nowrap scrollbar-hide">
-          {['dashboard', 'users', 'all_users', 'subscriptions', 'payments', 'security_center', 'ai_analytics', 'live_ai', 'app_convert', 'ai_lab', 'ai_insights', 'leaderboard', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'question-analytics', 'smart_hw', 'live', 'content', 'notifications', 'student-messages', 'messages', 'auto_reply', 'quotes'].map(tab => (
+          {['dashboard', 'users', 'all_users', 'subscriptions', 'payments', 'security_center', 'ai_analytics', 'live_ai', 'app_convert', 'ai_lab', 'ai_insights', 'leaderboard', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'question-analytics', 'smart_hw', 'content', 'notifications', 'student-messages', 'messages', 'auto_reply', 'quotes'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 transition-all ${activeTab===tab?'bg-amber-100 text-amber-700 shadow-sm border-b-4 md:border-b-0 md:border-r-4 border-amber-500':'hover:bg-slate-50 text-slate-600'}`}>
-              {tab === 'dashboard' ? 'Dashboard' : tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'payments' ? 'طلبات الدفع' : tab === 'security_center' ? 'مركز الحماية' : tab === 'ai_analytics' ? 'تحليلات AI' : tab === 'live_ai' ? 'Live AI' : tab === 'app_convert' ? 'تحويل App' : tab === 'ai_lab' ? 'AI Lab' : tab === 'ai_insights' ? 'AI Insights' : tab === 'leaderboard' ? 'لوحة الشرف' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'question-analytics' ? 'تحليل الأسئلة' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'student-messages' ? 'رسائل الطلاب' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : 'الإعدادات'}
+              {tab === 'dashboard' ? 'Dashboard' : tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'payments' ? 'طلبات الدفع' : tab === 'security_center' ? 'مركز الحماية' : tab === 'ai_analytics' ? 'تحليلات AI' : tab === 'live_ai' ? 'البث المباشر + Live AI' : tab === 'app_convert' ? 'تحويل App' : tab === 'ai_lab' ? 'AI Lab' : tab === 'ai_insights' ? 'AI Insights' : tab === 'leaderboard' ? 'لوحة الشرف' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'question-analytics' ? 'تحليل الأسئلة' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'student-messages' ? 'رسائل الطلاب' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : 'الإعدادات'}
             </button>
           ))}
         </div>
@@ -7922,7 +7974,7 @@ const AdminDashboard = ({ user }) => {
           )}
 
 
-          {activeTab === 'live_ai' && (
+          {false && activeTab === 'live_ai' && (
             <LiveSessionsAdminPanel adminGradeFilter={adminGradeFilter} />
           )}
 
@@ -7938,7 +7990,7 @@ const AdminDashboard = ({ user }) => {
           )}
 
 {activeTab === 'ai_insights' && (
-            <AdminAIInsightsPanel examResults={examResults} examsList={examsList} content={content} />
+            <AdminAIInsightsPanel examResults={examResults} examsList={examsList} content={contentList || []} />
           )}
 
 {activeTab === 'leaderboard' && (
@@ -7949,7 +8001,7 @@ const AdminDashboard = ({ user }) => {
             <AdminQuestionDeepAnalytics examsList={examsList} examResults={examResults} />
           )}
 
-          {activeTab === 'live' && (
+          {activeTab === 'live_ai' && (
               <div className="space-y-6">
                 <div className="glass-panel p-4 md:p-8 rounded-xl border-t-4 border-red-600">
                     <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6">
