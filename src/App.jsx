@@ -664,7 +664,7 @@ const Leaderboard = () => {
     const [topStudents, setTopStudents] = useState([]);
     const [config, setConfig] = useState({ show: true });
     useEffect(() => {
-        const unsubConfig = onSnapshot(doc(db,  'config'), (snap) => { if(snap.exists()) setConfig(snap.data()); });
+        const unsubConfig = onSnapshot(doc(db, 'settings', 'leaderboard_config'), (snap) => { if(snap.exists()) setConfig(snap.data()); });
         const unsub = onSnapshot(query(collection(db, 'exam_results')), (snap) => {
             const scores = {};
             snap.docs.forEach(doc => {
@@ -5983,11 +5983,8 @@ const AdminDashboard = ({ user }) => {
       const u = onSnapshot(q, s => setAnnouncements(s.docs.map(d => ({id: d.id, ...d.data()}))));
       return u;
   }, []);
+  // Auto replies removed permanently.
 
-  useEffect(() => {
-      const u = onSnapshot(collection(db, 'auto_replies'), s => setAutoReplies(s.docs.map(d => ({id: d.id, ...d.data()}))));
-      return u;
-  }, []);
 
   useEffect(() => {
       const u = onSnapshot(collection(db, 'quotes'), s => setQuotesList(s.docs.map(d => ({id: d.id, ...d.data()}))));
@@ -6838,18 +6835,13 @@ const AdminDashboard = ({ user }) => {
   };
 
   const toggleLeaderboard = async () => {
-      await setDoc(doc(db,  'config'), { show: !showLeaderboard }, { merge: true });
+      await setDoc(doc(db, 'settings', 'leaderboard_config'), { show: !showLeaderboard }, { merge: true });
       setShowLeaderboard(!showLeaderboard);
   };
 
-  const handleAddAutoReply = async () => {
-      if(!newAutoReply.keywords || !newAutoReply.response) return alert("أكمل البيانات");
-      await addDoc(collection(db, 'auto_replies'), newAutoReply);
-      setNewAutoReply({ keywords: '', response: '', isActive: true });
-  };
-  
-  const toggleAutoReply = async (id, currentStatus) => { await updateDoc(doc(db,  id), { isActive: !currentStatus }); };
-  const deleteAutoReply = async (id) => { if(window.confirm("حذف هذا الرد؟")) await deleteDoc(doc(db,  id)); };
+  const handleAddAutoReply = async () => { alert('تم حذف نظام الرد الآلي نهائيًا.'); };
+  const toggleAutoReply = async () => {};
+  const deleteAutoReply = async () => {};
   const handleAddQuote = async () => {
       if(!newQuote.text || !newQuote.source) return alert("أكمل البيانات");
       await addDoc(collection(db, 'quotes'), { ...newQuote, createdAt: serverTimestamp() });
@@ -6872,6 +6864,7 @@ const AdminDashboard = ({ user }) => {
 
   return (
     <div className="min-h-screen bg-slate-100 font-['Cairo'] relative overflow-x-hidden" dir="rtl">
+      <DebugPanel user={user} />
       <FloatingArabicBackground />
 
       {editingExamTime && (
@@ -7993,6 +7986,7 @@ const AdminDashboard = ({ user }) => {
 };
 
 const StudentDashboard = ({ user, userData, installPrompt }) => {
+  const safeContentList = Array.isArray(contentList) ? contentList : [];
   userData = userData || {
     name: user?.displayName || user?.email?.split('@')?.[0] || 'طالب',
     email: user?.email || '',
@@ -9524,7 +9518,6 @@ function App() {
     <AnimatePresence mode='wait'>
       <DesignSystemLoader />
       <DebugCollector user={user} />
-      <DebugPanel user={user} />
       <PlatformPerformanceBooster />
       <MobileExamHelperStyles />
       {!user ? (
