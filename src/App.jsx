@@ -8002,8 +8002,8 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
     subscriptionStatus: 'free',
     subscriptionExpiry: null
   };
-  userData?.name = userData?.name || user?.displayName || user?.email?.split('@')?.[0] || 'طالب';
-  userData?.grade = userData?.grade || '1sec';
+  userData.name = userData?.name || user?.displayName || user?.email?.split('@')?.[0] || 'طالب';
+  userData.grade = userData?.grade || '1sec';
   const [activeTab, setActiveTab] = useState('home');
   const [showStudentMessageComposer, setShowStudentMessageComposer] = useState(false);
   const [videoSectionTab, setVideoSectionTab] = useState('explanation');
@@ -8135,7 +8135,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
     }
   };
 
-  const isPremium = userData?.subscriptionStatus === 'premium' && (!userData?.subscriptionExpiry || userData?.subscriptionExpiry.toDate() > new Date());
+  const isPremium = userData.subscriptionStatus === 'premium' && (!userData?.subscriptionExpiry || userData?.subscriptionExpiry.toDate() > new Date());
   
   const startMistakesExam = () => {
       if (mistakes.length === 0) return alert("ليس لديك أي أخطاء مسجلة بعد! استمر في التميز 👏");
@@ -8258,12 +8258,12 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
       return <ExamRunner exam={reviewingExam} user={user} onClose={() => setReviewingExam(null)} isReviewMode={true} existingResult={result} />;
   }
 
-  const isBannedAll = userData?.status === 'banned_all';
-  const isBannedExam = userData?.status === 'banned_exam' || userData?.status === 'banned_cheating'; 
-  const isBannedContent = userData?.status === 'banned_content';
+  const isBannedAll = userData.status === 'banned_all';
+  const isBannedExam = userData.status === 'banned_exam' || userData.status === 'banned_cheating'; 
+  const isBannedContent = userData.status === 'banned_content';
 
-  if(userData?.status === 'pending') return <div className="h-screen flex items-center justify-center bg-amber-50 text-center p-4"><div className="bg-white p-8 rounded-2xl shadow-xl"><h2 className="text-2xl font-bold mb-2">طلبك قيد المراجعة ⏳</h2><button onClick={()=>signOut(auth)} className="mt-4 text-red-500 underline">خروج</button></div></div>;
-  if(userData?.status === 'rejected') return <div className="h-screen flex items-center justify-center bg-red-50"><div className="text-red-600 font-bold">تم رفض طلبك</div><button onClick={()=>signOut(auth)} className="ml-4 bg-white px-4 py-1 rounded">خروج</button></div>;
+  if(userData.status === 'pending') return <div className="h-screen flex items-center justify-center bg-amber-50 text-center p-4"><div className="bg-white p-8 rounded-2xl shadow-xl"><h2 className="text-2xl font-bold mb-2">طلبك قيد المراجعة ⏳</h2><button onClick={()=>signOut(auth)} className="mt-4 text-red-500 underline">خروج</button></div></div>;
+  if(userData.status === 'rejected') return <div className="h-screen flex items-center justify-center bg-red-50"><div className="text-red-600 font-bold">تم رفض طلبك</div><button onClick={()=>signOut(auth)} className="ml-4 bg-white px-4 py-1 rounded">خروج</button></div>;
   if (isBannedAll) return (
       <div className="h-screen flex flex-col items-center justify-center bg-red-50 text-center p-6"><Ban size={80} className="text-red-600 mb-4" /><h2 className="text-3xl font-bold text-red-800 mb-2 font-arabic">تم حظر حسابك</h2><p className="text-red-600 mb-6 font-bold">يرجى التواصل مع الإدارة أو المستر لمعرفة السبب.</p><button onClick={()=>signOut(auth)} className="bg-white text-red-600 px-6 py-2 rounded-full font-bold shadow-md hover:bg-red-100">تسجيل الخروج</button></div>
   );
