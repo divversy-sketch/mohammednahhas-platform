@@ -821,7 +821,8 @@ const LiveSessionView = ({ session, user, onClose }) => {
   const embedInfo = useMemo(() => getLiveEmbedInfo(session), [session]);
 
   useEffect(() => {
-    const q = query(collection(db, `live_sessions/${session.id}/chat`), orderBy('createdAt', 'asc'));
+    if (!session?.id) return;
+    const q = query(collection(db, 'live_sessions', session.id, 'chat'), orderBy('createdAt', 'asc'));
     const unsub = onSnapshot(q, (snap) => {
       setMessages(snap.docs.map(d => d.data()));
       chatRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -853,9 +854,10 @@ const LiveSessionView = ({ session, user, onClose }) => {
 
   const sendChat = async (e) => {
     e.preventDefault();
+    if(!session?.id) return alert('بيانات المحاضرة غير مكتملة. أعد فتح المحاضرة من داخل المنصة.');
     if(!msgInput.trim()) return;
     try {
-      await addDoc(collection(db, `live_sessions/${session.id}/chat`), { text: msgInput, user: user.displayName || 'طالب', createdAt: serverTimestamp() });
+      await addDoc(collection(db, 'live_sessions', session.id, 'chat'), { text: msgInput, user: user.displayName || 'طالب', createdAt: serverTimestamp() });
       setMsgInput("");
     } catch (error) {
       alert('تعذر إرسال الرسالة. تحقق من صلاحيات المحادثة.');
@@ -4846,8 +4848,8 @@ const AdminStudentMessaging = ({ users = [], adminGradeFilter = 'all' }) => {
   }, []);
 
   useEffect(() => {
-    if (!selectedStudentId) { setThreadMessages([]); return; }
-    const qRef = query(collection(db, `student_chats/${selectedStudentId}/messages`), orderBy('createdAt', 'asc'));
+    if (!selectedStudentId || typeof selectedStudentId !== 'string') { setThreadMessages([]); return; }
+    const qRef = query(collection(db, 'student_chats', selectedStudentId, 'messages'), orderBy('createdAt', 'asc'));
     const unsub = onSnapshot(qRef, (snap) => {
       setThreadMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setDoc(doc(db, 'student_chats', selectedStudentId), { unreadForAdmin: 0 }, { merge: true }).catch(() => {});
@@ -4856,7 +4858,7 @@ const AdminStudentMessaging = ({ users = [], adminGradeFilter = 'all' }) => {
   }, [selectedStudentId]);
 
   const sendToStudent = async (student, textValue) => {
-    if (!student?.id || !textValue.trim()) return;
+    if (!student?.id || typeof student.id !== 'string' || !textValue.trim()) return;
     await setDoc(doc(db, 'student_chats', student.id), {
       studentId: student.id,
       studentName: student.name || student.displayName || student.email || 'طالب',
@@ -4870,7 +4872,7 @@ const AdminStudentMessaging = ({ users = [], adminGradeFilter = 'all' }) => {
       updatedAt: serverTimestamp()
     }, { merge: true });
 
-    await addDoc(collection(db, `student_chats/${student.id}/messages`), {
+    await addDoc(collection(db, 'student_chats', student.id, 'messages'), {
       text: textValue.trim(),
       senderId: 'admin',
       senderRole: 'admin',
@@ -4980,8 +4982,8 @@ const StudentMessagesPanel = ({ user, userData, compact = false, onAfterReply = 
   const studentId = user?.uid;
 
   useEffect(() => {
-    if (!studentId) return;
-    const qRef = query(collection(db, `student_chats/${studentId}/messages`), orderBy('createdAt', 'asc'));
+    if (!studentId || typeof studentId !== 'string') return;
+    const qRef = query(collection(db, 'student_chats', studentId, 'messages'), orderBy('createdAt', 'asc'));
     const unsub = onSnapshot(qRef, (snap) => {
       setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }, (error) => {
@@ -5007,7 +5009,7 @@ const StudentMessagesPanel = ({ user, userData, compact = false, onAfterReply = 
   };
 
   const sendReply = async () => {
-    if (!reply.trim() || !studentId) return;
+    if (!reply.trim() || !studentId || typeof studentId !== 'string') return;
     try {
       await setDoc(doc(db, 'student_chats', studentId), {
         studentId,
@@ -5024,7 +5026,7 @@ const StudentMessagesPanel = ({ user, userData, compact = false, onAfterReply = 
         updatedAt: serverTimestamp()
       }, { merge: true });
 
-      await addDoc(collection(db, `student_chats/${studentId}/messages`), {
+      await addDoc(collection(db, 'student_chats', studentId, 'messages'), {
         text: reply.trim(),
         senderId: studentId,
         senderRole: 'student',
@@ -9122,7 +9124,7 @@ const isDebugAdmin = (user) => {
 const pushRemoteDebugLog = async (entry) => {
   try {
     const u = window.__nahhasDebugUser || {};
-    if (!u?.uid) return;
+    if (!u?.uid || !db) return;
     await addDoc(collection(db, 'debug_logs'), {
       ...entry,
       userId: u.uid,
@@ -9256,14 +9258,19 @@ const DebugPanel = ({ user }) => {
   };
 
   useEffect(() => {
-    if (!isDebugAdmin(user)) return;
-    const unsub = onSnapshot(collection(db, 'debug_logs'), (snap) => {
+    if (!isDebugAdmin(user) || !db) return;
+    let unsub = () => {};
+    try {
+      unsub = onSnapshot(collection(db, 'debug_logs'), (snap) => {
       const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       rows.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
       setRemoteLogs(rows.slice(0, 100));
     }, (error) => {
       pushDebugLog('debug-logs-read-error', error.message, {});
     });
+    } catch (error) {
+      pushDebugLog('debug-logs-init-error', error.message, {});
+    }
     return () => unsub();
   }, [user?.uid]);
 
