@@ -485,9 +485,11 @@ const getReviewRecommendations = (branchStats = {}, content = []) => {
 };
 
 
+
 const isZoomLink = (url = '') => /(^|\/\/|\.)(zoom\.us|zoomgov\.com)\//i.test(url || '');
 const isMeetLink = (url = '') => /(^|\/\/|\.)(meet\.google\.com)\//i.test(url || '');
 const isJitsiLink = (url = '') => /(^|\/\/|\.)(meet\.jit\.si|8x8\.vc)\//i.test(url || '');
+const isYouTubeLink = (url = '') => /(youtube\.com|youtu\.be)/i.test(url || '');
 
 const normalizeExternalUrl = (url = '') => {
     const clean = String(url || '').trim();
@@ -495,33 +497,97 @@ const normalizeExternalUrl = (url = '') => {
     return /^https?:\/\//i.test(clean) ? clean : `https://${clean}`;
 };
 
+const normalizeJitsiUrl = (url = '') => {
+    const clean = normalizeExternalUrl(url);
+    if (!clean) return '';
+    try {
+        const u = new URL(clean);
+        if (!isJitsiLink(clean)) return clean;
+        const room = (u.pathname || '').replace(/^\/+/, '').split(/[?#]/)[0];
+        const safeRoom = room || `nahhas-live-${Date.now()}`;
+        return `${u.origin}/${safeRoom}`;
+    } catch {
+        return clean;
+    }
+};
+
+const getYouTubeEmbedUrl = (url = '') => {
+    const clean = normalizeExternalUrl(url);
+    const id = getYouTubeID(clean);
+    if (!id) return '';
+    return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&controls=1&rel=0&modestbranding=1&playsinline=1`;
+};
+
 const getLiveEmbedInfo = (session = {}) => {
-    const liveUrl = normalizeExternalUrl(session.liveUrl);
+    const liveUrl = normalizeExternalUrl(session.liveUrl || session.url || session.streamUrl || '');
     const embedUrl = normalizeExternalUrl(session.embedUrl || session.optionalEmbedUrl || '');
-    const sessionType = session.sessionType || (isZoomLink(liveUrl) ? 'zoom' : isMeetLink(liveUrl) ? 'meet' : isJitsiLink(liveUrl) ? 'jitsi' : getYouTubeID(liveUrl) ? 'youtube' : 'external');
+    const detectedType = isJitsiLink(liveUrl) ? 'jitsi'
+        : isYouTubeLink(liveUrl) ? 'youtube'
+        : isZoomLink(liveUrl) ? 'zoom'
+        : isMeetLink(liveUrl) ? 'meet'
+        : 'external';
+
+    const sessionType = session.sessionType && session.sessionType !== 'external' ? session.sessionType : detectedType;
+
+    if (embedUrl) {
+        return {
+            type: sessionType || 'embed',
+            canEmbed: true,
+            embedSrc: embedUrl,
+            externalUrl: liveUrl || embedUrl,
+            note: 'سيتم تشغيل رابط التضمين داخل المنصة.'
+        };
+    }
 
     if (sessionType === 'youtube') {
-        const id = getYouTubeID(liveUrl);
-        return { type: 'youtube', canEmbed: !!id, embedSrc: id ? `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&controls=1&rel=0&modestbranding=1&playsinline=1` : '', externalUrl: liveUrl, note: 'يعمل داخل المنصة.' };
+        const embedSrc = getYouTubeEmbedUrl(liveUrl);
+        return {
+            type: 'youtube',
+            canEmbed: !!embedSrc,
+            embedSrc,
+            externalUrl: liveUrl,
+            note: embedSrc ? 'YouTube يعمل داخل المنصة، وتم تحويل الرابط تلقائيًا إلى Embed.' : 'رابط YouTube غير واضح.'
+        };
     }
 
     if (sessionType === 'jitsi') {
-        return { type: 'jitsi', canEmbed: true, embedSrc: liveUrl, externalUrl: liveUrl, note: 'هذا النوع مناسب للعمل داخل المنصة.' };
-    }
-
-    if (embedUrl) {
-        return { type: sessionType, canEmbed: true, embedSrc: embedUrl, externalUrl: liveUrl, note: 'سيتم فتح رابط التضمين داخل المنصة.' };
+        const embedSrc = normalizeJitsiUrl(liveUrl);
+        return {
+            type: 'jitsi',
+            canEmbed: !!embedSrc,
+            embedSrc,
+            externalUrl: embedSrc,
+            note: 'Jitsi يعمل داخل المنصة. استخدم رابط غرفة مباشر مثل https://meet.jit.si/nahhas-live-room'
+        };
     }
 
     if (sessionType === 'zoom') {
-        return { type: 'zoom', canEmbed: false, embedSrc: '', externalUrl: liveUrl, note: 'روابط Zoom العادية لا تعمل داخل iframe. للتشغيل داخل المنصة بالكامل نحتاج Zoom Meeting SDK أو رابط تضمين خاص.' };
+        return {
+            type: 'zoom',
+            canEmbed: false,
+            embedSrc: '',
+            externalUrl: liveUrl,
+            note: 'Zoom العادي لا يعمل داخل iframe. سيظهر للطالب زر فتح خارجي. للتشغيل داخل المنصة نحتاج Zoom SDK لاحقًا.'
+        };
     }
 
     if (sessionType === 'meet') {
-        return { type: 'meet', canEmbed: false, embedSrc: '', externalUrl: liveUrl, note: 'Google Meet يمنع غالبًا التشغيل داخل iframe، لذلك يظهر زر دخول خارجي بدل الشاشة السوداء.' };
+        return {
+            type: 'meet',
+            canEmbed: false,
+            embedSrc: '',
+            externalUrl: liveUrl,
+            note: 'Google Meet العادي لا يعمل داخل iframe غالبًا. استخدم Jitsi للتشغيل داخل المنصة أو افتحه خارجيًا.'
+        };
     }
 
-    return { type: sessionType, canEmbed: false, embedSrc: '', externalUrl: liveUrl, note: 'هذا الرابط غير مضمون تشغيله داخل المنصة. استخدم Jitsi أو رابط تضمين مخصص للتشغيل الداخلي.' };
+    return {
+        type: 'external',
+        canEmbed: false,
+        embedSrc: '',
+        externalUrl: liveUrl,
+        note: 'هذا الرابط لا يدعم التضمين داخل المنصة. استخدم Jitsi أو YouTube.'
+    };
 };
 
 const getLiveStatus = (session = {}) => {
@@ -530,6 +596,7 @@ const getLiveStatus = (session = {}) => {
     if (startMs && Date.now() + 10 * 60 * 1000 < startMs) return { label: 'قادمة', tone: 'bg-blue-100 text-blue-700' };
     return { label: 'مباشرة الآن', tone: 'bg-red-100 text-red-700' };
 };
+
 
 const PWAInstallBox = ({ installPrompt }) => {
     const [isStandalone, setIsStandalone] = useState(false);
@@ -814,9 +881,39 @@ const ChatWidget = ({ user }) => {
   );
 };
 
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+const callPlatformAIWithRetry = async (payload, attempts = 3) => {
+    let lastError = null;
+    for (let i = 0; i < attempts; i++) {
+        try {
+            const res = await fetch('/api/ai-coach', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || data?.ok === false) {
+                throw new Error(data?.error || data?.message || 'تعذر تشغيل الذكاء الاصطناعي الآن.');
+            }
+            return data;
+        } catch (error) {
+            lastError = error;
+            await sleep(900 * (i + 1));
+        }
+    }
+    throw lastError;
+};
+
+
 const LiveSessionView = ({ session, user, onClose }) => {
   const [messages, setMessages] = useState([]);
   const [msgInput, setMsgInput] = useState("");
+  const [aiQuestion, setAiQuestion] = useState("");
+  const [aiAnswer, setAiAnswer] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [liveExam, setLiveExam] = useState(null);
   const chatRef = useRef(null);
   const embedInfo = useMemo(() => getLiveEmbedInfo(session), [session]);
 
@@ -824,23 +921,24 @@ const LiveSessionView = ({ session, user, onClose }) => {
     if (!session?.id) return;
     const q = query(collection(db, 'live_sessions', session.id, 'chat'), orderBy('createdAt', 'asc'));
     const unsub = onSnapshot(q, (snap) => {
-      setMessages(snap.docs.map(d => d.data()));
+      setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       chatRef.current?.scrollIntoView({ behavior: "smooth" });
     }, (error) => {
       console.warn('live chat listener blocked:', error?.message);
       setMessages([]);
     });
     return () => unsub();
-  }, [session.id]);
+  }, [session?.id]);
 
   useEffect(() => {
     if (!user || !session?.id) return;
     const attendanceId = `${session.id}_${user.uid}`;
     setDoc(doc(db, 'live_attendance', attendanceId), {
       sessionId: session.id,
-      sessionTitle: session.title,
+      sessionTitle: session.title || '',
       userId: user.uid,
-      userName: user.displayName || 'طالب',
+      userEmail: user.email || '',
+      userName: user.displayName || user.email || 'طالب',
       joinedAt: serverTimestamp(),
       lastSeenAt: serverTimestamp(),
       platformView: embedInfo.canEmbed,
@@ -850,14 +948,61 @@ const LiveSessionView = ({ session, user, onClose }) => {
       setDoc(doc(db, 'live_attendance', attendanceId), { lastSeenAt: serverTimestamp() }, { merge: true }).catch(() => {});
     }, 30000);
     return () => clearInterval(interval);
-  }, [user, session?.id, session?.title, embedInfo.canEmbed, embedInfo.type]);
+  }, [user?.uid, session?.id, session?.title, embedInfo.canEmbed, embedInfo.type]);
+
+  const askLiveAI = async () => {
+    if (!aiQuestion.trim()) return alert('اكتب سؤالك الأول.');
+    setAiLoading(true);
+    setAiAnswer('');
+    try {
+      const data = await callPlatformAIWithRetry({
+        mode: 'live_question',
+        question: aiQuestion,
+        grade: session?.grade || '',
+        context: `محاضرة مباشرة بعنوان: ${session?.title || ''}`
+      });
+      const answer = data.analysis?.answer || data.data?.answer || data.analysis?.summary || data.data?.summary || 'تم التحليل بنجاح.';
+      setAiAnswer(answer);
+    } catch (error) {
+      setAiAnswer('مزود الذكاء الاصطناعي عليه ضغط مؤقت. جرّب بعد دقيقة أو اكتب السؤال بصيغة أقصر.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const generateLiveExam = async () => {
+    setAiLoading(true);
+    setLiveExam(null);
+    try {
+      const data = await callPlatformAIWithRetry({
+        mode: 'generate_exam',
+        topic: session?.title || 'المحاضرة المباشرة',
+        branches: session?.branch || session?.title || 'المحاضرة',
+        grade: session?.grade || '',
+        mcqCount: 15,
+        difficultyMix: ['easy','medium','hard','very_hard'],
+        instructions: 'ولد امتحان اختيار من متعدد من 15 إلى 20 سؤال من محتوى المحاضرة المباشرة، مناسب للمرحلة الدراسية فقط.'
+      });
+      const exam = data.analysis?.exam || data.data?.exam || data.analysis;
+      const questions = Array.isArray(exam?.questions) ? exam.questions : [];
+      setLiveExam({ title: exam?.title || `امتحان المحاضرة - ${session?.title || ''}`, questions });
+    } catch (error) {
+      setAiAnswer('تعذر توليد امتحان الآن بسبب ضغط مؤقت على الموديل. جرّب مرة أخرى بعد قليل.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const sendChat = async (e) => {
     e.preventDefault();
-    if(!session?.id) return alert('بيانات المحاضرة غير مكتملة. أعد فتح المحاضرة من داخل المنصة.');
+    if(!session?.id) return alert('بيانات المحاضرة غير مكتملة.');
     if(!msgInput.trim()) return;
     try {
-      await addDoc(collection(db, 'live_sessions', session.id, 'chat'), { text: msgInput, user: user.displayName || 'طالب', createdAt: serverTimestamp() });
+      await addDoc(collection(db, 'live_sessions', session.id, 'chat'), {
+        text: msgInput,
+        user: user?.displayName || user?.email || 'طالب',
+        createdAt: serverTimestamp()
+      });
       setMsgInput("");
     } catch (error) {
       alert('تعذر إرسال الرسالة. تحقق من صلاحيات المحادثة.');
@@ -866,16 +1011,17 @@ const LiveSessionView = ({ session, user, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col md:flex-row font-['Cairo']" dir="rtl">
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-h-0">
         <div className="bg-gradient-to-r from-red-600 to-red-800 p-3 text-white flex justify-between items-center shadow-lg">
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 bg-white rounded-full animate-pulse shadow-[0_0_10px_white]"></span>
-            <h2 className="font-bold">محاضرة أون لاين: {session.title}</h2>
+            <h2 className="font-bold">Live + AI: {session?.title}</h2>
           </div>
           <button onClick={onClose} className="text-sm bg-black/30 hover:bg-black/50 px-3 py-1 rounded transition">العودة للمنصة</button>
         </div>
-        <div className="flex-1 bg-black relative flex items-center justify-center overflow-hidden">
-          <div className="watermark-video z-50">{user?.displayName || 'طالب'} — منصة النحاس</div>
+
+        <div className="flex-1 bg-black relative flex items-center justify-center overflow-hidden min-h-[260px]">
+          <div className="watermark-video z-50">{user?.displayName || user?.email || 'طالب'} — منصة النحاس</div>
           {embedInfo.canEmbed ? (
             <iframe
               width="100%"
@@ -885,34 +1031,64 @@ const LiveSessionView = ({ session, user, onClose }) => {
               frameBorder="0"
               allow="camera; microphone; display-capture; autoplay; clipboard-write; fullscreen; encrypted-media"
               allowFullScreen
-              className="relative z-10 bg-black"
-              style={{ WebkitTransform: 'translateZ(0)' }}
+              className="relative z-10 bg-black w-full h-full min-h-[260px]"
             ></iframe>
           ) : (
             <div className="relative z-20 max-w-xl mx-auto p-8 text-center text-white">
               <Radio size={72} className="mx-auto mb-5 text-red-400" />
-              <h3 className="text-2xl font-black mb-3">الرابط لا يدعم التشغيل داخل المنصة مباشرة</h3>
+              <h3 className="text-2xl font-black mb-3">الرابط لا يعمل داخل المنصة</h3>
               <p className="text-slate-300 leading-relaxed mb-6">{embedInfo.note}</p>
               <div className="bg-white/10 border border-white/10 rounded-2xl p-4 text-sm text-slate-200 mb-6">
-                لتشغيل المحاضرة داخل المنصة بالكامل استخدم رابط Jitsi أو أضف رابط تضمين مخصص من الأدمن. أما Zoom/Meet العاديين فغالبًا يفتحوا خارج المنصة بسبب قيود الأمان.
+                استخدم Jitsi للتشغيل داخل المنصة. Zoom وGoogle Meet العاديين غالبًا يفتحوا خارجيًا بسبب قيود الأمان.
               </div>
               {embedInfo.externalUrl && (
                 <a href={embedInfo.externalUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-white text-red-700 px-6 py-3 rounded-full font-bold shadow-lg hover:bg-red-50 transition">
-                  فتح المحاضرة <ExternalLink size={18}/>
+                  فتح المحاضرة خارجيًا <ExternalLink size={18}/>
                 </a>
               )}
             </div>
           )}
         </div>
       </div>
-      <div className="w-full md:w-80 bg-white border-r flex flex-col h-1/3 md:h-full">
-        <div className="p-3 border-b bg-slate-50 font-bold text-slate-700">المحادثة المباشرة</div>
-        <div className="flex-1 overflow-y-auto p-3 space-y-2">
-          {messages.map((m, i) => (
-            <div key={i} className="text-sm bg-slate-50 p-2 rounded"><span className="font-bold text-amber-700">{m.user}: </span><span className="text-slate-800">{m.text}</span></div>
-          ))}
-          {messages.length === 0 && <p className="text-xs text-slate-400 text-center mt-6">لا توجد رسائل حتى الآن.</p>}
-          <div ref={chatRef} />
+
+      <div className="w-full md:w-[420px] bg-white border-r flex flex-col h-[48vh] md:h-full">
+        <div className="p-3 border-b bg-slate-50 font-bold text-slate-700">المحادثة + Live AI</div>
+        <div className="flex-1 overflow-y-auto p-3 space-y-3">
+          <div className="bg-fuchsia-50 border border-fuchsia-100 rounded-2xl p-3">
+            <p className="font-black text-fuchsia-800 mb-2">اسأل AI أثناء المحاضرة</p>
+            <textarea className="w-full border rounded-xl p-2 text-sm min-h-[80px]" placeholder="اكتب سؤالك عن المحاضرة..." value={aiQuestion} onChange={e=>setAiQuestion(e.target.value)} />
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <button disabled={aiLoading} onClick={askLiveAI} className="bg-fuchsia-600 text-white py-2 rounded-xl font-bold disabled:opacity-50">{aiLoading ? 'جاري...' : 'اسأل AI'}</button>
+              <button disabled={aiLoading} onClick={generateLiveExam} className="bg-emerald-600 text-white py-2 rounded-xl font-bold disabled:opacity-50">توليد امتحان</button>
+            </div>
+            {aiAnswer && <div className="mt-2 bg-white border rounded-xl p-2 text-sm text-slate-700 whitespace-pre-wrap">{aiAnswer}</div>}
+            {liveExam?.questions?.length > 0 && (
+              <div className="mt-2 bg-white border rounded-xl p-2 text-sm">
+                <p className="font-black text-emerald-700 mb-2">{liveExam.title}</p>
+                <p className="text-xs text-slate-500 mb-2">تم توليد {liveExam.questions.length} سؤال.</p>
+                <details>
+                  <summary className="cursor-pointer font-bold text-slate-700">عرض الأسئلة</summary>
+                  <div className="mt-2 space-y-2 max-h-56 overflow-auto">
+                    {liveExam.questions.slice(0, 20).map((q, i) => (
+                      <div key={q.id || i} className="bg-slate-50 rounded-lg p-2">
+                        <p className="font-bold">{i+1}. {q.text}</p>
+                        {Array.isArray(q.options) && <p className="text-xs text-slate-500">{q.options.join(' / ')}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              </div>
+            )}
+          </div>
+
+          <div className="border-t pt-3">
+            <p className="font-bold text-slate-700 mb-2">الشات المباشر</p>
+            {messages.map((m, i) => (
+              <div key={m.id || i} className="text-sm bg-slate-50 p-2 rounded mb-2"><span className="font-bold text-amber-700">{m.user}: </span><span className="text-slate-800">{m.text}</span></div>
+            ))}
+            {messages.length === 0 && <p className="text-xs text-slate-400 text-center mt-6">لا توجد رسائل حتى الآن.</p>}
+            <div ref={chatRef} />
+          </div>
         </div>
         <form onSubmit={sendChat} className="p-2 border-t flex gap-2">
           <input className="flex-1 border rounded px-2 py-1 text-sm" placeholder="اكتب تعليق..." value={msgInput} onChange={e=>setMsgInput(e.target.value)} />
@@ -922,6 +1098,7 @@ const LiveSessionView = ({ session, user, onClose }) => {
     </div>
   );
 };
+
 
 const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
   const videoId = getYouTubeID(video.url || video.file);
@@ -5835,7 +6012,7 @@ const AdminDashboard = ({ user }) => {
   const [contentList, setContentList] = useState([]);
   const [messagesList, setMessagesList] = useState([]); 
   const [newContent, setNewContent] = useState({ title: '', url: '', type: 'video', videoSection: 'explanation', isPublic: false, grade: '3sec', allowedEmails: '', isPremium: false, linkedExamId: '', estimatedDurationMinutes: '', branch: '' });
-  const [liveData, setLiveData] = useState({ title: '', liveUrl: '', grade: '3sec', passcode: '', allowedEmails: '', sessionType: 'external', embedUrl: '', scheduledAt: '', isOptional: true });
+  const [liveData, setLiveData] = useState({ title: '', liveUrl: '', grade: '3sec', passcode: '', allowedEmails: '', sessionType: 'jitsi', embedUrl: '', scheduledAt: '', isOptional: true });
   const [activeLiveSessions, setActiveLiveSessions] = useState([]);
   const [editingUser, setEditingUser] = useState(null);
   const [replyTexts, setReplyTexts] = useState({});
@@ -6661,24 +6838,52 @@ const AdminDashboard = ({ user }) => {
       if(window.confirm("حذف هذا المحتوى؟")) await deleteDoc(doc(db, 'content', id)); 
   };
 
-  const startLiveStream = async () => { 
-      if(!liveData.liveUrl) return alert("الرابط مطلوب!"); 
-      const allowedEmailsArray = liveData.allowedEmails ? liveData.allowedEmails.split(',').map(email => email.trim()) : [];
+  const startLiveStream = async () => {
+      if(!liveData.title?.trim()) return alert("اكتب عنوان المحاضرة.");
+      if(!liveData.liveUrl?.trim()) return alert("الرابط مطلوب!");
+
+      const allowedEmailsArray = liveData.allowedEmails
+        ? liveData.allowedEmails.split(',').map(email => email.trim()).filter(Boolean)
+        : [];
+
+      const rawUrl = normalizeExternalUrl(liveData.liveUrl);
+      const autoType = isJitsiLink(rawUrl) ? 'jitsi'
+        : isYouTubeLink(rawUrl) ? 'youtube'
+        : isZoomLink(rawUrl) ? 'zoom'
+        : isMeetLink(rawUrl) ? 'meet'
+        : liveData.sessionType || 'external';
+
+      const finalLiveUrl = autoType === 'jitsi' ? normalizeJitsiUrl(rawUrl) : rawUrl;
       const livePayload = {
           ...liveData,
-          liveUrl: normalizeExternalUrl(liveData.liveUrl),
+          title: liveData.title.trim(),
+          liveUrl: finalLiveUrl,
           embedUrl: normalizeExternalUrl(liveData.embedUrl),
+          sessionType: autoType,
           allowedEmails: allowedEmailsArray,
           status: 'active',
           isOptional: true,
+          aiEnabled: true,
+          liveAiMerged: true,
           createdAt: serverTimestamp()
       };
-      await addDoc(collection(db, 'live_sessions'), livePayload); 
-      if (allowedEmailsArray.length === 0) {
-          await addDoc(collection(db, 'notifications'), { text: `🔴 بث مباشر الآن: ${liveData.title}`, grade: liveData.grade, createdAt: serverTimestamp() }); 
+
+      const info = getLiveEmbedInfo(livePayload);
+      if (!info.canEmbed && (autoType === 'zoom' || autoType === 'meet')) {
+        const ok = window.confirm('هذا الرابط Zoom/Meet غالبًا لن يعمل داخل المنصة وسيظهر للطالب زر فتح خارجي. هل تريد نشره؟\n\nللتشغيل داخل المنصة استخدم Jitsi.');
+        if (!ok) return;
       }
-      alert("بدأ البث!"); 
-      setLiveData({ title: '', liveUrl: '', grade: '3sec', passcode: '', allowedEmails: '', sessionType: 'external', embedUrl: '', scheduledAt: '', isOptional: true });
+
+      await addDoc(collection(db, 'live_sessions'), livePayload);
+      if (allowedEmailsArray.length === 0) {
+          await addDoc(collection(db, 'notifications'), {
+            text: `🔴 محاضرة مباشرة الآن: ${liveData.title}`,
+            grade: liveData.grade,
+            createdAt: serverTimestamp()
+          });
+      }
+      alert("تم نشر المحاضرة في Live + AI!");
+      setLiveData({ title: '', liveUrl: '', grade: '3sec', passcode: '', allowedEmails: '', sessionType: 'jitsi', embedUrl: '', scheduledAt: '', isOptional: true });
   };
 
   const stopLiveStream = async (id) => { 
@@ -7744,50 +7949,81 @@ const AdminDashboard = ({ user }) => {
             <AdminQuestionDeepAnalytics examsList={examsList} examResults={examResults} />
           )}
 
-{activeTab === 'live' && (
-              <div className="glass-panel p-4 md:p-8 rounded-xl border-t-4 border-red-600">
-                  <h2 className="text-2xl font-bold mb-6 flex items-center gap-2 text-red-600 font-arabic"><Radio size={32}/> البث المباشر</h2>
-                  <div className="grid gap-4 mb-8">
-                      <input className="border p-3 rounded-xl w-full" placeholder="العنوان" value={liveData.title} onChange={e=>setLiveData({...liveData, title:e.target.value})}/>
-                      <select className="border p-3 rounded-xl w-full" value={liveData.sessionType} onChange={e=>setLiveData({...liveData, sessionType:e.target.value})}>
-                          <option value="external">رابط خارجي / عام</option>
-                          <option value="youtube">YouTube Live داخل المنصة</option>
-                          <option value="jitsi">Jitsi داخل المنصة</option>
-                          <option value="zoom">Zoom عادي / SDK لاحقًا</option>
-                          <option value="meet">Google Meet</option>
-                      </select>
-                      <input className="border p-3 rounded-xl w-full" placeholder="رابط المحاضرة الأساسي (Zoom/Meet/Jitsi/YouTube)" value={liveData.liveUrl} onChange={e=>setLiveData({...liveData, liveUrl:e.target.value})}/>
-                      <input className="border p-3 rounded-xl w-full" placeholder="رابط تضمين اختياري داخل المنصة (Embed URL) - اتركه فارغًا مع Zoom/Meet العادي" value={liveData.embedUrl} onChange={e=>setLiveData({...liveData, embedUrl:e.target.value})}/>
-                      <input type="datetime-local" className="border p-3 rounded-xl w-full" value={liveData.scheduledAt} onChange={e=>setLiveData({...liveData, scheduledAt:e.target.value})}/>
-                      <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-xl text-sm font-bold">
-                        ملاحظة: روابط Zoom و Google Meet العادية غالبًا لا تظهر داخل iframe بسبب قيود الأمان. للتشغيل داخل المنصة استخدم Jitsi أو رابط Embed مخصص أو Zoom SDK لاحقًا.
+          {activeTab === 'live' && (
+              <div className="space-y-6">
+                <div className="glass-panel p-4 md:p-8 rounded-xl border-t-4 border-red-600">
+                    <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6">
+                      <div>
+                        <h2 className="text-2xl font-black flex items-center gap-2 text-red-600 font-arabic"><Radio size={32}/> المحاضرات المباشرة + Live AI</h2>
+                        <p className="text-sm text-slate-500 mt-1">تم دمج صفحة البث المباشر مع Live AI في مكان واحد. الطالب يدخل اختياريًا، ويسأل AI من نفس نافذة المحاضرة.</p>
                       </div>
-                      <input className="border p-3 rounded-xl w-full" placeholder="الرقم السري (اختياري، اتركه فارغاً للدخول بدون كود)" value={liveData.passcode} onChange={e=>setLiveData({...liveData, passcode:e.target.value})}/>
-                      <input className="border p-3 rounded-xl w-full" placeholder="إيميلات مخصصة (اختياري، افصل بفاصلة)" value={liveData.allowedEmails} onChange={e=>setLiveData({...liveData, allowedEmails:e.target.value})}/>
-                      <select className="border p-3 rounded-xl w-full" value={liveData.grade} onChange={e=>setLiveData({...liveData, grade:e.target.value})}><GradeOptions/></select>
-                      <button onClick={startLiveStream} className="bg-red-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-red-500/30 w-full md:w-auto">بدء بث جديد</button>
-                  </div>
-                  {filteredLiveSessions.length > 0 && (
-                      <div className="mt-8 border-t pt-6">
-                          <h3 className="font-bold mb-4">البث المباشر الحالي</h3>
-                          <div className="space-y-3">
-                              {filteredLiveSessions.map(session => (
-                                  <div key={session.id} className="p-4 bg-red-50 border border-red-200 rounded-xl flex flex-col md:flex-row gap-4 justify-between md:items-center">
-                                      <div>
-                                        <p className="font-bold text-red-800">{session.title} <span className="text-xs bg-red-200 px-2 py-1 rounded-full text-red-700">{getGradeLabel(session.grade)}</span></p>
-                                        <p className="text-xs text-red-600 mt-1">النوع: {session.sessionType || 'external'} {session.scheduledAt ? `• الموعد: ${new Date(session.scheduledAt).toLocaleString('ar-EG')}` : ''}</p>
-                                        {session.passcode && <p className="text-xs text-red-600 mt-1">كود الدخول: {session.passcode}</p>}
-                                      </div>
-                                      <button onClick={() => stopLiveStream(session.id)} className="bg-slate-800 text-white px-4 py-2 rounded-lg font-bold hover:bg-slate-900 transition">إنهاء البث</button>
-                                  </div>
-                              ))}
+                      <span className="bg-fuchsia-50 text-fuchsia-700 px-4 py-2 rounded-full font-bold text-sm">Live + AI مدمج</span>
+                    </div>
+
+                    <div className="grid gap-4 mb-8 bg-white/70 border border-red-100 rounded-2xl p-4">
+                        <input className="border p-3 rounded-xl w-full" placeholder="عنوان المحاضرة، مثال: بث مباشر نحو - تالتة ثانوي" value={liveData.title} onChange={e=>setLiveData({...liveData, title:e.target.value})}/>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <select className="border p-3 rounded-xl w-full" value={liveData.sessionType} onChange={e=>setLiveData({...liveData, sessionType:e.target.value})}>
+                              <option value="jitsi">Jitsi داخل المنصة - الأفضل</option>
+                              <option value="youtube">YouTube Live داخل المنصة</option>
+                              <option value="zoom">Zoom رابط خارجي</option>
+                              <option value="meet">Google Meet رابط خارجي</option>
+                              <option value="external">رابط خارجي / عام</option>
+                          </select>
+                          <select className="border p-3 rounded-xl w-full" value={liveData.grade} onChange={e=>setLiveData({...liveData, grade:e.target.value})}><GradeOptions/></select>
+                        </div>
+
+                        <input className="border p-3 rounded-xl w-full" placeholder="رابط المحاضرة الأساسي: Jitsi / YouTube / Zoom / Meet" value={liveData.liveUrl} onChange={e=>setLiveData({...liveData, liveUrl:e.target.value})}/>
+                        <input className="border p-3 rounded-xl w-full" placeholder="رابط Embed اختياري داخل المنصة - اتركه فارغًا غالبًا" value={liveData.embedUrl} onChange={e=>setLiveData({...liveData, embedUrl:e.target.value})}/>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <input type="datetime-local" className="border p-3 rounded-xl w-full" value={liveData.scheduledAt} onChange={e=>setLiveData({...liveData, scheduledAt:e.target.value})}/>
+                          <input className="border p-3 rounded-xl w-full" placeholder="كود دخول اختياري" value={liveData.passcode} onChange={e=>setLiveData({...liveData, passcode:e.target.value})}/>
+                          <input className="border p-3 rounded-xl w-full" placeholder="إيميلات مخصصة اختياري" value={liveData.allowedEmails} onChange={e=>setLiveData({...liveData, allowedEmails:e.target.value})}/>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-xl text-sm font-bold">
+                            ✅ للتشغيل داخل المنصة استخدم Jitsi: https://meet.jit.si/nahhas-live-room
                           </div>
-                      </div>
-                  )}
+                          <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-xl text-sm font-bold">
+                            ✅ YouTube: ضع رابط الفيديو العادي أو embed وسيتم تحويله تلقائيًا.
+                          </div>
+                          <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-xl text-sm font-bold">
+                            ⚠️ Zoom/Meet العادي لا يظهر داخل المنصة، وسيظهر زر فتح خارجي للطالب.
+                          </div>
+                        </div>
+
+                        <button onClick={startLiveStream} className="bg-red-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-red-500/30 w-full md:w-auto">نشر محاضرة Live + AI</button>
+                    </div>
+
+                    {filteredLiveSessions.length > 0 && (
+                        <div className="mt-8 border-t pt-6">
+                            <h3 className="font-bold mb-4">المحاضرات المباشرة الحالية</h3>
+                            <div className="space-y-3">
+                                {filteredLiveSessions.map(session => {
+                                  const info = getLiveEmbedInfo(session);
+                                  return (
+                                    <div key={session.id} className="p-4 bg-red-50 border border-red-200 rounded-xl flex flex-col md:flex-row gap-4 justify-between md:items-center">
+                                        <div>
+                                          <p className="font-bold text-red-800">{session.title} <span className="text-xs bg-red-200 px-2 py-1 rounded-full text-red-700">{getGradeLabel(session.grade)}</span></p>
+                                          <p className="text-xs text-red-600 mt-1">النوع: {session.sessionType || info.type} {session.scheduledAt ? `• الموعد: ${new Date(session.scheduledAt).toLocaleString('ar-EG')}` : ''}</p>
+                                          <p className="text-xs mt-1 font-bold">{info.canEmbed ? '✅ يعمل داخل المنصة' : '⚠️ يفتح خارجيًا'}</p>
+                                          {session.passcode && <p className="text-xs text-red-600 mt-1">كود الدخول: {session.passcode}</p>}
+                                        </div>
+                                        <button onClick={() => stopLiveStream(session.id)} className="bg-slate-800 text-white px-4 py-2 rounded-lg font-bold hover:bg-slate-900 transition">إنهاء المحاضرة</button>
+                                    </div>
+                                  )
+                                })}
+                            </div>
+                        </div>
+                    )}
+                </div>
               </div>
           )}
 
-          {activeTab === 'content' && (
+{activeTab === 'content' && (
               <div className="glass-panel p-4 md:p-6 rounded-xl">
                   <h2 className="font-bold mb-4 font-arabic text-xl">إضافة محتوى</h2>
                   <form onSubmit={handleAddContent} className="grid gap-4 mb-6">
