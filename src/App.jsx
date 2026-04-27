@@ -503,9 +503,25 @@ const normalizeJitsiUrl = (url = '') => {
     try {
         const u = new URL(clean);
         if (!isJitsiLink(clean)) return clean;
+
         const room = (u.pathname || '').replace(/^\/+/, '').split(/[?#]/)[0];
         const safeRoom = room || `nahhas-live-${Date.now()}`;
-        return `${u.origin}/${safeRoom}`;
+
+        // مهم للموبايل:
+        // disableDeepLinking يمنع Jitsi من تحويل الطالب لتحميل التطبيق
+        // ويجبر المحاضرة تفتح داخل iframe في المنصة قدر الإمكان.
+        const jitsiHashParams = [
+            'config.disableDeepLinking=true',
+            'config.prejoinPageEnabled=false',
+            'config.startWithAudioMuted=true',
+            'config.startWithVideoMuted=false',
+            'config.enableWelcomePage=false',
+            'interfaceConfig.MOBILE_APP_PROMO=false',
+            'interfaceConfig.SHOW_JITSI_WATERMARK=false',
+            'interfaceConfig.SHOW_WATERMARK_FOR_GUESTS=false'
+        ].join('&');
+
+        return `${u.origin}/${safeRoom}#${jitsiHashParams}`;
     } catch {
         return clean;
     }
@@ -8037,7 +8053,7 @@ const AdminDashboard = ({ user }) => {
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                           <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-xl text-sm font-bold">
-                            ✅ للتشغيل داخل المنصة استخدم Jitsi: https://meet.jit.si/nahhas-live-room
+                            ✅ Jitsi يفتح داخل المنصة: https://meet.jit.si/nahhas-live-room — وتم تعطيل تحويل الطالب للتطبيق
                           </div>
                           <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-xl text-sm font-bold">
                             ✅ YouTube: ضع رابط الفيديو العادي أو embed وسيتم تحويله تلقائيًا.
