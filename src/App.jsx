@@ -710,7 +710,7 @@ const ChatWidget = ({ user }) => {
   const [autoReplies, setAutoReplies] = useState([]);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db), (snap) => {
+    const unsub = onSnapshot(collection(db, 'auto_replies'), (snap) => {
         const rules = snap.docs.map(d => d.data()).filter(r => r.isActive);
         setAutoReplies(rules);
     });
@@ -5985,7 +5985,7 @@ const AdminDashboard = ({ user }) => {
   }, []);
 
   useEffect(() => {
-      const u = onSnapshot(collection(db), s => setAutoReplies(s.docs.map(d => ({id: d.id, ...d.data()}))));
+      const u = onSnapshot(collection(db, 'auto_replies'), s => setAutoReplies(s.docs.map(d => ({id: d.id, ...d.data()}))));
       return u;
   }, []);
 
@@ -6844,7 +6844,7 @@ const AdminDashboard = ({ user }) => {
 
   const handleAddAutoReply = async () => {
       if(!newAutoReply.keywords || !newAutoReply.response) return alert("أكمل البيانات");
-      await addDoc(collection(db), newAutoReply);
+      await addDoc(collection(db, 'auto_replies'), newAutoReply);
       setNewAutoReply({ keywords: '', response: '', isActive: true });
   };
   
