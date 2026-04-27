@@ -2519,13 +2519,19 @@ const LiveAttendanceModal = ({ session, onClose }) => {
 
   useEffect(() => {
     if (!session?.id) return;
+
     const unsub = onSnapshot(collection(db, 'live_attendance'), (snap) => {
       const rows = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(r => r.sessionId === session.id)
         .sort((a, b) => (b.joinedAt?.seconds || 0) - (a.joinedAt?.seconds || 0));
+
       setAttendance(rows);
-    }, () => setAttendance([]));
+    }, (error) => {
+      pushDebugLog?.('live-attendance-error', error.message, {});
+      setAttendance([]);
+    });
+
     return () => unsub();
   }, [session?.id]);
 
@@ -2533,16 +2539,27 @@ const LiveAttendanceModal = ({ session, onClose }) => {
     const header = ['studentName', 'grade', 'userEmail', 'joinedAt'];
     const rows = attendance.map(r => {
       const joined = r.joinedAt?.toDate?.()?.toLocaleString('ar-EG') || '';
-      return [r.studentName || '', getGradeLabel(r.grade || ''), r.userEmail || r.email || '', joined]
-        .map(v => `"${String(v).replaceAll('"', '""')}"`).join(',');
+      return [
+        r.studentName || '',
+        getGradeLabel(r.grade || ''),
+        r.userEmail || r.email || '',
+        joined
+      ].map(v => `"${String(v).replaceAll('"', '""')}"`).join(',');
     });
-    const blob = new Blob([[header.join(','), ...rows].join('\n')], { type: 'text/csv;charset=utf-8' });
+
+    const csv = [header.join(','), ...rows].join('\\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `live_attendance_${session?.title || session?.id}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const copyNames = async () => {
+    await navigator.clipboard?.writeText(attendance.map(a => a.studentName || a.userId).join('\\n'));
+    alert('تم نسخ أسماء الحضور.');
   };
 
   return (
@@ -2555,21 +2572,38 @@ const LiveAttendanceModal = ({ session, onClose }) => {
           </div>
           <button onClick={onClose} className="bg-white/10 hover:bg-white/20 rounded-full p-2"><X/></button>
         </div>
+
         <div className="p-5">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
-            <div className="bg-sky-50 border border-sky-100 rounded-2xl p-4"><p className="text-xs font-bold text-sky-600">إجمالي الحضور</p><p className="text-4xl font-black text-sky-800">{attendance.length}</p></div>
-            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4"><p className="text-xs font-bold text-emerald-600">الصف</p><p className="text-xl font-black text-emerald-800">{getGradeLabel(session?.grade)}</p></div>
-            <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4"><p className="text-xs font-bold text-purple-600">الفرع</p><p className="text-xl font-black text-purple-800">{session?.branch || 'عام'}</p></div>
+            <div className="bg-sky-50 border border-sky-100 rounded-2xl p-4">
+              <p className="text-xs font-bold text-sky-600">إجمالي الحضور</p>
+              <p className="text-4xl font-black text-sky-800">{attendance.length}</p>
+            </div>
+            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4">
+              <p className="text-xs font-bold text-emerald-600">الصف</p>
+              <p className="text-xl font-black text-emerald-800">{getGradeLabel(session?.grade)}</p>
+            </div>
+            <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4">
+              <p className="text-xs font-bold text-purple-600">الفرع</p>
+              <p className="text-xl font-black text-purple-800">{session?.branch || 'عام'}</p>
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-2 mb-4">
             <button onClick={exportCSV} className="bg-slate-900 text-white px-4 py-2 rounded-xl font-black">تصدير CSV</button>
-            <button onClick={() => navigator.clipboard?.writeText(attendance.map(a => a.studentName || a.userId).join('\n'))} className="bg-sky-100 text-sky-700 px-4 py-2 rounded-xl font-bold">نسخ الأسماء</button>
+            <button onClick={copyNames} className="bg-sky-100 text-sky-700 px-4 py-2 rounded-xl font-bold">نسخ الأسماء</button>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-sm border rounded-2xl overflow-hidden">
-              <thead><tr className="bg-slate-100 text-slate-700"><th className="p-3 text-right">الطالب</th><th className="p-3">الصف</th><th className="p-3">الإيميل / ID</th><th className="p-3">وقت الدخول</th></tr></thead>
+              <thead>
+                <tr className="bg-slate-100 text-slate-700">
+                  <th className="p-3 text-right">الطالب</th>
+                  <th className="p-3">الصف</th>
+                  <th className="p-3">الإيميل / ID</th>
+                  <th className="p-3">وقت الدخول</th>
+                </tr>
+              </thead>
               <tbody>
                 {attendance.map(row => (
                   <tr key={row.id} className="border-b hover:bg-slate-50">
@@ -2579,7 +2613,14 @@ const LiveAttendanceModal = ({ session, onClose }) => {
                     <td className="p-3 text-center font-bold">{row.joinedAt?.toDate?.()?.toLocaleString('ar-EG') || 'غير محدد'}</td>
                   </tr>
                 ))}
-                {attendance.length === 0 && <tr><td colSpan="4" className="p-10 text-center text-slate-400 font-bold">لا يوجد حضور مسجل لهذه المحاضرة حتى الآن.</td></tr>}
+
+                {attendance.length === 0 && (
+                  <tr>
+                    <td colSpan="4" className="p-10 text-center text-slate-400 font-bold">
+                      لا يوجد حضور مسجل لهذه المحاضرة حتى الآن.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -2593,57 +2634,79 @@ const LiveAttendanceModal = ({ session, onClose }) => {
   );
 };
 
-
 const LiveSessionsAdminPanel = ({ adminGradeFilter = 'all' }) => {
   const [sessions, setSessions] = useState([]);
   const [selectedAttendanceSession, setSelectedAttendanceSession] = useState(null);
+
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'live_sessions'), (snap) => {
       const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       rows.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
       setSessions(rows);
     }, () => setSessions([]));
+
     return () => unsub();
   }, []);
 
-  const toggleLive = async (s) => updateDoc(doc(db, 'live_sessions', s.id), { isLive: !s.isLive });
+  const toggleLive = async (s) => {
+    await updateDoc(doc(db, 'live_sessions', s.id), { isLive: !s.isLive });
+  };
+
   const remove = async (s) => {
     if (!window.confirm('حذف المحاضرة؟')) return;
     await deleteDoc(doc(db, 'live_sessions', s.id));
   };
 
   return (
-    <div className="space-y-6">
-      <LiveSessionCreator adminGradeFilter={adminGradeFilter} />
-      <div className="glass-panel rounded-2xl p-5 border-t-4 border-slate-700">
-        <h2 className="text-2xl font-black text-slate-800 mb-4">إدارة المحاضرات المباشرة</h2>
-        <div className="space-y-3">
-          {sessions.map(s => (
-            <div key={s.id} className="bg-white border rounded-2xl p-4 flex flex-col md:flex-row justify-between gap-3">
-              <div>
-                <h3 className="font-black text-slate-800">{s.title}</h3>
-                <p className="text-xs text-slate-500">{getGradeLabel(s.grade)} • {s.branch || 'عام'} • {s.platform || 'custom'}</p>
-                <p className="text-xs text-slate-400 break-all mt-1">{s.streamUrl || s.url}</p>
+    <>
+      <div className="space-y-6">
+        <LiveSessionCreator adminGradeFilter={adminGradeFilter} />
+
+        <div className="glass-panel rounded-2xl p-5 border-t-4 border-slate-700">
+          <h2 className="text-2xl font-black text-slate-800 mb-4">إدارة المحاضرات المباشرة</h2>
+
+          <div className="space-y-3">
+            {sessions.map(s => (
+              <div key={s.id} className="bg-white border rounded-2xl p-4 flex flex-col md:flex-row justify-between gap-3">
+                <div>
+                  <h3 className="font-black text-slate-800">{s.title}</h3>
+                  <p className="text-xs text-slate-500">{getGradeLabel(s.grade)} • {s.branch || 'عام'} • {s.platform || 'custom'}</p>
+                  <p className="text-xs text-slate-400 break-all mt-1">{s.streamUrl || s.url}</p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => toggleLive(s)} className={`${s.isLive ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'} px-4 py-2 rounded-xl font-bold`}>
+                    {s.isLive ? 'إيقاف' : 'تشغيل'}
+                  </button>
+
+                  <button onClick={() => setSelectedAttendanceSession(s)} className="bg-sky-100 text-sky-700 px-4 py-2 rounded-xl font-bold">
+                    عرض الحضور
+                  </button>
+
+                  <button onClick={() => remove(s)} className="bg-red-100 text-red-700 px-4 py-2 rounded-xl font-bold">
+                    حذف
+                  </button>
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <button onClick={() => toggleLive(s)} className={`${s.isLive ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'} px-4 py-2 rounded-xl font-bold`}>{s.isLive ? 'إيقاف' : 'تشغيل'}</button>
-                <button onClick={() => setSelectedAttendanceSession(s)} className="bg-sky-100 text-sky-700 px-4 py-2 rounded-xl font-bold">عرض الحضور</button>
-                <button onClick={() => remove(s)} className="bg-red-100 text-red-700 px-4 py-2 rounded-xl font-bold">حذف</button>
-              </div>
-            </div>
-          ))}
-          {!sessions.length && <p className="text-center text-slate-400 py-8 font-bold">لا توجد محاضرات بعد.</p>}
+            ))}
+
+            {!sessions.length && (
+              <p className="text-center text-slate-400 py-8 font-bold">لا توجد محاضرات بعد.</p>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+
       {selectedAttendanceSession && (
         <LiveAttendanceModal
           session={selectedAttendanceSession}
           onClose={() => setSelectedAttendanceSession(null)}
         />
       )}
+    </>
   );
 };
+
 
 const LiveSessionStudentViewer = ({ session, user, userData, onClose }) => {
   const [messages, setMessages] = useState([]);
@@ -8864,6 +8927,9 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                 )}
             </div>
         )}
+
+        {activeTab === 'settings' && (
+              <div className="glass-panel p-4 md:p-6 rounded-xl max-w-2xl">
                 <form onSubmit={handleUpdateMyProfile} className="space-y-4">
                   <div><label className="block text-sm font-bold text-slate-700 mb-2">الاسم</label><input disabled className="w-full border p-3 rounded-xl bg-slate-100 text-slate-500 cursor-not-allowed" value={editFormData.name} /><p className="text-xs text-red-500 mt-1">لا يمكن تغيير الاسم (تواصل مع الإدارة).</p></div>
                   <div><label className="block text-sm font-bold text-slate-700 mb-2">رقم الهاتف</label><input className="w-full border p-3 rounded-xl" value={editFormData.phone} onChange={e=>setEditFormData({...editFormData, phone: normalizeEgyptPhone(e.target.value)})} /></div>
@@ -9046,7 +9112,6 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
-export default 
 const DEBUG_EVENT_NAME = 'nahhas-platform-debug-log';
 
 const isDebugAdmin = (user) => {
@@ -9464,3 +9529,5 @@ function App() {
     </AppErrorBoundary>
   );
 }
+
+export default App;
