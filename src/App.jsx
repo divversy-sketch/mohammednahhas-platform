@@ -3158,7 +3158,10 @@ const AIInteractiveExamModal = ({ user, userData, onClose }) => {
   const [finished, setFinished] = useState(false);
 
   const generateExam = async () => {
-    if (!topic.trim() && !branch.trim()) return alert('اكتب عايز تمتحن في إيه أو أي فرع.');
+    if (!topic.trim() && !branch.trim()) return alert('اكتب اسم الدرس أو الفرع الذي تريد الامتحان فيه.');
+    if (!topic.trim() && ['نحو','بلاغة','قراءة','نصوص'].includes(branch.trim())) {
+      return alert('اكتب اسم الدرس بالتحديد، مثل: اسم التفضيل، كان وأخواتها، التشبيه، النصوص...');
+    }
     setLoading(true);
     setFinished(false);
     setAnswers({});

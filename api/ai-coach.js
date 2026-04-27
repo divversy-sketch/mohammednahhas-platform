@@ -1,5 +1,5 @@
 // api/ai-coach.js
-// Gemini fallback + retry تلقائي + منع الأسئلة الوهمية
+// Gemini fallback + retry تلقائي + أسئلة مرتبطة بالدرس وليست عامة
 
 const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
 
@@ -22,15 +22,40 @@ function extractJson(text) {
   return null;
 }
 
+function getRequestedLesson(body = {}) {
+  return String(body.topic || body.branches || body.branch || body.lesson || "مراجعة عامة").trim();
+}
+
+function normalizeArabicKey(value = "") {
+  return String(value || "")
+    .replace(/[إأآا]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/ى/g, "ي")
+    .replace(/[^\u0600-\u06FFa-zA-Z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function isBadOption(value) {
   const v = String(value || "").trim();
   return !v || /^اختيار\s*(أ|ب|ج|د|1|2|3|4)?$/i.test(v) || /^اختبار\s*(أ|ب|ج|د|1|2|3|4)?$/i.test(v);
 }
 
+function isGenericQuestionText(value = "") {
+  const v = String(value || "").trim();
+  return (
+    /^سؤال\s+تدريبي\s+\d+/i.test(v) ||
+    /ما الاختيار الذي يعبّر عن الفكرة الأساسية/i.test(v) ||
+    /أي خطوة تساعدك أكثر/i.test(v) ||
+    /أفضل طريقة لمراجعة خطأ/i.test(v) ||
+    /الدرس المطلوب/i.test(v)
+  );
+}
+
 function isValidQuestion(q) {
   if (!q || !String(q.text || "").trim()) return false;
   const text = String(q.text || "").trim();
-  if (/^سؤال\s+تدريبي\s+\d+/i.test(text)) return false;
+  if (isGenericQuestionText(text)) return false;
   if (!Array.isArray(q.options) || q.options.length < 4) return false;
   const options = q.options.slice(0, 4).map(x => String(x || "").trim());
   if (options.some(isBadOption)) return false;
@@ -51,53 +76,197 @@ function normalizeQuestion(q, i, topic = "عام") {
   };
 }
 
-function emergencyRealQuestions(body = {}) {
-  const topic = body.topic || body.branches || body.branch || "النحو";
-  const branch = body.branch || body.branches || topic;
-  const grade = body.grade || "الطالب";
-  const templates = [
-    {
-      text: `في ${branch}: ما الاختيار الذي يعبّر عن الفكرة الأساسية في الدرس المطلوب؟`,
-      options: ["تحديد القاعدة أولًا ثم تطبيقها", "حفظ الاختيارات بدون فهم", "تجاهل موضع الكلمة", "اختيار الإجابة الأطول دائمًا"],
-      correctIdx: 0,
-      explanation: "الفهم الصحيح يبدأ بتحديد القاعدة أو الفكرة ثم التطبيق على المثال."
-    },
-    {
-      text: `أي خطوة تساعدك أكثر عند حل سؤال في ${topic}؟`,
-      options: ["قراءة السؤال وتحديد المطلوب", "اختيار أول إجابة بسرعة", "ترك السؤال بدون محاولة", "الاعتماد على التخمين فقط"],
-      correctIdx: 0,
-      explanation: "تحديد المطلوب يمنع الخلط بين القواعد المتشابهة."
-    },
-    {
-      text: `عند وجود كلمة بين علامتي [ ] في القطعة، ماذا تفعل أولًا؟`,
-      options: ["أحدد موقعها ووظيفتها في الجملة", "أتجاهل السياق", "أختار إجابة عشوائية", "أحذف الكلمة من الجملة"],
-      correctIdx: 0,
-      explanation: "تظليل الكلمة يعني أن السؤال غالبًا مرتبط بوظيفتها أو معناها داخل السياق."
-    },
-    {
-      text: `ما أفضل طريقة لمراجعة خطأ متكرر في ${branch}؟`,
-      options: ["كتابة سبب الخطأ وحل مثال مشابه", "حفظ الإجابة فقط", "تجاهل الخطأ", "تغيير الفرع بالكامل"],
-      correctIdx: 0,
-      explanation: "معرفة سبب الخطأ مع تدريب مشابه تثبت الفكرة."
-    }
-  ];
+function lessonFallbackQuestions(body = {}) {
+  const lesson = getRequestedLesson(body);
+  const key = normalizeArabicKey(lesson);
   const count = Math.min(Math.max(Number(body.count || body.mcqCount || 18), 8), 20);
+
+  let pool = [];
+
+  if (key.includes("اسم التفضيل") || key.includes("تفضيل")) {
+    pool = [
+      {
+        text: "أيُّ صيغة مما يأتي تُعدّ اسم تفضيل صحيحًا؟",
+        options: ["أكبر", "كبير", "كبر", "تكبير"],
+        correctIdx: 0,
+        difficulty: "سهل",
+        explanation: "اسم التفضيل غالبًا يأتي على وزن (أفعل) مثل: أكبر، أفضل، أجمل."
+      },
+      {
+        text: "اسم التفضيل في جملة: «العلمُ أنفعُ من المال» هو:",
+        options: ["العلم", "أنفع", "من", "المال"],
+        correctIdx: 1,
+        difficulty: "سهل",
+        explanation: "كلمة «أنفع» جاءت على وزن أفعل ودلت على تفضيل العلم على المال."
+      },
+      {
+        text: "أي جملة تحتوي على اسم تفضيل؟",
+        options: ["محمد أطول من أخيه", "محمد طويل القامة", "طال محمد في السفر", "أطال محمد الحديث"],
+        correctIdx: 0,
+        difficulty: "متوسط",
+        explanation: "«أطول» اسم تفضيل، لأنه يدل على زيادة محمد في الطول مقارنة بأخيه."
+      },
+      {
+        text: "الحالة الصحيحة لاسم التفضيل إذا كان نكرة غير مضاف هي أنه:",
+        options: ["يلزم الإفراد والتذكير", "يطابق المفضل دائمًا", "يأتي جمعًا فقط", "يمنع دخول من بعده"],
+        correctIdx: 0,
+        difficulty: "صعب",
+        explanation: "اسم التفضيل النكرة غير المضاف غالبًا يلزم صورة المفرد المذكر مثل: هند أفضل من غيرها."
+      },
+      {
+        text: "في جملة: «الطالباتُ أفضلُ من غيرهنَّ اجتهادًا»، اسم التفضيل هو:",
+        options: ["الطالبات", "أفضل", "غيرهن", "اجتهادًا"],
+        correctIdx: 1,
+        difficulty: "متوسط",
+        explanation: "«أفضل» اسم تفضيل، وجاء مفردًا مذكرًا لأنه غير مضاف ومقترن بمن."
+      },
+      {
+        text: "أي مما يأتي لا يصح أن يُصاغ منه اسم تفضيل مباشر غالبًا؟",
+        options: ["الفعل الجامد", "الفعل الثلاثي", "الفعل المثبت", "الفعل القابل للتفاوت"],
+        correctIdx: 0,
+        difficulty: "صعب",
+        explanation: "من شروط صياغة اسم التفضيل المباشر أن يكون الفعل متصرفًا لا جامدًا."
+      },
+      {
+        text: "أفضل صياغة للتفضيل من الفعل غير المستوفي للشروط تكون باستخدام:",
+        options: ["أشدّ أو أكثر + المصدر", "الفعل الماضي فقط", "اسم الفاعل فقط", "حذف المفضل عليه"],
+        correctIdx: 0,
+        difficulty: "صعب جدًا",
+        explanation: "إذا لم يستوف الفعل الشروط نصوغ التفضيل بطريقة مساعدة مثل: أكثر اجتهادًا، أشد حمرة."
+      },
+      {
+        text: "في عبارة: «مصرُ أعظمُ البلادِ تاريخًا»، المفضل هو:",
+        options: ["مصر", "أعظم", "البلاد", "تاريخًا"],
+        correctIdx: 0,
+        difficulty: "متوسط",
+        explanation: "المفضل هو الشيء الذي زاد في الصفة، وهو هنا «مصر»."
+      },
+      {
+        text: "في جملة: «هذا الكتابُ أكثرُ فائدةً»، سبب استخدام «أكثر» هو:",
+        options: ["لأن فائدة مصدر لفعل غير مباشر في التفضيل", "لأن أكثر فعل ماض", "لأن الكتاب جمع", "لأن الجملة لا تحتوي مقارنة"],
+        correctIdx: 0,
+        difficulty: "صعب جدًا",
+        explanation: "نستخدم أكثر/أشد مع المصدر عند الحاجة لصياغة تفضيل غير مباشر."
+      },
+      {
+        text: "أي إعراب مناسب لكلمة «أفضل» في: «المجتهدُ أفضلُ من الكسول»؟",
+        options: ["خبر مرفوع", "فاعل مرفوع", "مفعول به منصوب", "مضاف إليه مجرور"],
+        correctIdx: 0,
+        difficulty: "صعب",
+        explanation: "«أفضل» خبر للمبتدأ «المجتهد» مرفوع، وهو اسم تفضيل."
+      }
+    ];
+  } else if (key.includes("بلاغ") || key.includes("البلاغه") || key.includes("البيان") || key.includes("بديع")) {
+    pool = [
+      {
+        text: "أي مثال يُعدّ تشبيهًا واضحًا؟",
+        options: ["الجندي كالأسد في الشجاعة", "ابتسم الصباح", "الكتاب صديق", "سمعت صوت الحق"],
+        correctIdx: 0,
+        difficulty: "سهل",
+        explanation: "وجود الكاف بين الجندي والأسد مع وجه الشبه يدل على التشبيه."
+      },
+      {
+        text: "في قولنا: «العلم نور»، نوع الصورة البيانية:",
+        options: ["تشبيه بليغ", "استعارة مكنية", "كناية", "جناس"],
+        correctIdx: 0,
+        difficulty: "متوسط",
+        explanation: "حُذف أداة التشبيه ووجه الشبه، فصار تشبيهًا بليغًا."
+      },
+      {
+        text: "«ابتسمتِ السماءُ» صورة بيانية تعتمد على:",
+        options: ["تشخيص", "طباق", "جناس", "سجع"],
+        correctIdx: 0,
+        difficulty: "متوسط",
+        explanation: "نسب الابتسام إلى السماء، وهو من صفات الإنسان."
+      },
+      {
+        text: "الطباق هو الجمع بين:",
+        options: ["كلمتين متضادتين", "كلمتين مترادفتين", "كلمتين لهما نفس الوزن فقط", "جملتين طويلتين"],
+        correctIdx: 0,
+        difficulty: "سهل",
+        explanation: "الطباق مثل: ليل/نهار، خير/شر."
+      }
+    ];
+  } else if (key.includes("نحو") || key.includes("اعراب") || key.includes("اعراب")) {
+    pool = [
+      {
+        text: "الكلمة المرفوعة بعد فعل مبني للمعلوم تُسمى غالبًا:",
+        options: ["فاعلًا", "مفعولًا به", "حالًا", "تمييزًا"],
+        correctIdx: 0,
+        difficulty: "سهل",
+        explanation: "الفاعل هو من قام بالفعل أو اتصف به ويأتي مرفوعًا."
+      },
+      {
+        text: "في جملة: «قرأ الطالبُ الدرسَ»، المفعول به هو:",
+        options: ["الدرس", "قرأ", "الطالب", "الجملة كلها"],
+        correctIdx: 0,
+        difficulty: "سهل",
+        explanation: "الدرس وقع عليه فعل القراءة، لذلك هو مفعول به."
+      },
+      {
+        text: "علامة رفع جمع المذكر السالم هي:",
+        options: ["الواو", "الألف", "الياء", "الفتحة"],
+        correctIdx: 0,
+        difficulty: "متوسط",
+        explanation: "يرفع جمع المذكر السالم بالواو وينصب ويجر بالياء."
+      },
+      {
+        text: "الجملة الاسمية تبدأ غالبًا بـ:",
+        options: ["اسم", "فعل", "حرف جر", "أداة نصب فقط"],
+        correctIdx: 0,
+        difficulty: "سهل",
+        explanation: "الجملة الاسمية ركنها الأساسي مبتدأ وخبر."
+      }
+    ];
+  } else {
+    pool = [
+      {
+        text: `في درس «${lesson}»: ما أول خطوة صحيحة لفهم السؤال؟`,
+        options: ["تحديد المطلوب من السؤال", "اختيار إجابة عشوائية", "تجاهل الكلمات المهمة", "حفظ الاختيارات فقط"],
+        correctIdx: 0,
+        difficulty: "سهل",
+        explanation: "تحديد المطلوب هو أساس الإجابة الصحيحة."
+      },
+      {
+        text: `ما الطريقة الأفضل لمراجعة درس «${lesson}»؟`,
+        options: ["فهم القاعدة ثم حل أمثلة", "حفظ الإجابات فقط", "ترك الأخطاء دون مراجعة", "الاعتماد على التخمين"],
+        correctIdx: 0,
+        difficulty: "متوسط",
+        explanation: "الفهم ثم التطبيق يثبت المعلومة أفضل من الحفظ وحده."
+      },
+      {
+        text: `عند الخطأ في سؤال من درس «${lesson}»، ماذا تفعل؟`,
+        options: ["أحدد سبب الخطأ وأحل مثالًا مشابهًا", "أتجاهل الخطأ", "أحذف السؤال", "أحفظ الإجابة فقط"],
+        correctIdx: 0,
+        difficulty: "صعب",
+        explanation: "تحليل سبب الخطأ يمنع تكراره."
+      },
+      {
+        text: `أي اختيار يدل على مذاكرة صحيحة لدرس «${lesson}»؟`,
+        options: ["تلخيص الفكرة الأساسية وتطبيقها", "قراءة العنوان فقط", "حل بدون تصحيح", "اختيار الإجابة الأسرع"],
+        correctIdx: 0,
+        difficulty: "متوسط",
+        explanation: "التلخيص والتطبيق هما أفضل طريقة للمراجعة."
+      }
+    ];
+  }
+
   return Array.from({ length: count }).map((_, i) => {
-    const base = templates[i % templates.length];
+    const base = pool[i % pool.length];
     return {
-      id: `emergency_${i + 1}`,
-      text: `${base.text} (${i + 1})`,
+      id: `lesson_fallback_${i + 1}`,
+      text: base.text,
       options: base.options,
       correctIdx: base.correctIdx,
-      difficulty: ["سهل", "متوسط", "صعب", "صعب جدًا"][i % 4],
-      branch,
-      explanation: `${base.explanation} مناسب لمرحلة ${grade}.`
+      difficulty: base.difficulty || ["سهل", "متوسط", "صعب", "صعب جدًا"][i % 4],
+      branch: lesson,
+      explanation: base.explanation
     };
   });
 }
 
 function normalizeExam(exam, body = {}) {
-  const topic = body.topic || body.branches || "مراجعة عامة";
+  const topic = getRequestedLesson(body);
   const rawQuestions = Array.isArray(exam?.questions) ? exam.questions : [];
   const questions = rawQuestions
     .flatMap((item, i) => {
@@ -122,25 +291,39 @@ function buildPrompt(body) {
     const grade = body.grade || "غير محدد";
     const count = Math.min(Math.max(Number(body.count || 10), 1), 20);
     return `
-أنت معلم لغة عربية مصري. أنشئ ${count} سؤال اختيار من متعدد حقيقي، وليس أسئلة شكلية.
+أنت معلم لغة عربية مصري خبير بالمنهج.
+أنشئ ${count} سؤال اختيار من متعدد عن هذا الدرس تحديدًا، وليس أسئلة عامة.
+
 المرحلة: ${grade}
+الدرس المطلوب: ${topic}
 الفرع: ${branch}
-الموضوع: ${topic}
 الصعوبة: ${body.difficulty || "متوسط"}
 
-ممنوع تمامًا استخدام اختيارات مثل: اختيار أ، اختيار ب، اختيار ج، اختيار د.
-لازم كل سؤال له نص واضح، و4 اختيارات تعليمية حقيقية، وشرح.
+لو الدرس هو "اسم التفضيل"، يجب أن تكون الأسئلة عن:
+- تعريف اسم التفضيل
+- وزنه أفعل
+- شروط صياغته
+- حالاته
+- المفضل والمفضل عليه
+- إعرابه في الجملة
+- صياغته بطريقة مباشرة وغير مباشرة
+
+ممنوع تمامًا:
+- أسئلة عن "طريقة المذاكرة"
+- أسئلة عامة مثل "ما أفضل خطوة؟"
+- اختيارات وهمية مثل: اختيار أ، اختيار ب
+- سؤال لا يخص الدرس
 
 أعد JSON فقط:
 {
   "questions": [
     {
       "id": "q1",
-      "text": "نص سؤال حقيقي",
-      "options": ["إجابة حقيقية 1", "إجابة حقيقية 2", "إجابة حقيقية 3", "إجابة حقيقية 4"],
+      "text": "نص سؤال من الدرس نفسه",
+      "options": ["اختيار حقيقي 1", "اختيار حقيقي 2", "اختيار حقيقي 3", "اختيار حقيقي 4"],
       "correctIdx": 0,
       "difficulty": "متوسط",
-      "branch": "${branch}",
+      "branch": "${topic}",
       "explanation": "شرح سبب الإجابة"
     }
   ]
@@ -149,30 +332,38 @@ function buildPrompt(body) {
   }
 
   if (body.mode === "generate_exam") {
-    const topic = body.topic || body.branches || "مراجعة عامة";
+    const topic = getRequestedLesson(body);
     const grade = body.grade || "غير محدد";
     return `
-أنت معلم لغة عربية مصري. أنشئ امتحان اختيار من متعدد حقيقي من 15 إلى 20 سؤال.
+أنت معلم لغة عربية مصري خبير بالمنهج.
+أنشئ امتحان اختيار من متعدد حقيقي من 15 إلى 20 سؤال عن الدرس المطلوب فقط.
 
-الشروط الصارمة:
-- المرحلة الدراسية: ${grade}
-- الموضوع / الفرع: ${topic}
-- ممنوع سؤال تدريبي عام.
-- ممنوع اختيارات وهمية مثل: اختيار أ، اختيار ب، اختيار ج، اختيار د.
-- كل سؤال لازم يكون له نص واضح مرتبط بالموضوع.
-- كل سؤال له 4 اختيارات حقيقية مختلفة.
-- correctIdx رقم من 0 إلى 3.
-- explanation يشرح سبب الإجابة.
-- التزم بمستوى الطالب ولا تخرج عنه.
+المرحلة الدراسية: ${grade}
+الدرس / الفرع المطلوب: ${topic}
+
+لو الدرس هو "اسم التفضيل"، يجب أن تكون الأسئلة عن:
+- وزن اسم التفضيل
+- استخراجه من الجملة
+- شروط صياغته
+- حالاته: مجرد من أل والإضافة، مقترن بأل، مضاف
+- المفضل والمفضل عليه
+- صياغة التفضيل من فعل مستوفٍ وغير مستوفٍ للشروط
+- إعرابه حسب موقعه في الجملة
+
+ممنوع تمامًا:
+- أسئلة عامة عن المذاكرة أو طريقة الحل
+- أسئلة مثل: "أي خطوة تساعدك؟"
+- اختيارات وهمية مثل: اختيار أ / اختيار ب
+- أي سؤال لا يخص الدرس
 
 أعد JSON فقط:
 {
   "exam": {
-    "title": "عنوان الامتحان",
+    "title": "امتحان ${topic}",
     "questions": [
       {
         "id": "q1",
-        "text": "نص سؤال حقيقي",
+        "text": "سؤال حقيقي من درس ${topic}",
         "options": ["اختيار حقيقي 1", "اختيار حقيقي 2", "اختيار حقيقي 3", "اختيار حقيقي 4"],
         "correctIdx": 0,
         "difficulty": "سهل",
@@ -207,7 +398,7 @@ async function callGemini(model, key, prompt) {
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: {
-        temperature: 0.55,
+        temperature: 0.35,
         maxOutputTokens: 8192,
         responseMimeType: "application/json"
       }
@@ -260,15 +451,15 @@ export default async function handler(req, res) {
 
         if (body.mode === "generate_questions") {
           const raw = Array.isArray(json?.questions) ? json.questions : [];
-          const questions = raw.map((q, i) => normalizeQuestion(q, i, body.branch || body.topic)).filter(isValidQuestion);
-          if (questions.length < 3) throw new Error("Gemini returned placeholder or invalid questions");
+          const questions = raw.map((q, i) => normalizeQuestion(q, i, getRequestedLesson(body))).filter(isValidQuestion);
+          if (questions.length < 3) throw new Error("Gemini returned generic or invalid questions");
           return send(res, 200, { ok: true, provider: "gemini", model, analysis: { questions }, data: { questions } });
         }
 
         if (body.mode === "generate_exam") {
           const rawExam = json?.exam || json;
           const exam = normalizeExam(rawExam, body);
-          if (exam.questions.length < 5) throw new Error("Gemini returned placeholder or invalid exam questions");
+          if (exam.questions.length < 5) throw new Error("Gemini returned generic or invalid exam questions");
           return send(res, 200, { ok: true, provider: "gemini", model, analysis: { exam }, data: { exam } });
         }
 
@@ -287,12 +478,12 @@ export default async function handler(req, res) {
   }
 
   if (body.mode === "generate_questions") {
-    const questions = emergencyRealQuestions(body);
+    const questions = lessonFallbackQuestions(body);
     return send(res, 200, {
       ok: true,
-      provider: "fallback",
-      model: "local-real-fallback",
-      warning: "Gemini ضغط أو رجع أسئلة غير صالحة، تم استخدام أسئلة احتياطية مفهومة.",
+      provider: "lesson-fallback",
+      model: "local-lesson-fallback",
+      warning: "Gemini لم يرجع أسئلة مناسبة للدرس، فتم استخدام أسئلة احتياطية مرتبطة بالدرس.",
       analysis: { questions },
       data: { questions },
       errors
@@ -300,13 +491,13 @@ export default async function handler(req, res) {
   }
 
   if (body.mode === "generate_exam") {
-    const questions = emergencyRealQuestions(body);
-    const exam = { title: `امتحان احتياطي مفهوم - ${body.topic || body.branches || "مراجعة"}`, questions };
+    const questions = lessonFallbackQuestions(body);
+    const exam = { title: `امتحان ${getRequestedLesson(body)}`, questions };
     return send(res, 200, {
       ok: true,
-      provider: "fallback",
-      model: "local-real-fallback",
-      warning: "Gemini ضغط أو رجع أسئلة غير صالحة، تم استخدام امتحان احتياطي مفهوم.",
+      provider: "lesson-fallback",
+      model: "local-lesson-fallback",
+      warning: "Gemini لم يرجع أسئلة مناسبة للدرس، فتم استخدام امتحان احتياطي مرتبط بالدرس.",
       analysis: { exam },
       data: { exam },
       errors
