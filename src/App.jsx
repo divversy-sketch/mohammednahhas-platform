@@ -80,9 +80,9 @@ const savePushTokenForUser = async (user, userData = {}) => {
   await setDoc(doc(db, 'push_tokens', tokenId), {
     token,
     userId: user.uid,
-    userName: user.displayName || userData.name || 'طالب',
-    email: user.email || userData.email || '',
-    grade: userData.grade || 'all',
+    userName: user.displayName || userData?.name || 'طالب',
+    email: user.email || userData?.email || '',
+    grade: userData?.grade || 'all',
     platform: navigator.platform || '',
     userAgent: navigator.userAgent || '',
     enabled: true,
@@ -664,7 +664,7 @@ const Leaderboard = () => {
     const [topStudents, setTopStudents] = useState([]);
     const [config, setConfig] = useState({ show: true });
     useEffect(() => {
-        const unsubConfig = onSnapshot(doc(db, 'settings', 'config'), (snap) => { if(snap.exists()) setConfig(snap.data()); });
+        const unsubConfig = onSnapshot(doc(db,  'config'), (snap) => { if(snap.exists()) setConfig(snap.data()); });
         const unsub = onSnapshot(query(collection(db, 'exam_results')), (snap) => {
             const scores = {};
             snap.docs.forEach(doc => {
@@ -710,7 +710,7 @@ const ChatWidget = ({ user }) => {
   const [autoReplies, setAutoReplies] = useState([]);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'auto_replies'), (snap) => {
+    const unsub = onSnapshot(collection(db), (snap) => {
         const rules = snap.docs.map(d => d.data()).filter(r => r.isActive);
         setAutoReplies(rules);
     });
@@ -2330,6 +2330,440 @@ const getTodayKey = () => {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 };
 
+
+const LiveAICoachPanel = ({ session, user, userData }) => {
+  const [question, setQuestion] = useState('');
+  const [answer, setAnswer] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [summary, setSummary] = useState('');
+  const [examDraft, setExamDraft] = useState(null);
+
+  const lessonContext = {
+    title: session?.title || '',
+    branch: session?.branch || '',
+    grade: session?.grade || userData?.grade || '',
+    description: session?.description || session?.notes || '',
+    streamUrl: session?.streamUrl || session?.url || ''
+  };
+
+  const askAI = async () => {
+    if (!question.trim()) return alert('اكتب سؤالك الأول.');
+    setLoading(true);
+    setAnswer('');
+    try {
+      const res = await fetch('/api/ai-coach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'student_chat',
+          studentName: userData?.name || user?.displayName || user?.email || '',
+          grade: lessonContext.grade,
+          question: `سؤال الطالب أثناء المحاضرة: ${question}\n\nسياق المحاضرة: ${JSON.stringify(lessonContext)}`,
+          recentResults: []
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'AI لم يرد الآن.');
+      const a = data.analysis || data.data || {};
+      setAnswer(a.answer || a.explanation || a.summary || 'تم.');
+    } catch (e) {
+      setAnswer(e.message || 'تعذر تشغيل AI الآن.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const summarizeLesson = async () => {
+    setLoading(true);
+    setSummary('');
+    try {
+      const res = await fetch('/api/ai-coach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'student_chat',
+          grade: lessonContext.grade,
+          question: `لخص هذه المحاضرة للطلاب بنقاط منظمة، ثم اكتب أهم الأفكار، ثم أسئلة مراجعة قصيرة. بيانات المحاضرة: ${JSON.stringify(lessonContext)}`
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'تعذر تلخيص المحاضرة.');
+      const a = data.analysis || data.data || {};
+      setSummary(a.answer || a.explanation || a.summary || JSON.stringify(a));
+    } catch (e) {
+      setSummary(e.message || 'تعذر التلخيص الآن.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateLessonExam = async () => {
+    setLoading(true);
+    setExamDraft(null);
+    try {
+      const res = await fetch('/api/ai-coach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'generate_exam',
+          topic: `${lessonContext.title} ${lessonContext.description}`,
+          branches: lessonContext.branch || lessonContext.title,
+          grade: lessonContext.grade,
+          mcqCount: 15,
+          essayCount: 0,
+          duration: 20,
+          instructions: 'امتحان سريع من محتوى المحاضرة فقط. لا تخرج عن عنوان ووصف المحاضرة.'
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'تعذر توليد امتحان المحاضرة.');
+      setExamDraft((data.analysis || data.data || {}).exam || data.analysis || data.data);
+    } catch (e) {
+      alert(e.message || 'تعذر توليد الامتحان.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="bg-white/95 border border-fuchsia-100 rounded-2xl p-4 space-y-4 shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div>
+          <h3 className="font-black text-xl text-slate-800 flex items-center gap-2">
+            <Sparkles className="text-fuchsia-600"/> Live AI Coach
+          </h3>
+          <p className="text-xs text-slate-500">AI يعتمد على عنوان ووصف المحاضرة وشات الطلبة، وليس على صوت الفيديو مباشرة.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button disabled={loading} onClick={summarizeLesson} className="bg-blue-100 text-blue-700 px-4 py-2 rounded-xl font-bold">تلخيص المحاضرة</button>
+          <button disabled={loading} onClick={generateLessonExam} className="bg-fuchsia-600 text-white px-4 py-2 rounded-xl font-black">توليد امتحان</button>
+        </div>
+      </div>
+      <div className="flex flex-col md:flex-row gap-2">
+        <input value={question} onChange={(e)=>setQuestion(e.target.value)} onKeyDown={(e)=>{ if(e.key === 'Enter') askAI(); }} className="flex-1 border rounded-xl p-3" placeholder="اسأل AI أثناء المحاضرة..." />
+        <button disabled={loading} onClick={askAI} className="bg-slate-900 text-white px-5 py-3 rounded-xl font-black">{loading ? 'جاري...' : 'اسأل AI'}</button>
+      </div>
+      {answer && <div className="bg-sky-50 border border-sky-100 text-slate-800 rounded-xl p-3 font-bold leading-relaxed whitespace-pre-wrap">{answer}</div>}
+      {summary && <div className="bg-emerald-50 border border-emerald-100 text-slate-800 rounded-xl p-3 font-bold leading-relaxed whitespace-pre-wrap">{summary}</div>}
+      {examDraft && (
+        <details className="bg-fuchsia-50 border border-fuchsia-100 rounded-xl p-3">
+          <summary className="cursor-pointer font-black text-fuchsia-700">امتحان المحاضرة الناتج من AI</summary>
+          <pre dir="ltr" className="mt-3 bg-slate-900 text-slate-100 rounded-xl p-3 text-xs overflow-auto max-h-[360px]">{JSON.stringify(examDraft, null, 2)}</pre>
+        </details>
+      )}
+    </div>
+  );
+};
+
+const LiveSessionCreator = ({ adminGradeFilter = 'all' }) => {
+  const [title, setTitle] = useState('');
+  const [streamUrl, setStreamUrl] = useState('');
+  const [platform, setPlatform] = useState('jitsi');
+  const [grade, setGrade] = useState(adminGradeFilter === 'all' ? '3sec' : adminGradeFilter);
+  const [branch, setBranch] = useState('');
+  const [description, setDescription] = useState('');
+
+  const createSession = async () => {
+    if (!title.trim()) return alert('اكتب عنوان المحاضرة.');
+    let finalUrl = streamUrl.trim();
+    if (platform === 'jitsi' && !finalUrl) {
+      const room = `Nahhas-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      finalUrl = `https://meet.jit.si/${room}`;
+    }
+    if (!finalUrl) return alert('ضع رابط البث أو اختر Jitsi لإنشاء غرفة تلقائيًا.');
+
+    await addDoc(collection(db, 'live_sessions'), {
+      title: title.trim(),
+      streamUrl: finalUrl,
+      url: finalUrl,
+      platform,
+      grade,
+      branch: branch.trim(),
+      description: description.trim(),
+      notes: description.trim(),
+      isLive: true,
+      createdAt: serverTimestamp()
+    });
+
+    setTitle('');
+    setStreamUrl('');
+    setBranch('');
+    setDescription('');
+    alert('تم إنشاء المحاضرة المباشرة.');
+  };
+
+  return (
+    <div className="glass-panel rounded-2xl p-5 border-t-4 border-sky-600 mb-6">
+      <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2 mb-4"><Radio className="text-sky-600"/> إنشاء محاضرة Live + AI</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+        <input className="border rounded-xl p-3" placeholder="عنوان المحاضرة" value={title} onChange={e=>setTitle(e.target.value)} />
+        <select className="border rounded-xl p-3" value={platform} onChange={e=>setPlatform(e.target.value)}>
+          <option value="jitsi">Jitsi Meet - مجاني داخل المنصة</option>
+          <option value="youtube">YouTube Live</option>
+          <option value="zoom">Zoom / رابط خارجي</option>
+          <option value="custom">رابط مخصص iframe</option>
+        </select>
+        <select className="border rounded-xl p-3" value={grade} onChange={e=>setGrade(e.target.value)}><GradeOptions/></select>
+        <input className="border rounded-xl p-3" placeholder="الفرع: نحو / قراءة / بلاغة..." value={branch} onChange={e=>setBranch(e.target.value)} />
+      </div>
+      <input className="border rounded-xl p-3 w-full mb-3" placeholder="رابط البث - اتركه فارغًا مع Jitsi لإنشاء غرفة تلقائيًا" value={streamUrl} onChange={e=>setStreamUrl(e.target.value)} />
+      <textarea className="border rounded-xl p-3 w-full mb-3 min-h-[100px]" placeholder="اكتب وصف المحاضرة أو نقاط الدرس حتى يفهم AI المحتوى..." value={description} onChange={e=>setDescription(e.target.value)} />
+      <button onClick={createSession} className="bg-sky-600 text-white px-6 py-3 rounded-xl font-black hover:bg-sky-700">إنشاء المحاضرة</button>
+    </div>
+  );
+};
+
+
+const LiveAttendanceModal = ({ session, onClose }) => {
+  const [attendance, setAttendance] = useState([]);
+
+  useEffect(() => {
+    if (!session?.id) return;
+    const unsub = onSnapshot(collection(db, 'live_attendance'), (snap) => {
+      const rows = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(r => r.sessionId === session.id)
+        .sort((a, b) => (b.joinedAt?.seconds || 0) - (a.joinedAt?.seconds || 0));
+      setAttendance(rows);
+    }, () => setAttendance([]));
+    return () => unsub();
+  }, [session?.id]);
+
+  const exportCSV = () => {
+    const header = ['studentName', 'grade', 'userEmail', 'joinedAt'];
+    const rows = attendance.map(r => {
+      const joined = r.joinedAt?.toDate?.()?.toLocaleString('ar-EG') || '';
+      return [r.studentName || '', getGradeLabel(r.grade || ''), r.userEmail || r.email || '', joined]
+        .map(v => `"${String(v).replaceAll('"', '""')}"`).join(',');
+    });
+    const blob = new Blob([[header.join(','), ...rows].join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `live_attendance_${session?.title || session?.id}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100000] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3" dir="rtl">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-y-auto border-t-8 border-sky-600">
+        <div className="bg-slate-900 text-white p-4 flex items-center justify-between sticky top-0 z-10">
+          <div>
+            <h2 className="font-black text-2xl">حضور المحاضرة</h2>
+            <p className="text-xs text-slate-300 mt-1">{session?.title} • عدد الحضور: {attendance.length}</p>
+          </div>
+          <button onClick={onClose} className="bg-white/10 hover:bg-white/20 rounded-full p-2"><X/></button>
+        </div>
+        <div className="p-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+            <div className="bg-sky-50 border border-sky-100 rounded-2xl p-4"><p className="text-xs font-bold text-sky-600">إجمالي الحضور</p><p className="text-4xl font-black text-sky-800">{attendance.length}</p></div>
+            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4"><p className="text-xs font-bold text-emerald-600">الصف</p><p className="text-xl font-black text-emerald-800">{getGradeLabel(session?.grade)}</p></div>
+            <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4"><p className="text-xs font-bold text-purple-600">الفرع</p><p className="text-xl font-black text-purple-800">{session?.branch || 'عام'}</p></div>
+          </div>
+
+          <div className="flex flex-wrap gap-2 mb-4">
+            <button onClick={exportCSV} className="bg-slate-900 text-white px-4 py-2 rounded-xl font-black">تصدير CSV</button>
+            <button onClick={() => navigator.clipboard?.writeText(attendance.map(a => a.studentName || a.userId).join('\n'))} className="bg-sky-100 text-sky-700 px-4 py-2 rounded-xl font-bold">نسخ الأسماء</button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-sm border rounded-2xl overflow-hidden">
+              <thead><tr className="bg-slate-100 text-slate-700"><th className="p-3 text-right">الطالب</th><th className="p-3">الصف</th><th className="p-3">الإيميل / ID</th><th className="p-3">وقت الدخول</th></tr></thead>
+              <tbody>
+                {attendance.map(row => (
+                  <tr key={row.id} className="border-b hover:bg-slate-50">
+                    <td className="p-3 font-black text-slate-800">{row.studentName || 'طالب'}</td>
+                    <td className="p-3 text-center font-bold">{getGradeLabel(row.grade)}</td>
+                    <td className="p-3 text-center text-xs text-slate-500">{row.userEmail || row.email || row.userId}</td>
+                    <td className="p-3 text-center font-bold">{row.joinedAt?.toDate?.()?.toLocaleString('ar-EG') || 'غير محدد'}</td>
+                  </tr>
+                ))}
+                {attendance.length === 0 && <tr><td colSpan="4" className="p-10 text-center text-slate-400 font-bold">لا يوجد حضور مسجل لهذه المحاضرة حتى الآن.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 mt-5 text-sm font-bold text-amber-800 leading-relaxed">
+            ملاحظة: الطالب يتسجل حضوره عندما يدخل المحاضرة من داخل المنصة. لو دخل مباشرة من رابط Jitsi خارج المنصة، لن يظهر في الحضور.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+const LiveSessionsAdminPanel = ({ adminGradeFilter = 'all' }) => {
+  const [sessions, setSessions] = useState([]);
+  const [selectedAttendanceSession, setSelectedAttendanceSession] = useState(null);
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'live_sessions'), (snap) => {
+      const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      rows.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+      setSessions(rows);
+    }, () => setSessions([]));
+    return () => unsub();
+  }, []);
+
+  const toggleLive = async (s) => updateDoc(doc(db, 'live_sessions', s.id), { isLive: !s.isLive });
+  const remove = async (s) => {
+    if (!window.confirm('حذف المحاضرة؟')) return;
+    await deleteDoc(doc(db, 'live_sessions', s.id));
+  };
+
+  return (
+    <div className="space-y-6">
+      <LiveSessionCreator adminGradeFilter={adminGradeFilter} />
+      <div className="glass-panel rounded-2xl p-5 border-t-4 border-slate-700">
+        <h2 className="text-2xl font-black text-slate-800 mb-4">إدارة المحاضرات المباشرة</h2>
+        <div className="space-y-3">
+          {sessions.map(s => (
+            <div key={s.id} className="bg-white border rounded-2xl p-4 flex flex-col md:flex-row justify-between gap-3">
+              <div>
+                <h3 className="font-black text-slate-800">{s.title}</h3>
+                <p className="text-xs text-slate-500">{getGradeLabel(s.grade)} • {s.branch || 'عام'} • {s.platform || 'custom'}</p>
+                <p className="text-xs text-slate-400 break-all mt-1">{s.streamUrl || s.url}</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => toggleLive(s)} className={`${s.isLive ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'} px-4 py-2 rounded-xl font-bold`}>{s.isLive ? 'إيقاف' : 'تشغيل'}</button>
+                <button onClick={() => setSelectedAttendanceSession(s)} className="bg-sky-100 text-sky-700 px-4 py-2 rounded-xl font-bold">عرض الحضور</button>
+                <button onClick={() => remove(s)} className="bg-red-100 text-red-700 px-4 py-2 rounded-xl font-bold">حذف</button>
+              </div>
+            </div>
+          ))}
+          {!sessions.length && <p className="text-center text-slate-400 py-8 font-bold">لا توجد محاضرات بعد.</p>}
+        </div>
+      </div>
+    </div>
+      {selectedAttendanceSession && (
+        <LiveAttendanceModal
+          session={selectedAttendanceSession}
+          onClose={() => setSelectedAttendanceSession(null)}
+        />
+      )}
+  );
+};
+
+const LiveSessionStudentViewer = ({ session, user, userData, onClose }) => {
+  const [messages, setMessages] = useState([]);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    if (!session?.id || !user?.uid) return;
+    setDoc(doc(db, 'live_attendance', `${session.id}_${user.uid}`), {
+      sessionId: session.id,
+      userId: user.uid,
+      userEmail: user?.email || '',
+      studentName: userData?.name || user?.displayName || user?.email || 'طالب',
+      grade: userData?.grade || '',
+      joinedAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    }, { merge: true }).catch(() => {});
+  }, [session?.id, user?.uid]);
+
+  useEffect(() => {
+    if (!session?.id) return;
+    const unsub = onSnapshot(collection(db, 'live_sessions', session.id, 'chat'), (snap) => {
+      const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      rows.sort((a,b)=>(a.createdAt?.seconds||0)-(b.createdAt?.seconds||0));
+      setMessages(rows.slice(-80));
+    }, () => setMessages([]));
+    return () => unsub();
+  }, [session?.id]);
+
+  const sendMsg = async () => {
+    if (!msg.trim()) return;
+    await addDoc(collection(db, 'live_sessions', session.id, 'chat'), {
+      userId: user.uid,
+      studentName: userData?.name || user?.displayName || user?.email || 'طالب',
+      message: msg.trim(),
+      createdAt: serverTimestamp()
+    });
+    setMsg('');
+  };
+
+  const embedUrl = session?.streamUrl || session?.url || '';
+  const isYouTube = embedUrl.includes('youtube.com') || embedUrl.includes('youtu.be');
+  const normalizedUrl = isYouTube ? embedUrl.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/') : embedUrl;
+
+  return (
+    <div className="fixed inset-0 z-[99999] bg-slate-950/95 p-3 md:p-6 overflow-y-auto" dir="rtl">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex items-center justify-between text-white mb-4">
+          <div>
+            <h2 className="font-black text-2xl">{session?.title}</h2>
+            <p className="text-sm text-slate-300">{getGradeLabel(session?.grade)} • {session?.branch || 'محاضرة مباشرة'}</p>
+          </div>
+          <button onClick={onClose} className="bg-white/10 hover:bg-white/20 rounded-full p-3"><X/></button>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <div className="xl:col-span-2 space-y-4">
+            <div className="bg-black rounded-2xl overflow-hidden border border-white/10">
+              <iframe title={session?.title || 'live'} src={normalizedUrl} allow="camera; microphone; fullscreen; display-capture; autoplay" allowFullScreen className="w-full h-[62vh] min-h-[360px]" />
+            </div>
+            <LiveAICoachPanel session={session} user={user} userData={userData} />
+          </div>
+
+          <div className="bg-white rounded-2xl p-4 h-fit max-h-[82vh] flex flex-col">
+            <h3 className="font-black text-slate-800 mb-3">شات المحاضرة</h3>
+            <div className="flex-1 overflow-y-auto space-y-2 bg-slate-50 rounded-xl p-3 min-h-[320px]">
+              {messages.map(m => (
+                <div key={m.id} className="bg-white border rounded-xl p-2">
+                  <p className="text-xs font-black text-sky-700">{m.studentName || 'طالب'}</p>
+                  <p className="text-sm font-bold text-slate-700">{m.message}</p>
+                </div>
+              ))}
+              {!messages.length && <p className="text-center text-slate-400 font-bold mt-10">لا توجد رسائل بعد.</p>}
+            </div>
+            <div className="flex gap-2 mt-3">
+              <input value={msg} onChange={e=>setMsg(e.target.value)} onKeyDown={e=>{ if(e.key === 'Enter') sendMsg(); }} className="flex-1 border rounded-xl p-3" placeholder="اكتب رسالة..." />
+              <button onClick={sendMsg} className="bg-sky-600 text-white px-4 rounded-xl font-black">إرسال</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const LiveSessionsStudentPanel = ({ user, userData }) => {
+  const [sessions, setSessions] = useState([]);
+  const [selected, setSelected] = useState(null);
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'live_sessions'), (snap) => {
+      const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const grade = userData?.grade || '';
+      const filtered = rows.filter(s => s.isLive !== false && (!s.grade || !grade || s.grade === grade || s.grade === 'all'));
+      filtered.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+      setSessions(filtered);
+    }, () => setSessions([]));
+    return () => unsub();
+  }, [userData?.grade]);
+
+  return (
+    <div className="glass-panel rounded-2xl p-5 border-t-4 border-sky-600">
+      <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2 mb-4"><Radio className="text-sky-600"/> محاضرات أونلاين Live</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {sessions.map(s => (
+          <div key={s.id} className="bg-white border rounded-2xl p-4">
+            <div className="flex justify-between gap-3 mb-2">
+              <h3 className="font-black text-slate-800">{s.title}</h3>
+              <span className="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full font-black">LIVE</span>
+            </div>
+            <p className="text-xs text-slate-500 mb-3">{getGradeLabel(s.grade)} • {s.branch || 'عام'}</p>
+            <p className="text-sm text-slate-600 mb-3 line-clamp-2">{s.description || s.notes || 'محاضرة مباشرة'}</p>
+            <button onClick={() => setSelected(s)} className="bg-sky-600 text-white w-full py-3 rounded-xl font-black">دخول المحاضرة</button>
+          </div>
+        ))}
+        {!sessions.length && <p className="text-center text-slate-400 font-bold py-10 md:col-span-2">لا توجد محاضرات مباشرة الآن.</p>}
+      </div>
+      {selected && <LiveSessionStudentViewer session={selected} user={user} userData={userData} onClose={() => setSelected(null)} />}
+    </div>
+  );
+};
+
 const AIUsageBadge = ({ user }) => {
   const [usage, setUsage] = useState(null);
   useEffect(() => {
@@ -3297,6 +3731,7 @@ const RealAIBox = ({ title = 'AI الحقيقي', payload = {}, compact = false 
     } catch (error) {
       console.error('Real AI error:', error);
       setAiError(error.message || 'حدث خطأ أثناء تشغيل AI.');
+      pushDebugLog('ai-error', error.message || 'AI Error', { stack: error.stack });
     } finally {
       setLoadingAI(false);
     }
@@ -4897,7 +5332,7 @@ const StudentAssignmentsPanel = ({ assignments = [], submissions = [], user, use
       grade: selectedAssignment.grade,
       branch: selectedAssignment.branch,
       studentId: user.uid,
-      studentName: userData.name,
+      studentName: userData?.name,
       answerText,
       answerImage,
       reviewStatus: 'submitted',
@@ -5325,6 +5760,7 @@ const AdminPerformanceAnalytics = ({ examResults = [], examsList = [], users = [
 };
 
 const AdminDashboard = ({ user }) => {
+  const userData = user || {};
   const [adminReviewExamData, setAdminReviewExamData] = useState(null);
   const [adminReviewResult, setAdminReviewResult] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard'); 
@@ -5484,7 +5920,7 @@ const AdminDashboard = ({ user }) => {
   }, []);
 
   useEffect(() => {
-      const u = onSnapshot(collection(db, 'auto_replies'), s => setAutoReplies(s.docs.map(d => ({id: d.id, ...d.data()}))));
+      const u = onSnapshot(collection(db), s => setAutoReplies(s.docs.map(d => ({id: d.id, ...d.data()}))));
       return u;
   }, []);
 
@@ -6337,18 +6773,18 @@ const AdminDashboard = ({ user }) => {
   };
 
   const toggleLeaderboard = async () => {
-      await setDoc(doc(db, 'settings', 'config'), { show: !showLeaderboard }, { merge: true });
+      await setDoc(doc(db,  'config'), { show: !showLeaderboard }, { merge: true });
       setShowLeaderboard(!showLeaderboard);
   };
 
   const handleAddAutoReply = async () => {
       if(!newAutoReply.keywords || !newAutoReply.response) return alert("أكمل البيانات");
-      await addDoc(collection(db, 'auto_replies'), newAutoReply);
+      await addDoc(collection(db), newAutoReply);
       setNewAutoReply({ keywords: '', response: '', isActive: true });
   };
   
-  const toggleAutoReply = async (id, currentStatus) => { await updateDoc(doc(db, 'auto_replies', id), { isActive: !currentStatus }); };
-  const deleteAutoReply = async (id) => { if(window.confirm("حذف هذا الرد؟")) await deleteDoc(doc(db, 'auto_replies', id)); };
+  const toggleAutoReply = async (id, currentStatus) => { await updateDoc(doc(db,  id), { isActive: !currentStatus }); };
+  const deleteAutoReply = async (id) => { if(window.confirm("حذف هذا الرد؟")) await deleteDoc(doc(db,  id)); };
   const handleAddQuote = async () => {
       if(!newQuote.text || !newQuote.source) return alert("أكمل البيانات");
       await addDoc(collection(db, 'quotes'), { ...newQuote, createdAt: serverTimestamp() });
@@ -6710,9 +7146,9 @@ const AdminDashboard = ({ user }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-4 md:p-6 relative z-10">
         <div className="glass-panel p-4 rounded-xl h-fit space-y-2 flex md:flex-col overflow-x-auto md:overflow-x-visible whitespace-nowrap scrollbar-hide">
-          {['dashboard', 'users', 'all_users', 'subscriptions', 'payments', 'security_center', 'ai_analytics', 'app_convert', 'ai_lab', 'ai_insights', 'leaderboard', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'question-analytics', 'smart_hw', 'live', 'content', 'notifications', 'student-messages', 'messages', 'auto_reply', 'quotes', 'settings'].map(tab => (
+          {['dashboard', 'users', 'all_users', 'subscriptions', 'payments', 'security_center', 'ai_analytics', 'live_ai', 'app_convert', 'ai_lab', 'ai_insights', 'leaderboard', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'question-analytics', 'smart_hw', 'live', 'content', 'notifications', 'student-messages', 'messages', 'auto_reply', 'quotes'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 transition-all ${activeTab===tab?'bg-amber-100 text-amber-700 shadow-sm border-b-4 md:border-b-0 md:border-r-4 border-amber-500':'hover:bg-slate-50 text-slate-600'}`}>
-              {tab === 'dashboard' ? 'Dashboard' : tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'payments' ? 'طلبات الدفع' : tab === 'security_center' ? 'مركز الحماية' : tab === 'ai_analytics' ? 'تحليلات AI' : tab === 'app_convert' ? 'تحويل App' : tab === 'ai_lab' ? 'AI Lab' : tab === 'ai_insights' ? 'AI Insights' : tab === 'leaderboard' ? 'لوحة الشرف' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'question-analytics' ? 'تحليل الأسئلة' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'student-messages' ? 'رسائل الطلاب' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : 'الإعدادات'}
+              {tab === 'dashboard' ? 'Dashboard' : tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'payments' ? 'طلبات الدفع' : tab === 'security_center' ? 'مركز الحماية' : tab === 'ai_analytics' ? 'تحليلات AI' : tab === 'live_ai' ? 'Live AI' : tab === 'app_convert' ? 'تحويل App' : tab === 'ai_lab' ? 'AI Lab' : tab === 'ai_insights' ? 'AI Insights' : tab === 'leaderboard' ? 'لوحة الشرف' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'question-analytics' ? 'تحليل الأسئلة' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'student-messages' ? 'رسائل الطلاب' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : 'الإعدادات'}
             </button>
           ))}
         </div>
@@ -7222,6 +7658,11 @@ const AdminDashboard = ({ user }) => {
             <AdminAIUsageAnalytics users={activeUsersList} />
           )}
 
+
+          {activeTab === 'live_ai' && (
+            <LiveSessionsAdminPanel adminGradeFilter={adminGradeFilter} />
+          )}
+
 {activeTab === 'app_convert' && (
             <AppConversionGuidePanel />
           )}
@@ -7480,30 +7921,6 @@ const AdminDashboard = ({ user }) => {
                   </div>
               </div>
           )}
-
-          {activeTab === 'settings' && (
-              <div className="glass-panel p-4 md:p-6 rounded-xl space-y-6">
-                  <h2 className="font-bold mb-4 font-arabic text-xl">إدارة الموقع</h2>
-                  <div className="border p-4 rounded-xl">
-                      <h3 className="font-bold mb-2 text-amber-600">شريط الإعلانات</h3>
-                      <div className="flex flex-col md:flex-row gap-2 mb-4">
-                          <input className="border p-2 flex-1 rounded w-full" placeholder="نص الإعلان" value={newAnnouncement} onChange={e=>setNewAnnouncement(e.target.value)} />
-                          <button onClick={handleAddAnnouncement} className="bg-green-600 text-white px-6 py-2 rounded font-bold w-full md:w-auto">نشر</button>
-                      </div>
-                      <div className="space-y-2">
-                          {announcements.map(a => (
-                              <div key={a.id} className="flex justify-between items-center bg-slate-50 p-2 rounded">
-                                  <span className="text-sm">{a.text}</span><button onClick={() => handleDeleteAnnouncement(a.id)} className="text-red-500 hover:bg-red-100 p-1 rounded"><Trash2 size={14}/></button>
-                              </div>
-                          ))}
-                      </div>
-                  </div>
-                  <div className="border p-4 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                      <div><h3 className="font-bold text-blue-600">لوحة الشرف (الأوائل)</h3><p className="text-sm text-slate-500">إظهار أو إخفاء لوحة الأوائل في صفحة الطلاب</p></div>
-                      <button onClick={toggleLeaderboard} className={`px-6 py-2 rounded-full font-bold w-full md:w-auto ${showLeaderboard ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'}`}>{showLeaderboard ? 'ظاهرة' : 'مخفية'}</button>
-                  </div>
-              </div>
-          )}
         </div>
       </div>
     </div>
@@ -7522,8 +7939,8 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
     subscriptionStatus: 'free',
     subscriptionExpiry: null
   };
-  userData.name = userData.name || user?.displayName || user?.email?.split('@')?.[0] || 'طالب';
-  userData.grade = userData.grade || '1sec';
+  userData?.name = userData?.name || user?.displayName || user?.email?.split('@')?.[0] || 'طالب';
+  userData?.grade = userData?.grade || '1sec';
   const [activeTab, setActiveTab] = useState('home');
   const [showStudentMessageComposer, setShowStudentMessageComposer] = useState(false);
   const [videoSectionTab, setVideoSectionTab] = useState('explanation');
@@ -7575,19 +7992,19 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
     const hwParam = urlParams.get('hw');
     if (hwParam) { setScanningHwId(hwParam); window.history.replaceState({}, document.title, window.location.pathname); }
 
-    const unsubContent = onSnapshot(query(collection(db, 'content'), where('grade', '==', userData.grade)), s => {
+    const unsubContent = onSnapshot(query(collection(db, 'content'), where('grade', '==', userData?.grade)), s => {
         const allContent = s.docs.map(d=>({id:d.id,...d.data()}));
         const visibleContent = allContent.filter(c => { if (!c.allowedEmails || c.allowedEmails.length === 0) return true; return c.allowedEmails.includes(user.email); });
         setContent(visibleContent);
     }, error => { console.warn('content listener blocked:', error?.message); setContent([]); });
 
-    const unsubLive = onSnapshot(query(collection(db, 'live_sessions'), where('status', '==', 'active'), where('grade', '==', userData.grade)), s => {
+    const unsubLive = onSnapshot(query(collection(db, 'live_sessions'), where('status', '==', 'active'), where('grade', '==', userData?.grade)), s => {
         const activeSessions = s.docs.map(d=>({id:d.id, ...d.data()}));
         const visibleSessions = activeSessions.filter(ls => { if (!ls.allowedEmails || ls.allowedEmails.length === 0) return true; return ls.allowedEmails.includes(user.email); });
         setLiveSessions(visibleSessions);
     }, error => { console.warn('live_sessions listener blocked:', error?.message); setLiveSessions([]); });
 
-    const unsubExams = onSnapshot(query(collection(db, 'exams'), where('grade', '==', userData.grade)), s => setExams(s.docs.map(d=>({id:d.id,...d.data()}))), error => { console.warn('exams listener blocked:', error?.message); setExams([]); });
+    const unsubExams = onSnapshot(query(collection(db, 'exams'), where('grade', '==', userData?.grade)), s => setExams(s.docs.map(d=>({id:d.id,...d.data()}))), error => { console.warn('exams listener blocked:', error?.message); setExams([]); });
     const unsubResults = onSnapshot(query(collection(db, 'exam_results'), where('studentId', '==', user.uid)), s => {
         const rows = s.docs.map(d=>({id:d.id,...d.data()}));
         rows.sort((a,b) => (b.submittedAt?.seconds || 0) - (a.submittedAt?.seconds || 0));
@@ -7599,7 +8016,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
     const unsubMistakes = onSnapshot(query(collection(db, 'student_mistakes'), where('userId', '==', user.uid)), s => {
         const rows = s.docs.map(d => ({id: d.id, ...d.data()})); rows.sort((a,b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)); setMistakes(rows);
     }, error => { console.warn('student_mistakes listener blocked:', error?.message); setMistakes([]); });
-    const unsubNotif = onSnapshot(query(collection(db, 'notifications'), where('grade', 'in', ['all', userData.grade]), limit(10)), s => {
+    const unsubNotif = onSnapshot(query(collection(db, 'notifications'), where('grade', 'in', ['all', userData?.grade]), limit(10)), s => {
         const newNotifs = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
         setNotifications(newNotifs);
         if(newNotifs.length > 0) {
@@ -7609,7 +8026,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
         }
     }, error => { console.warn('notifications listener blocked:', error?.message); setNotifications([]); });
 
-    const unsubAssignments = onSnapshot(query(collection(db, 'assignments'), where('grade', '==', userData.grade)), s => {
+    const unsubAssignments = onSnapshot(query(collection(db, 'assignments'), where('grade', '==', userData?.grade)), s => {
         const rows = s.docs.map(d=>({id:d.id,...d.data()}));
         rows.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
         setAssignments(rows);
@@ -7625,7 +8042,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
         setVideoViews(s.docs.map(d=>({id:d.id,...d.data()})));
     }, error => { console.warn('video_views listener blocked:', error?.message); setVideoViews([]); });
 
-    setEditFormData({ name: userData.name, phone: userData.phone, parentPhone: userData.parentPhone, grade: userData.grade });
+    setEditFormData({ name: userData?.name, phone: userData.phone, parentPhone: userData.parentPhone, grade: userData?.grade });
 
     return () => { unsubContent(); unsubLive(); unsubExams(); unsubResults(); unsubHwResults(); unsubMistakes(); unsubNotif(); unsubAssignments(); unsubAssignmentSubs(); unsubVideoViews(); };
   }, [userData, user]);
@@ -7655,7 +8072,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
     }
   };
 
-  const isPremium = userData?.subscriptionStatus === 'premium' && (!userData.subscriptionExpiry || userData.subscriptionExpiry.toDate() > new Date());
+  const isPremium = userData?.subscriptionStatus === 'premium' && (!userData?.subscriptionExpiry || userData?.subscriptionExpiry.toDate() > new Date());
   
   const startMistakesExam = () => {
       if (mistakes.length === 0) return alert("ليس لديك أي أخطاء مسجلة بعد! استمر في التميز 👏");
@@ -7682,8 +8099,8 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
           const days = codeData.days;
           let newExpiry = new Date();
-          if(isPremium && userData.subscriptionExpiry) {
-              newExpiry = userData.subscriptionExpiry.toDate();
+          if(isPremium && userData?.subscriptionExpiry) {
+              newExpiry = userData?.subscriptionExpiry.toDate();
           }
           newExpiry.setDate(newExpiry.getDate() + days);
 
@@ -7760,13 +8177,13 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
       const payload = { phone: normalizedPhone };
 
-      if (editFormData.grade !== userData.grade) {
+      if (editFormData.grade !== userData?.grade) {
           payload.requestedGrade = editFormData.grade;
           payload.gradeUpdateStatus = 'pending';
       }
 
       await updateDoc(doc(db, 'users', user.uid), payload);
-      alert(editFormData.grade !== userData.grade ? "تم حفظ رقم الهاتف وإرسال طلب تغيير المرحلة إلى الأدمن." : "تم تحديث رقم الهاتف بنجاح.");
+      alert(editFormData.grade !== userData?.grade ? "تم حفظ رقم الهاتف وإرسال طلب تغيير المرحلة إلى الأدمن." : "تم تحديث رقم الهاتف بنجاح.");
   };
 
   if (scanningHwId) return <SmartHomeworkScanner hwId={scanningHwId} user={user} onClose={() => setScanningHwId(null)} />;
@@ -7932,7 +8349,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
           </div>
         </div>
       )}
-      {playingVideo && <SecureVideoPlayer video={playingVideo} user={user} userName={userData.name} onClose={() => setPlayingVideo(null)} onProgress={handleVideoProgress} />}
+      {playingVideo && <SecureVideoPlayer video={playingVideo} user={user} userName={userData?.name} onClose={() => setPlayingVideo(null)} onProgress={handleVideoProgress} />}
       {playingHtml && <InteractiveViewer content={playingHtml} user={userData} onClose={() => setPlayingHtml(null)} />}
       {showAIInteractiveExam && <AIInteractiveExamModal user={user} userData={userData} onClose={() => setShowAIInteractiveExam(false)} />}
       <FloatingArabicBackground />
@@ -7981,7 +8398,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                 <button onClick={() => setShowFocusMode(true)} className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-full font-bold shadow-lg transition flex items-center gap-2"><Headphones size={18}/><span className="hidden md:inline">التركيز</span></button>
             </div>
             <div className="flex items-center gap-3">
-                {isPremium && <span className="hidden md:flex bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-bold items-center gap-1 border border-amber-200"><Crown size={14}/> VIP صالح حتى: {userData.subscriptionExpiry?.toDate().toLocaleDateString('ar-EG')}</span>}
+                {isPremium && <span className="hidden md:flex bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-bold items-center gap-1 border border-amber-200"><Crown size={14}/> VIP صالح حتى: {userData?.subscriptionExpiry?.toDate().toLocaleDateString('ar-EG')}</span>}
                 <button onClick={() => {requestNotificationPermission(); setShowNotifications(!showNotifications); setHasNewNotif(false);}} className="relative p-2 glass-panel rounded-full shadow-sm hover:bg-white transition">
                     <Bell className="text-slate-600"/>{hasNewNotif && <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>}
                 </button>
@@ -8037,6 +8454,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                 <AIStudentChatCoach user={user} userData={userData} examResults={examResults} />
                 <PaymentRequestStudentPanel user={user} userData={userData} />
                 <AIExamHistoryPanel user={user} userData={userData} />
+                <LiveSessionsStudentPanel user={user} userData={userData} />
                 <AISmartRecommendations userResults={examResults} content={content} exams={exams} userData={userData} />
                 <LeaderboardPanel examResults={examResults} users={[userData ? { ...userData, id: user?.uid } : {}]} currentUserId={user?.uid} gradeFilter={userData?.grade || 'all'} />
                 {liveSessions.length > 0 && (
@@ -8052,8 +8470,8 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                 <Announcements />
                 <PWAInstallBox installPrompt={installPrompt} />
                 <h2 className="text-3xl font-bold text-slate-800 font-arabic flex flex-wrap items-center gap-2">
-                    منور يا <span className="text-amber-600">{String(userData.name || 'طالب').split(' ')[0]}</span> 👋 
-                    <span className="text-sm font-normal text-slate-500 bg-slate-200 px-3 py-1 rounded-full font-sans">{getGradeLabel(userData.grade)}</span>
+                    منور يا <span className="text-amber-600">{String(userData?.name || 'طالب').split(' ')[0]}</span> 👋 
+                    <span className="text-sm font-normal text-slate-500 bg-slate-200 px-3 py-1 rounded-full font-sans">{getGradeLabel(userData?.grade)}</span>
                     {isPremium ? (
                         <span className="bg-amber-100 text-amber-700 text-xs px-3 py-1 rounded-full font-bold flex items-center gap-1 shadow-sm"><Crown size={14}/> حساب VIP</span>
                     ) : (
@@ -8117,7 +8535,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                     <Crown size={64} className={`mx-auto mb-4 ${isPremium ? 'text-amber-500' : 'text-slate-300'}`} />
                     <h2 className="text-3xl font-bold font-arabic text-slate-800 mb-2">حالة اشتراكك</h2>
                     {isPremium ? (
-                        <p className="text-green-600 font-bold text-lg bg-green-50 inline-block px-4 py-2 rounded-full border border-green-200">أنت الآن على الباقة المدفوعة (VIP). صالحة حتى: {userData.subscriptionExpiry?.toDate().toLocaleDateString('ar-EG')}</p>
+                        <p className="text-green-600 font-bold text-lg bg-green-50 inline-block px-4 py-2 rounded-full border border-green-200">أنت الآن على الباقة المدفوعة (VIP). صالحة حتى: {userData?.subscriptionExpiry?.toDate().toLocaleDateString('ar-EG')}</p>
                     ) : (
                         <p className="text-slate-500 font-bold text-lg">حسابك الآن مجاني. اشحن لتتمكن من فتح كل الفيديوهات والامتحانات المغلقة.</p>
                     )}
@@ -8446,16 +8864,6 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                 )}
             </div>
         )}
-
-        {activeTab === 'settings' && (
-              <div className="glass-panel p-4 md:p-8 rounded-xl max-w-2xl mx-auto">
-                <h2 className="text-xl md:text-2xl font-bold mb-6 flex items-center gap-2 font-arabic text-slate-800"><Settings className="text-slate-700"/> إعدادات الحساب</h2>
-                {userData.gradeUpdateStatus === 'pending' && (
-                    <div className="mb-4 bg-yellow-50 text-yellow-800 p-4 rounded-xl border border-yellow-200 flex flex-col md:flex-row items-center gap-2 font-bold text-center md:text-right text-sm">
-                        <RefreshCw className="animate-spin-slow" size={20} /> 
-                        لقد قمت بطلب تغيير المرحلة إلى {getGradeLabel(userData.requestedGrade)}. الطلب قيد المراجعة.
-                    </div>
-                )}
                 <form onSubmit={handleUpdateMyProfile} className="space-y-4">
                   <div><label className="block text-sm font-bold text-slate-700 mb-2">الاسم</label><input disabled className="w-full border p-3 rounded-xl bg-slate-100 text-slate-500 cursor-not-allowed" value={editFormData.name} /><p className="text-xs text-red-500 mt-1">لا يمكن تغيير الاسم (تواصل مع الإدارة).</p></div>
                   <div><label className="block text-sm font-bold text-slate-700 mb-2">رقم الهاتف</label><input className="w-full border p-3 rounded-xl" value={editFormData.phone} onChange={e=>setEditFormData({...editFormData, phone: normalizeEgyptPhone(e.target.value)})} /></div>
@@ -8638,7 +9046,325 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
-export default function App() {
+export default 
+const DEBUG_EVENT_NAME = 'nahhas-platform-debug-log';
+
+const isDebugAdmin = (user) => {
+  const email = (user?.email || '').toLowerCase();
+  return email === 'mido16280@gmail.com';
+};
+
+const pushRemoteDebugLog = async (entry) => {
+  try {
+    const u = window.__nahhasDebugUser || {};
+    if (!u?.uid) return;
+    await addDoc(collection(db, 'debug_logs'), {
+      ...entry,
+      userId: u.uid,
+      userEmail: u.email || '',
+      userName: u.displayName || u.email || '',
+      createdAt: serverTimestamp(),
+      page: window.location.href,
+      userAgent: navigator.userAgent
+    });
+  } catch (e) {}
+};
+
+const pushDebugLog = (type, title, details = {}) => {
+  try {
+    const entry = {
+      id: `${Date.now()}_${Math.random().toString(36).slice(2)}`,
+      type,
+      title,
+      details,
+      at: new Date().toLocaleString('ar-EG')
+    };
+    const current = JSON.parse(localStorage.getItem('nahhas_debug_logs') || '[]');
+    localStorage.setItem('nahhas_debug_logs', JSON.stringify([entry, ...current].slice(0, 80)));
+    window.dispatchEvent(new CustomEvent(DEBUG_EVENT_NAME, { detail: entry }));
+    pushRemoteDebugLog(entry);
+  } catch (e) {}
+};
+
+const explainDebugError = (errorText = '') => {
+  const t = String(errorText || '').toLowerCase();
+  if (t.includes('userdata') && t.includes('not defined')) return 'متغير userData مستخدم في مكان غير متاح. الحل استخدام userData?. أو تمرير بيانات المستخدم للكومبوننت.';
+  if (t.includes('/api/ai-coach') || t.includes('gemini') || t.includes('ai')) return 'مشكلة في اتصال AI. راجع api/ai-coach.js ومفتاح GEMINI_API_KEY واضغط فحص AI.';
+  if (t.includes('permission') || t.includes('insufficient permissions')) return 'مشكلة Firebase Rules. راجع صلاحيات الـ collection المستخدمة.';
+  if (t.includes('failed to fetch') || t.includes('network')) return 'مشكلة اتصال أو API غير متاح حاليًا.';
+  if (t.includes('undefined')) return 'يوجد متغير غير متعرف في هذا الجزء من الصفحة.';
+  return 'خطأ عام. انسخ سجل التشخيص وابعت التفاصيل.';
+};
+
+class PlatformErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null, info: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, info) {
+    pushDebugLog('react-error', error?.message || 'React Error', {
+      stack: error?.stack,
+      componentStack: info?.componentStack
+    });
+    this.setState({ info });
+  }
+  render() {
+    if (this.state.hasError) {
+      const msg = this.state.error?.message || 'حدث خطأ غير معروف';
+      return (
+        <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4" dir="rtl">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full p-6 border-t-8 border-amber-500">
+            <h1 className="text-2xl font-black text-slate-900 mb-2">⚠️ الموقع تحت الصيانة مؤقتًا</h1>
+            <p className="text-slate-600 font-bold mb-4">ظهر خطأ وتم منع انهيار الصفحة بالكامل.</p>
+            <div className="bg-red-50 border border-red-100 rounded-2xl p-4 mb-3">
+              <p className="font-black text-red-700">سبب الخطأ:</p>
+              <p className="font-mono text-sm text-red-800 break-all" dir="ltr">{msg}</p>
+            </div>
+            <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 mb-4">
+              <p className="font-black text-blue-700">التفسير المقترح:</p>
+              <p className="font-bold text-blue-900">{explainDebugError(msg)}</p>
+            </div>
+            <button onClick={() => window.location.reload()} className="bg-slate-900 text-white px-5 py-3 rounded-xl font-black">إعادة تحميل</button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+
+const DebugCollector = ({ user }) => {
+  useEffect(() => {
+    window.__nahhasDebugUser = user ? {
+      uid: user.uid,
+      email: user.email,
+      displayName: user.displayName
+    } : null;
+
+    const onError = (event) => {
+      pushDebugLog('window-error', event.message || 'Window Error', {
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+        stack: event.error?.stack
+      });
+    };
+
+    const onRejection = (event) => {
+      pushDebugLog('promise-error', event.reason?.message || String(event.reason || 'Unhandled Promise'), {
+        stack: event.reason?.stack,
+        reason: String(event.reason || '')
+      });
+    };
+
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onRejection);
+
+    return () => {
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onRejection);
+    };
+  }, [user?.uid, user?.email]);
+
+  return null;
+};
+
+
+const DebugPanel = ({ user }) => {
+  if (!isDebugAdmin(user)) return null;
+  const [open, setOpen] = useState(false);
+  const [remoteLogs, setRemoteLogs] = useState([]);
+  const [logs, setLogs] = useState([]);
+  const [aiStatus, setAiStatus] = useState(null);
+  const [checking, setChecking] = useState(false);
+
+  const loadLogs = () => {
+    try {
+      setLogs(JSON.parse(localStorage.getItem('nahhas_debug_logs') || '[]'));
+    } catch {
+      setLogs([]);
+    }
+  };
+
+  useEffect(() => {
+    if (!isDebugAdmin(user)) return;
+    const unsub = onSnapshot(collection(db, 'debug_logs'), (snap) => {
+      const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      rows.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+      setRemoteLogs(rows.slice(0, 100));
+    }, (error) => {
+      pushDebugLog('debug-logs-read-error', error.message, {});
+    });
+    return () => unsub();
+  }, [user?.uid]);
+
+  useEffect(() => {
+    loadLogs();
+    const onDebug = () => loadLogs();
+    const onError = (event) => pushDebugLog('window-error', event.message || 'Window Error', {
+      filename: event.filename,
+      lineno: event.lineno,
+      colno: event.colno,
+      stack: event.error?.stack
+    });
+    const onRejection = (event) => pushDebugLog('promise-error', event.reason?.message || String(event.reason || 'Unhandled Promise'), {
+      stack: event.reason?.stack,
+      reason: String(event.reason || '')
+    });
+
+    window.addEventListener(DEBUG_EVENT_NAME, onDebug);
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onRejection);
+
+    const originalError = console.error;
+    console.error = (...args) => {
+      try {
+        pushDebugLog('console-error', args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' '), {});
+      } catch (e) {}
+      originalError(...args);
+    };
+
+    return () => {
+      window.removeEventListener(DEBUG_EVENT_NAME, onDebug);
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onRejection);
+      console.error = originalError;
+    };
+  }, []);
+
+  const checkAI = async () => {
+    setChecking(true);
+    setAiStatus(null);
+    try {
+      const res = await fetch('/api/ai-coach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'student_chat', question: 'اختبار سريع للذكاء الاصطناعي', grade: '3 ثانوي' })
+      });
+      const data = await res.json().catch(() => ({}));
+      const status = { ok: res.ok && data.ok, status: res.status, data };
+      setAiStatus(status);
+      pushDebugLog(status.ok ? 'ai-ok' : 'ai-error', status.ok ? 'AI يعمل' : 'AI لا يعمل', status);
+    } catch (e) {
+      const status = { ok: false, error: e.message };
+      setAiStatus(status);
+      pushDebugLog('ai-error', e.message, { stack: e.stack });
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const checkFirebase = async () => {
+    try {
+      await getDoc(doc(db, 'settings', 'public'));
+      pushDebugLog('firebase-ok', 'Firebase متصل', {});
+      alert('Firebase متصل ✅');
+    } catch (e) {
+      pushDebugLog('firebase-error', e.message, { stack: e.stack });
+      alert(`Firebase Error: ${e.message}`);
+    }
+  };
+
+  const copyLogs = async () => {
+    await navigator.clipboard?.writeText(JSON.stringify({ localLogs: logs, platformLogs: remoteLogs }, null, 2));
+    alert('تم نسخ سجل التشخيص.');
+  };
+
+  const clearLogs = () => {
+    localStorage.removeItem('nahhas_debug_logs');
+    setLogs([]);
+  };
+
+  return (
+    <>
+      <button onClick={() => setOpen(true)} className="fixed bottom-24 right-4 z-[99999] bg-slate-900 text-white rounded-full shadow-2xl px-4 py-3 font-black text-sm border border-white/20">
+        🛠 Debug
+      </button>
+
+      {open && (
+        <div className="fixed inset-0 z-[100000] bg-black/70 backdrop-blur-sm p-3 md:p-6 overflow-y-auto" dir="rtl">
+          <div className="bg-white max-w-5xl mx-auto rounded-3xl shadow-2xl overflow-hidden border-t-8 border-slate-900">
+            <div className="bg-slate-900 text-white p-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-black">لوحة التشخيص الداخلية</h2>
+                <p className="text-xs text-slate-300">بديل F12 على الموبايل والآيباد</p>
+              </div>
+              <button onClick={() => setOpen(false)} className="bg-white/10 hover:bg-white/20 rounded-full p-2"><X/></button>
+            </div>
+
+            <div className="p-5 space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <button onClick={checkAI} disabled={checking} className="bg-fuchsia-600 text-white rounded-xl p-3 font-black disabled:opacity-50">{checking ? 'فحص AI...' : 'فحص AI'}</button>
+                <button onClick={checkFirebase} className="bg-blue-600 text-white rounded-xl p-3 font-black">فحص Firebase</button>
+                <button onClick={copyLogs} className="bg-emerald-600 text-white rounded-xl p-3 font-black">نسخ السجل</button>
+                <button onClick={clearLogs} className="bg-red-100 text-red-700 rounded-xl p-3 font-black">مسح السجل</button>
+              </div>
+
+              {aiStatus && (
+                <div className={`rounded-2xl p-4 border ${aiStatus.ok ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
+                  <p className={`font-black ${aiStatus.ok ? 'text-emerald-700' : 'text-red-700'}`}>{aiStatus.ok ? 'AI يعمل ✅' : 'AI لا يعمل ❌'}</p>
+                  <pre dir="ltr" className="mt-2 bg-slate-900 text-slate-100 rounded-xl p-3 text-xs overflow-auto max-h-[260px]">{JSON.stringify(aiStatus, null, 2)}</pre>
+                </div>
+              )}
+
+
+              <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4">
+                <h3 className="font-black text-purple-800 mb-3">أخطاء المنصة من كل المستخدمين</h3>
+                <div className="space-y-3 max-h-[420px] overflow-auto">
+                  {remoteLogs.map(log => (
+                    <div key={log.id} className="bg-white border rounded-2xl p-3">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                        <p className="font-black text-slate-800">{log.title}</p>
+                        <span className="text-xs bg-purple-100 text-purple-700 rounded-full px-2 py-1 font-bold">{log.type} • {log.userEmail || 'مستخدم'}</span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1 break-all">{log.page}</p>
+                      <p className="text-sm text-blue-700 font-bold mt-2">{explainDebugError(log.title)}</p>
+                      <details className="mt-2">
+                        <summary className="cursor-pointer text-xs text-slate-500 font-bold">عرض التفاصيل</summary>
+                        <pre dir="ltr" className="mt-2 bg-slate-900 text-slate-100 rounded-xl p-3 text-xs overflow-auto max-h-[260px]">{JSON.stringify(log.details || {}, null, 2)}</pre>
+                      </details>
+                    </div>
+                  ))}
+                  {!remoteLogs.length && <p className="text-center text-purple-400 font-bold py-8">لا توجد أخطاء مرسلة من المستخدمين بعد.</p>}
+                </div>
+              </div>
+
+              <div className="bg-slate-50 border rounded-2xl p-4">
+                <h3 className="font-black text-slate-800 mb-3">آخر الأخطاء والأحداث</h3>
+                <div className="space-y-3 max-h-[520px] overflow-auto">
+                  {logs.map(log => (
+                    <div key={log.id} className="bg-white border rounded-2xl p-3">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                        <p className="font-black text-slate-800">{log.title}</p>
+                        <span className="text-xs bg-slate-100 text-slate-600 rounded-full px-2 py-1 font-bold">{log.type} • {log.at}</span>
+                      </div>
+                      <p className="text-sm text-blue-700 font-bold mt-2">{explainDebugError(log.title)}</p>
+                      <details className="mt-2">
+                        <summary className="cursor-pointer text-xs text-slate-500 font-bold">عرض التفاصيل</summary>
+                        <pre dir="ltr" className="mt-2 bg-slate-900 text-slate-100 rounded-xl p-3 text-xs overflow-auto max-h-[260px]">{JSON.stringify(log.details || {}, null, 2)}</pre>
+                      </details>
+                    </div>
+                  ))}
+                  {!logs.length && <p className="text-center text-slate-400 font-bold py-8">لا توجد أخطاء مسجلة.</p>}
+                </div>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 text-sm font-bold text-amber-800 leading-relaxed">
+                عند ظهور مشكلة: افتح هذه اللوحة، اضغط "نسخ السجل"، وابعتلي التفاصيل. كده نعرف السبب بدون F12.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+function App() {
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -8725,6 +9451,8 @@ export default function App() {
     <AppErrorBoundary>
     <AnimatePresence mode='wait'>
       <DesignSystemLoader />
+      <DebugCollector user={user} />
+      <DebugPanel user={user} />
       <PlatformPerformanceBooster />
       <MobileExamHelperStyles />
       {!user ? (
