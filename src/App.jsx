@@ -7986,7 +7986,6 @@ const AdminDashboard = ({ user }) => {
 };
 
 const StudentDashboard = ({ user, userData, installPrompt }) => {
-  const safeContentList = Array.isArray(contentList) ? contentList : [];
   userData = userData || {
     name: user?.displayName || user?.email?.split('@')?.[0] || 'طالب',
     email: user?.email || '',
