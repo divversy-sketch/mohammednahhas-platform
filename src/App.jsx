@@ -3167,9 +3167,27 @@ const AIInteractiveExamModal = ({ user, userData, onClose }) => {
       const usageRef = doc(db, 'ai_usage', `${user.uid}_${todayKey}`);
       const usageSnap = await getDoc(usageRef);
       const currentCount = safeNumber(usageSnap.data()?.count, 0);
-      const dailyLimit = userData?.subscription?.active ? 20 : 5;
+
+      // إصلاح VIP:
+      // بعض الحسابات تخزن الاشتراك بصيغ مختلفة، فمش صح نعتمد على userData.subscription.active فقط.
+      const now = Date.now();
+      const subscription = userData?.subscription || {};
+      const expiryRaw = userData?.subscriptionExpiry || subscription?.expiryDate || subscription?.expiresAt || subscription?.endDate || userData?.vipUntil;
+      const expiryMs = expiryRaw?.toDate ? expiryRaw.toDate().getTime() : (expiryRaw ? new Date(expiryRaw).getTime() : 0);
+      const isVIP = Boolean(
+        subscription?.active ||
+        userData?.isVIP ||
+        userData?.vip ||
+        userData?.role === 'vip' ||
+        userData?.plan === 'vip' ||
+        userData?.subscriptionStatus === 'active' ||
+        userData?.subscriptionType === 'vip' ||
+        (Number.isFinite(expiryMs) && expiryMs > now)
+      );
+
+      const dailyLimit = isVIP ? 50 : 5;
       if (currentCount >= dailyLimit) {
-        alert(`وصلت للحد اليومي لاستخدام AI (${dailyLimit} مرات). جرب بكرة أو فعل VIP.`);
+        alert(`وصلت للحد اليومي لاستخدام AI (${dailyLimit} مرات). ${isVIP ? 'أعد المحاولة غدًا.' : 'جرب بكرة أو فعل VIP.'}`);
         setLoading(false);
         return;
       }
@@ -3233,7 +3251,14 @@ const AIInteractiveExamModal = ({ user, userData, onClose }) => {
           difficulty: item.difficulty || ['سهل','متوسط','صعب','صعب جدًا'][bi % 4],
           explanation: item.explanation || 'راجع فكرة السؤال جيدًا.'
         }];
-      }).filter(q => q?.text && Array.isArray(q.options) && q.options.length >= 2);
+      }).filter(q => {
+        const questionText = String(q?.text || '').trim();
+        const options = Array.isArray(q?.options) ? q.options.map(o => String(o || '').trim()) : [];
+        const badOption = options.some(o => /^اختيار\s*(أ|ب|ج|د|1|2|3|4)?$/i.test(o) || /^اختبار\s*(أ|ب|ج|د|1|2|3|4)?$/i.test(o));
+        const uniqueOptions = new Set(options.filter(Boolean)).size;
+        const isPlaceholderQuestion = /^سؤال\s+تدريبي\s+\d+/i.test(questionText);
+        return questionText && options.length >= 4 && uniqueOptions >= 4 && !badOption && !isPlaceholderQuestion;
+      });
 
       if (flat.length === 0) {
         throw new Error('AI رجّع الامتحان بدون أسئلة صالحة. جرّب فرع أو موضوع أوضح.');
@@ -3246,6 +3271,8 @@ const AIInteractiveExamModal = ({ user, userData, onClose }) => {
         dateKey: getTodayKey(),
         count: increment(1),
         lastTopic: topic || branch,
+        isVIP,
+        dailyLimit,
         updatedAt: serverTimestamp()
       }, { merge: true });
 
