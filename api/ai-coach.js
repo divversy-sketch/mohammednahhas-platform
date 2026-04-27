@@ -1,5 +1,5 @@
 // api/ai-coach.js
-// Gemini fallback + retry تلقائي + فحص JSON أقوى
+// Gemini fallback + retry تلقائي + دعم generate_exam و generate_questions
 
 const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
 
@@ -15,31 +15,45 @@ function send(res, status, payload) {
 function extractJson(text) {
   const clean = String(text || "").replace(/```json|```/g, "").trim();
   try { return JSON.parse(clean); } catch {}
-
   const match = clean.match(/\{[\s\S]*\}/);
   if (match) {
     try { return JSON.parse(match[0]); } catch {}
   }
-
   return null;
+}
+
+function normalizeQuestion(q, i, topic = "عام") {
+  return {
+    id: q?.id || `q_${i + 1}`,
+    text: String(q?.text || `سؤال تدريبي ${i + 1} في ${topic}`).trim(),
+    options: Array.isArray(q?.options) && q.options.length >= 4
+      ? q.options.slice(0, 4).map(x => String(x || "").trim())
+      : ["اختيار أ", "اختيار ب", "اختيار ج", "اختيار د"],
+    correctIdx: Number.isInteger(q?.correctIdx) && q.correctIdx >= 0 && q.correctIdx <= 3 ? q.correctIdx : 0,
+    difficulty: q?.difficulty || ["سهل", "متوسط", "صعب", "صعب جدًا"][i % 4],
+    branch: q?.branch || topic,
+    explanation: q?.explanation || "راجع فكرة السؤال ثم قارن الإجابات."
+  };
+}
+
+function fallbackQuestions(body = {}) {
+  const topic = body.topic || body.branches || body.branch || "مراجعة عامة";
+  const count = Math.min(Math.max(Number(body.count || body.mcqCount || 18), 5), 20);
+  return Array.from({ length: count }).map((_, i) => normalizeQuestion({}, i, topic));
 }
 
 function normalizeExam(exam, body = {}) {
   const topic = body.topic || body.branches || "مراجعة عامة";
   const rawQuestions = Array.isArray(exam?.questions) ? exam.questions : [];
-
   const questions = rawQuestions
-    .filter(q => q && q.text && Array.isArray(q.options) && q.options.length >= 4)
-    .slice(0, 20)
-    .map((q, i) => ({
-      id: q.id || `q_${i + 1}`,
-      text: String(q.text || "").trim(),
-      options: q.options.slice(0, 4).map(x => String(x || "").trim()),
-      correctIdx: Number.isInteger(q.correctIdx) && q.correctIdx >= 0 && q.correctIdx <= 3 ? q.correctIdx : 0,
-      difficulty: q.difficulty || ["سهل", "متوسط", "صعب", "صعب جدًا"][i % 4],
-      branch: q.branch || topic,
-      explanation: q.explanation || "راجع فكرة السؤال ثم قارن الإجابات."
-    }));
+    .filter(q => q && (q.text || Array.isArray(q.subQuestions)))
+    .flatMap((item, i) => {
+      if (Array.isArray(item.subQuestions)) {
+        return item.subQuestions.map((q, j) => normalizeQuestion({ ...q, blockText: item.text || "" }, i + j, topic));
+      }
+      return [normalizeQuestion(item, i, topic)];
+    })
+    .slice(0, 20);
 
   return {
     title: exam?.title || `امتحان AI - ${topic}`,
@@ -51,19 +65,42 @@ function fallbackExam(body = {}) {
   const topic = body.topic || body.branches || "المحاضرة";
   return {
     title: `امتحان تدريبي مؤقت - ${topic}`,
-    questions: Array.from({ length: 18 }).map((_, i) => ({
-      id: `fallback_${i + 1}`,
-      text: `سؤال تدريبي ${i + 1} في ${topic} مناسب لمرحلة ${body.grade || "الطالب"}.`,
-      options: ["اختيار أ", "اختيار ب", "اختيار ج", "اختيار د"],
-      correctIdx: i % 4,
-      difficulty: ["سهل", "متوسط", "صعب", "صعب جدًا"][i % 4],
-      branch: topic,
-      explanation: "ظهر هذا السؤال الاحتياطي بسبب ضغط مؤقت على مزود الذكاء الاصطناعي. أعد التوليد لاحقًا للحصول على امتحان أقوى."
-    }))
+    questions: fallbackQuestions({ ...body, topic, count: 18 })
   };
 }
 
 function buildPrompt(body) {
+  if (body.mode === "generate_questions") {
+    const topic = body.topic || "مراجعة عامة";
+    const branch = body.branch || body.branches || topic;
+    const grade = body.grade || "غير محدد";
+    const count = Math.min(Math.max(Number(body.count || 10), 1), 20);
+    return `
+أنت مساعد تعليمي مصري متخصص في اللغة العربية.
+أنشئ ${count} سؤال اختيار من متعدد فقط.
+
+المرحلة الدراسية: ${grade}
+الفرع: ${branch}
+الموضوع: ${topic}
+الصعوبة: ${body.difficulty || "متوسط"}
+
+أعد JSON فقط:
+{
+  "questions": [
+    {
+      "id": "q1",
+      "text": "نص السؤال",
+      "options": ["اختيار أ", "اختيار ب", "اختيار ج", "اختيار د"],
+      "correctIdx": 0,
+      "difficulty": "متوسط",
+      "branch": "${branch}",
+      "explanation": "شرح الإجابة"
+    }
+  ]
+}
+`;
+  }
+
   if (body.mode === "generate_exam") {
     const topic = body.topic || body.branches || "مراجعة عامة";
     const grade = body.grade || "غير محدد";
@@ -117,7 +154,6 @@ function buildPrompt(body) {
 
 async function callGemini(model, key, prompt) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -163,9 +199,7 @@ export default async function handler(req, res) {
   }
 
   const key = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
-  if (!key) {
-    return send(res, 500, { ok: false, error: "GEMINI_API_KEY غير موجود في Vercel" });
-  }
+  if (!key) return send(res, 500, { ok: false, error: "GEMINI_API_KEY غير موجود في Vercel" });
 
   const body = req.body || {};
   const prompt = buildPrompt(body);
@@ -177,13 +211,22 @@ export default async function handler(req, res) {
         const txt = await callGemini(model, key, prompt);
         const json = extractJson(txt);
 
+        if (body.mode === "generate_questions") {
+          const raw = Array.isArray(json?.questions) ? json.questions : [];
+          const questions = raw.length ? raw.map((q, i) => normalizeQuestion(q, i, body.branch || body.topic)) : fallbackQuestions(body);
+          return send(res, 200, {
+            ok: true,
+            provider: raw.length ? "gemini" : "fallback",
+            model: raw.length ? model : "local-fallback",
+            analysis: { questions },
+            data: { questions }
+          });
+        }
+
         if (body.mode === "generate_exam") {
           const rawExam = json?.exam || json;
           const exam = normalizeExam(rawExam, body);
-
-          if (!exam.questions.length) {
-            throw new Error("Gemini returned no valid exam questions");
-          }
+          if (!exam.questions.length) throw new Error("Gemini returned no valid exam questions");
 
           return send(res, 200, {
             ok: true,
@@ -206,6 +249,19 @@ export default async function handler(req, res) {
         await new Promise(r => setTimeout(r, 800 * attempt));
       }
     }
+  }
+
+  if (body.mode === "generate_questions") {
+    const questions = fallbackQuestions(body);
+    return send(res, 200, {
+      ok: true,
+      provider: "fallback",
+      model: "local-fallback",
+      warning: "ضغط مؤقت على Gemini، تم استخدام أسئلة احتياطية.",
+      analysis: { questions },
+      data: { questions },
+      errors
+    });
   }
 
   if (body.mode === "generate_exam") {

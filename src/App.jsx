@@ -3193,33 +3193,50 @@ const AIInteractiveExamModal = ({ user, userData, onClose }) => {
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) throw new Error(data.error || 'تعذر توليد الامتحان الآن.');
 
-      const generatedExam = data.analysis?.exam || data.analysis;
-      const blocks = Array.isArray(generatedExam?.questions) ? generatedExam.questions : [];
-      let flat = blocks.flatMap((block, bi) =>
-        (Array.isArray(block.subQuestions) ? block.subQuestions : []).map((q, qi) => ({
-          ...q,
-          id: q.id || `ai_${bi}_${qi}_${Date.now()}`,
-          blockText: block.text || '',
-          branch: q.branch || branch || 'عام',
-          type: q.type || 'mcq',
-          options: Array.isArray(q.options) && q.options.length >= 2 ? q.options : ['اختيار 1', 'اختيار 2', 'اختيار 3', 'اختيار 4'],
-          correctIdx: safeNumber(q.correctIdx, 0),
-          difficulty: q.difficulty || ['سهل','متوسط','صعب','صعب جدًا'][qi % 4],
-          explanation: q.explanation || 'راجع فكرة السؤال جيدًا.'
-        }))
-      );
+      const generatedExam = data.analysis?.exam || data.data?.exam || data.analysis || data.data || {};
+      const rawQuestions = Array.isArray(generatedExam?.questions)
+        ? generatedExam.questions
+        : Array.isArray(data.analysis?.questions)
+          ? data.analysis.questions
+          : Array.isArray(data.data?.questions)
+            ? data.data.questions
+            : [];
 
-      if (flat.length === 0 && Array.isArray(data.analysis?.questions)) {
-        flat = data.analysis.questions.map((q, qi) => ({
-          ...q,
-          id: q.id || `ai_${qi}_${Date.now()}`,
-          branch: q.branch || branch || 'عام',
-          type: q.type || 'mcq',
-          options: q.options || ['اختيار 1', 'اختيار 2', 'اختيار 3', 'اختيار 4'],
-          correctIdx: safeNumber(q.correctIdx, 0),
-          difficulty: q.difficulty || ['سهل','متوسط','صعب','صعب جدًا'][qi % 4],
-          explanation: q.explanation || 'راجع فكرة السؤال جيدًا.'
-        }));
+      // إصلاح جذري:
+      // الـ AI ممكن يرجع الأسئلة بطريقتين:
+      // 1) blocks فيها subQuestions
+      // 2) questions مباشرة كقائمة أسئلة
+      // الكود القديم كان يتعامل مع الطريقة الأولى فقط، فكان يعرض 0 سؤال رغم إن الـ API رجع أسئلة.
+      let flat = rawQuestions.flatMap((item, bi) => {
+        if (Array.isArray(item?.subQuestions)) {
+          return item.subQuestions.map((q, qi) => ({
+            ...q,
+            id: q.id || `ai_${bi}_${qi}_${Date.now()}`,
+            blockText: item.text || '',
+            branch: q.branch || branch || item.branch || 'عام',
+            type: q.type || 'mcq',
+            options: Array.isArray(q.options) && q.options.length >= 2 ? q.options.slice(0, 4) : ['اختيار 1', 'اختيار 2', 'اختيار 3', 'اختيار 4'],
+            correctIdx: safeNumber(q.correctIdx, 0),
+            difficulty: q.difficulty || ['سهل','متوسط','صعب','صعب جدًا'][qi % 4],
+            explanation: q.explanation || 'راجع فكرة السؤال جيدًا.'
+          }));
+        }
+
+        return [{
+          ...item,
+          id: item.id || `ai_${bi}_${Date.now()}`,
+          blockText: item.blockText || '',
+          branch: item.branch || branch || 'عام',
+          type: item.type || 'mcq',
+          options: Array.isArray(item.options) && item.options.length >= 2 ? item.options.slice(0, 4) : ['اختيار 1', 'اختيار 2', 'اختيار 3', 'اختيار 4'],
+          correctIdx: safeNumber(item.correctIdx, 0),
+          difficulty: item.difficulty || ['سهل','متوسط','صعب','صعب جدًا'][bi % 4],
+          explanation: item.explanation || 'راجع فكرة السؤال جيدًا.'
+        }];
+      }).filter(q => q?.text && Array.isArray(q.options) && q.options.length >= 2);
+
+      if (flat.length === 0) {
+        throw new Error('AI رجّع الامتحان بدون أسئلة صالحة. جرّب فرع أو موضوع أوضح.');
       }
 
       await setDoc(doc(db, 'ai_usage', `${user.uid}_${getTodayKey()}`), {
@@ -3694,7 +3711,15 @@ const AIQuestionGeneratorPanel = ({ userData = null, onAddQuestions = null }) =>
       });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || 'تعذر توليد الأسئلة.');
-      const questions = Array.isArray(data.analysis?.questions) ? data.analysis.questions : [];
+      const questions = Array.isArray(data.analysis?.questions)
+        ? data.analysis.questions
+        : Array.isArray(data.data?.questions)
+          ? data.data.questions
+          : Array.isArray(data.analysis?.exam?.questions)
+            ? data.analysis.exam.questions
+            : Array.isArray(data.data?.exam?.questions)
+              ? data.data.exam.questions
+              : [];
       setGenerated(questions.map((q, idx) => ({
         id: `ai_${Date.now()}_${idx}`,
         text: q.text || '',
