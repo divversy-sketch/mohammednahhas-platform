@@ -975,7 +975,7 @@ const LiveSessionView = ({ session, user, onClose }) => {
       <div className="w-full md:w-[420px] bg-white border-r flex flex-col h-[48vh] md:h-full">
         <div className="p-3 border-b bg-slate-50 font-bold text-slate-700">المحادثة المباشرة</div>
         <div className="flex-1 overflow-y-auto p-3 space-y-3">
-          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-3 text-sm text-amber-800 font-bold leading-relaxed">تم إيقاف AI للطلاب داخل المحاضرات مؤقتًا لتوفير Gemini. استخدم الشات المباشر لكتابة سؤالك للمستر.</div>
+          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-3 text-sm text-amber-800 font-bold leading-relaxed">استخدم الشات المباشر داخل المحاضرة لكتابة سؤالك للمستر.</div>
 
           <div className="border-t pt-3">
             <p className="font-bold text-slate-700 mb-2">الشات المباشر</p>
@@ -1254,11 +1254,94 @@ const StudentLocalAdvice = ({ metrics = {}, content = [] }) => {
   const branches = Object.entries(metrics?.branchStats || {}).map(([branch, data]) => ({ branch, pct: data.possible > 0 ? Math.round((safeNumber(data.earned, 0) / safeNumber(data.possible, 0)) * 100) : 0, wrong: safeNumber(data.wrong, 0) })).sort((a,b)=>a.pct-b.pct);
   const weakBranches = branches.filter(b => b.pct < 70).slice(0, 3);
   const recommendations = getReviewRecommendations(metrics?.branchStats || {}, content || []);
-  return <div className="mt-5 bg-slate-900/70 border border-slate-700 rounded-3xl p-5 text-slate-100"><div className="flex items-center gap-2 mb-4"><BrainCircuit className="text-amber-400"/><h3 className="font-black text-xl">تحليل ذكي بدون استهلاك AI</h3></div><p className="text-sm text-slate-300 mb-4">التحليل مبني على إجابات الطالب ونسب الفروع داخل المنصة فقط، بدون Gemini.</p>{weakBranches.length===0?<div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 text-emerald-200 font-bold">ممتاز يا بطل. لا توجد فروع أقل من 70%. راجع الأخطاء الفردية وحافظ على مستواك.</div>:<div className="space-y-3">{weakBranches.map((b,idx)=>{const rec=recommendations.find(r=>r.branch===b.branch);return <div key={idx} className="bg-white/5 border border-white/10 rounded-2xl p-4"><div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-2"><p className="font-black text-red-300">راجع فرع: {b.branch}</p><span className="text-xs bg-red-500/20 text-red-200 px-3 py-1 rounded-full font-bold">{b.pct}%</span></div><p className="text-sm text-slate-200 leading-relaxed">عندك {b.wrong} أخطاء في هذا الفرع. ابدأ بمراجعة القاعدة، ثم حل أسئلة قصيرة، وبعدها ارجع لبنك الأخطاء.</p>{rec?.title && <p className="text-xs text-amber-200 mt-2">اقتراح مراجعة: {rec.title}</p>}</div>})}</div>}</div>;
+  return <div className="mt-5 bg-slate-900/70 border border-slate-700 rounded-3xl p-5 text-slate-100"><div className="flex items-center gap-2 mb-4"><BrainCircuit className="text-amber-400"/><h3 className="font-black text-xl">تحليل الطالب</h3></div><p className="text-sm text-slate-300 mb-4">التحليل مبني على إجاباتك ونسب الفروع داخل المنصة.</p>{weakBranches.length===0?<div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 text-emerald-200 font-bold">ممتاز يا بطل. لا توجد فروع أقل من 70%. راجع الأخطاء الفردية وحافظ على مستواك.</div>:<div className="space-y-3">{weakBranches.map((b,idx)=>{const rec=recommendations.find(r=>r.branch===b.branch);return <div key={idx} className="bg-white/5 border border-white/10 rounded-2xl p-4"><div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-2"><p className="font-black text-red-300">راجع فرع: {b.branch}</p><span className="text-xs bg-red-500/20 text-red-200 px-3 py-1 rounded-full font-bold">{b.pct}%</span></div><p className="text-sm text-slate-200 leading-relaxed">عندك {b.wrong} أخطاء في هذا الفرع. ابدأ بمراجعة القاعدة، ثم حل أسئلة قصيرة، وبعدها ارجع لبنك الأخطاء.</p>{rec?.title && <p className="text-xs text-amber-200 mt-2">اقتراح مراجعة: {rec.title}</p>}</div>})}</div>}</div>;
 };
 const StudentLocalHomeCoach = ({ userResults = [], content = [] }) => { const branchStats={}; (userResults||[]).slice(0,10).forEach(r=>{const stats=r?.branchStats||r?.performanceAnalysis?.branchStats||r?.branchAnalysis||{}; Object.entries(stats).forEach(([branch,d])=>{branchStats[branch]=branchStats[branch]||{earned:0,possible:0,wrong:0}; branchStats[branch].earned+=safeNumber(d.earned,0); branchStats[branch].possible+=safeNumber(d.possible,d.total||0); branchStats[branch].wrong+=safeNumber(d.wrong,0);});}); return <StudentLocalAdvice metrics={{branchStats}} content={content}/>; };
-const LocalQuestionExplanation = ({ question, answers }) => { if(!question||question.type==='essay') return null; const selectedIdx=answers?.[question.id]; const correctIdx=safeNumber(question.correctIdx,0); const selectedText=selectedIdx!==undefined?question.options?.[selectedIdx]:'لم يتم اختيار إجابة'; const correctText=question.options?.[correctIdx]||'غير محدد'; const isCorrect=selectedIdx===correctIdx; return <div className={`mb-6 rounded-2xl p-4 border ${isCorrect?'bg-emerald-50 border-emerald-200 text-emerald-800':'bg-amber-50 border-amber-200 text-amber-900'}`}><h4 className="font-black mb-2">شرح المنصة بدون AI</h4><p className="text-sm font-bold">إجابتك: {selectedText}</p><p className="text-sm font-bold">الإجابة الصحيحة: {correctText}</p>{question.explanation?<p className="text-sm mt-2 leading-relaxed">الشرح: {question.explanation}</p>:<p className="text-xs mt-2 opacity-80">راجع قاعدة هذا السؤال من فرع {question.branch || 'الدرس'} ثم أعد حل أسئلة مشابهة.</p>}</div>; };
-const LocalEssayReviewBox = ({ question, answer }) => { const answerText=typeof answer==='object'?answer?.text:answer; const hasAnswer=!!String(answerText||'').trim()||!!answer?.image; return <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4"><h4 className="font-black text-purple-800 flex items-center gap-2"><PenTool size={18}/> مراجعة مقالي بدون AI</h4><p className="text-sm text-purple-700 mt-2">{hasAnswer?'تم حفظ إجابتك المقالية. التصحيح النهائي يتم من الأدمن حاليًا لحين تفعيل خطة AI المدفوعة.':'لا توجد إجابة مقالية محفوظة لهذا السؤال.'}</p>{question?.modelAnswer&&<p className="text-xs text-slate-600 mt-2"><b>نموذج إجابة:</b> {question.modelAnswer}</p>}</div>; };
+const buildStudentProgressInsights = (userResults = [], mistakes = []) => {
+  const completed = (userResults || []).filter(r => r?.status === 'completed').sort((a, b) => {
+    const da = a?.submittedAt?.toDate?.()?.getTime?.() || 0;
+    const db = b?.submittedAt?.toDate?.()?.getTime?.() || 0;
+    return db - da;
+  });
+  const latest = completed[0];
+  const latestPct = latest ? getResultPercentage(latest) : 0;
+  const avg = completed.length ? Math.round(completed.reduce((sum, r) => sum + getResultPercentage(r), 0) / completed.length) : 0;
+  const best = completed.length ? Math.max(...completed.map(getResultPercentage)) : 0;
+  const previous = completed[1] ? getResultPercentage(completed[1]) : null;
+  const trend = previous === null ? 'ابدأ بحل امتحان لتكوين متابعة دقيقة' : latestPct > previous ? 'مستواك بيتحسن' : latestPct < previous ? 'فيه انخفاض بسيط محتاج مراجعة' : 'مستواك ثابت';
+  const branchMap = {};
+  completed.forEach(r => {
+    const stats = r?.branchStats || r?.performanceAnalysis?.branchStats || {};
+    Object.entries(stats).forEach(([branch, data]) => {
+      branchMap[branch] = branchMap[branch] || { branch, earned: 0, possible: 0, wrong: 0, count: 0 };
+      branchMap[branch].earned += safeNumber(data?.earned, 0);
+      branchMap[branch].possible += safeNumber(data?.possible, data?.total || 0);
+      branchMap[branch].wrong += safeNumber(data?.wrong, 0);
+      branchMap[branch].count += 1;
+    });
+  });
+  (mistakes || []).forEach(m => {
+    const branch = m?.question?.branch || 'عام';
+    branchMap[branch] = branchMap[branch] || { branch, earned: 0, possible: 0, wrong: 0, count: 0 };
+    branchMap[branch].wrong += 1;
+  });
+  const branches = Object.values(branchMap).map(b => ({
+    ...b,
+    pct: b.possible > 0 ? Math.round((b.earned / b.possible) * 100) : (b.wrong > 0 ? 0 : 100)
+  })).sort((a, b) => (a.pct - b.pct) || (b.wrong - a.wrong));
+  const weakBranches = branches.filter(b => b.pct < 75 || b.wrong > 0).slice(0, 3);
+  return { completed, latestPct, avg, best, previous, trend, branches, weakBranches, mistakesCount: mistakes.length };
+};
+
+const StudentLevelHomePanel = ({ userResults = [], mistakes = [], content = [], onOpenMistakes, onStartMistakesExam }) => {
+  const insights = useMemo(() => buildStudentProgressInsights(userResults, mistakes), [userResults, mistakes]);
+  const level = insights.avg >= 85 ? { label: 'ممتاز', tone: 'text-emerald-700 bg-emerald-50 border-emerald-200', note: 'حافظ على مستواك وراجع الأخطاء البسيطة.' }
+    : insights.avg >= 70 ? { label: 'جيد جدًا', tone: 'text-blue-700 bg-blue-50 border-blue-200', note: 'مستواك قوي، ركّز على أضعف فرعين.' }
+    : insights.avg >= 50 ? { label: 'جيد', tone: 'text-amber-700 bg-amber-50 border-amber-200', note: 'محتاج تدريب منتظم على الفروع الضعيفة.' }
+    : { label: 'يحتاج متابعة', tone: 'text-red-700 bg-red-50 border-red-200', note: 'ابدأ بخطة قصيرة يوميًا وراجع أخطاءك أولًا.' };
+  return (
+    <div className="glass-panel rounded-3xl p-5 md:p-7 border-t-4 border-indigo-600 overflow-hidden relative">
+      <div className="absolute -left-10 -top-10 w-40 h-40 rounded-full bg-indigo-100/70 blur-2xl"></div>
+      <div className="relative z-10 flex flex-col lg:flex-row lg:items-start justify-between gap-6">
+        <div className="flex-1">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
+            <div><h2 className="text-2xl md:text-3xl font-black text-slate-900 flex items-center gap-2"><BarChart3 className="text-indigo-600"/> مستواك الحالي</h2><p className="text-slate-500 text-sm mt-1">متابعة تلقائية مبنية على نتائجك وبنك أخطائك.</p></div>
+            <span className={`px-4 py-2 rounded-full border font-black text-sm ${level.tone}`}>{level.label}</span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+            <div className="bg-white border rounded-2xl p-4"><p className="text-xs text-slate-500 font-bold">المتوسط</p><p className="text-3xl font-black text-indigo-700">{insights.avg}%</p></div>
+            <div className="bg-white border rounded-2xl p-4"><p className="text-xs text-slate-500 font-bold">آخر نتيجة</p><p className="text-3xl font-black text-blue-700">{insights.latestPct}%</p></div>
+            <div className="bg-white border rounded-2xl p-4"><p className="text-xs text-slate-500 font-bold">أفضل نتيجة</p><p className="text-3xl font-black text-emerald-700">{insights.best}%</p></div>
+            <div className="bg-white border rounded-2xl p-4"><p className="text-xs text-slate-500 font-bold">أخطاء للمراجعة</p><p className="text-3xl font-black text-red-700">{insights.mistakesCount}</p></div>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="bg-slate-900 text-white rounded-2xl p-4"><p className="text-xs text-indigo-200 font-bold mb-1">حالة التقدم</p><p className="font-black text-lg mb-2">{insights.trend}</p><p className="text-sm text-slate-300 leading-relaxed">{level.note}</p></div>
+            <div className="bg-white border rounded-2xl p-4"><p className="font-black text-slate-800 mb-3">أهم الفروع الآن</p>{insights.weakBranches.length === 0 ? <p className="text-sm text-emerald-700 font-bold bg-emerald-50 border border-emerald-100 rounded-xl p-3">لا توجد فروع ضعيفة واضحة حاليًا. استمر في حل تدريبات قصيرة للمراجعة.</p> : <div className="space-y-2">{insights.weakBranches.map((b, i) => <div key={i} className="flex items-center justify-between gap-3 bg-slate-50 border rounded-xl p-3"><div><p className="font-black text-slate-800">{b.branch}</p><p className="text-xs text-slate-500">أخطاء: {b.wrong}</p></div><span className="font-black text-red-600">{b.pct}%</span></div>)}</div>}</div>
+          </div>
+        </div>
+        <div className="w-full lg:w-80 bg-gradient-to-br from-amber-50 to-white border border-amber-100 rounded-3xl p-5 shadow-sm"><h3 className="font-black text-amber-800 flex items-center gap-2 mb-3"><Target/> ذاكر أخطائي</h3><p className="text-sm text-slate-600 leading-relaxed mb-4">ابدأ تدريب سريع من الأسئلة التي أخطأت فيها سابقًا، أو افتح البنك للمراجعة التفصيلية.</p><div className="space-y-2"><button onClick={onStartMistakesExam} className="w-full bg-red-600 text-white rounded-2xl py-3 font-black hover:bg-red-700 transition shadow-lg shadow-red-500/20 flex items-center justify-center gap-2"><Play size={18}/> ابدأ تدريب أخطائي</button><button onClick={onOpenMistakes} className="w-full bg-white border border-amber-200 text-amber-800 rounded-2xl py-3 font-black hover:bg-amber-50 transition flex items-center justify-center gap-2"><BrainCircuit size={18}/> فتح بنك الأخطاء</button></div></div>
+      </div>
+    </div>
+  );
+};
+
+const StudentStudyPlanPanel = ({ userResults = [], mistakes = [], content = [], onOpenMistakes, onStartMistakesExam }) => {
+  const insights = useMemo(() => buildStudentProgressInsights(userResults, mistakes), [userResults, mistakes]);
+  const weak = insights.weakBranches.length ? insights.weakBranches : [{ branch: 'مراجعة عامة', pct: insights.avg || 0, wrong: mistakes.length }];
+  const plan = weak.slice(0, 3).map((b, i) => {
+    const related = (content || []).find(c => (c.branch || '').includes(b.branch) || (c.title || '').includes(b.branch));
+    return { day: i + 1, title: b.branch, pct: b.pct, tasks: [`راجع قاعدة ${b.branch} لمدة 15 دقيقة.`, related ? `شاهد أو افتح: ${related.title}` : 'حل تدريب قصير من المنصة.', 'اختم بمراجعة سؤالين من بنك الأخطاء.'] };
+  });
+  return (
+    <div className="glass-panel rounded-3xl p-5 md:p-7 border-t-4 border-emerald-600">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5"><div><h2 className="text-2xl font-black text-slate-900 flex items-center gap-2"><ClipboardList className="text-emerald-600"/> خطة مذاكرة مقترحة</h2><p className="text-sm text-slate-500 mt-1">خطة قصيرة تتغير حسب نتائجك وأخطائك.</p></div><div className="flex gap-2"><button onClick={onStartMistakesExam} className="bg-red-600 text-white px-4 py-2 rounded-xl font-black hover:bg-red-700 transition">تدريب الأخطاء</button><button onClick={onOpenMistakes} className="bg-slate-900 text-white px-4 py-2 rounded-xl font-black hover:bg-slate-800 transition">تفاصيل الأخطاء</button></div></div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">{plan.map(item => <div key={item.day} className="bg-white border rounded-2xl p-4 shadow-sm"><div className="flex items-center justify-between mb-3"><span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-black">اليوم {item.day}</span><span className="text-xs font-bold text-slate-500">{item.pct}%</span></div><h3 className="font-black text-slate-900 mb-3">{item.title}</h3><ol className="space-y-2 text-sm text-slate-700 list-decimal list-inside">{item.tasks.map((t, i) => <li key={i}>{t}</li>)}</ol></div>)}</div>
+    </div>
+  );
+};
+
+const LocalQuestionExplanation = ({ question, answers }) => { if(!question||question.type==='essay') return null; const selectedIdx=answers?.[question.id]; const correctIdx=safeNumber(question.correctIdx,0); const selectedText=selectedIdx!==undefined?question.options?.[selectedIdx]:'لم يتم اختيار إجابة'; const correctText=question.options?.[correctIdx]||'غير محدد'; const isCorrect=selectedIdx===correctIdx; return <div className={`mb-6 rounded-2xl p-4 border ${isCorrect?'bg-emerald-50 border-emerald-200 text-emerald-800':'bg-amber-50 border-amber-200 text-amber-900'}`}><h4 className="font-black mb-2">شرح المنصة</h4><p className="text-sm font-bold">إجابتك: {selectedText}</p><p className="text-sm font-bold">الإجابة الصحيحة: {correctText}</p>{question.explanation?<p className="text-sm mt-2 leading-relaxed">الشرح: {question.explanation}</p>:<p className="text-xs mt-2 opacity-80">راجع قاعدة هذا السؤال من فرع {question.branch || 'الدرس'} ثم أعد حل أسئلة مشابهة.</p>}</div>; };
+const LocalEssayReviewBox = ({ question, answer }) => { const answerText=typeof answer==='object'?answer?.text:answer; const hasAnswer=!!String(answerText||'').trim()||!!answer?.image; return <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4"><h4 className="font-black text-purple-800 flex items-center gap-2"><PenTool size={18}/> مراجعة السؤال المقالي</h4><p className="text-sm text-purple-700 mt-2">{hasAnswer?'تم حفظ إجابتك المقالية. التصحيح النهائي يتم من الأدمن حاليًا.':'لا توجد إجابة مقالية محفوظة لهذا السؤال.'}</p>{question?.modelAnswer&&<p className="text-xs text-slate-600 mt-2"><b>نموذج إجابة:</b> {question.modelAnswer}</p>}</div>; };
 
 const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult = null }) => {
   const [activeView, setActiveView] = useState(isReviewMode || existingResult ? 'dashboard' : 'questions');
@@ -1844,7 +1927,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
           {!isSubmitted && (
             <div className="mb-6 bg-blue-900/20 text-blue-300 p-4 rounded-2xl border border-blue-900/40 text-center font-bold">
-              زر التسليم أصبح ظاهرًا في أعلى صفحة الأسئلة وأيضًا داخل لوحة التحكم.
+              زر التسليم وملء الشاشة ظاهران في أعلى صفحة الأسئلة.
             </div>
           )}
 
@@ -2011,13 +2094,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
               </button>
             ))}
           </div>
-        )}
-
-        {!isSubmitted && (
-          <button onClick={() => setActiveView('dashboard')} className="bg-slate-700 hover:bg-slate-600 px-6 py-2.5 rounded-xl font-bold transition whitespace-nowrap flex items-center gap-2">
-            <Layout size={18} /> لوحة التحكم
-          </button>
-        )}
+        )}
       </div>
 
       <div className="flex-1 flex overflow-hidden relative z-50">
@@ -4199,9 +4276,9 @@ const AdvancedAIStudentCoach = ({ userResults = [], exams = [], content = [], us
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
         <div>
           <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2">
-            <Sparkles className="text-fuchsia-600"/> المدرب الذكي AI
+            <BarChart3 className="text-fuchsia-600"/> مستواك وخطة التطوير
           </h2>
-          <p className="text-sm text-slate-500 mt-1">تحليل ذكي لأخطاء الطالب حسب الفروع والنقاط المتكررة بدون تكلفة إضافية.</p>
+          <p className="text-sm text-slate-500 mt-1">متابعة مستواك حسب نتائجك وأخطائك المتكررة.</p>
         </div>
         <div className="bg-fuchsia-50 border border-fuchsia-100 rounded-2xl px-4 py-3">
           <p className="text-xs font-bold text-fuchsia-600">حالة الطالب</p>
@@ -8320,8 +8397,8 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
       if (mistakes.length === 0) return alert("ليس لديك أي أخطاء مسجلة بعد! استمر في التميز 👏");
       const shuffledMistakes = [...mistakes].sort(() => 0.5 - Math.random()).slice(0, 20);
       const generatedExam = {
-          id: 'custom_mistakes_exam', title: 'امتحان نقاط الضعف (بنك الأخطاء) 🏦', duration: shuffledMistakes.length * 2, 
-          questions: [ { text: 'أجب عن هذه الأسئلة التي أخطأت بها سابقاً:', subQuestions: shuffledMistakes.map(m => m.question) } ]
+          id: 'custom_mistakes_exam', title: 'تدريب ذاكر أخطائي', duration: Math.max(5, shuffledMistakes.length * 2), 
+          questions: [ { text: 'تدريب سريع على الأسئلة التي تحتاج مراجعة:', subQuestions: shuffledMistakes.map(m => ({ ...m.question, branch: m.question?.branch || 'مراجعة الأخطاء' })) } ]
       };
       setActiveExam(generatedExam);
   };
@@ -8603,7 +8680,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
       )}
       {playingVideo && <SecureVideoPlayer video={playingVideo} user={user} userName={userData?.name} onClose={() => setPlayingVideo(null)} onProgress={handleVideoProgress} />}
       {playingHtml && <InteractiveViewer content={playingHtml} user={userData} onClose={() => setPlayingHtml(null)} />}
-      {/* AI امتحانات الطلاب متوقفة مؤقتًا لتوفير Gemini quota */}
+      {/*  */}
       <FloatingArabicBackground />
       
       <aside className={`fixed top-0 bottom-0 right-0 z-40 bg-white/95 backdrop-blur-xl w-72 p-6 shadow-xl transition-transform duration-300 ${mobileMenu ? 'translate-x-0' : 'translate-x-full md:translate-x-0'} border-l border-slate-200 flex flex-col`}>
@@ -8632,7 +8709,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                 <div onClick={() => {setActiveTab('exams'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><ClipboardList/> الامتحانات</div>
                 <div onClick={() => {setActiveTab('assignments'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='assignments'?'bg-emerald-100 text-emerald-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-emerald-600'}`}><FileCheck/> الواجبات</div>
                 <div onClick={() => {setActiveTab('smart_hw_results'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='smart_hw_results'?'bg-blue-100 text-blue-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-blue-600'}`}><QrCode/> سجل الالواجبات</div>
-                <div onClick={() => {setActiveTab('mistakes_bank'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='mistakes_bank'?'bg-red-100 text-red-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-red-600'}`}><BrainCircuit/> بنك الأخطاء</div>
+                <div onClick={() => {setActiveTab('mistakes_bank'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='mistakes_bank'?'bg-red-100 text-red-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-red-600'}`}><BrainCircuit/> ذاكر أخطائي</div>
                 <div onClick={() => {setActiveTab('performance'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='performance'?'bg-blue-100 text-blue-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-blue-600'}`}><BarChart3/> تحليل الأداء</div>
               </>
           )}
@@ -8684,8 +8761,8 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
         {activeTab === 'home' && (
             <div className="space-y-8">
-                <StudentSmartPerformanceReport userResults={examResults} content={content} />
-                <StudentLocalHomeCoach userResults={examResults} content={content} />
+                <StudentLevelHomePanel userResults={examResults} mistakes={mistakes} content={content} onOpenMistakes={() => setActiveTab('mistakes_bank')} onStartMistakesExam={startMistakesExam} />
+                <StudentStudyPlanPanel userResults={examResults} mistakes={mistakes} content={content} onOpenMistakes={() => setActiveTab('mistakes_bank')} onStartMistakesExam={startMistakesExam} />
                 {liveSessions.length > 0 && (
                     <div className="bg-white border border-red-100 text-slate-800 p-4 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm">
                         <div>
@@ -8807,17 +8884,17 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
             <div className="glass-panel p-4 md:p-8 rounded-2xl">
                 <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 border-b border-slate-200 pb-6">
                     <div>
-                        <h2 className="text-2xl md:text-3xl font-bold font-arabic text-red-700 flex items-center gap-3"><BrainCircuit size={32} className="text-red-500" /> بنك أخطاء الطالب 🏦</h2>
-                        <p className="text-slate-500 mt-2 text-sm md:text-lg">كل سؤال أخطأت فيه سيتم تسجيله هنا لتتمكن من مراجعته والتدرب عليه.</p>
+                        <h2 className="text-2xl md:text-3xl font-bold font-arabic text-red-700 flex items-center gap-3"><BrainCircuit size={32} className="text-red-500" /> ذاكر أخطائي</h2>
+                        <p className="text-slate-500 mt-2 text-sm md:text-lg">راجع أخطاءك حسب الفروع وابدأ تدريبًا سريعًا من نفس الأسئلة.</p>
                     </div>
-                    <button onClick={startMistakesExam} className="bg-red-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-bold shadow-xl shadow-red-500/30 hover:bg-red-700 transition flex items-center gap-2 transform hover:scale-105 w-full md:w-auto justify-center"><Target size={20}/> امتحان من أخطائي</button>
+                    <button onClick={startMistakesExam} className="bg-red-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-bold shadow-xl shadow-red-500/30 hover:bg-red-700 transition flex items-center gap-2 transform hover:scale-105 w-full md:w-auto justify-center"><Target size={20}/> ابدأ تدريب من أخطائي</button>
                 </div>
                 {mistakes.length === 0 ? (
                     <div className="text-center py-16 bg-white rounded-2xl border border-slate-100 shadow-sm"><Trophy size={64} className="mx-auto text-amber-400 mb-4 opacity-80" /><h3 className="text-2xl font-bold text-slate-700">ممتاز جداً يا بطل! 👏</h3><p className="text-slate-500 mt-2">بنك الأخطاء الخاص بك فارغ تماماً. استمر على هذا المستوى.</p></div>
                 ) : (
                     <div className="grid grid-cols-1 gap-6">
                         <div className="bg-red-50 text-red-700 p-4 rounded-xl border border-red-200 font-bold flex items-center gap-2 text-sm md:text-base">
-                            <AlertOctagon /> لديك {mistakes.length} سؤال في بنك الأخطاء. يجب مراجعتها جيداً قبل الامتحان النهائي!
+                            <AlertOctagon /> لديك {mistakes.length} سؤال يحتاج مراجعة. ابدأ بالأكثر تكرارًا ثم حل تدريب قصير.
                         </div>
                         {mistakes.map(m => (
                             <div key={m.id} className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-200 hover:border-red-300 transition relative overflow-hidden">
@@ -8980,7 +9057,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
         {activeTab === 'interactive_exams' && !isBannedExam && (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 md:col-span-3 text-amber-800 font-bold">امتحان AI المخصص متوقف مؤقتًا للطلاب. ستظل الامتحانات التفاعلية المنشورة من الأدمن متاحة هنا.</div>
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 md:col-span-3 text-amber-800 font-bold">التوليد التلقائي للامتحانات متوقف مؤقتًا. ستظل الامتحانات التفاعلية المنشورة من الأدمن متاحة هنا.</div>
                 
                 {interactiveExams.map(h => (
                     <motion.div whileHover={{y:-5}} key={h.id} className="glass-card rounded-xl overflow-hidden cursor-pointer relative" onClick={() => handlePremiumClick(() => setPlayingHtml(h))}>
