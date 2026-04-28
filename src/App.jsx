@@ -745,7 +745,7 @@ const Announcements = () => {
 
 const Leaderboard = () => {
     const [topStudents, setTopStudents] = useState([]);
-    const [config, setConfig] = useState({ show: true });
+    const [config, setConfig] = useState({ show: false });
     useEffect(() => {
         const unsubConfig = onSnapshot(doc(db, 'settings', 'leaderboard_config'), (snap) => { if(snap.exists()) setConfig(snap.data()); });
         const unsub = onSnapshot(query(collection(db, 'exam_results')), (snap) => {
@@ -790,16 +790,7 @@ const ChatWidget = ({ user }) => {
   const [sessionId] = useState(() => Math.random().toString(36).substr(2, 9)); 
   const chatEndRef = useRef(null);
   const [isContactAdminMode, setIsContactAdminMode] = useState(false);
-  const [autoReplies, setAutoReplies] = useState([]);
-
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'auto_replies'), (snap) => {
-        const rules = snap.docs.map(d => d.data()).filter(r => r.isActive);
-        setAutoReplies(rules);
-    });
-    return () => unsub();
-  }, []);
-  
+  // تم حذف نظام الرد الآلي المعتمد على Firestore.
   useEffect(() => {
     if (!isOpen) return;
     const userId = user ? user.email : sessionId;
@@ -838,13 +829,8 @@ const ChatWidget = ({ user }) => {
            setIsContactAdminMode(false);
       } 
       else {
-          let matchedRule = null;
-          for (const rule of autoReplies) {
-              const keywords = rule.keywords.split(',').map(k => k.trim().toLowerCase());
-              if (keywords.some(k => lowerText.includes(k) && k.length > 0)) { matchedRule = rule; break; }
-          }
-          if (matchedRule) botResponse = matchedRule.response;
-          else if (lowerText.includes("ادمن") || lowerText.includes("مستر") || lowerText.includes("تواصل")) {
+          if (lowerText.includes("ادمن") || lowerText.includes("مستر") || lowerText.includes("تواصل")) {
+
                botResponse = "اكتب رسالتك للمستر وهيتم الرد عليك هنا 👇";
                setIsContactAdminMode(true);
           } else {
@@ -1031,7 +1017,7 @@ const LiveSessionView = ({ session, user, onClose }) => {
         <div className="bg-gradient-to-r from-red-600 to-red-800 p-3 text-white flex justify-between items-center shadow-lg">
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 bg-white rounded-full animate-pulse shadow-[0_0_10px_white]"></span>
-            <h2 className="font-bold">Live + AI: {session?.title}</h2>
+            <h2 className="font-bold">محاضرة مباشرة: {session?.title}</h2>
           </div>
           <button onClick={onClose} className="text-sm bg-black/30 hover:bg-black/50 px-3 py-1 rounded transition">العودة للمنصة</button>
         </div>
@@ -1068,34 +1054,9 @@ const LiveSessionView = ({ session, user, onClose }) => {
       </div>
 
       <div className="w-full md:w-[420px] bg-white border-r flex flex-col h-[48vh] md:h-full">
-        <div className="p-3 border-b bg-slate-50 font-bold text-slate-700">المحادثة + Live AI</div>
+        <div className="p-3 border-b bg-slate-50 font-bold text-slate-700">المحادثة المباشرة</div>
         <div className="flex-1 overflow-y-auto p-3 space-y-3">
-          <div className="bg-fuchsia-50 border border-fuchsia-100 rounded-2xl p-3">
-            <p className="font-black text-fuchsia-800 mb-2">اسأل AI أثناء المحاضرة</p>
-            <textarea className="w-full border rounded-xl p-2 text-sm min-h-[80px]" placeholder="اكتب سؤالك عن المحاضرة..." value={aiQuestion} onChange={e=>setAiQuestion(e.target.value)} />
-            <div className="grid grid-cols-2 gap-2 mt-2">
-              <button disabled={aiLoading} onClick={askLiveAI} className="bg-fuchsia-600 text-white py-2 rounded-xl font-bold disabled:opacity-50">{aiLoading ? 'جاري...' : 'اسأل AI'}</button>
-              <button disabled={aiLoading} onClick={generateLiveExam} className="bg-emerald-600 text-white py-2 rounded-xl font-bold disabled:opacity-50">توليد امتحان</button>
-            </div>
-            {aiAnswer && <div className="mt-2 bg-white border rounded-xl p-2 text-sm text-slate-700 whitespace-pre-wrap">{aiAnswer}</div>}
-            {liveExam?.questions?.length > 0 && (
-              <div className="mt-2 bg-white border rounded-xl p-2 text-sm">
-                <p className="font-black text-emerald-700 mb-2">{liveExam.title}</p>
-                <p className="text-xs text-slate-500 mb-2">تم توليد {liveExam.questions.length} سؤال.</p>
-                <details>
-                  <summary className="cursor-pointer font-bold text-slate-700">عرض الأسئلة</summary>
-                  <div className="mt-2 space-y-2 max-h-56 overflow-auto">
-                    {liveExam.questions.slice(0, 20).map((q, i) => (
-                      <div key={q.id || i} className="bg-slate-50 rounded-lg p-2">
-                        <p className="font-bold">{i+1}. {q.text}</p>
-                        {Array.isArray(q.options) && <p className="text-xs text-slate-500">{q.options.join(' / ')}</p>}
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              </div>
-            )}
-          </div>
+          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-3 text-sm text-amber-800 font-bold leading-relaxed">تم إيقاف AI للطلاب داخل المحاضرات مؤقتًا لتوفير Gemini. استخدم الشات المباشر لكتابة سؤالك للمستر.</div>
 
           <div className="border-t pt-3">
             <p className="font-bold text-slate-700 mb-2">الشات المباشر</p>
@@ -1368,6 +1329,17 @@ const InteractiveViewer = ({ content, user, onClose }) => {
     );
 };
 
+
+
+const StudentLocalAdvice = ({ metrics = {}, content = [] }) => {
+  const branches = Object.entries(metrics?.branchStats || {}).map(([branch, data]) => ({ branch, pct: data.possible > 0 ? Math.round((safeNumber(data.earned, 0) / safeNumber(data.possible, 0)) * 100) : 0, wrong: safeNumber(data.wrong, 0) })).sort((a,b)=>a.pct-b.pct);
+  const weakBranches = branches.filter(b => b.pct < 70).slice(0, 3);
+  const recommendations = getReviewRecommendations(metrics?.branchStats || {}, content || []);
+  return <div className="mt-5 bg-slate-900/70 border border-slate-700 rounded-3xl p-5 text-slate-100"><div className="flex items-center gap-2 mb-4"><BrainCircuit className="text-amber-400"/><h3 className="font-black text-xl">تحليل ذكي بدون استهلاك AI</h3></div><p className="text-sm text-slate-300 mb-4">التحليل مبني على إجابات الطالب ونسب الفروع داخل المنصة فقط، بدون Gemini.</p>{weakBranches.length===0?<div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 text-emerald-200 font-bold">ممتاز يا بطل. لا توجد فروع أقل من 70%. راجع الأخطاء الفردية وحافظ على مستواك.</div>:<div className="space-y-3">{weakBranches.map((b,idx)=>{const rec=recommendations.find(r=>r.branch===b.branch);return <div key={idx} className="bg-white/5 border border-white/10 rounded-2xl p-4"><div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-2"><p className="font-black text-red-300">راجع فرع: {b.branch}</p><span className="text-xs bg-red-500/20 text-red-200 px-3 py-1 rounded-full font-bold">{b.pct}%</span></div><p className="text-sm text-slate-200 leading-relaxed">عندك {b.wrong} أخطاء في هذا الفرع. ابدأ بمراجعة القاعدة، ثم حل أسئلة قصيرة، وبعدها ارجع لبنك الأخطاء.</p>{rec?.title && <p className="text-xs text-amber-200 mt-2">اقتراح مراجعة: {rec.title}</p>}</div>})}</div>}</div>;
+};
+const StudentLocalHomeCoach = ({ userResults = [], content = [] }) => { const branchStats={}; (userResults||[]).slice(0,10).forEach(r=>{const stats=r?.branchStats||r?.performanceAnalysis?.branchStats||r?.branchAnalysis||{}; Object.entries(stats).forEach(([branch,d])=>{branchStats[branch]=branchStats[branch]||{earned:0,possible:0,wrong:0}; branchStats[branch].earned+=safeNumber(d.earned,0); branchStats[branch].possible+=safeNumber(d.possible,d.total||0); branchStats[branch].wrong+=safeNumber(d.wrong,0);});}); return <StudentLocalAdvice metrics={{branchStats}} content={content}/>; };
+const LocalQuestionExplanation = ({ question, answers }) => { if(!question||question.type==='essay') return null; const selectedIdx=answers?.[question.id]; const correctIdx=safeNumber(question.correctIdx,0); const selectedText=selectedIdx!==undefined?question.options?.[selectedIdx]:'لم يتم اختيار إجابة'; const correctText=question.options?.[correctIdx]||'غير محدد'; const isCorrect=selectedIdx===correctIdx; return <div className={`mb-6 rounded-2xl p-4 border ${isCorrect?'bg-emerald-50 border-emerald-200 text-emerald-800':'bg-amber-50 border-amber-200 text-amber-900'}`}><h4 className="font-black mb-2">شرح المنصة بدون AI</h4><p className="text-sm font-bold">إجابتك: {selectedText}</p><p className="text-sm font-bold">الإجابة الصحيحة: {correctText}</p>{question.explanation?<p className="text-sm mt-2 leading-relaxed">الشرح: {question.explanation}</p>:<p className="text-xs mt-2 opacity-80">راجع قاعدة هذا السؤال من فرع {question.branch || 'الدرس'} ثم أعد حل أسئلة مشابهة.</p>}</div>; };
+const LocalEssayReviewBox = ({ question, answer }) => { const answerText=typeof answer==='object'?answer?.text:answer; const hasAnswer=!!String(answerText||'').trim()||!!answer?.image; return <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4"><h4 className="font-black text-purple-800 flex items-center gap-2"><PenTool size={18}/> مراجعة مقالي بدون AI</h4><p className="text-sm text-purple-700 mt-2">{hasAnswer?'تم حفظ إجابتك المقالية. التصحيح النهائي يتم من الأدمن حاليًا لحين تفعيل خطة AI المدفوعة.':'لا توجد إجابة مقالية محفوظة لهذا السؤال.'}</p>{question?.modelAnswer&&<p className="text-xs text-slate-600 mt-2"><b>نموذج إجابة:</b> {question.modelAnswer}</p>}</div>; };
 
 const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult = null }) => {
   const [activeView, setActiveView] = useState(isReviewMode || existingResult ? 'dashboard' : 'questions');
@@ -1946,11 +1918,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                 {performanceInsights.map((note, idx) => <div key={idx} className="bg-slate-900/60 border border-slate-700 rounded-xl p-3 text-slate-200 text-sm font-bold">{note}</div>)}
               </div>
               <div className="mt-5">
-                <RealAIBox
-                  title="تحليل AI شامل بعد الامتحان"
-                  compact={true}
-                  payload={buildExamAIPayload({ exam, answers, metrics: detailedMetrics, user })}
-                />
+                <StudentLocalAdvice metrics={detailedMetrics} content={[]} />
               </div>
             </div>
           )}
@@ -2201,23 +2169,14 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
             {isSubmitted && (
               <div className="mb-6">
-                <RealAIBox
-                  title="شرح AI لهذا السؤال"
-                  compact={true}
-                  payload={buildQuestionAIPayload({ exam, question: currentQObj, answers, user, result: existingResult })}
-                />
+                <LocalQuestionExplanation question={currentQObj} answers={answers} />
               </div>
             )}
 
             {currentQObj.type === 'essay' ? (
               <div className="space-y-4">
                 {isSubmitted && (
-                  <AIEssayCorrectorBox
-                    exam={exam}
-                    question={currentQObj}
-                    answer={answers[currentQObj.id]}
-                    studentName={user?.displayName || ''}
-                  />
+                  <LocalEssayReviewBox question={currentQObj} answer={answers[currentQObj.id]} />
                 )}
                 {!isSubmitted ? (
                   <>
@@ -2513,7 +2472,7 @@ const AIQuickHealthCheck = () => {
       const res = await fetch('/api/ai-coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'student_chat', question: 'اختبار تشغيل سريع', recentResults: [] })
+        body: JSON.stringify({ mode: 'generate_questions', question: 'اختبار تشغيل سريع', topic: 'النحو', count: 1, adminOnly: true })
       });
       const data = await res.json().catch(() => ({}));
       setStatus(res.ok && data.ok ? 'ok' : 'bad');
@@ -5059,8 +5018,7 @@ const MobileStudentBottomNav = ({ activeTab, setActiveTab, onMessageClick }) => 
   const items = [
     { key: 'home', label: 'الرئيسية', icon: Layout },
     { key: 'videos', label: 'المحاضرات', icon: PlayCircle },
-    { key: 'exams', label: 'الامتحانات', icon: ClipboardList },
-    { key: 'interactive_exams', label: 'AI امتحان', icon: Sparkles },
+    { key: 'exams', label: 'الامتحانات', icon: ClipboardList },
     { key: 'logout', label: 'خروج', icon: LogOut }
   ];
 
@@ -5072,7 +5030,7 @@ const MobileStudentBottomNav = ({ activeTab, setActiveTab, onMessageClick }) => 
 
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 z-[9990] bg-white border-t border-slate-200 shadow-[0_-8px_24px_rgba(0,0,0,0.08)] px-2 py-2">
-      <div className="grid grid-cols-5 gap-1">
+      <div className="grid grid-cols-4 gap-1">
         {items.map(item => {
           const Icon = item.icon;
           const active = activeTab === item.key;
@@ -6134,7 +6092,7 @@ const AdminDashboard = ({ user }) => {
   const [essayMaxDrafts, setEssayMaxDrafts] = useState({});
   const [newAnnouncement, setNewAnnouncement] = useState(""); 
   const [newStudentNotification, setNewStudentNotification] = useState({ title: '', text: '', grade: 'all', clickUrl: '/' }); 
-  const [showLeaderboard, setShowLeaderboard] = useState(true);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [announcements, setAnnouncements] = useState([]);
   
   const [autoReplies, setAutoReplies] = useState([]);
@@ -7524,9 +7482,9 @@ const AdminDashboard = ({ user }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-4 md:p-6 relative z-10">
         <div className="glass-panel p-4 rounded-xl h-fit space-y-2 flex md:flex-col overflow-x-auto md:overflow-x-visible whitespace-nowrap scrollbar-hide">
-          {['dashboard', 'users', 'all_users', 'subscriptions', 'payments', 'security_center', 'ai_analytics', 'live_ai', 'app_convert', 'ai_lab', 'ai_insights', 'leaderboard', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'question-analytics', 'smart_hw', 'content', 'notifications', 'student-messages', 'messages', 'auto_reply', 'quotes'].map(tab => (
+          {['dashboard', 'users', 'all_users', 'subscriptions', 'payments', 'security_center', 'ai_analytics', 'live_ai', 'app_convert', 'ai_lab', 'ai_insights', 'leaderboard', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'question-analytics', 'smart_hw', 'content', 'notifications', 'student-messages', 'messages'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 transition-all ${activeTab===tab?'bg-amber-100 text-amber-700 shadow-sm border-b-4 md:border-b-0 md:border-r-4 border-amber-500':'hover:bg-slate-50 text-slate-600'}`}>
-              {tab === 'dashboard' ? 'Dashboard' : tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'payments' ? 'طلبات الدفع' : tab === 'security_center' ? 'مركز الحماية' : tab === 'ai_analytics' ? 'تحليلات AI' : tab === 'live_ai' ? 'البث المباشر + Live AI' : tab === 'app_convert' ? 'تحويل App' : tab === 'ai_lab' ? 'AI Lab' : tab === 'ai_insights' ? 'AI Insights' : tab === 'leaderboard' ? 'لوحة الشرف' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'question-analytics' ? 'تحليل الأسئلة' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'student-messages' ? 'رسائل الطلاب' : tab === 'messages' ? 'الرسائل' : tab === 'auto_reply' ? 'الرد الآلي' : tab === 'quotes' ? 'إدارة الحكم' : 'الإعدادات'}
+              {tab === 'dashboard' ? 'Dashboard' : tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'payments' ? 'طلبات الدفع' : tab === 'security_center' ? 'مركز الحماية' : tab === 'ai_analytics' ? 'تحليلات AI' : tab === 'live_ai' ? 'البث المباشر + Live AI' : tab === 'app_convert' ? 'تحويل App' : tab === 'ai_lab' ? 'AI Lab' : tab === 'ai_insights' ? 'AI Insights' : tab === 'leaderboard' ? 'لوحة الشرف' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'question-analytics' ? 'تحليل الأسئلة' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'student-messages' ? 'رسائل الطلاب' : tab === 'messages' ? 'الرسائل' : 'الإعدادات'}
             </button>
           ))}
         </div>
@@ -8281,55 +8239,7 @@ const AdminDashboard = ({ user }) => {
 
           {activeTab === 'messages' && <StudentMessagesPanel user={user} userData={userData} />}
 
-          {activeTab === 'auto_reply' && (
-              <div className="glass-panel p-4 md:p-6 rounded-xl">
-                  <h2 className="font-bold mb-4 flex items-center gap-2 font-arabic text-xl"><Bot /> إعدادات الرد الآلي</h2>
-                  <div className="bg-slate-50 p-4 rounded-xl border mb-6">
-                      <h3 className="font-bold mb-2 text-sm">إضافة قاعدة جديدة</h3>
-                      <div className="grid gap-3">
-                          <input className="border p-2 rounded w-full" placeholder="الكلمات المفتاحية (افصل بينها بفاصلة، مثال: سعر,حجز,مواعيد)" value={newAutoReply.keywords} onChange={e=>setNewAutoReply({...newAutoReply, keywords:e.target.value})} />
-                          <textarea className="border p-2 rounded h-20 w-full" placeholder="الرد الذي سيظهر للطالب..." value={newAutoReply.response} onChange={e=>setNewAutoReply({...newAutoReply, response:e.target.value})} />
-                          <button onClick={handleAddAutoReply} className="bg-amber-600 text-white py-2 rounded font-bold hover:bg-amber-700 w-full md:w-auto">إضافة القاعدة</button>
-                      </div>
-                  </div>
-                  <div className="space-y-3">
-                      {autoReplies.map(rule => (
-                          <div key={rule.id} className={`p-4 rounded-lg border flex flex-col md:flex-row justify-between md:items-center gap-4 ${rule.isActive ? 'bg-white border-green-200' : 'bg-gray-50 border-gray-200 opacity-70'}`}>
-                              <div className="flex-1">
-                                  <p className="font-bold text-sm text-slate-600 mb-1">الكلمات: <span className="text-blue-600">{rule.keywords}</span></p>
-                                  <p className="text-slate-800 text-sm md:text-base">{rule.response}</p>
-                              </div>
-                              <div className="flex items-center justify-end gap-2">
-                                  <button onClick={() => toggleAutoReply(rule.id, rule.isActive)} className={`p-2 rounded-full ${rule.isActive ? 'bg-green-100 text-green-600' : 'bg-gray-200 text-gray-500'}`} title={rule.isActive ? "تعطيل" : "تنشيط"}><Power size={18} /></button>
-                                  <button onClick={() => deleteAutoReply(rule.id)} className="p-2 rounded-full bg-red-100 text-red-600 hover:bg-red-200"><Trash2 size={18} /></button>
-                              </div>
-                          </div>
-                      ))}
-                  </div>
-              </div>
-          )}
-
-          {activeTab === 'quotes' && (
-              <div className="glass-panel p-4 md:p-6 rounded-xl">
-                  <h2 className="font-bold mb-4 flex items-center gap-2 font-arabic text-xl"><PenTool /> إدارة الحكم والأقوال</h2>
-                  <div className="bg-slate-50 p-4 rounded-xl border mb-6">
-                      <h3 className="font-bold mb-2 text-sm">إضافة حكمة جديدة</h3>
-                      <div className="grid gap-3">
-                          <input className="border p-2 rounded w-full" placeholder="نص الحكمة" value={newQuote.text} onChange={e=>setNewQuote({...newQuote, text:e.target.value})} />
-                          <input className="border p-2 rounded w-full" placeholder="المصدر (مثال: تحفيز، شعر، حكمة)" value={newQuote.source} onChange={e=>setNewQuote({...newQuote, source:e.target.value})} />
-                          <button onClick={handleAddQuote} className="bg-amber-600 text-white py-2 rounded font-bold hover:bg-amber-700 w-full md:w-auto">إضافة</button>
-                      </div>
-                  </div>
-                  <div className="space-y-3">
-                      {quotesList.map(q => (
-                          <div key={q.id} className="p-3 rounded-lg border bg-white flex justify-between items-center gap-2">
-                              <div><p className="font-bold text-slate-800 text-sm md:text-base">"{q.text}"</p><p className="text-xs text-slate-500">- {q.source}</p></div>
-                              <button onClick={() => deleteQuote(q.id)} className="p-2 text-red-500 hover:bg-red-50 rounded"><Trash2 size={18} /></button>
-                          </div>
-                      ))}
-                  </div>
-              </div>
-          )}
+          {/* تم حذف صفحة الرد الآلي وإدارة الحكم من لوحة الأدمن */}
         </div>
       </div>
     </div>
@@ -8360,8 +8270,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   const [exams, setExams] = useState([]);
   const [activeExam, setActiveExam] = useState(null);
   const [playingVideo, setPlayingVideo] = useState(null);
-  const [playingHtml, setPlayingHtml] = useState(null);
-  const [showAIInteractiveExam, setShowAIInteractiveExam] = useState(false);
+  const [playingHtml, setPlayingHtml] = useState(null);
   const [examResults, setExamResults] = useState([]);
   const [hwResults, setHwResults] = useState([]); 
   const [assignments, setAssignments] = useState([]);
@@ -8409,7 +8318,12 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
     const unsubLive = onSnapshot(query(collection(db, 'live_sessions'), where('status', '==', 'active'), where('grade', '==', userData?.grade)), s => {
         const activeSessions = s.docs.map(d=>({id:d.id, ...d.data()}));
-        const visibleSessions = activeSessions.filter(ls => { if (!ls.allowedEmails || ls.allowedEmails.length === 0) return true; return ls.allowedEmails.includes(user.email); });
+        const visibleSessions = activeSessions.filter(ls => {
+            const allowedByEmail = !ls.allowedEmails || ls.allowedEmails.length === 0 || ls.allowedEmails.includes(user.email);
+            const notDeleted = ls.deleted !== true && ls.isDeleted !== true;
+            const isOpen = ls.status === 'active' && ls.isLive !== false && ls.ended !== true && ls.closed !== true;
+            return allowedByEmail && notDeleted && isOpen;
+        });
         setLiveSessions(visibleSessions);
     }, error => { console.warn('live_sessions listener blocked:', error?.message); setLiveSessions([]); });
 
@@ -8770,7 +8684,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
       )}
       {playingVideo && <SecureVideoPlayer video={playingVideo} user={user} userName={userData?.name} onClose={() => setPlayingVideo(null)} onProgress={handleVideoProgress} />}
       {playingHtml && <InteractiveViewer content={playingHtml} user={userData} onClose={() => setPlayingHtml(null)} />}
-      {showAIInteractiveExam && <AIInteractiveExamModal user={user} userData={userData} onClose={() => setShowAIInteractiveExam(false)} />}
+      {/* AI امتحانات الطلاب متوقفة مؤقتًا لتوفير Gemini quota */}
       <FloatingArabicBackground />
       
       <aside className={`fixed top-0 bottom-0 right-0 z-40 bg-white/95 backdrop-blur-xl w-72 p-6 shadow-xl transition-transform duration-300 ${mobileMenu ? 'translate-x-0' : 'translate-x-full md:translate-x-0'} border-l border-slate-200 flex flex-col`}>
@@ -8796,8 +8710,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
           )}
           {!isBannedExam && (
               <>
-                <div onClick={() => {setActiveTab('exams'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><ClipboardList/> الامتحانات</div>
-                <div onClick={() => {setActiveTab('interactive_exams'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='interactive_exams'?'bg-emerald-100 text-emerald-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-emerald-600'}`}><Sparkles/> امتحان تفاعلي</div>
+                <div onClick={() => {setActiveTab('exams'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><ClipboardList/> الامتحانات</div>
                 <div onClick={() => {setActiveTab('assignments'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='assignments'?'bg-emerald-100 text-emerald-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-emerald-600'}`}><FileCheck/> الواجبات</div>
                 <div onClick={() => {setActiveTab('smart_hw_results'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='smart_hw_results'?'bg-blue-100 text-blue-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-blue-600'}`}><QrCode/> سجل الالواجبات</div>
                 <div onClick={() => {setActiveTab('mistakes_bank'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='mistakes_bank'?'bg-red-100 text-red-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-red-600'}`}><BrainCircuit/> بنك الأخطاء</div>
@@ -8853,30 +8766,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
         {activeTab === 'home' && (
             <div className="space-y-8">
                 <StudentSmartPerformanceReport userResults={examResults} content={content} />
-                <AdvancedAIStudentCoach userResults={examResults} exams={exams} content={content} userData={userData} />
-                <RealAIBox
-                  title="AI شامل للطالب"
-                  payload={{
-                    mode: 'student_home_plan',
-                    language: 'ar-EG',
-                    question: 'حلل مستوى الطالب من نتائجه الأخيرة وقدّم خطة مذاكرة شخصية ونصائح عملية.',
-                    studentName: userData?.name || user?.displayName || '',
-                    grade: userData?.grade || '',
-                    recentResults: (examResults || []).slice(0, 8).map(r => ({
-                      examTitle: r.examTitle,
-                      score: r.score,
-                      total: r.total,
-                      percentage: getResultPercentage(r),
-                      branchAnalysis: r.branchAnalysis || r.branchStats || {}
-                    }))
-                  }}
-                />
-                <AIStudentChatCoach user={user} userData={userData} examResults={examResults} />
-                <PaymentRequestStudentPanel user={user} userData={userData} />
-                <AIExamHistoryPanel user={user} userData={userData} />
-                <LiveSessionsStudentPanel user={user} userData={userData} />
-                <AISmartRecommendations userResults={examResults} content={content} exams={exams} userData={userData} />
-                <LeaderboardPanel examResults={examResults} users={[userData ? { ...userData, id: user?.uid } : {}]} currentUserId={user?.uid} gradeFilter={userData?.grade || 'all'} />
+                <StudentLocalHomeCoach userResults={examResults} content={content} />
                 {liveSessions.length > 0 && (
                     <div className="bg-white border border-red-100 text-slate-800 p-4 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm">
                         <div>
@@ -9171,18 +9061,8 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
         {activeTab === 'interactive_exams' && !isBannedExam && (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                <motion.div whileHover={{y:-5}} className="glass-card rounded-xl overflow-hidden cursor-pointer relative border-2 border-fuchsia-300" onClick={() => setShowAIInteractiveExam(true)}>
-                    <div className="h-48 bg-gradient-to-br from-fuchsia-600 via-purple-700 to-slate-900 flex items-center justify-center relative group">
-                        <Sparkles className="text-white w-20 h-20 opacity-90 group-hover:scale-110 transition drop-shadow-lg"/>
-                        <span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(userData?.grade)}</span>
-                        <span className="absolute top-2 right-2 bg-fuchsia-500 text-white text-xs px-2 py-1 rounded-full font-bold flex items-center gap-1 shadow-md">AI</span>
-                    </div>
-                    <div className="p-4">
-                        <h3 className="font-black text-lg text-slate-800">امتحان AI مخصص</h3>
-                        <p className="text-xs text-slate-500 mt-1">اكتب الفرع وAI يولد لك 15-20 سؤال مناسب لمرحلتك.</p>
-                        <button className="mt-3 w-full font-bold py-2 rounded-lg transition shadow-sm bg-fuchsia-100 text-fuchsia-700 hover:bg-fuchsia-200">ابدأ امتحان AI</button>
-                    </div>
-                </motion.div>
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 md:col-span-3 text-amber-800 font-bold">امتحان AI المخصص متوقف مؤقتًا للطلاب. ستظل الامتحانات التفاعلية المنشورة من الأدمن متاحة هنا.</div>
+                
                 {interactiveExams.map(h => (
                     <motion.div whileHover={{y:-5}} key={h.id} className="glass-card rounded-xl overflow-hidden cursor-pointer relative" onClick={() => handlePremiumClick(() => setPlayingHtml(h))}>
                         <div className="h-48 bg-gradient-to-br from-emerald-600 to-teal-900 flex items-center justify-center relative group">
@@ -9322,8 +9202,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 const LandingPage = ({ onAuthClick, installPrompt }) => {
   const [publicContent, setPublicContent] = useState([]);
   const [playingVideo, setPlayingVideo] = useState(null); 
-  const [playingHtml, setPlayingHtml] = useState(null);
-  const [showAIInteractiveExam, setShowAIInteractiveExam] = useState(false);
+  const [playingHtml, setPlayingHtml] = useState(null);
   
   useEffect(() => { const u = onSnapshot(query(collection(db, 'content'), where('isPublic', '==', true)), s => setPublicContent(s.docs.map(d=>d.data()))); return u; }, []);
   const openFacebook = () => window.open("https://www.facebook.com/share/17aiUQWKf5/", "_blank");
@@ -9688,7 +9567,7 @@ const DebugPanel = ({ user }) => {
       const res = await fetch('/api/ai-coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'student_chat', question: 'اختبار سريع للذكاء الاصطناعي', grade: '3 ثانوي' })
+        body: JSON.stringify({ mode: 'generate_questions', question: 'اختبار سريع للذكاء الاصطناعي', topic: 'النحو', count: 1, adminOnly: true })
       });
       const data = await res.json().catch(() => ({}));
       const status = { ok: res.ok && data.ok, status: res.status, data };
