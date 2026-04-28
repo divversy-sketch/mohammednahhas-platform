@@ -21,6 +21,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { auth, db, savePushTokenForUser, setupForegroundPushListener } from '../services/firebase';
 import { isVisibleLiveSession } from '../utils/liveSessions';
+import HomeDashboard from '../components/student/HomeDashboard';
 
 const getAdminAIHeaders = async () => {
   const token = await auth?.currentUser?.getIdToken?.();
@@ -2094,7 +2095,8 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
               </button>
             ))}
           </div>
-        )}
+        )}
+
       </div>
 
       <div className="flex-1 flex overflow-hidden relative z-50">
@@ -5014,7 +5016,8 @@ const MobileStudentBottomNav = ({ activeTab, setActiveTab, onMessageClick }) => 
   const items = [
     { key: 'home', label: 'الرئيسية', icon: Layout },
     { key: 'videos', label: 'المحاضرات', icon: PlayCircle },
-    { key: 'exams', label: 'الامتحانات', icon: ClipboardList },
+    { key: 'exams', label: 'الامتحانات', icon: ClipboardList },
+
     { key: 'logout', label: 'خروج', icon: LogOut }
   ];
 
@@ -8266,7 +8269,8 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   const [exams, setExams] = useState([]);
   const [activeExam, setActiveExam] = useState(null);
   const [playingVideo, setPlayingVideo] = useState(null);
-  const [playingHtml, setPlayingHtml] = useState(null);
+  const [playingHtml, setPlayingHtml] = useState(null);
+
   const [examResults, setExamResults] = useState([]);
   const [hwResults, setHwResults] = useState([]); 
   const [assignments, setAssignments] = useState([]);
@@ -8706,7 +8710,8 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
           )}
           {!isBannedExam && (
               <>
-                <div onClick={() => {setActiveTab('exams'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><ClipboardList/> الامتحانات</div>
+                <div onClick={() => {setActiveTab('exams'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><ClipboardList/> الامتحانات</div>
+
                 <div onClick={() => {setActiveTab('assignments'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='assignments'?'bg-emerald-100 text-emerald-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-emerald-600'}`}><FileCheck/> الواجبات</div>
                 <div onClick={() => {setActiveTab('smart_hw_results'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='smart_hw_results'?'bg-blue-100 text-blue-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-blue-600'}`}><QrCode/> سجل الالواجبات</div>
                 <div onClick={() => {setActiveTab('mistakes_bank'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='mistakes_bank'?'bg-red-100 text-red-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-red-600'}`}><BrainCircuit/> ذاكر أخطائي</div>
@@ -8761,8 +8766,19 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
         {activeTab === 'home' && (
             <div className="space-y-8">
-                <StudentLevelHomePanel userResults={examResults} mistakes={mistakes} content={content} onOpenMistakes={() => setActiveTab('mistakes_bank')} onStartMistakesExam={startMistakesExam} />
-                <StudentStudyPlanPanel userResults={examResults} mistakes={mistakes} content={content} onOpenMistakes={() => setActiveTab('mistakes_bank')} onStartMistakesExam={startMistakesExam} />
+                <HomeDashboard
+                    userData={userData}
+                    examResults={examResults}
+                    mistakes={mistakes}
+                    content={content}
+                    videos={videos}
+                    filesAndLinks={filesAndLinks}
+                    isPremium={isPremium}
+                    isBannedContent={isBannedContent}
+                    getGradeLabel={getGradeLabel}
+                    setActiveTab={setActiveTab}
+                    onStartMistakesExam={startMistakesExam}
+                />
                 {liveSessions.length > 0 && (
                     <div className="bg-white border border-red-100 text-slate-800 p-4 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm">
                         <div>
@@ -9198,7 +9214,8 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 const LandingPage = ({ onAuthClick, installPrompt }) => {
   const [publicContent, setPublicContent] = useState([]);
   const [playingVideo, setPlayingVideo] = useState(null); 
-  const [playingHtml, setPlayingHtml] = useState(null);
+  const [playingHtml, setPlayingHtml] = useState(null);
+
   
   useEffect(() => { const u = onSnapshot(query(collection(db, 'content'), where('isPublic', '==', true)), s => setPublicContent(s.docs.map(d=>d.data()))); return u; }, []);
   const openFacebook = () => window.open("https://www.facebook.com/share/17aiUQWKf5/", "_blank");
