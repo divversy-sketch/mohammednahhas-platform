@@ -1,12 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getMessaging, getToken, onMessage, isSupported as isMessagingSupported } from 'firebase/messaging';
-import { 
-  getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, 
+import {  signInWithEmailAndPassword, createUserWithEmailAndPassword, 
   signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail 
 } from 'firebase/auth';
-import { 
-  getFirestore, doc, setDoc, getDoc, getDocs, collection, addDoc, query, where, 
+import {  doc, setDoc, getDoc, getDocs, collection, addDoc, query, where, 
   onSnapshot, updateDoc, deleteDoc, orderBy, serverTimestamp, writeBatch, limit, increment 
 } from 'firebase/firestore';
 import { 
@@ -23,93 +19,16 @@ import {
   Target, AlertCircle, Crown, CreditCard, Key, Wand2, WalletCards, Smartphone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { auth, db, savePushTokenForUser, setupForegroundPushListener } from './services/firebase';
+import { isVisibleLiveSession } from './utils/liveSessions';
 
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+const getAdminAIHeaders = async () => {
+  const token = await auth?.currentUser?.getIdToken?.();
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
 };
-
-let app, auth, db;
-try {
-  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-  auth = getAuth(app);
-  db = getFirestore(app);
-} catch (error) { 
-  console.error("Firebase Initialization Error:", error); 
-}
-
-const FIREBASE_VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY || '';
-
-const getBrowserMessaging = async () => {
-  try {
-    if (!app) return null;
-    const supported = await isMessagingSupported();
-    if (!supported) return null;
-    return getMessaging(app);
-  } catch (error) {
-    console.warn('Firebase Messaging is not available:', error?.message);
-    return null;
-  }
-};
-
-const savePushTokenForUser = async (user, userData = {}) => {
-  if (!user?.uid) throw new Error('لا يوجد مستخدم مسجل');
-  if (!('Notification' in window)) throw new Error('المتصفح لا يدعم الإشعارات');
-  if (!FIREBASE_VAPID_KEY) throw new Error('مفتاح VAPID غير موجود في إعدادات Vercel');
-
-  const permission = await Notification.requestPermission();
-  if (permission !== 'granted') throw new Error('لم يتم السماح بالإشعارات');
-
-  const messaging = await getBrowserMessaging();
-  if (!messaging) throw new Error('خدمة إشعارات Firebase غير متاحة على هذا الجهاز');
-
-  const registration = await navigator.serviceWorker.ready;
-  const token = await getToken(messaging, {
-    vapidKey: FIREBASE_VAPID_KEY,
-    serviceWorkerRegistration: registration
-  });
-
-  if (!token) throw new Error('تعذر إنشاء رمز الإشعارات');
-
-  const tokenId = `${user.uid}_${token.slice(-18).replace(/[^a-zA-Z0-9]/g, '')}`;
-  await setDoc(doc(db, 'push_tokens', tokenId), {
-    token,
-    userId: user.uid,
-    userName: user.displayName || userData?.name || 'طالب',
-    email: user.email || userData?.email || '',
-    grade: userData?.grade || 'all',
-    platform: navigator.platform || '',
-    userAgent: navigator.userAgent || '',
-    enabled: true,
-    updatedAt: serverTimestamp(),
-    createdAt: serverTimestamp()
-  }, { merge: true });
-
-  return token;
-};
-
-const setupForegroundPushListener = async (onPayload) => {
-  const messaging = await getBrowserMessaging();
-  if (!messaging) return () => {};
-  return onMessage(messaging, (payload) => {
-    onPayload?.(payload);
-    const title = payload?.notification?.title || payload?.data?.title || 'تنبيه جديد';
-    const body = payload?.notification?.body || payload?.data?.body || payload?.data?.text || '';
-    try {
-      if (Notification.permission === 'granted') {
-        new Notification(title, { body, icon: '/icons/icon-192.png', badge: '/icons/icon-192.png' });
-      }
-    } catch (error) {
-      console.warn('Foreground notification failed:', error?.message);
-    }
-  });
-};
-
 
 const formatWatchTime = (totalSeconds) => {
     if (!totalSeconds || totalSeconds < 0) return 'أقل من ثانية';
@@ -892,7 +811,7 @@ const callPlatformAIWithRetry = async (payload, attempts = 3) => {
         try {
             const res = await fetch('/api/ai-coach', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: await getAdminAIHeaders(),
                 body: JSON.stringify(payload)
             });
             const data = await res.json().catch(() => ({}));
@@ -2337,7 +2256,7 @@ const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
 
             const response = await fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: await getAdminAIHeaders(),
                 body: JSON.stringify({
                     contents: [{
                         role: "user",
@@ -2471,7 +2390,7 @@ const AIQuickHealthCheck = () => {
     try {
       const res = await fetch('/api/ai-coach', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAdminAIHeaders(),
         body: JSON.stringify({ mode: 'generate_questions', question: 'اختبار تشغيل سريع', topic: 'النحو', count: 1, adminOnly: true })
       });
       const data = await res.json().catch(() => ({}));
@@ -2517,7 +2436,7 @@ const LiveAICoachPanel = ({ session, user, userData }) => {
     try {
       const res = await fetch('/api/ai-coach', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAdminAIHeaders(),
         body: JSON.stringify({
           mode: 'student_chat',
           studentName: userData?.name || user?.displayName || user?.email || '',
@@ -2543,7 +2462,7 @@ const LiveAICoachPanel = ({ session, user, userData }) => {
     try {
       const res = await fetch('/api/ai-coach', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAdminAIHeaders(),
         body: JSON.stringify({
           mode: 'student_chat',
           grade: lessonContext.grade,
@@ -2567,7 +2486,7 @@ const LiveAICoachPanel = ({ session, user, userData }) => {
     try {
       const res = await fetch('/api/ai-coach', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAdminAIHeaders(),
         body: JSON.stringify({
           mode: 'generate_exam',
           topic: `${lessonContext.title} ${lessonContext.description}`,
@@ -3125,7 +3044,7 @@ const AIInteractiveExamModal = ({ user, userData, onClose }) => {
     try {
       const res = await fetch('/api/ai-coach', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAdminAIHeaders(),
         body: JSON.stringify({
           mode: 'generate_exam',
           language: 'ar-EG',
@@ -3645,7 +3564,7 @@ const AIQuestionGeneratorPanel = ({ userData = null, onAddQuestions = null }) =>
     try {
       const res = await fetch('/api/ai-coach', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAdminAIHeaders(),
         body: JSON.stringify({
           mode: 'generate_questions',
           language: 'ar-EG',
@@ -3751,7 +3670,7 @@ const AIEssayCorrectorBox = ({ exam, question, answer, studentName = '' }) => {
     try {
       const res = await fetch('/api/ai-coach', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAdminAIHeaders(),
         body: JSON.stringify({
           mode: 'essay_correct',
           language: 'ar-EG',
@@ -3817,7 +3736,7 @@ const AIExamBuilderPanel = ({ userData = null }) => {
     try {
       const res = await fetch('/api/ai-coach', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAdminAIHeaders(),
         body: JSON.stringify({
           mode: 'generate_exam',
           language: 'ar-EG',
@@ -3889,7 +3808,7 @@ const AIStudentChatCoach = ({ user, userData, examResults = [] }) => {
     try {
       const res = await fetch('/api/ai-coach', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAdminAIHeaders(),
         body: JSON.stringify({
           mode: 'student_chat',
           language: 'ar-EG',
@@ -3948,7 +3867,7 @@ const RealAIBox = ({ title = 'AI الحقيقي', payload = {}, compact = false 
     try {
       const res = await fetch('/api/ai-coach', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAdminAIHeaders(),
         body: JSON.stringify(payload)
       });
 
@@ -9566,7 +9485,7 @@ const DebugPanel = ({ user }) => {
     try {
       const res = await fetch('/api/ai-coach', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAdminAIHeaders(),
         body: JSON.stringify({ mode: 'generate_questions', question: 'اختبار سريع للذكاء الاصطناعي', topic: 'النحو', count: 1, adminOnly: true })
       });
       const data = await res.json().catch(() => ({}));
