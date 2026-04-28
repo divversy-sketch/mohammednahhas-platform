@@ -1558,6 +1558,9 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     setShowAntiCheatChoice(true);
     await saveExamProgress({
       status: 'security_hold',
+      adminDecision: null,
+      adminSecurityAction: 'pending',
+      resumeApproved: false,
       antiCheatWarnings: nextWarning,
       antiCheatLog: nextLog,
       securityHoldAt: serverTimestamp(),
@@ -1916,9 +1919,9 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
           </div>
 
           {!isSubmitted && (
-            <div className="mb-6 bg-slate-800/60 text-slate-200 p-4 rounded-2xl border border-slate-700 text-center font-bold flex flex-col md:flex-row items-center justify-between gap-3">
-              <span>وضع الأمان مفعل: يتم تسجيل الخروج من الصفحة، النسخ/اللصق، كليك يمين، والخروج من ملء الشاشة.</span>
-              <button onClick={() => document.documentElement.requestFullscreen?.().catch(() => {})} className="bg-amber-500 text-slate-900 px-4 py-2 rounded-xl font-black">تفعيل ملء الشاشة</button>
+            <div className="mb-6 bg-slate-800/60 text-slate-200 p-4 rounded-2xl border border-slate-700 text-center font-bold">
+              وضع الأمان مفعل: يتم تسجيل الخروج من الصفحة، النسخ/اللصق، كليك يمين، والخروج من ملء الشاشة.
+              زر ملء الشاشة موجود الآن بجانب زر التسليم داخل صفحة الأسئلة.
             </div>
           )}
 
@@ -2085,10 +2088,17 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
           )}
           <h2 className="font-bold text-lg font-sans text-amber-400 truncate hidden md:block">{exam.title} {isSubmitted ? '(مراجعة الإجابات)' : ''}</h2>
           {!isSubmitted && (
-            <div className="flex items-center gap-3">
-              <div className="bg-slate-800 px-6 py-2 rounded-full font-mono shadow-inner border border-slate-700 font-bold text-amber-400 text-lg flex items-center gap-2">
+            <div className="flex items-center gap-2 md:gap-3 flex-wrap justify-end">
+              <div className="bg-slate-800 px-4 md:px-6 py-2 rounded-full font-mono shadow-inner border border-slate-700 font-bold text-amber-400 text-base md:text-lg flex items-center gap-2">
                 <Timer size={18} /> {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
               </div>
+              <button
+                onClick={() => document.documentElement.requestFullscreen?.().catch(() => alert('لو ملء الشاشة لم يعمل، افتح المنصة من المتصفح مباشرة وليس داخل تطبيق خارجي.'))}
+                className="bg-amber-500 hover:bg-amber-600 text-slate-900 px-3 md:px-4 py-2 rounded-xl font-black transition whitespace-nowrap flex items-center gap-2 shadow-lg"
+                title="تفعيل ملء الشاشة"
+              >
+                <Layout size={18} /> ملء الشاشة
+              </button>
               <button onClick={confirmSubmit} className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-xl font-bold transition whitespace-nowrap flex items-center gap-2 shadow-lg">
                 <CheckCircle size={18} /> تسليم
               </button>
@@ -8596,7 +8606,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
     };
 
     if (previousResult) {
-        const hasAdminContinueApproval = previousResult.adminDecision === 'continue' || previousResult.resumeApproved === true;
+        const hasAdminContinueApproval = previousResult.adminDecision === 'continue';
         const hasAdminRestartApproval = previousResult.adminDecision === 'restart';
 
         if (previousResult.status === 'completed') {
@@ -8618,7 +8628,8 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
           await setDoc(doc(db, 'exam_results', previousResult.id), {
             status: 'in_progress',
             adminDecision: 'continue_consumed',
-            resumeApproved: true,
+            resumeApproved: false,
+            adminSecurityAction: 'continue_consumed',
             resumedAfterAdminApprovalAt: serverTimestamp(),
             lastSavedAt: serverTimestamp(),
             sourceVideoId: previousResult.sourceVideoId || options.sourceVideoId || null
@@ -9164,7 +9175,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                 const isExamTimeOver = Date.now() > new Date(e.endTime).getTime();
                 
                 let statusText = null; let statusClass = "";
-                const canResumeByAdmin = prevResult && (prevResult.adminDecision === 'continue' || prevResult.resumeApproved === true);
+                const canResumeByAdmin = prevResult && prevResult.adminDecision === 'continue';
                 const canRestartByAdmin = prevResult && prevResult.adminDecision === 'restart';
                 const waitingAdminDecision = prevResult && ['security_hold', 'in_progress', 'cheated'].includes(prevResult.status) && !canResumeByAdmin && !canRestartByAdmin;
                 if (prevResult) {
