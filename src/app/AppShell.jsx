@@ -21,7 +21,6 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { auth, db, savePushTokenForUser, setupForegroundPushListener } from '../services/firebase';
 import { isVisibleLiveSession } from '../utils/liveSessions';
-import HomeDashboard from '../components/student/HomeDashboard';
 
 const getAdminAIHeaders = async () => {
   const token = await auth?.currentUser?.getIdToken?.();
@@ -330,37 +329,78 @@ const calculateDetailedExamMetrics = (exam, answers = {}, essayGrades = {}) => {
     let totalScore = 0;
     let totalPossible = 0;
     let mcqCount = 0;
+    let mcqAnswered = 0;
+    let mcqCorrect = 0;
+    let mcqWrong = 0;
     let essayCount = 0;
+    let essayAnswered = 0;
+    let essayPending = 0;
 
     questions.forEach(q => {
         const branch = q.branch || 'عام';
-        branchStats[branch] = branchStats[branch] || { earned: 0, possible: 0, answered: 0, total: 0, correct: 0, wrong: 0, essay: 0 };
+        branchStats[branch] = branchStats[branch] || {
+            earned: 0,
+            possible: 0,
+            answered: 0,
+            total: 0,
+            correct: 0,
+            wrong: 0,
+            essay: 0,
+            essayAnswered: 0,
+            essayPending: 0,
+            mcq: 0,
+            mcqAnswered: 0
+        };
+
         const maxScore = getQuestionMaxScore(q);
         totalPossible += maxScore;
         branchStats[branch].possible += maxScore;
         branchStats[branch].total += 1;
+
         const answerValue = answers[q.id];
         const answered = q.type === 'essay'
             ? !!(answerValue && ((typeof answerValue === 'string' && answerValue.trim()) || answerValue.text || answerValue.image))
-            : answerValue !== undefined;
+            : answerValue !== undefined && answerValue !== null && answerValue !== '';
+
         if (answered) branchStats[branch].answered += 1;
 
         if (q.type === 'essay') {
             essayCount += 1;
             branchStats[branch].essay += 1;
+            if (answered) {
+                essayAnswered += 1;
+                branchStats[branch].essayAnswered += 1;
+            }
+
             const gradeInfo = essayGrades[q.id] || {};
-            const earned = safeNumber(gradeInfo.score, 0);
-            totalScore += earned;
-            branchStats[branch].earned += earned;
+            const hasEssayGrade = gradeInfo.score !== undefined && gradeInfo.score !== null && gradeInfo.score !== '';
+
+            if (hasEssayGrade) {
+                const earned = Math.max(0, Math.min(maxScore, safeNumber(gradeInfo.score, 0)));
+                totalScore += earned;
+                branchStats[branch].earned += earned;
+            } else if (answered) {
+                essayPending += 1;
+                branchStats[branch].essayPending += 1;
+            }
         } else {
             mcqCount += 1;
-            const isCorrect = answerValue === q.correctIdx;
-            if (isCorrect) {
-                totalScore += maxScore;
-                branchStats[branch].earned += maxScore;
-                branchStats[branch].correct += 1;
-            } else if (answered) {
-                branchStats[branch].wrong += 1;
+            branchStats[branch].mcq += 1;
+
+            if (answered) {
+                mcqAnswered += 1;
+                branchStats[branch].mcqAnswered += 1;
+                const isCorrect = answerValue === q.correctIdx;
+
+                if (isCorrect) {
+                    mcqCorrect += 1;
+                    totalScore += maxScore;
+                    branchStats[branch].earned += maxScore;
+                    branchStats[branch].correct += 1;
+                } else {
+                    mcqWrong += 1;
+                    branchStats[branch].wrong += 1;
+                }
             }
         }
     });
@@ -371,7 +411,12 @@ const calculateDetailedExamMetrics = (exam, answers = {}, essayGrades = {}) => {
         percentage: totalPossible > 0 ? Math.round((totalScore / totalPossible) * 100) : 0,
         branchStats,
         mcqCount,
+        mcqAnswered,
+        mcqCorrect,
+        mcqWrong,
         essayCount,
+        essayAnswered,
+        essayPending,
         questions
     };
 };
@@ -1252,10 +1297,63 @@ const InteractiveViewer = ({ content, user, onClose }) => {
 
 
 const StudentLocalAdvice = ({ metrics = {}, content = [] }) => {
-  const branches = Object.entries(metrics?.branchStats || {}).map(([branch, data]) => ({ branch, pct: data.possible > 0 ? Math.round((safeNumber(data.earned, 0) / safeNumber(data.possible, 0)) * 100) : 0, wrong: safeNumber(data.wrong, 0) })).sort((a,b)=>a.pct-b.pct);
-  const weakBranches = branches.filter(b => b.pct < 70).slice(0, 3);
+  const branches = Object.entries(metrics?.branchStats || {})
+    .map(([branch, data]) => {
+      const possible = safeNumber(data?.possible, 0);
+      const earned = safeNumber(data?.earned, 0);
+      const wrong = safeNumber(data?.wrong, 0);
+      const mcq = safeNumber(data?.mcq, 0);
+      const essayPending = safeNumber(data?.essayPending, 0);
+      const pct = possible > 0 ? Math.round((earned / possible) * 100) : 100;
+      return { branch, pct, wrong, mcq, essayPending };
+    })
+    .sort((a, b) => (b.wrong - a.wrong) || (a.pct - b.pct));
+
+  const weakBranches = branches.filter(b => b.wrong > 0).slice(0, 3);
+  const pendingEssayBranches = branches.filter(b => b.essayPending > 0 && b.wrong === 0).slice(0, 2);
   const recommendations = getReviewRecommendations(metrics?.branchStats || {}, content || []);
-  return <div className="mt-5 bg-slate-900/70 border border-slate-700 rounded-3xl p-5 text-slate-100"><div className="flex items-center gap-2 mb-4"><BrainCircuit className="text-amber-400"/><h3 className="font-black text-xl">تحليل الطالب</h3></div><p className="text-sm text-slate-300 mb-4">التحليل مبني على إجاباتك ونسب الفروع داخل المنصة.</p>{weakBranches.length===0?<div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 text-emerald-200 font-bold">ممتاز يا بطل. لا توجد فروع أقل من 70%. راجع الأخطاء الفردية وحافظ على مستواك.</div>:<div className="space-y-3">{weakBranches.map((b,idx)=>{const rec=recommendations.find(r=>r.branch===b.branch);return <div key={idx} className="bg-white/5 border border-white/10 rounded-2xl p-4"><div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-2"><p className="font-black text-red-300">راجع فرع: {b.branch}</p><span className="text-xs bg-red-500/20 text-red-200 px-3 py-1 rounded-full font-bold">{b.pct}%</span></div><p className="text-sm text-slate-200 leading-relaxed">عندك {b.wrong} أخطاء في هذا الفرع. ابدأ بمراجعة القاعدة، ثم حل أسئلة قصيرة، وبعدها ارجع لبنك الأخطاء.</p>{rec?.title && <p className="text-xs text-amber-200 mt-2">اقتراح مراجعة: {rec.title}</p>}</div>})}</div>}</div>;
+
+  return (
+    <div className="mt-5 bg-slate-900/70 border border-slate-700 rounded-3xl p-5 text-slate-100">
+      <div className="flex items-center gap-2 mb-4">
+        <BrainCircuit className="text-amber-400" />
+        <h3 className="font-black text-xl">تحليل الطالب</h3>
+      </div>
+      <p className="text-sm text-slate-300 mb-4">التحليل مبني على إجاباتك ونسب الفروع داخل المنصة.</p>
+
+      {weakBranches.length === 0 ? (
+        <div className="space-y-3">
+          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 text-emerald-200 font-bold">
+            ممتاز يا بطل. لا توجد أخطاء اختيارية واضحة في الفروع المعروضة. راجع الأسئلة التي لم تثبت منها وحافظ على مستواك.
+          </div>
+          {pendingEssayBranches.map((b) => (
+            <div key={b.branch} className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 text-amber-100">
+              <p className="font-black">فرع {b.branch} يحتوي على سؤال مقالي بانتظار التصحيح.</p>
+              <p className="text-sm mt-1">لا أعتبره خطأ. بعد تصحيح المقالي ستظهر النسبة النهائية بدقة.</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {weakBranches.map((b, idx) => {
+            const rec = recommendations.find(r => r.branch === b.branch);
+            return (
+              <div key={idx} className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-2">
+                  <p className="font-black text-red-300">راجع فرع: {b.branch}</p>
+                  <span className="text-xs bg-red-500/20 text-red-200 px-3 py-1 rounded-full font-bold">{b.wrong} خطأ</span>
+                </div>
+                <p className="text-sm text-slate-200 leading-relaxed">
+                  ركز على الأسئلة التي أخطأت فيها داخل هذا الفرع أولًا، ثم راجع القاعدة المرتبطة بها، وبعدها حل تدريبًا قصيرًا للتثبيت.
+                </p>
+                {rec?.title && <p className="text-xs text-amber-200 mt-2">اقتراح مراجعة: {rec.title}</p>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 };
 const StudentLocalHomeCoach = ({ userResults = [], content = [] }) => { const branchStats={}; (userResults||[]).slice(0,10).forEach(r=>{const stats=r?.branchStats||r?.performanceAnalysis?.branchStats||r?.branchAnalysis||{}; Object.entries(stats).forEach(([branch,d])=>{branchStats[branch]=branchStats[branch]||{earned:0,possible:0,wrong:0}; branchStats[branch].earned+=safeNumber(d.earned,0); branchStats[branch].possible+=safeNumber(d.possible,d.total||0); branchStats[branch].wrong+=safeNumber(d.wrong,0);});}); return <StudentLocalAdvice metrics={{branchStats}} content={content}/>; };
 const buildStudentProgressInsights = (userResults = [], mistakes = []) => {
@@ -1675,9 +1773,9 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
 
   const handleSubmit = async (auto = false) => {
     setShowSubmitConfirm(false);
-    const finalScore = calculateScore();
-    const timeTaken = Math.round((Date.now() - startTime) / 1000);
     const finalMetrics = calculateDetailedExamMetrics(exam, answers);
+    const finalScore = finalMetrics.mcqCorrect;
+    const timeTaken = Math.round((Date.now() - startTime) / 1000);
     const finalBranchStats = Object.fromEntries(
       Object.entries(finalMetrics.branchStats || {}).map(([branch, stat]) => [branch, {
         earned: safeNumber(stat.earned, 0),
@@ -1792,37 +1890,29 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
   }
 
   const totalQs = flatQuestions.length;
-  const solvedQs = flatQuestions.filter((q) => answers[q.id] !== undefined && answers[q.id] !== '' && answers[q.id] !== null).length;
-  const unsolvedQs = totalQs - solvedQs;
-  const correctQs = score;
-  const wrongQs = mcqQuestions.filter((q) => answers[q.id] !== undefined && answers[q.id] !== q.correctIdx).length;
-  const percentage = mcqQuestions.length > 0 ? Math.round((score / mcqQuestions.length) * 100) : 0;
-  const essayAnswered = essayQuestions.filter((q) => {
-    const val = answers[q.id];
-    if (typeof val === 'object') return !!(val?.text?.trim() || val?.image);
-    return !!val;
-  }).length;
+  const detailedMetrics = calculateDetailedExamMetrics(exam, answers);
+  const solvedQs = detailedMetrics.mcqAnswered + detailedMetrics.essayAnswered;
+  const unsolvedQs = Math.max(0, totalQs - solvedQs);
+  const savedCorrectScore = safeNumber(existingResult?.mcqScore ?? existingResult?.score, NaN);
+  const correctQs = Number.isFinite(savedCorrectScore) && isSubmitted ? savedCorrectScore : detailedMetrics.mcqCorrect;
+  const wrongQs = Math.max(0, detailedMetrics.mcqAnswered - correctQs);
+  const percentage = detailedMetrics.mcqCount > 0 ? Math.round((correctQs / detailedMetrics.mcqCount) * 100) : 0;
+  const essayAnswered = detailedMetrics.essayAnswered;
 
-  const branchStats = {};
-  flatQuestions.forEach((q) => {
-    const b = q.branch;
-    if (!branchStats[b]) branchStats[b] = { total: 0, solved: 0, correct: 0, wrong: 0, unsolved: 0, essay: 0 };
-    branchStats[b].total++;
-    const isAnswered = answers[q.id] !== undefined && answers[q.id] !== '' && answers[q.id] !== null;
-    if (isAnswered) branchStats[b].solved++;
-    else branchStats[b].unsolved++;
-
-    if (q.type === 'essay') {
-      branchStats[b].essay++;
-    } else if (answers[q.id] === q.correctIdx) {
-      branchStats[b].correct++;
-    } else if (answers[q.id] !== undefined) {
-      branchStats[b].wrong++;
-    }
-  });
+  const branchStats = Object.fromEntries(
+    Object.entries(detailedMetrics.branchStats || {}).map(([branch, stat]) => [branch, {
+      total: safeNumber(stat.total, 0),
+      solved: safeNumber(stat.answered, 0),
+      correct: safeNumber(stat.correct, 0),
+      wrong: safeNumber(stat.wrong, 0),
+      unsolved: Math.max(0, safeNumber(stat.total, 0) - safeNumber(stat.answered, 0)),
+      essay: safeNumber(stat.essay, 0),
+      essayPending: safeNumber(stat.essayPending, 0),
+      mcq: safeNumber(stat.mcq, 0)
+    }])
+  );
 
   const canReview = exam.id === 'custom_mistakes_exam' || Date.now() > new Date(exam.endTime).getTime();
-  const detailedMetrics = calculateDetailedExamMetrics(exam, answers);
   const performanceInsights = getPerformanceInsights(detailedMetrics);
   const gradeBadge = getGradeBadge(detailedMetrics.percentage || percentage);
 
@@ -8766,19 +8856,8 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
         {activeTab === 'home' && (
             <div className="space-y-8">
-                <HomeDashboard
-                    userData={userData}
-                    examResults={examResults}
-                    mistakes={mistakes}
-                    content={content}
-                    videos={videos}
-                    filesAndLinks={filesAndLinks}
-                    isPremium={isPremium}
-                    isBannedContent={isBannedContent}
-                    getGradeLabel={getGradeLabel}
-                    setActiveTab={setActiveTab}
-                    onStartMistakesExam={startMistakesExam}
-                />
+                <StudentLevelHomePanel userResults={examResults} mistakes={mistakes} content={content} onOpenMistakes={() => setActiveTab('mistakes_bank')} onStartMistakesExam={startMistakesExam} />
+                <StudentStudyPlanPanel userResults={examResults} mistakes={mistakes} content={content} onOpenMistakes={() => setActiveTab('mistakes_bank')} onStartMistakesExam={startMistakesExam} />
                 {liveSessions.length > 0 && (
                     <div className="bg-white border border-red-100 text-slate-800 p-4 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm">
                         <div>
