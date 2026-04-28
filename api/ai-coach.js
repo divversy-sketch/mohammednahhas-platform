@@ -1,5 +1,6 @@
 // api/ai-coach.js
-// Gemini فقط - بدون fallback وبدون حدود استخدام
+// Phase 30 - Gemini AI: exam review + question explain + student home plan + essay correction
+// Gemini فقط - بدون حدود استخدام، مع دعم كل أوضاع المنصة.
 
 const GEMINI_MODELS = [
   process.env.GEMINI_MODEL || "gemini-2.5-flash",
@@ -27,7 +28,11 @@ function extractJson(text) {
 }
 
 function getLesson(body = {}) {
-  return String(body.lesson || body.topic || body.branches || body.branch || body.question || "").trim();
+  return String(body.lesson || body.topic || body.branches || body.branch || body.question || body.questionText || "").trim();
+}
+
+function safeString(value, fallback = "") {
+  return String(value ?? fallback).trim();
 }
 
 function isBadOption(value) {
@@ -80,22 +85,160 @@ function normalizeExam(rawExam, body = {}) {
   };
 }
 
+function compactQuestions(list = [], max = 30) {
+  return (Array.isArray(list) ? list : []).slice(0, max).map((q, i) => ({
+    number: i + 1,
+    text: q.text || q.questionText || "",
+    branch: q.branch || "عام",
+    type: q.type || "mcq",
+    correctAnswer: q.correctAnswer || "",
+    chosenAnswer: q.chosenAnswer || q.studentAnswer || "",
+    isCorrect: q.isCorrect,
+    explanation: q.explanation || ""
+  }));
+}
+
 function buildPrompt(body = {}) {
+  const mode = body.mode || "student_chat";
   const lesson = getLesson(body);
   const grade = body.grade || "غير محدد";
   const count = Math.min(Math.max(Number(body.mcqCount || body.count || 18), 5), 20);
 
-  if (body.mode === "generate_questions") {
+  if (mode === "question_explain") {
+    const q = body.question || {};
+    return `
+أنت مدرس لغة عربية مصري.
+اشرح للطالب سؤالًا واحدًا بعد الامتحان.
+
+بيانات الطالب:
+الاسم: ${body.studentName || ""}
+المرحلة: ${grade}
+الامتحان: ${body.examTitle || ""}
+
+السؤال:
+${q.text || body.questionText || ""}
+
+الفرع: ${q.branch || body.branch || "عام"}
+القطعة إن وجدت:
+${q.blockText || ""}
+
+اختيارات السؤال:
+${Array.isArray(q.options) ? q.options.map((x, i) => `${i}: ${x}`).join("\n") : ""}
+
+إجابة الطالب: ${q.chosenAnswer || body.studentAnswer || "لم يجب"}
+الإجابة الصحيحة: ${q.correctAnswer || body.correctAnswer || ""}
+شرح محفوظ من السؤال إن وجد: ${q.explanation || ""}
+
+أعد JSON فقط:
+{
+  "summary": "ملخص قصير لحالة إجابة الطالب",
+  "answer": "التصويب المباشر للطالب",
+  "explanation": "شرح الفكرة والقاعدة بطريقة بسيطة",
+  "mistakeReason": "سبب الخطأ المحتمل إن كانت الإجابة خطأ",
+  "studyPlan": ["خطوة مذاكرة 1", "خطوة مذاكرة 2", "خطوة مذاكرة 3"],
+  "quickExercises": ["تدريب قصير 1", "تدريب قصير 2"]
+}
+`;
+  }
+
+  if (mode === "exam_review") {
+    const wrongQuestions = compactQuestions(body.wrongQuestions || (body.questions || []).filter(q => q.isCorrect === false), 25);
+    const weakBranches = body.weakBranches || [];
+    return `
+أنت مدرس لغة عربية مصري ومحلل أداء.
+حلل نتيجة طالب بعد امتحان، وقدم مراجعة ذكية مفيدة.
+
+بيانات الطالب:
+الاسم: ${body.studentName || ""}
+المرحلة: ${grade}
+الامتحان: ${body.examTitle || ""}
+
+إحصائيات النتيجة:
+${JSON.stringify(body.metrics || {}, null, 2)}
+
+الفروع الضعيفة:
+${JSON.stringify(weakBranches, null, 2)}
+
+الأسئلة الخطأ:
+${JSON.stringify(wrongQuestions, null, 2)}
+
+المطلوب:
+- شرح عام لأداء الطالب.
+- تحديد سبب الأخطاء.
+- خطة مذاكرة عملية حسب الفروع الضعيفة.
+- تدريبات قصيرة مقترحة.
+- لا تقل "لم يتم تقديم سؤال الطالب" لأن هذه مراجعة امتحان كامل وليست سؤالًا واحدًا.
+
+أعد JSON فقط:
+{
+  "summary": "ملخص ذكي لأداء الطالب",
+  "answer": "تقييم واضح ومباشر",
+  "explanation": "شرح نقاط القوة والضعف والأسئلة الخطأ",
+  "mistakeReason": "الأسباب المتكررة للأخطاء",
+  "studyPlan": ["خطة 1", "خطة 2", "خطة 3", "خطة 4"],
+  "quickExercises": ["تدريب 1", "تدريب 2", "تدريب 3"]
+}
+`;
+  }
+
+  if (mode === "student_home_plan") {
+    return `
+أنت مدرب مذاكرة للغة العربية.
+حلل نتائج الطالب الأخيرة واعمل خطة مذاكرة مخصصة.
+
+الطالب: ${body.studentName || ""}
+المرحلة: ${grade}
+النتائج الأخيرة:
+${JSON.stringify(body.recentResults || [], null, 2)}
+المحتوى المقترح إن وجد:
+${JSON.stringify(body.recommendedContent || body.content || [], null, 2)}
+
+أعد JSON فقط:
+{
+  "summary": "ملخص حالة الطالب",
+  "answer": "نصيحة واضحة للطالب",
+  "explanation": "تحليل مختصر لأقوى وأضعف الفروع",
+  "mistakeReason": "سبب التعثر المحتمل",
+  "studyPlan": ["ماذا يذاكر أولًا", "ماذا يحل", "متى يراجع", "كيف يقيس تقدمه"],
+  "quickExercises": ["تدريب سريع 1", "تدريب سريع 2"]
+}
+`;
+  }
+
+  if (mode === "essay_correct") {
+    const q = body.question || {};
+    return `
+أنت مصحح لغة عربية.
+صحح إجابة مقالية للطالب واقترح درجة، لكن القرار النهائي للأدمن.
+
+الطالب: ${body.studentName || ""}
+الامتحان: ${body.examTitle || ""}
+السؤال: ${q.text || ""}
+الفرع: ${q.branch || ""}
+الإجابة النموذجية أو معيار التصحيح: ${q.modelAnswer || ""}
+الدرجة العظمى: ${q.maxScore || 10}
+إجابة الطالب:
+${body.studentAnswer || ""}
+
+أعد JSON فقط:
+{
+  "suggestedScore": 0,
+  "feedback": "ملاحظات التصحيح",
+  "strengths": ["نقطة قوة"],
+  "improvements": ["نقطة تحسين"]
+}
+`;
+  }
+
+  if (mode === "generate_questions") {
     return `
 أنت معلم لغة عربية مصري خبير.
 الطالب طلب أسئلة عن: "${lesson}"
 المرحلة الدراسية: ${grade}
 عدد الأسئلة المطلوب: ${Math.min(count, 10)}
 
-اكتب أسئلة اختيار من متعدد عن نفس الدرس الذي كتبه الطالب فقط، أيًا كان الدرس: اسم الفاعل، اسم المفعول، اسم التفضيل، التشبيه، الاستعارة، القراءة، النصوص، النحو... إلخ.
-لا تستخدم أمثلة محفوظة ثابتة.
-لا تسأل عن طريقة المذاكرة أو خطوات الحل.
-كل سؤال يجب أن يكون من محتوى الدرس نفسه.
+اكتب أسئلة اختيار من متعدد عن نفس الدرس الذي كتبه الطالب فقط.
+ممنوع أسئلة عامة عن المذاكرة أو خطوات الحل.
 كل سؤال له 4 اختيارات حقيقية مختلفة.
 correctIdx رقم من 0 إلى 3.
 
@@ -116,7 +259,7 @@ correctIdx رقم من 0 إلى 3.
 `;
   }
 
-  if (body.mode === "generate_exam") {
+  if (mode === "generate_exam") {
     return `
 أنت معلم لغة عربية مصري خبير.
 أنشئ امتحان اختيار من متعدد من ${count} سؤال.
@@ -124,13 +267,8 @@ correctIdx رقم من 0 إلى 3.
 مهم جدًا:
 - الدرس المطلوب من الطالب هو: "${lesson}"
 - المرحلة الدراسية: ${grade}
-- يجب أن تكون كل الأسئلة عن هذا الدرس تحديدًا، وليس عن درس آخر.
-- إذا كتب الطالب "اسم الفاعل" تكون الأسئلة عن اسم الفاعل فقط.
-- إذا كتب الطالب "اسم التفضيل" تكون الأسئلة عن اسم التفضيل فقط.
-- إذا كتب الطالب أي درس آخر، ولّد له من Gemini عن هذا الدرس.
-- ممنوع fallback.
+- يجب أن تكون كل الأسئلة عن هذا الدرس تحديدًا.
 - ممنوع أسئلة عامة عن المذاكرة أو طريقة الحل.
-- ممنوع اختيارات وهمية مثل: اختيار أ / اختيار ب.
 - كل سؤال 4 اختيارات حقيقية مختلفة.
 - correctIdx رقم من 0 إلى 3.
 - اشرح الإجابة في explanation.
@@ -155,15 +293,18 @@ correctIdx رقم من 0 إلى 3.
 `;
   }
 
+  const userQuestion = safeString(body.question || body.message || lesson);
   return `
 أنت مساعد تعليمي مصري.
 السياق: ${body.context || ""}
-سؤال الطالب: ${body.question || body.message || lesson || ""}
+سؤال الطالب: ${userQuestion || "قدّم مساعدة تعليمية عامة مناسبة للطالب."}
 
 أعد JSON فقط:
 {
   "summary": "ملخص",
   "answer": "إجابة واضحة",
+  "explanation": "شرح مبسط",
+  "mistakeReason": "",
   "studyPlan": ["خطوة 1", "خطوة 2", "خطوة 3"],
   "quickExercises": ["تدريب 1", "تدريب 2"]
 }
@@ -178,7 +319,7 @@ async function callGemini(model, key, prompt) {
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: {
-        temperature: 0.55,
+        temperature: 0.45,
         maxOutputTokens: 8192,
         responseMimeType: "application/json"
       }
@@ -205,7 +346,7 @@ export default async function handler(req, res) {
   if (req.method === "GET") {
     return send(res, 200, {
       ok: true,
-      message: "AI Coach API works - Gemini only",
+      message: "AI Coach API works - Gemini full platform modes",
       provider: "gemini",
       fallback: false,
       limits: false,
@@ -295,7 +436,7 @@ export default async function handler(req, res) {
     provider: "gemini",
     fallback: false,
     limits: false,
-    error: "Gemini لم يولد أسئلة صالحة الآن. جرّب مرة أخرى أو اكتب اسم الدرس بشكل أوضح.",
+    error: "Gemini لم يرد برد صالح الآن. جرّب مرة أخرى بعد قليل أو اختصر السؤال.",
     errors
   });
 }

@@ -3809,7 +3809,7 @@ const AIEssayCorrectorBox = ({ exam, question, answer, studentName = '' }) => {
       });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || 'تعذر تصحيح المقالي.');
-      setCorrection(data.analysis);
+      setCorrection(data.analysis || data.data || null);
     } catch (error) {
       console.error('AI essay correction error:', error);
       alert(error.message || 'تعذر تصحيح المقالي.');
@@ -3998,7 +3998,7 @@ const RealAIBox = ({ title = 'AI الحقيقي', payload = {}, compact = false 
         throw new Error(data.error || 'AI غير متصل حاليًا. تأكد من وجود فولدر api في جذر المشروع ومن مفاتيح OPENAI_API_KEY أو GEMINI_API_KEY في Vercel ثم اعمل Redeploy.');
       }
 
-      setAiResult(data.analysis);
+      setAiResult(data.analysis || data.data || null);
     } catch (error) {
       console.error('Real AI error:', error);
       setAiError(error.message || 'حدث خطأ أثناء تشغيل AI.');
@@ -4039,6 +4039,13 @@ const RealAIBox = ({ title = 'AI الحقيقي', payload = {}, compact = false 
             <div className="bg-fuchsia-50 border border-fuchsia-100 rounded-xl p-3">
               <p className="text-xs font-bold text-fuchsia-600 mb-1">ملخص ذكي</p>
               <p className="font-bold text-slate-800 leading-relaxed">{aiResult.summary}</p>
+            </div>
+          )}
+
+          {aiResult.answer && (
+            <div className="bg-sky-50 border border-sky-100 rounded-xl p-3">
+              <p className="text-xs font-bold text-sky-600 mb-1">إجابة AI</p>
+              <p className="font-bold text-slate-800 leading-relaxed whitespace-pre-wrap">{aiResult.answer}</p>
             </div>
           )}
 
@@ -4090,6 +4097,12 @@ const buildQuestionAIPayload = ({ exam, question, answers, user, result = null }
     language: 'ar-EG',
     examTitle: exam?.title || '',
     studentName: user?.displayName || '',
+    grade: exam?.grade || '',
+    questionText: question?.text || '',
+    branch: question?.branch || '',
+    studentAnswer: chosenAnswer || 'لم يجب',
+    correctAnswer: correctAnswer || '',
+    isCorrect: !isEssay ? studentAnswer === question?.correctIdx : null,
     question: {
       text: question?.text || '',
       branch: question?.branch || '',
@@ -4122,18 +4135,32 @@ const buildExamAIPayload = ({ exam, answers, metrics, user }) => {
     };
   });
 
+  const wrongQuestions = questions.filter(q => q.isCorrect === false).slice(0, 25);
+  const weakBranches = Object.entries(metrics?.branchStats || {})
+    .map(([branch, data]) => ({
+      branch,
+      percentage: data?.possible > 0 ? Math.round((safeNumber(data?.earned, 0) / safeNumber(data?.possible, 1)) * 100) : 0,
+      wrong: safeNumber(data?.wrong, 0),
+      correct: safeNumber(data?.correct, 0)
+    }))
+    .sort((a, b) => a.percentage - b.percentage);
+
   return {
     mode: 'exam_review',
     language: 'ar-EG',
     examTitle: exam?.title || '',
     studentName: user?.displayName || '',
+    grade: exam?.grade || '',
+    question: `حلل نتيجة الطالب بعد امتحان ${exam?.title || ''}. ركز على الأسئلة الخطأ، سبب الخطأ، وخطة مذاكرة مخصصة.`,
     metrics: {
       percentage: metrics?.percentage,
       totalScore: metrics?.totalScore,
       totalPossible: metrics?.totalPossible,
       branchStats: metrics?.branchStats || {}
     },
-    questions
+    questions,
+    wrongQuestions,
+    weakBranches
   };
 };
 
@@ -8832,6 +8859,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                   payload={{
                     mode: 'student_home_plan',
                     language: 'ar-EG',
+                    question: 'حلل مستوى الطالب من نتائجه الأخيرة وقدّم خطة مذاكرة شخصية ونصائح عملية.',
                     studentName: userData?.name || user?.displayName || '',
                     grade: userData?.grade || '',
                     recentResults: (examResults || []).slice(0, 8).map(r => ({
