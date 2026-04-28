@@ -6622,11 +6622,18 @@ const AdminDashboard = ({ user }) => {
   const handleApproveSecurityContinue = async (result) => {
     if (!result?.id) return;
     if (!window.confirm(`السماح للطالب ${result.studentName || ''} باستكمال الامتحان بنفس الإجابات والوقت المتبقي؟`)) return;
+
+    const safeRemainingTime = safeNumber(result.remainingTime, safeNumber(result.totalTime, 60) * 60);
     const payload = {
       status: 'in_progress',
       adminDecision: 'continue',
       adminSecurityAction: 'continue',
       securityReleased: true,
+      resumeApproved: true,
+      resumeApprovedAt: serverTimestamp(),
+      remainingTime: safeRemainingTime,
+      currentQIndex: safeNumber(result.currentQIndex, 0),
+      answers: result.answers || {},
       adminApprovedBy: user.email || user.uid,
       adminApprovedAt: serverTimestamp(),
       antiCheatLog: [
@@ -6635,10 +6642,10 @@ const AdminDashboard = ({ user }) => {
       ]
     };
     await updateDoc(doc(db, 'exam_results', result.id), payload);
-    const updated = { ...result, ...payload };
+    const updated = { ...result, ...payload, remainingTime: safeRemainingTime, currentQIndex: safeNumber(result.currentQIndex, 0), answers: result.answers || {} };
     setExamResults(prev => prev.map(r => r.id === result.id ? updated : r));
     if (viewingResult?.id === result.id) setViewingResult(updated);
-    alert('تم السماح للطالب باستكمال الامتحان. عندما يدخل نفس الامتحان سيكمل من نفس الإجابات والوقت المتبقي.');
+    alert('تم السماح للطالب باستكمال الامتحان. عندما يدخل نفس الامتحان سيظهر له زر الاستكمال ويكمل من نفس الإجابات والوقت المتبقي.');
   };
 
   const handleApproveSecurityRestart = async (result) => {
@@ -7833,9 +7840,9 @@ const AdminDashboard = ({ user }) => {
                            })()}
                        </div>
                        <h3 className="font-bold text-lg mb-2">إجابات الطالب: {viewingResult.studentName}</h3>
-                       {viewingResult.status === 'security_hold' && (
+                       {(['security_hold', 'in_progress', 'cheated'].includes(viewingResult.status) && !['continue', 'restart', 'continue_consumed', 'restart_consumed'].includes(viewingResult.adminDecision)) && (
                          <div className="mb-4 bg-red-50 border border-red-200 text-red-800 p-4 rounded-xl">
-                           <p className="font-black mb-2 flex items-center gap-2"><ShieldAlert size={18}/> هذه المحاولة موقوفة أمنيًا وتحتاج قرار الأدمن</p>
+                           <p className="font-black mb-2 flex items-center gap-2"><ShieldAlert size={18}/> هذه المحاولة تحتاج قرار الأدمن</p>
                            <p className="text-sm font-bold mb-3">يمكنك السماح للطالب بالاستكمال من نفس الإجابات والوقت المتبقي، أو السماح بإعادة الامتحان من البداية.</p>
                            <div className="flex flex-col md:flex-row gap-2">
                              <button onClick={() => handleApproveSecurityContinue(viewingResult)} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-700">السماح بالاستكمال</button>
@@ -7955,7 +7962,7 @@ const AdminDashboard = ({ user }) => {
                                        </p>
                                    </div>
                                    <div className="flex gap-2 flex-wrap justify-end">
-                                      {res.status === 'security_hold' && (
+                                      {(['security_hold', 'in_progress', 'cheated'].includes(res.status) && !['continue', 'restart', 'continue_consumed', 'restart_consumed'].includes(res.adminDecision)) && (
                                         <>
                                           <button onClick={()=>handleApproveSecurityContinue(res)} className="bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-blue-700">السماح بالاستكمال</button>
                                           <button onClick={()=>handleApproveSecurityRestart(res)} className="bg-amber-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-amber-700">السماح بالإعادة</button>
@@ -8577,78 +8584,84 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
   const startExamWithCode = async (exam, options = {}) => {
     if (isBannedExam) return alert("أنت محظور من دخول الامتحانات.");
+
     const previousResult = examResults.find(r => r.examId === exam.id);
+    const openExamFromSavedResult = (result, resumeData = null) => {
+      setActiveExam({
+        ...exam,
+        attemptId: result.id,
+        resumeData: resumeData || result,
+        sourceVideoId: result.sourceVideoId || options.sourceVideoId || null
+      });
+    };
+
     if (previousResult) {
+        const hasAdminContinueApproval = previousResult.adminDecision === 'continue' || previousResult.resumeApproved === true;
+        const hasAdminRestartApproval = previousResult.adminDecision === 'restart';
+
         if (previousResult.status === 'completed') {
           alert(`أنت امتحنت الامتحان ده قبل كده وجبت ${previousResult.score}.`);
           return;
         }
+
+        if (hasAdminContinueApproval && ['security_hold', 'in_progress', 'cheated'].includes(previousResult.status)) {
+          const approvedResume = {
+            ...previousResult,
+            status: 'in_progress',
+            answers: previousResult.answers || {},
+            remainingTime: safeNumber(previousResult.remainingTime, exam.duration * 60),
+            currentQIndex: safeNumber(previousResult.currentQIndex, 0),
+            antiCheatWarnings: safeNumber(previousResult.antiCheatWarnings, 0),
+            antiCheatLog: previousResult.antiCheatLog || []
+          };
+
+          await setDoc(doc(db, 'exam_results', previousResult.id), {
+            status: 'in_progress',
+            adminDecision: 'continue_consumed',
+            resumeApproved: true,
+            resumedAfterAdminApprovalAt: serverTimestamp(),
+            lastSavedAt: serverTimestamp(),
+            sourceVideoId: previousResult.sourceVideoId || options.sourceVideoId || null
+          }, { merge: true });
+
+          openExamFromSavedResult({ ...previousResult, ...approvedResume, adminDecision: 'continue_consumed' }, approvedResume);
+          return;
+        }
+
+        if (hasAdminRestartApproval && ['security_hold', 'in_progress', 'cheated'].includes(previousResult.status)) {
+          const freshResume = {
+            answers: {},
+            remainingTime: exam.duration * 60,
+            currentQIndex: 0,
+            antiCheatWarnings: 0,
+            antiCheatLog: previousResult.antiCheatLog || []
+          };
+
+          await setDoc(doc(db, 'exam_results', previousResult.id), {
+            answers: {},
+            remainingTime: exam.duration * 60,
+            currentQIndex: 0,
+            score: 0,
+            total: 0,
+            status: 'in_progress',
+            adminDecision: 'restart_consumed',
+            resumeApproved: false,
+            antiCheatWarnings: 0,
+            restartedByAdminDecisionAt: serverTimestamp(),
+            sourceVideoId: previousResult.sourceVideoId || options.sourceVideoId || null
+          }, { merge: true });
+
+          openExamFromSavedResult({ ...previousResult, ...freshResume, status: 'in_progress', adminDecision: 'restart_consumed' }, freshResume);
+          return;
+        }
+
         if (previousResult.status === 'security_hold') {
-          if (previousResult.adminDecision === 'continue') {
-            setActiveExam({ ...exam, attemptId: previousResult.id, resumeData: previousResult, sourceVideoId: previousResult.sourceVideoId || options.sourceVideoId || null });
-            return;
-          }
-          if (previousResult.adminDecision === 'restart') {
-            const freshResume = { answers: {}, remainingTime: exam.duration * 60, antiCheatWarnings: 0, antiCheatLog: previousResult.antiCheatLog || [] };
-            await setDoc(doc(db, 'exam_results', previousResult.id), {
-              answers: {},
-              remainingTime: exam.duration * 60,
-              currentQIndex: 0,
-              score: 0,
-              total: 0,
-              status: 'in_progress',
-              adminDecision: 'restart_consumed',
-              antiCheatWarnings: 0,
-              restartedByAdminDecisionAt: serverTimestamp(),
-              sourceVideoId: previousResult.sourceVideoId || options.sourceVideoId || null
-            }, { merge: true });
-            setActiveExam({ ...exam, attemptId: previousResult.id, resumeData: freshResume, sourceVideoId: previousResult.sourceVideoId || options.sourceVideoId || null });
-            return;
-          }
-          alert('تم إيقاف محاولتك مؤقتًا بسبب تنبيهات الأمان. تواصل مع الأدمن ليقرر السماح بالاستكمال أو إعادة الامتحان.');
+          alert('تم إيقاف محاولتك مؤقتًا بسبب تنبيهات الأمان. انتظر موافقة الأدمن على الاستكمال أو الإعادة.');
           return;
         }
 
         if (previousResult.status === 'in_progress') {
-          if (previousResult.adminDecision === 'continue') {
-            setActiveExam({ ...exam, attemptId: previousResult.id, resumeData: previousResult, sourceVideoId: previousResult.sourceVideoId || options.sourceVideoId || null });
-            return;
-          }
-          if (previousResult.adminDecision === 'restart') {
-            const freshResume = { answers: {}, remainingTime: exam.duration * 60, antiCheatWarnings: 0, antiCheatLog: previousResult.antiCheatLog || [] };
-            await setDoc(doc(db, 'exam_results', previousResult.id), {
-              answers: {},
-              remainingTime: exam.duration * 60,
-              currentQIndex: 0,
-              score: 0,
-              total: 0,
-              adminDecision: 'restart_consumed',
-              antiCheatWarnings: 0,
-              restartedByAdminDecisionAt: serverTimestamp(),
-              sourceVideoId: previousResult.sourceVideoId || options.sourceVideoId || null
-            }, { merge: true });
-            setActiveExam({ ...exam, attemptId: previousResult.id, resumeData: freshResume, sourceVideoId: previousResult.sourceVideoId || options.sourceVideoId || null });
-            return;
-          }
-          const resume = window.confirm('لديك محاولة غير مكتملة لهذا الامتحان. اضغط OK للاستكمال بنفس الإجابات والوقت المتبقي، أو Cancel لإعادة الامتحان من البداية.');
-          if (resume) {
-            setActiveExam({ ...exam, attemptId: previousResult.id, resumeData: previousResult, sourceVideoId: previousResult.sourceVideoId || options.sourceVideoId || null });
-          } else {
-            await setDoc(doc(db, 'exam_results', previousResult.id), {
-              answers: {},
-              remainingTime: exam.duration * 60,
-              currentQIndex: 0,
-              score: 0,
-              total: 0,
-              status: 'in_progress',
-              antiCheatWarnings: 0,
-              antiCheatLog: [...(previousResult.antiCheatLog || []), { type: 'student_restart_before_resume', at: new Date().toISOString() }],
-              restartCount: increment(1),
-              restartedAt: serverTimestamp(),
-              sourceVideoId: previousResult.sourceVideoId || options.sourceVideoId || null
-            }, { merge: true });
-            setActiveExam({ ...exam, attemptId: previousResult.id, resumeData: { answers: {}, remainingTime: exam.duration * 60, antiCheatWarnings: 0, antiCheatLog: [] }, sourceVideoId: previousResult.sourceVideoId || options.sourceVideoId || null });
-          }
+          alert('لديك محاولة غير مكتملة. لا يمكن الاستكمال إلا بعد موافقة الأدمن من لوحة النتائج.');
           return;
         }
 
@@ -8657,6 +8670,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
           return;
         }
     }
+
     const now = new Date(); const start = new Date(exam.startTime); const end = new Date(exam.endTime);
     if (now < start) return alert(`الامتحان لم يبدأ بعد. موعد البدء: ${start.toLocaleString('ar-EG')}`);
     if (now > end) return alert("عفواً، انتهى وقت الامتحان.");
@@ -8670,6 +8684,8 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
               score: 0,
               total: 0,
               status: 'in_progress',
+              adminDecision: null,
+              resumeApproved: false,
               sourceVideoId: options.sourceVideoId || null,
               startedFromVideo: !!options.skipCode,
               submittedAt: serverTimestamp()
@@ -9148,9 +9164,15 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                 const isExamTimeOver = Date.now() > new Date(e.endTime).getTime();
                 
                 let statusText = null; let statusClass = "";
+                const canResumeByAdmin = prevResult && (prevResult.adminDecision === 'continue' || prevResult.resumeApproved === true);
+                const canRestartByAdmin = prevResult && prevResult.adminDecision === 'restart';
+                const waitingAdminDecision = prevResult && ['security_hold', 'in_progress', 'cheated'].includes(prevResult.status) && !canResumeByAdmin && !canRestartByAdmin;
                 if (prevResult) {
                     if (prevResult.status === 'completed') { statusText = `تم الحل: ${prevResult.score} درجة`; statusClass = "bg-green-500 text-white"; } 
-                    else if (prevResult.status === 'in_progress') { statusText = "قيد التنفيذ / انسحاب ⚠️"; statusClass = "bg-yellow-500 text-white"; } 
+                    else if (canResumeByAdmin) { statusText = "مسموح بالاستكمال ✅"; statusClass = "bg-blue-600 text-white"; }
+                    else if (canRestartByAdmin) { statusText = "مسموح بالإعادة ✅"; statusClass = "bg-amber-600 text-white"; }
+                    else if (prevResult.status === 'security_hold') { statusText = "موقوف في انتظار الأدمن 🛡️"; statusClass = "bg-red-600 text-white"; }
+                    else if (prevResult.status === 'in_progress') { statusText = "ينتظر موافقة الأدمن ⏳"; statusClass = "bg-yellow-500 text-white"; } 
                     else if (prevResult.status === 'cheated') { statusText = "تم الحظر (غش)"; statusClass = "bg-red-600 text-white"; }
                 }
 
@@ -9173,8 +9195,20 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                                  )}
                                  <button onClick={() => generatePDF('student', {studentName: user.displayName, score: prevResult.score, total: e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0), status: prevResult.status, examTitle: e.title, questions: e.questions.flatMap(q => q.subQuestions), answers: prevResult.answers })} className="flex-1 bg-green-100 text-green-700 py-2 md:py-3 rounded-xl font-bold hover:bg-green-200 flex items-center justify-center gap-1 transition shadow-sm text-xs md:text-sm"><Download size={14}/> شهادة</button>
                             </div>
+                        ) : canResumeByAdmin ? (
+                            <button onClick={() => startExamWithCode(e, { skipCode: true })} className="w-full bg-blue-600 text-white py-2 md:py-3 rounded-xl font-bold hover:bg-blue-700 flex items-center justify-center gap-2 shadow-lg transition text-sm">
+                                <Play size={14}/> استكمال الامتحان بموافقة الأدمن
+                            </button>
+                        ) : canRestartByAdmin ? (
+                            <button onClick={() => startExamWithCode(e, { skipCode: true })} className="w-full bg-amber-600 text-white py-2 md:py-3 rounded-xl font-bold hover:bg-amber-700 flex items-center justify-center gap-2 shadow-lg transition text-sm">
+                                <RefreshCw size={14}/> بدء الامتحان من جديد بموافقة الأدمن
+                            </button>
+                        ) : waitingAdminDecision ? (
+                            <div className="bg-amber-50 text-amber-700 p-2 md:p-3 rounded-xl font-bold text-center border border-amber-200 text-sm">
+                                المحاولة محفوظة. انتظر موافقة الأدمن للاستكمال أو الإعادة.
+                            </div>
                         ) : prevResult ? (
-                            <div className="bg-red-50 text-red-600 p-2 md:p-3 rounded-xl font-bold text-center border border-red-200 text-sm">لا يمكن إعادة الامتحان</div>
+                            <div className="bg-red-50 text-red-600 p-2 md:p-3 rounded-xl font-bold text-center border border-red-200 text-sm">لا يمكن دخول الامتحان</div>
                         ) : (
                             <div className="space-y-2">
                                 <p className="text-xs text-slate-500">يبدأ: {new Date(e.startTime).toLocaleString('ar-EG')}</p>
