@@ -1,23 +1,21 @@
 // src/components/video/YouTubeTrackedPlayer.jsx
-// مشغل YouTube ذكي: يعمل بالـ YouTube IFrame API للتتبع، ومعه fallback iframe لو الـ API اتأخر.
+// إصلاح نهائي: الفيديو يشتغل فورًا.
+// التتبع يحاول يشتغل باستخدام YouTube IFrame API، لكن لا يمنع تشغيل الفيديو أبدًا.
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
-let youTubeApiPromise = null;
+let ytApiPromise = null;
 
-function loadYouTubeIframeApi(timeoutMs = 8000) {
+function loadYouTubeApi() {
   if (window.YT?.Player) return Promise.resolve(window.YT);
 
-  if (!youTubeApiPromise) {
-    youTubeApiPromise = new Promise((resolve, reject) => {
-      const done = () => {
-        if (window.YT?.Player) resolve(window.YT);
-      };
+  if (!ytApiPromise) {
+    ytApiPromise = new Promise((resolve, reject) => {
+      const previousReady = window.onYouTubeIframeAPIReady;
 
-      const previous = window.onYouTubeIframeAPIReady;
       window.onYouTubeIframeAPIReady = () => {
-        if (typeof previous === "function") previous();
-        done();
+        if (typeof previousReady === "function") previousReady();
+        if (window.YT?.Player) resolve(window.YT);
       };
 
       if (!document.getElementById("youtube-iframe-api")) {
@@ -25,45 +23,59 @@ function loadYouTubeIframeApi(timeoutMs = 8000) {
         tag.id = "youtube-iframe-api";
         tag.src = "https://www.youtube.com/iframe_api";
         tag.async = true;
-        tag.onerror = () => reject(new Error("YouTube API failed to load"));
+        tag.onerror = () => reject(new Error("YouTube API load failed"));
         document.body.appendChild(tag);
       }
 
+      const started = Date.now();
       const poll = setInterval(() => {
         if (window.YT?.Player) {
           clearInterval(poll);
-          done();
+          resolve(window.YT);
         }
-      }, 300);
 
-      setTimeout(() => {
-        clearInterval(poll);
-        if (window.YT?.Player) done();
-        else reject(new Error("YouTube API timeout"));
-      }, timeoutMs);
+        if (Date.now() - started > 7000) {
+          clearInterval(poll);
+          reject(new Error("YouTube API timeout"));
+        }
+      }, 250);
     });
   }
 
-  return youTubeApiPromise;
+  return ytApiPromise;
 }
 
 const nowIso = () => new Date().toISOString();
 
-function getNumber(fn, fallback = 0) {
-  try {
-    const n = Number(fn());
-    return Number.isFinite(n) ? n : fallback;
-  } catch {
-    return fallback;
-  }
-}
+const num = (v, f = 0) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : f;
+};
 
-function getDateMs(value) {
-  if (!value) return 0;
-  if (value?.seconds) return value.seconds * 1000;
-  if (typeof value?.toDate === "function") return value.toDate().getTime();
-  const ms = new Date(value).getTime();
-  return Number.isFinite(ms) ? ms : 0;
+function cleanVideoId(value = "") {
+  const raw = String(value || "").trim();
+
+  if (/^[a-zA-Z0-9_-]{11}$/.test(raw)) return raw;
+
+  try {
+    const url = new URL(raw);
+    if (url.hostname.includes("youtu.be")) {
+      const id = url.pathname.split("/").filter(Boolean)[0];
+      if (/^[a-zA-Z0-9_-]{11}$/.test(id)) return id;
+    }
+
+    const v = url.searchParams.get("v");
+    if (v && /^[a-zA-Z0-9_-]{11}$/.test(v)) return v;
+
+    const parts = url.pathname.split("/").filter(Boolean);
+    const embedIndex = parts.findIndex((p) => p === "embed" || p === "shorts");
+    if (embedIndex >= 0 && parts[embedIndex + 1] && /^[a-zA-Z0-9_-]{11}$/.test(parts[embedIndex + 1])) {
+      return parts[embedIndex + 1];
+    }
+  } catch {}
+
+  const match = raw.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([a-zA-Z0-9_-]{11})/);
+  return match?.[1] || raw;
 }
 
 export default function YouTubeTrackedPlayer({
@@ -75,129 +87,169 @@ export default function YouTubeTrackedPlayer({
   doc,
   collection,
   setDoc,
-  addDoc,
   updateDoc,
   serverTimestamp,
   increment,
-  onProgress,
-  safeNumber = (v, f = 0) => {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : f;
-  }
+  onProgress
 }) {
-  const hostRef = useRef(null);
+  const finalVideoId = useMemo(() => {
+    return cleanVideoId(videoId || video?.youtubeId || video?.youtubeUrl || video?.url || video?.videoUrl || video?.link);
+  }, [videoId, video]);
+
+  const iframeId = useMemo(() => `yt-player-${video?.id || finalVideoId}-${Math.random().toString(36).slice(2)}`, [video?.id, finalVideoId]);
+
   const playerRef = useRef(null);
   const mountedRef = useRef(false);
-  const sessionCloseRef = useRef(null);
+  const timersRef = useRef({ tick: null, flush: null });
+  const sessionRefRef = useRef(null);
 
-  const [fallbackIframe, setFallbackIframe] = useState(false);
-  const [message, setMessage] = useState("جاري تجهيز مشغل YouTube الذكي...");
+  const [trackingStatus, setTrackingStatus] = useState("جاري تفعيل التتبع...");
+  const [apiReady, setApiReady] = useState(false);
+
+  const embedSrc = useMemo(() => {
+    if (!finalVideoId) return "";
+    return `https://www.youtube.com/embed/${finalVideoId}?enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}&rel=0&modestbranding=1&playsinline=1`;
+  }, [finalVideoId]);
 
   useEffect(() => {
-    if (!videoId || !video?.id || !user?.uid) return;
+    if (!finalVideoId || !video?.id || !user?.uid) return;
 
     mountedRef.current = true;
 
     const viewId = `${user.uid}_${video.id}`;
     const viewRef = doc(db, "video_views", viewId);
     const sessionRef = doc(collection(db, "video_watch_sessions"));
+    sessionRefRef.current = sessionRef;
 
-    let tickTimer = null;
-    let flushTimer = null;
     let player = null;
-
     let sessionStartedAtMs = Date.now();
-    let sessionRealSeconds = 0;
-    let pendingRealSeconds = 0;
-    let lastTickMs = Date.now();
-    let lastPlaybackTime = 0;
-    let lastKnownPosition = 0;
-    let lastDuration = safeNumber(video.durationSeconds, safeNumber(video.estimatedDurationMinutes, 0) * 60);
-    let lastPlayerState = -1;
-    let restored = false;
-    let sessionKind = "new_watch";
-    let skippedSecondsIgnoredTotal = 0;
     let started = false;
 
-    const duration = () => {
-      const d = getNumber(() => player?.getDuration?.(), lastDuration);
-      if (d > 0) lastDuration = d;
-      return lastDuration || 0;
+    let lastState = -1;
+    let lastTickMs = Date.now();
+    let lastPosition = 0;
+    let lastPlaybackPosition = 0;
+    let durationSeconds = num(video.durationSeconds, num(video.estimatedDurationMinutes) * 60);
+
+    let realWatchedSeconds = 0;
+    let pendingSeconds = 0;
+    let skippedSeconds = 0;
+    let sessionType = "new_watch";
+    let closed = false;
+
+    const getDuration = () => {
+      try {
+        const d = num(player?.getDuration?.(), durationSeconds);
+        if (d > 0) durationSeconds = d;
+      } catch {}
+      return durationSeconds || 0;
     };
 
-    const currentTime = () => getNumber(() => player?.getCurrentTime?.(), lastKnownPosition);
-
-    const percent = () => {
-      const d = duration();
-      return d > 0 ? Math.min(100, Math.round((lastKnownPosition / d) * 100)) : 0;
+    const getCurrentTime = () => {
+      try {
+        return num(player?.getCurrentTime?.(), lastPosition);
+      } catch {
+        return lastPosition;
+      }
     };
 
-    const isPlaying = () => lastPlayerState === window.YT?.PlayerState?.PLAYING;
+    const getPercent = () => {
+      const d = getDuration();
+      return d > 0 ? Math.min(100, Math.round((lastPosition / d) * 100)) : 0;
+    };
 
-    const writeSessionStart = async () => {
+    const isPlaying = () => {
+      return lastState === window.YT?.PlayerState?.PLAYING;
+    };
+
+    const startSessionDocs = async () => {
+      if (started) return;
+      started = true;
+
       try {
         await setDoc(sessionRef, {
           userId: user.uid,
           userEmail: user.email || "",
           userName: userName || user.displayName || user.email || "طالب",
           videoId: video.id,
-          youtubeVideoId: videoId,
+          youtubeVideoId: finalVideoId,
           videoTitle: video.title || "",
           linkedExamId: video.linkedExamId || null,
-          sessionType: sessionKind,
+          sessionType,
           openedAt: serverTimestamp(),
           openedAtISO: nowIso(),
           openedAtMs: sessionStartedAtMs,
-          startPositionSeconds: lastKnownPosition,
-          endPositionSeconds: lastKnownPosition,
+          startPositionSeconds: lastPosition,
+          endPositionSeconds: lastPosition,
           watchedSecondsThisSession: 0,
           realPlaybackSeconds: 0,
           skippedSecondsIgnored: 0,
-          videoDurationSeconds: duration(),
+          videoDurationSeconds: getDuration(),
           playerType: "youtube_iframe_api",
           status: "open"
         }, { merge: true });
-      } catch (error) {
-        console.warn("video watch session start blocked:", error?.message);
-      }
-    };
 
-    const writeMainViewStart = async () => {
-      try {
         await setDoc(viewRef, {
           userId: user.uid,
           userEmail: user.email || "",
           userName: userName || user.displayName || user.email || "طالب",
           videoId: video.id,
-          youtubeVideoId: videoId,
+          youtubeVideoId: finalVideoId,
           videoTitle: video.title || "",
           linkedExamId: video.linkedExamId || null,
-          estimatedDuration: duration(),
-          durationSeconds: duration(),
+          estimatedDuration: getDuration(),
+          durationSeconds: getDuration(),
           lastOpenedAt: serverTimestamp(),
           lastOpenedAtISO: nowIso(),
-          lastPositionSeconds: lastKnownPosition,
-          resumeAtSeconds: lastKnownPosition,
+          lastPositionSeconds: lastPosition,
+          resumeAtSeconds: lastPosition,
           lastSessionId: sessionRef.id,
           playerType: "youtube_iframe_api",
           watchStatus: "watching"
         }, { merge: true });
       } catch (error) {
-        console.warn("youtube view start blocked:", error?.message);
+        console.warn("youtube session start blocked:", error?.message);
+        setTrackingStatus("التتبع يحتاج صلاحيات Firestore");
+      }
+    };
+
+    const restorePosition = async () => {
+      try {
+        const { getDoc } = await import("firebase/firestore");
+        const snap = await getDoc(viewRef);
+        if (!snap.exists()) return;
+
+        const data = snap.data() || {};
+        const resumeAt = num(data.resumeAtSeconds ?? data.lastPositionSeconds, 0);
+        const d = getDuration();
+
+        if (resumeAt > 3 && (!d || resumeAt < d - 5)) {
+          sessionType = "resume";
+          lastPosition = resumeAt;
+          lastPlaybackPosition = resumeAt;
+          player?.seekTo?.(resumeAt, true);
+
+          await setDoc(sessionRef, {
+            sessionType: "resume",
+            resumedFromSeconds: resumeAt,
+            resumedFromPercent: d > 0 ? Math.round((resumeAt / d) * 100) : 0
+          }, { merge: true });
+        }
+      } catch (error) {
+        console.warn("youtube restore blocked:", error?.message);
       }
     };
 
     const flush = async (force = false) => {
       if (!mountedRef.current && !force) return;
 
-      const secondsToAdd = Math.max(0, Math.round(pendingRealSeconds));
-      const p = percent();
+      const addSeconds = Math.max(0, Math.round(pendingSeconds));
+      const percent = getPercent();
 
-      onProgress?.(video.id, p, lastKnownPosition);
+      onProgress?.(video.id, percent, lastPosition);
 
-      if (secondsToAdd <= 0 && !force) return;
-
-      pendingRealSeconds = 0;
+      if (addSeconds <= 0 && !force) return;
+      pendingSeconds = 0;
 
       try {
         await setDoc(viewRef, {
@@ -205,18 +257,18 @@ export default function YouTubeTrackedPlayer({
           userEmail: user.email || "",
           userName: userName || user.displayName || user.email || "طالب",
           videoId: video.id,
-          youtubeVideoId: videoId,
+          youtubeVideoId: finalVideoId,
           videoTitle: video.title || "",
           viewedAt: serverTimestamp(),
           lastSeenAt: serverTimestamp(),
           lastSeenAtISO: nowIso(),
-          watchedSeconds: increment(secondsToAdd),
-          actualWatchedSeconds: increment(secondsToAdd),
-          lastPositionSeconds: lastKnownPosition,
-          resumeAtSeconds: lastKnownPosition,
-          estimatedDuration: duration(),
-          durationSeconds: duration(),
-          watchedPercent: p,
+          watchedSeconds: increment(addSeconds),
+          actualWatchedSeconds: increment(addSeconds),
+          lastPositionSeconds: lastPosition,
+          resumeAtSeconds: lastPosition,
+          estimatedDuration: getDuration(),
+          durationSeconds: getDuration(),
+          watchedPercent: percent,
           linkedExamId: video.linkedExamId || null,
           lastSessionId: sessionRef.id,
           playerType: "youtube_iframe_api",
@@ -224,23 +276,24 @@ export default function YouTubeTrackedPlayer({
         }, { merge: true });
 
         await setDoc(sessionRef, {
-          endPositionSeconds: lastKnownPosition,
-          watchedSecondsThisSession: Math.round(sessionRealSeconds),
-          realPlaybackSeconds: Math.round(sessionRealSeconds),
-          skippedSecondsIgnored: Math.round(skippedSecondsIgnoredTotal),
-          videoDurationSeconds: duration(),
-          watchedPercentThisSession: p,
+          endPositionSeconds: lastPosition,
+          watchedSecondsThisSession: Math.round(realWatchedSeconds),
+          realPlaybackSeconds: Math.round(realWatchedSeconds),
+          skippedSecondsIgnored: Math.round(skippedSeconds),
+          videoDurationSeconds: getDuration(),
+          watchedPercentThisSession: percent,
           lastUpdatedAt: serverTimestamp(),
           lastUpdatedAtISO: nowIso()
         }, { merge: true });
       } catch (error) {
-        console.warn("youtube watch progress blocked:", error?.message);
+        console.warn("youtube progress blocked:", error?.message);
+        setTrackingStatus("التتبع يحتاج صلاحيات Firestore");
       }
     };
 
     const closeSession = async () => {
-      if (!started) return;
-      const p = percent();
+      if (closed || !started) return;
+      closed = true;
 
       try {
         await flush(true);
@@ -250,77 +303,45 @@ export default function YouTubeTrackedPlayer({
           closedAtISO: nowIso(),
           closedAtMs: Date.now(),
           sessionLengthWallSeconds: Math.max(0, Math.round((Date.now() - sessionStartedAtMs) / 1000)),
-          watchedSecondsThisSession: Math.round(sessionRealSeconds),
-          realPlaybackSeconds: Math.round(sessionRealSeconds),
-          skippedSecondsIgnored: Math.round(skippedSecondsIgnoredTotal),
-          endPositionSeconds: lastKnownPosition,
-          videoDurationSeconds: duration(),
-          watchedPercentThisSession: p,
+          watchedSecondsThisSession: Math.round(realWatchedSeconds),
+          realPlaybackSeconds: Math.round(realWatchedSeconds),
+          skippedSecondsIgnored: Math.round(skippedSeconds),
+          endPositionSeconds: lastPosition,
+          videoDurationSeconds: getDuration(),
+          watchedPercentThisSession: getPercent(),
           status: "closed"
         });
 
         await setDoc(viewRef, {
           lastClosedAt: serverTimestamp(),
           lastClosedAtISO: nowIso(),
-          lastPositionSeconds: lastKnownPosition,
-          resumeAtSeconds: lastKnownPosition,
-          watchedPercent: p,
-          watchStatus: p >= 95 ? "completed" : "paused",
+          lastPositionSeconds: lastPosition,
+          resumeAtSeconds: lastPosition,
+          watchedPercent: getPercent(),
+          watchStatus: getPercent() >= 95 ? "completed" : "paused",
           playerType: "youtube_iframe_api"
         }, { merge: true });
       } catch (error) {
-        console.warn("youtube watch close blocked:", error?.message);
-      }
-    };
-
-    sessionCloseRef.current = closeSession;
-
-    const restorePosition = async () => {
-      if (restored || !player?.seekTo) return;
-      restored = true;
-
-      try {
-        const { getDoc } = await import("firebase/firestore");
-        const snap = await getDoc(viewRef);
-        if (!snap.exists()) return;
-
-        const data = snap.data() || {};
-        const resumeAt = safeNumber(data.resumeAtSeconds ?? data.lastPositionSeconds, 0);
-        const d = duration();
-
-        if (resumeAt > 3 && (!d || resumeAt < d - 5)) {
-          sessionKind = "resume";
-          lastKnownPosition = resumeAt;
-          lastPlaybackTime = resumeAt;
-          player.seekTo(resumeAt, true);
-
-          await setDoc(sessionRef, {
-            sessionType: "resume",
-            resumedFromSeconds: resumeAt,
-            resumedFromPercent: d > 0 ? Math.round((resumeAt / d) * 100) : 0
-          }, { merge: true });
-        }
-      } catch (error) {
-        console.warn("youtube resume restore blocked:", error?.message);
+        console.warn("youtube close blocked:", error?.message);
       }
     };
 
     const tick = () => {
-      if (!mountedRef.current || !player) return;
+      if (!player) return;
 
       const now = Date.now();
-      const deltaWallSeconds = Math.max(0, Math.min(2, (now - lastTickMs) / 1000));
+      const wallDelta = Math.max(0, Math.min(2, (now - lastTickMs) / 1000));
       lastTickMs = now;
 
-      const ct = currentTime();
-      const playbackDelta = ct - lastPlaybackTime;
+      const current = getCurrentTime();
+      const playbackDelta = current - lastPlaybackPosition;
 
       if (isPlaying() && !document.hidden) {
-        const forwardJump = playbackDelta > deltaWallSeconds + 2;
+        const jumpedForward = playbackDelta > wallDelta + 2;
 
-        if (forwardJump) {
-          const ignored = Math.max(0, Math.round(playbackDelta - deltaWallSeconds));
-          skippedSecondsIgnoredTotal += ignored;
+        if (jumpedForward) {
+          const ignored = Math.max(0, Math.round(playbackDelta - wallDelta));
+          skippedSeconds += ignored;
 
           setDoc(sessionRef, {
             skippedSecondsIgnored: increment(ignored),
@@ -328,63 +349,53 @@ export default function YouTubeTrackedPlayer({
             lastSkipDetectedAtISO: nowIso()
           }, { merge: true }).catch(() => {});
         } else {
-          const validSeconds = Math.max(0, Math.min(deltaWallSeconds, Math.max(0, playbackDelta || deltaWallSeconds)));
-          sessionRealSeconds += validSeconds;
-          pendingRealSeconds += validSeconds;
+          const valid = Math.max(0, Math.min(wallDelta, Math.max(0, playbackDelta || wallDelta)));
+          realWatchedSeconds += valid;
+          pendingSeconds += valid;
         }
       }
 
-      lastPlaybackTime = ct;
-      lastKnownPosition = ct;
-      onProgress?.(video.id, percent(), lastKnownPosition);
+      lastPlaybackPosition = current;
+      lastPosition = current;
+
+      onProgress?.(video.id, getPercent(), lastPosition);
     };
 
-    const startTracking = async () => {
-      if (started) return;
-      started = true;
-      await restorePosition();
-
-      lastKnownPosition = currentTime();
-      lastPlaybackTime = lastKnownPosition;
-
-      await writeSessionStart();
-      await writeMainViewStart();
-
-      tickTimer = setInterval(tick, 1000);
-      flushTimer = setInterval(() => flush(false), 10000);
-    };
-
-    const init = async () => {
+    const initTracking = async () => {
       try {
-        const YT = await loadYouTubeIframeApi();
-        if (!mountedRef.current || !hostRef.current) return;
+        const YT = await loadYouTubeApi();
 
-        player = new YT.Player(hostRef.current, {
-          videoId,
-          width: "100%",
-          height: "100%",
-          playerVars: {
-            rel: 0,
-            modestbranding: 1,
-            playsinline: 1,
-            enablejsapi: 1,
-            origin: window.location.origin
-          },
+        if (!mountedRef.current) return;
+
+        player = new YT.Player(iframeId, {
           events: {
-            onReady: async () => {
+            onReady: async (event) => {
+              player = event.target;
               playerRef.current = player;
-              setMessage("");
-              lastDuration = duration();
-              await startTracking();
+              setApiReady(true);
+              setTrackingStatus("التتبع مفعل");
+
+              durationSeconds = getDuration();
+
+              await restorePosition();
+
+              lastPosition = getCurrentTime();
+              lastPlaybackPosition = lastPosition;
+              lastTickMs = Date.now();
+
+              await startSessionDocs();
+
+              timersRef.current.tick = setInterval(tick, 1000);
+              timersRef.current.flush = setInterval(() => flush(false), 10000);
             },
             onStateChange: (event) => {
-              lastPlayerState = event.data;
+              lastState = event.data;
 
               if (event.data === YT.PlayerState.PLAYING) {
                 lastTickMs = Date.now();
-                lastPlaybackTime = currentTime();
-                lastKnownPosition = lastPlaybackTime;
-                startTracking();
+                lastPosition = getCurrentTime();
+                lastPlaybackPosition = lastPosition;
+                startSessionDocs();
               }
 
               if (
@@ -397,51 +408,51 @@ export default function YouTubeTrackedPlayer({
               }
             },
             onError: () => {
-              setFallbackIframe(true);
-              setMessage("");
+              setTrackingStatus("الفيديو يعمل، لكن التتبع الذكي لم يتفعل لهذا الفيديو");
             }
           }
         });
+
+        setTimeout(() => {
+          if (!apiReady && mountedRef.current) {
+            setTrackingStatus("الفيديو يعمل، جاري محاولة تفعيل التتبع...");
+          }
+        }, 4000);
       } catch (error) {
-        console.warn("youtube iframe api unavailable, fallback to iframe:", error?.message);
-        setFallbackIframe(true);
-        setMessage("");
+        console.warn("YouTube API failed; video still works as normal iframe:", error?.message);
+        setTrackingStatus("الفيديو يعمل بدون تتبع دقيق مؤقتًا");
       }
     };
 
-    init();
+    initTracking();
 
-    const handleBeforeUnload = () => {
+    const beforeUnload = () => {
       tick();
       closeSession();
     };
 
-    const handleVisibility = () => {
+    const visibility = () => {
       if (document.hidden) {
         tick();
         flush(true);
       }
     };
 
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("beforeunload", beforeUnload);
+    document.addEventListener("visibilitychange", visibility);
 
     return () => {
       mountedRef.current = false;
-      clearInterval(tickTimer);
-      clearInterval(flushTimer);
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-      document.removeEventListener("visibilitychange", handleVisibility);
-
+      window.removeEventListener("beforeunload", beforeUnload);
+      document.removeEventListener("visibilitychange", visibility);
+      clearInterval(timersRef.current.tick);
+      clearInterval(timersRef.current.flush);
       tick();
       closeSession();
-
-      try {
-        player?.destroy?.();
-      } catch {}
     };
   }, [
-    videoId,
+    finalVideoId,
+    iframeId,
     video?.id,
     video?.title,
     video?.durationSeconds,
@@ -453,26 +464,29 @@ export default function YouTubeTrackedPlayer({
     onProgress
   ]);
 
-  if (fallbackIframe) {
+  if (!finalVideoId) {
     return (
-      <iframe
-        className="w-full h-full"
-        src={`https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1&playsinline=1&enablejsapi=1`}
-        title="YouTube Video"
-        frameBorder="0"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-        allowFullScreen
-      />
+      <div className="w-full h-full bg-black flex items-center justify-center text-white font-black">
+        رابط YouTube غير صحيح
+      </div>
     );
   }
 
   return (
     <div className="relative w-full h-full bg-black">
-      <div ref={hostRef} className="w-full h-full" />
+      <iframe
+        id={iframeId}
+        className="w-full h-full"
+        src={embedSrc}
+        title={video?.title || "YouTube Video"}
+        frameBorder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowFullScreen
+      />
 
-      {message && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black text-white font-bold">
-          {message}
+      {trackingStatus && trackingStatus !== "التتبع مفعل" && (
+        <div className="absolute bottom-3 right-3 bg-black/70 text-white text-xs md:text-sm px-3 py-2 rounded-xl backdrop-blur pointer-events-none">
+          {trackingStatus}
         </div>
       )}
     </div>
