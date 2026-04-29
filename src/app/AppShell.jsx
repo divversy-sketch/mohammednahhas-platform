@@ -30,7 +30,6 @@ import ContentOrganizerPhase3 from '../components/admin/ContentOrganizerPhase3';
 import MobilePerformancePhase3 from '../components/admin/MobilePerformancePhase3';
 import SmartVideoPlayerPhase5 from '../components/video/SmartVideoPlayerPhase5';
 import VideoLibraryPhase5 from '../components/admin/VideoLibraryPhase5';
-import VideoWatchAnalyticsPhase4 from '../components/admin/VideoWatchAnalyticsPhase4';
 
 const getAdminAIHeaders = async () => {
   const token = await auth?.currentUser?.getIdToken?.();
@@ -6216,7 +6215,6 @@ const AdminDashboard = ({ user }) => {
   const [liveData, setLiveData] = useState({ title: '', liveUrl: '', grade: '3sec', passcode: '', allowedEmails: '', sessionType: 'jitsi', embedUrl: '', scheduledAt: '', isOptional: true });
   const [activeLiveSessions, setActiveLiveSessions] = useState([]);
     const [videoViewsPhase3, setVideoViewsPhase3] = useState([]);
-  const [videoWatchSessionsPhase4, setVideoWatchSessionsPhase4] = useState([]);
 const [editingUser, setEditingUser] = useState(null);
   const [replyTexts, setReplyTexts] = useState({});
   const [examBuilder, setExamBuilder] = useState({ title: '', grade: '3sec', duration: 60, startTime: '', endTime: '', questions: [], accessCode: '', isPremium: false });
@@ -7303,18 +7301,6 @@ const [editingUser, setEditingUser] = useState(null);
   const deleteQuote = async (id) => { if(window.confirm("حذف هذه الحكمة؟")) await deleteDoc(doc(db, 'quotes', id)); };
 
 
-  useEffect(() => {
-      const unsubWatchSessions = onSnapshot(collection(db, 'video_watch_sessions'), (snap) => {
-          const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          rows.sort((a, b) => (b.openedAtMs || b.openedAt?.seconds || 0) - (a.openedAtMs || a.openedAt?.seconds || 0));
-          setVideoWatchSessionsPhase4(rows);
-      }, (error) => {
-          console.warn('phase4 video watch sessions listener blocked:', error?.message);
-          setVideoWatchSessionsPhase4([]);
-      });
-      return () => unsubWatchSessions();
-  }, []);
-
   const filteredPendingUsers = pendingUsers.filter(u => adminGradeFilter === 'all' || u.grade === adminGradeFilter);
   const filteredActiveUsers = activeUsersList.filter(u => adminGradeFilter === 'all' || u.grade === adminGradeFilter);
   const filteredContentList = contentList.filter(c => adminGradeFilter === 'all' || c.grade === adminGradeFilter);
@@ -7670,9 +7656,9 @@ const [editingUser, setEditingUser] = useState(null);
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-4 md:p-6 relative z-10">
         <div className="glass-panel p-4 rounded-xl h-fit space-y-2 flex md:flex-col overflow-x-auto md:overflow-x-visible whitespace-nowrap scrollbar-hide">
-          {['dashboard', 'phase5_video_library', 'phase4_video_analytics', 'phase3_parent', 'phase3_content_map', 'phase3_mobile_perf', 'users', 'all_users', 'subscriptions', 'payments', 'security_center', 'ai_analytics', 'live_ai', 'app_convert', 'ai_lab', 'ai_insights', 'leaderboard', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'question-analytics', 'smart_hw', 'content', 'notifications', 'student-messages', 'messages'].map(tab => (
+          {['dashboard', 'phase5_video_library', 'phase3_parent', 'phase3_content_map', 'phase3_mobile_perf', 'users', 'all_users', 'subscriptions', 'payments', 'security_center', 'ai_analytics', 'live_ai', 'app_convert', 'ai_lab', 'ai_insights', 'leaderboard', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'question-analytics', 'smart_hw', 'content', 'notifications', 'student-messages', 'messages'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 transition-all ${activeTab===tab?'bg-amber-100 text-amber-700 shadow-sm border-b-4 md:border-b-0 md:border-r-4 border-amber-500':'hover:bg-slate-50 text-slate-600'}`}>
-              {tab === 'dashboard' ? 'Dashboard' : tab === 'phase5_video_library' ? 'مكتبة الفيديوهات' : tab === 'phase4_video_analytics' ? 'تحليل المشاهدة' : tab === 'phase3_parent' ? 'ولي الأمر V3' : tab === 'phase3_content_map' ? 'تنظيم المحتوى V3' : tab === 'phase3_mobile_perf' ? 'الموبايل والأداء V3' : tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'payments' ? 'طلبات الدفع' : tab === 'security_center' ? 'مركز الحماية' : tab === 'ai_analytics' ? 'تحليلات AI' : tab === 'live_ai' ? 'البث المباشر + Live AI' : tab === 'app_convert' ? 'تحويل App' : tab === 'ai_lab' ? 'AI Lab' : tab === 'ai_insights' ? 'AI Insights' : tab === 'leaderboard' ? 'لوحة الشرف' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'question-analytics' ? 'تحليل الأسئلة' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'student-messages' ? 'رسائل الطلاب' : tab === 'messages' ? 'الرسائل' : 'الإعدادات'}
+              {tab === 'dashboard' ? 'Dashboard' : tab === 'phase5_video_library' ? 'مكتبة الفيديوهات' : tab === 'phase3_parent' ? 'ولي الأمر V3' : tab === 'phase3_content_map' ? 'تنظيم المحتوى V3' : tab === 'phase3_mobile_perf' ? 'الموبايل والأداء V3' : tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'payments' ? 'طلبات الدفع' : tab === 'security_center' ? 'مركز الحماية' : tab === 'ai_analytics' ? 'تحليلات AI' : tab === 'live_ai' ? 'البث المباشر + Live AI' : tab === 'app_convert' ? 'تحويل App' : tab === 'ai_lab' ? 'AI Lab' : tab === 'ai_insights' ? 'AI Insights' : tab === 'leaderboard' ? 'لوحة الشرف' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'question-analytics' ? 'تحليل الأسئلة' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'student-messages' ? 'رسائل الطلاب' : tab === 'messages' ? 'الرسائل' : 'الإعدادات'}
             </button>
           ))}
         </div>
@@ -7693,14 +7679,6 @@ const [editingUser, setEditingUser] = useState(null);
             />
           )}
 
-          {activeTab === 'phase4_video_analytics' && (
-            <VideoWatchAnalyticsPhase4
-              users={[...pendingUsers, ...activeUsersList]}
-              content={contentList}
-              videoViews={videoViewsPhase3}
-              watchSessions={videoWatchSessionsPhase4}
-            />
-          )}
 
           {activeTab === 'phase3_parent' && (
             <ParentProgressPhase3
