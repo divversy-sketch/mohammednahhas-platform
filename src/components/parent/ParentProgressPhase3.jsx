@@ -13,7 +13,12 @@ import {
   Calendar,
   Video,
   FileText,
-  Activity
+  Activity,
+  X,
+  UserRound,
+  GraduationCap,
+  TimerReset,
+  CheckCircle2
 } from "lucide-react";
 
 const safeNumber = (value, fallback = 0) => {
@@ -177,7 +182,7 @@ const buildStudentRows = ({ users = [], results = [], mistakes = [], videoViews 
       const weakBranchesText = Object.entries(weakBranches)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 3)
-        .map(([branch, count]) => `${branch} (${count} أخطاء)`)
+        .map(([branch, count]) => `${branch} (${count})`)
         .join("، ");
 
       const status =
@@ -200,7 +205,7 @@ const buildStudentRows = ({ users = [], results = [], mistakes = [], videoViews 
         avg,
         latestResult,
         latestPercentage: latestResult ? getResultPercentage(latestResult) : 0,
-        latestExam: latestResult?.examTitle || latestResult?.title || "لا يوجد",
+        latestExam: latestResult?.examTitle || latestResult?.title || "لا يوجد امتحان",
         latestResultDate: latestResult?.submittedAt || latestResult?.createdAt || null,
         mistakesCount: studentMistakes.length,
         videoViews: studentVideoViews,
@@ -263,6 +268,7 @@ export default function ParentProgressPhase3({
 }) {
   const [search, setSearch] = useState("");
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const rows = useMemo(
     () => buildStudentRows({ users, results, mistakes, videoViews, content }),
@@ -271,21 +277,31 @@ export default function ParentProgressPhase3({
 
   const filtered = useMemo(() => {
     const s = search.trim().toLowerCase();
-    if (!s) return rows;
-    return rows.filter((r) =>
-      String(r.name).toLowerCase().includes(s) ||
-      String(r.email).toLowerCase().includes(s) ||
-      String(r.phone).includes(s) ||
-      String(r.parentPhone).includes(s)
-    );
-  }, [rows, search]);
+    return rows.filter((r) => {
+      const byText =
+        !s ||
+        String(r.name).toLowerCase().includes(s) ||
+        String(r.email).toLowerCase().includes(s) ||
+        String(r.phone).includes(s) ||
+        String(r.parentPhone).includes(s);
+
+      const byStatus =
+        statusFilter === "all" ||
+        (statusFilter === "weak" && r.status === "يحتاج متابعة") ||
+        (statusFilter === "active" && (r.activeDays > 0 || r.examsCount > 0 || r.watchedVideosCount > 0)) ||
+        (statusFilter === "excellent" && r.status === "ممتاز");
+
+      return byText && byStatus;
+    });
+  }, [rows, search, statusFilter]);
 
   const summary = useMemo(() => {
     const active = rows.filter((r) => r.activeDays > 0 || r.examsCount > 0 || r.watchedVideosCount > 0).length;
     const weak = rows.filter((r) => r.status === "يحتاج متابعة").length;
+    const excellent = rows.filter((r) => r.status === "ممتاز").length;
     const avg = rows.length ? Math.round(rows.reduce((s, r) => s + r.avg, 0) / rows.length) : 0;
     const watchSeconds = rows.reduce((s, r) => s + r.totalWatchSeconds, 0);
-    return { total: rows.length, active, weak, avg, watchSeconds };
+    return { total: rows.length, active, weak, excellent, avg, watchSeconds };
   }, [rows]);
 
   const openWhatsApp = (row) => {
@@ -298,128 +314,83 @@ export default function ParentProgressPhase3({
   };
 
   return (
-    <div className="space-y-6" dir="rtl">
-      <div className="bg-gradient-to-r from-indigo-700 to-slate-900 text-white rounded-3xl p-6 shadow-xl">
-        <h2 className="text-2xl md:text-3xl font-black mb-2 flex items-center gap-2">
-          <Users /> متابعة ولي الأمر
-        </h2>
-        <p className="text-indigo-100">
-          تقرير كامل عن الطالب: النتائج، أيام استخدام المنصة، مشاهدة الفيديوهات، الأخطاء، ورابط واتساب جاهز لولي الأمر.
-        </p>
+    <div className="space-y-7 p-1 md:p-0" dir="rtl">
+      <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-l from-slate-950 via-indigo-950 to-indigo-700 p-6 md:p-8 text-white shadow-2xl">
+        <div className="absolute -top-20 -left-20 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
+        <div className="absolute -bottom-24 right-10 h-64 w-64 rounded-full bg-indigo-400/20 blur-3xl" />
+
+        <div className="relative z-10 flex flex-col xl:flex-row xl:items-center justify-between gap-5">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-bold text-indigo-100 mb-4">
+              <Users size={16} /> متابعة أولياء الأمور
+            </div>
+            <h2 className="text-3xl md:text-4xl font-black mb-2">
+              لوحة متابعة ولي الأمر
+            </h2>
+            <p className="text-indigo-100 max-w-3xl leading-relaxed">
+              متابعة منظمة لكل طالب: آخر نتيجة، النشاط، مشاهدة الفيديوهات، الأخطاء، ورسالة واتساب جاهزة لولي الأمر.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 min-w-[260px]">
+            <HeroMini title="طلاب" value={summary.total} />
+            <HeroMini title="متوسط" value={`${summary.avg}%`} />
+            <HeroMini title="نشطون" value={summary.active} />
+            <HeroMini title="متابعة" value={summary.weak} danger />
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <Stat title="إجمالي الطلاب" value={summary.total} icon={<Users />} />
-        <Stat title="طلاب نشطون" value={summary.active} icon={<Activity />} />
-        <Stat title="يحتاجون متابعة" value={summary.weak} icon={<AlertTriangle />} />
-        <Stat title="متوسط عام" value={`${summary.avg}%`} icon={<TrendingUp />} />
-        <Stat title="إجمالي مشاهدة" value={formatDuration(summary.watchSeconds)} icon={<Clock />} />
+      <div className="grid grid-cols-2 xl:grid-cols-5 gap-3 md:gap-4">
+        <Stat title="إجمالي الطلاب" value={summary.total} icon={<Users />} tone="indigo" />
+        <Stat title="طلاب نشطون" value={summary.active} icon={<Activity />} tone="blue" />
+        <Stat title="يحتاجون متابعة" value={summary.weak} icon={<AlertTriangle />} tone="red" />
+        <Stat title="ممتازون" value={summary.excellent} icon={<CheckCircle2 />} tone="emerald" />
+        <Stat title="إجمالي مشاهدة" value={formatDuration(summary.watchSeconds)} icon={<Clock />} tone="amber" />
       </div>
 
-      <section className="bg-white border rounded-3xl p-5 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
-          <h3 className="text-xl font-black text-slate-900">قائمة متابعة الطلاب</h3>
-          <div className="relative">
-            <Search className="absolute right-3 top-3 text-slate-400" size={18} />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="بحث باسم الطالب أو رقم ولي الأمر..."
-              className="pr-10 pl-4 py-3 rounded-2xl border w-full md:w-96 outline-none focus:border-indigo-500"
-            />
+      <section className="bg-white border border-slate-200 rounded-[2rem] p-4 md:p-6 shadow-sm">
+        <div className="flex flex-col 2xl:flex-row 2xl:items-center justify-between gap-4 mb-6">
+          <div>
+            <h3 className="text-2xl font-black text-slate-950">الطلاب</h3>
+            <p className="text-sm text-slate-500 mt-1">اختار طالب لعرض التفاصيل أو إرسال تقرير واتساب.</p>
+          </div>
+
+          <div className="flex flex-col lg:flex-row gap-3 w-full 2xl:w-auto">
+            <div className="relative flex-1 lg:w-96">
+              <Search className="absolute right-4 top-3.5 text-slate-400" size={18} />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="بحث باسم الطالب أو رقم ولي الأمر..."
+                className="w-full pr-11 pl-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 outline-none focus:border-indigo-500 focus:bg-white transition"
+              />
+            </div>
+
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              <FilterButton active={statusFilter === "all"} onClick={() => setStatusFilter("all")}>الكل</FilterButton>
+              <FilterButton active={statusFilter === "active"} onClick={() => setStatusFilter("active")}>نشطون</FilterButton>
+              <FilterButton active={statusFilter === "weak"} onClick={() => setStatusFilter("weak")}>متابعة</FilterButton>
+              <FilterButton active={statusFilter === "excellent"} onClick={() => setStatusFilter("excellent")}>ممتاز</FilterButton>
+            </div>
           </div>
         </div>
 
         {filtered.length === 0 ? (
-          <div className="bg-slate-50 border rounded-2xl p-8 text-center text-slate-500 font-bold">
+          <div className="bg-slate-50 border border-dashed rounded-3xl p-10 text-center text-slate-500 font-bold">
             لا توجد بيانات مطابقة.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-right">
-              <thead>
-                <tr className="text-slate-500 border-b">
-                  <th className="py-3">الطالب</th>
-                  <th className="py-3">ولي الأمر</th>
-                  <th className="py-3">آخر نتيجة</th>
-                  <th className="py-3">أيام النشاط</th>
-                  <th className="py-3">الفيديوهات</th>
-                  <th className="py-3">مشاهدة</th>
-                  <th className="py-3">أخطاء</th>
-                  <th className="py-3">الحالة</th>
-                  <th className="py-3">إجراء</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((row) => (
-                  <tr key={row.id} className="border-b last:border-0 hover:bg-slate-50">
-                    <td className="py-3">
-                      <p className="font-black text-slate-900">{row.name}</p>
-                      <p className="text-xs text-slate-400">{row.grade || "غير محدد"}</p>
-                    </td>
-                    <td className="py-3 text-slate-600">
-                      <div className="flex items-center gap-1">
-                        <Phone size={14} />
-                        {row.parentPhone || row.phone || "غير مسجل"}
-                      </div>
-                    </td>
-                    <td className="py-3">
-                      <p className="font-black text-indigo-700">{row.latestPercentage}%</p>
-                      <p className="text-xs text-slate-500">{row.latestExam}</p>
-                    </td>
-                    <td className="py-3 font-bold text-slate-700">
-                      <div className="flex items-center gap-1">
-                        <Calendar size={14} />
-                        {row.activeDays}
-                      </div>
-                    </td>
-                    <td className="py-3 font-bold text-blue-700">{row.watchedVideosCount}</td>
-                    <td className="py-3 text-slate-700">{formatDuration(row.totalWatchSeconds)}</td>
-                    <td className="py-3 font-bold text-red-600">{row.mistakesCount}</td>
-                    <td className="py-3">
-                      <span className={`px-3 py-1 rounded-full text-xs font-black ${
-                        row.status === "ممتاز"
-                          ? "bg-emerald-50 text-emerald-700"
-                          : row.status === "جيد"
-                            ? "bg-blue-50 text-blue-700"
-                            : row.status === "يحتاج متابعة"
-                              ? "bg-red-50 text-red-700"
-                              : "bg-slate-100 text-slate-600"
-                      }`}>
-                        {row.status}
-                      </span>
-                    </td>
-                    <td className="py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedStudent(row)}
-                          className="bg-slate-900 text-white px-3 py-2 rounded-xl font-bold text-xs flex items-center gap-1"
-                        >
-                          <Eye size={14} /> التفاصيل
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openWhatsApp(row)}
-                          className="bg-green-600 text-white px-3 py-2 rounded-xl font-bold text-xs flex items-center gap-1"
-                        >
-                          <MessageCircle size={14} /> واتساب
-                        </button>
-                        {onOpenStudent && (
-                          <button
-                            type="button"
-                            onClick={() => onOpenStudent(row)}
-                            className="bg-indigo-50 text-indigo-700 px-3 py-2 rounded-xl font-bold text-xs"
-                          >
-                            فتح
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-4">
+            {filtered.map((row) => (
+              <StudentCard
+                key={row.id}
+                row={row}
+                onDetails={() => setSelectedStudent(row)}
+                onWhatsApp={() => openWhatsApp(row)}
+                onOpenStudent={onOpenStudent}
+              />
+            ))}
           </div>
         )}
       </section>
@@ -435,27 +406,114 @@ export default function ParentProgressPhase3({
   );
 }
 
+function StudentCard({ row, onDetails, onWhatsApp, onOpenStudent }) {
+  const statusTone =
+    row.status === "ممتاز"
+      ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+      : row.status === "جيد"
+        ? "bg-blue-50 text-blue-700 border-blue-100"
+        : row.status === "يحتاج متابعة"
+          ? "bg-red-50 text-red-700 border-red-100"
+          : "bg-slate-100 text-slate-600 border-slate-200";
+
+  return (
+    <div className="group rounded-3xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200">
+      <div className="flex items-start justify-between gap-3 mb-5">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-600 to-slate-900 text-white flex items-center justify-center shadow">
+              <UserRound size={20} />
+            </div>
+            <div className="min-w-0">
+              <h4 className="font-black text-slate-950 truncate max-w-[240px]">{row.name}</h4>
+              <p className="text-xs text-slate-400 flex items-center gap-1">
+                <GraduationCap size={13} /> {row.grade || "غير محدد"}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <span className={`shrink-0 px-3 py-1 rounded-full border text-xs font-black ${statusTone}`}>
+          {row.status}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 mb-4">
+        <Metric label="المتوسط" value={`${row.avg}%`} />
+        <Metric label="آخر نتيجة" value={`${row.latestPercentage}%`} />
+        <Metric label="نشاط" value={`${row.activeDays} يوم`} />
+      </div>
+
+      <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4 space-y-3 mb-4">
+        <InfoLine icon={<Phone size={15} />} label="ولي الأمر" value={row.parentPhone || row.phone || "غير مسجل"} />
+        <InfoLine icon={<ClipboardCheck size={15} />} label="آخر امتحان" value={row.latestExam} />
+        <InfoLine icon={<Video size={15} />} label="الفيديوهات" value={`${row.watchedVideosCount} فيديو • ${formatDuration(row.totalWatchSeconds)}`} />
+        <InfoLine icon={<AlertTriangle size={15} />} label="الأخطاء" value={`${row.mistakesCount} خطأ`} danger={row.mistakesCount > 0} />
+      </div>
+
+      {row.weakBranchesText && (
+        <div className="mb-4 rounded-2xl bg-red-50 border border-red-100 p-3">
+          <p className="text-xs font-black text-red-700 mb-1">فروع تحتاج متابعة</p>
+          <p className="text-sm font-bold text-red-800 leading-relaxed">{row.weakBranchesText}</p>
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={onDetails}
+          className="flex-1 min-w-[110px] bg-slate-900 text-white px-4 py-3 rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:bg-slate-800 transition"
+        >
+          <Eye size={16} /> التفاصيل
+        </button>
+        <button
+          type="button"
+          onClick={onWhatsApp}
+          className="flex-1 min-w-[110px] bg-green-600 text-white px-4 py-3 rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:bg-green-700 transition"
+        >
+          <MessageCircle size={16} /> واتساب
+        </button>
+        {onOpenStudent && (
+          <button
+            type="button"
+            onClick={() => onOpenStudent(row)}
+            className="bg-indigo-50 text-indigo-700 px-4 py-3 rounded-2xl font-black text-sm hover:bg-indigo-100 transition"
+          >
+            فتح
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function StudentDetailsModal({ row, onClose, onWhatsApp }) {
   return (
-    <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" dir="rtl">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b p-5 flex flex-col md:flex-row md:items-center justify-between gap-3 rounded-t-3xl">
-          <div>
-            <h3 className="text-2xl font-black text-slate-900">{row.name}</h3>
-            <p className="text-sm text-slate-500">تقرير متابعة كامل لولي الأمر</p>
+    <div className="fixed inset-0 z-[100] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-3 md:p-5" dir="rtl">
+      <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-6xl max-h-[92vh] overflow-hidden flex flex-col">
+        <div className="bg-gradient-to-l from-slate-950 to-indigo-800 text-white p-5 md:p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-14 h-14 rounded-3xl bg-white/10 border border-white/10 flex items-center justify-center">
+              <UserRound />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-2xl md:text-3xl font-black truncate">{row.name}</h3>
+              <p className="text-sm text-indigo-100">تقرير متابعة كامل لولي الأمر</p>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <button onClick={onWhatsApp} className="bg-green-600 text-white px-4 py-2 rounded-xl font-black flex items-center gap-2">
+
+          <div className="flex flex-wrap gap-2">
+            <button onClick={onWhatsApp} className="bg-green-600 text-white px-4 py-3 rounded-2xl font-black flex items-center gap-2 hover:bg-green-700 transition">
               <MessageCircle size={18} /> إرسال واتساب
             </button>
-            <button onClick={onClose} className="bg-slate-900 text-white px-4 py-2 rounded-xl font-black">
-              إغلاق
+            <button onClick={onClose} className="bg-white/10 text-white px-4 py-3 rounded-2xl font-black hover:bg-white/20 transition flex items-center gap-2">
+              <X size={18} /> إغلاق
             </button>
           </div>
         </div>
 
-        <div className="p-5 space-y-6">
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="p-4 md:p-6 overflow-y-auto space-y-6 bg-slate-50">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
             <Mini title="المتوسط" value={`${row.avg}%`} />
             <Mini title="آخر نتيجة" value={`${row.latestPercentage}%`} />
             <Mini title="الامتحانات" value={row.examsCount} />
@@ -463,71 +521,51 @@ function StudentDetailsModal({ row, onClose, onWhatsApp }) {
             <Mini title="الأخطاء" value={row.mistakesCount} />
           </div>
 
-          <section className="border rounded-3xl p-5 bg-slate-50">
-            <h4 className="text-xl font-black text-slate-900 mb-3 flex items-center gap-2">
-              <ClipboardCheck className="text-indigo-600" /> آخر نتيجة امتحان
-            </h4>
-            <div className="bg-white border rounded-2xl p-4">
-              <p className="font-black text-slate-900">{row.latestExam}</p>
-              <p className="text-indigo-700 font-black text-2xl mt-1">{row.latestPercentage}%</p>
-              <p className="text-sm text-slate-500 mt-1">{formatDate(row.latestResultDate)}</p>
-            </div>
-          </section>
-
-          <section className="border rounded-3xl p-5 bg-slate-50">
-            <h4 className="text-xl font-black text-slate-900 mb-3 flex items-center gap-2">
-              <PlayCircle className="text-blue-600" /> مشاهدة الفيديوهات
-            </h4>
-
-            {(row.videoViews || []).length === 0 ? (
-              <div className="bg-white border rounded-2xl p-6 text-center text-slate-500 font-bold">
-                لا توجد مشاهدات فيديو مسجلة لهذا الطالب.
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
+            <section className="xl:col-span-1 bg-white border rounded-3xl p-5 shadow-sm">
+              <h4 className="text-xl font-black text-slate-900 mb-4 flex items-center gap-2">
+                <ClipboardCheck className="text-indigo-600" /> آخر نتيجة
+              </h4>
+              <div className="rounded-3xl border bg-indigo-50/50 p-5">
+                <p className="font-black text-slate-900 mb-2">{row.latestExam}</p>
+                <p className="text-indigo-700 font-black text-5xl">{row.latestPercentage}%</p>
+                <p className="text-sm text-slate-500 mt-3">{formatDate(row.latestResultDate)}</p>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {(row.videoViews || []).map((v, i) => (
-                  <div key={`${v.videoId || v.contentId || i}`} className="bg-white border rounded-2xl p-4">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-3">
-                      <div>
-                        <p className="font-black text-slate-900 flex items-center gap-2">
-                          <Video size={16} className="text-blue-600" />
-                          {v.title}
-                        </p>
-                        <p className="text-xs text-slate-500 mt-1">
-                          آخر مشاهدة: {formatDate(v.lastViewedAt)}
-                        </p>
-                      </div>
-                      <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-black">
-                        {v.watchedPercent || 0}%
-                      </span>
-                    </div>
 
-                    <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden border">
-                      <div
-                        className="h-full bg-blue-600 rounded-full"
-                        style={{ width: `${Math.min(100, v.watchedPercent || 0)}%` }}
-                      />
-                    </div>
-
-                    <div className="flex flex-wrap gap-3 text-sm text-slate-600 mt-3">
-                      <span>شاهد: <b>{formatDuration(v.watchedSeconds)}</b></span>
-                      <span>مدة الفيديو: <b>{v.durationSeconds ? formatDuration(v.durationSeconds) : "غير محددة"}</b></span>
-                    </div>
-                  </div>
-                ))}
+              <div className="mt-4 rounded-3xl border bg-white p-4 space-y-3">
+                <InfoLine icon={<Phone size={15} />} label="ولي الأمر" value={row.parentPhone || row.phone || "غير مسجل"} />
+                <InfoLine icon={<TimerReset size={15} />} label="آخر نشاط" value={row.lastActivityMs ? formatDate(row.lastActivityMs) : "غير متاح"} />
+                <InfoLine icon={<Clock size={15} />} label="إجمالي المشاهدة" value={formatDuration(row.totalWatchSeconds)} />
               </div>
-            )}
-          </section>
+            </section>
 
-          <section className="border rounded-3xl p-5 bg-slate-50">
-            <h4 className="text-xl font-black text-slate-900 mb-3 flex items-center gap-2">
+            <section className="xl:col-span-2 bg-white border rounded-3xl p-5 shadow-sm">
+              <h4 className="text-xl font-black text-slate-900 mb-4 flex items-center gap-2">
+                <PlayCircle className="text-blue-600" /> مشاهدة الفيديوهات
+              </h4>
+
+              {(row.videoViews || []).length === 0 ? (
+                <div className="bg-slate-50 border border-dashed rounded-3xl p-8 text-center text-slate-500 font-bold">
+                  لا توجد مشاهدات فيديو مسجلة لهذا الطالب.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {(row.videoViews || []).map((v, i) => (
+                    <VideoProgressCard key={`${v.videoId || v.contentId || i}`} view={v} />
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+
+          <section className="bg-white border rounded-3xl p-5 shadow-sm">
+            <h4 className="text-xl font-black text-slate-900 mb-4 flex items-center gap-2">
               <FileText className="text-red-600" /> ملخص يحتاج متابعة
             </h4>
-            <div className="bg-white border rounded-2xl p-4 space-y-2 text-slate-700 font-bold">
-              <p>الحالة العامة: {row.status}</p>
-              <p>إجمالي وقت مشاهدة الفيديوهات: {formatDuration(row.totalWatchSeconds)}</p>
-              <p>الفيديوهات المكتملة بنسبة 80% أو أكثر: {row.completedVideos}</p>
-              <p>الفروع التي تحتاج متابعة: {row.weakBranchesText || "لا توجد فروع ضعيفة واضحة"}</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <SummaryBox title="الحالة العامة" value={row.status} />
+              <SummaryBox title="فيديوهات مكتملة 80%+" value={row.completedVideos} />
+              <SummaryBox title="فروع ضعيفة" value={row.weakBranchesText || "لا توجد"} />
             </div>
           </section>
         </div>
@@ -536,23 +574,123 @@ function StudentDetailsModal({ row, onClose, onWhatsApp }) {
   );
 }
 
-function Stat({ title, value, icon }) {
+function VideoProgressCard({ view }) {
+  const percent = Math.min(100, safeNumber(view.watchedPercent, 0));
+
   return (
-    <div className="bg-white border rounded-3xl p-4 shadow-sm">
-      <div className="flex items-center justify-between text-indigo-700 mb-3">
-        <span className="font-bold text-sm">{title}</span>
+    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-3">
+        <div className="min-w-0">
+          <p className="font-black text-slate-900 flex items-center gap-2">
+            <Video size={17} className="text-blue-600 shrink-0" />
+            <span className="truncate">{view.title}</span>
+          </p>
+          <p className="text-xs text-slate-500 mt-1">
+            آخر مشاهدة: {formatDate(view.lastViewedAt)}
+          </p>
+        </div>
+        <span className="shrink-0 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-black border border-blue-100">
+          {percent}%
+        </span>
+      </div>
+
+      <div className="w-full h-3 bg-white rounded-full overflow-hidden border border-slate-200">
+        <div
+          className="h-full bg-gradient-to-l from-blue-600 to-indigo-500 rounded-full"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+
+      <div className="flex flex-wrap gap-3 text-sm text-slate-600 mt-3">
+        <span>شاهد: <b>{formatDuration(view.watchedSeconds)}</b></span>
+        <span>مدة الفيديو: <b>{view.durationSeconds ? formatDuration(view.durationSeconds) : "غير محددة"}</b></span>
+      </div>
+    </div>
+  );
+}
+
+function HeroMini({ title, value, danger }) {
+  return (
+    <div className={`rounded-3xl border p-4 backdrop-blur ${danger ? "bg-red-500/15 border-red-300/20" : "bg-white/10 border-white/10"}`}>
+      <p className="text-xs text-white/70 font-bold mb-1">{title}</p>
+      <p className="text-2xl font-black">{value}</p>
+    </div>
+  );
+}
+
+function Stat({ title, value, icon, tone = "indigo" }) {
+  const styles = {
+    indigo: "text-indigo-700 bg-indigo-50 border-indigo-100",
+    blue: "text-blue-700 bg-blue-50 border-blue-100",
+    red: "text-red-700 bg-red-50 border-red-100",
+    emerald: "text-emerald-700 bg-emerald-50 border-emerald-100",
+    amber: "text-amber-700 bg-amber-50 border-amber-100"
+  };
+
+  return (
+    <div className={`border rounded-3xl p-4 shadow-sm ${styles[tone] || styles.indigo}`}>
+      <div className="flex items-center justify-between mb-3">
+        <span className="font-bold text-xs md:text-sm">{title}</span>
         {icon}
       </div>
-      <p className="text-2xl font-black text-slate-900">{value}</p>
+      <p className="text-xl md:text-2xl font-black text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+function FilterButton({ active, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-4 py-3 rounded-2xl font-black text-sm whitespace-nowrap border transition ${
+        active
+          ? "bg-slate-900 text-white border-slate-900 shadow"
+          : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Metric({ label, value }) {
+  return (
+    <div className="rounded-2xl bg-slate-50 border border-slate-100 p-3 text-center">
+      <p className="text-[11px] text-slate-500 font-bold mb-1">{label}</p>
+      <p className="text-lg font-black text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+function InfoLine({ icon, label, value, danger }) {
+  return (
+    <div className="flex items-start justify-between gap-3 text-sm">
+      <div className="flex items-center gap-2 text-slate-500 shrink-0">
+        {icon}
+        <span className="font-bold">{label}</span>
+      </div>
+      <span className={`font-black text-left break-words ${danger ? "text-red-600" : "text-slate-800"}`}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function SummaryBox({ title, value }) {
+  return (
+    <div className="rounded-2xl border bg-slate-50 p-4">
+      <p className="text-xs text-slate-500 font-bold mb-2">{title}</p>
+      <p className="font-black text-slate-900 leading-relaxed">{value}</p>
     </div>
   );
 }
 
 function Mini({ title, value }) {
   return (
-    <div className="bg-white border rounded-2xl p-4 text-center">
+    <div className="bg-white border rounded-3xl p-4 text-center shadow-sm">
       <p className="text-xs text-slate-500 font-bold mb-2">{title}</p>
-      <p className="text-2xl font-black text-slate-900">{value}</p>
+      <p className="text-2xl md:text-3xl font-black text-slate-900">{value}</p>
     </div>
   );
 }
