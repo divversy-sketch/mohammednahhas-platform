@@ -28,9 +28,6 @@ import NotificationsCenterPhase2 from '../components/notifications/Notifications
 import ParentProgressPhase3 from '../components/parent/ParentProgressPhase3';
 import ContentOrganizerPhase3 from '../components/admin/ContentOrganizerPhase3';
 import MobilePerformancePhase3 from '../components/admin/MobilePerformancePhase3';
-import { createVideoWatchTracker } from '../utils/videoWatchTracker';
-import YouTubeTrackedPlayer from '../components/video/YouTubeTrackedPlayer';
-import VideoWatchAnalyticsPhase4 from '../components/admin/VideoWatchAnalyticsPhase4';
 
 const getAdminAIHeaders = async () => {
   const token = await auth?.currentUser?.getIdToken?.();
@@ -1069,48 +1066,46 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
   }, [user, video.id]);
 
   useEffect(() => {
-      if (!user || !video?.id) return;
+      if (!user || !video.id) return;
+      const viewId = `${user.uid}_${video.id}`;
+      const viewRef = doc(db, 'video_views', viewId);
+      let timerInterval; let localSeconds = 0; let lastSyncedSeconds = 0;
+      const estimatedDuration = safeNumber(video.durationSeconds, safeNumber(video.estimatedDurationMinutes, 0) * 60);
 
-      const estimatedDuration = safeNumber(
-          video.durationSeconds,
-          safeNumber(video.estimatedDurationMinutes, 0) * 60
-      );
-
-      const tracker = createVideoWatchTracker({
-          db,
-          doc,
-          collection,
-          setDoc,
-          addDoc,
-          updateDoc,
-          serverTimestamp,
-          increment,
-          user,
-          userName,
-          video,
-          videoId,
-          videoRef,
-          estimatedDuration,
-          onProgress,
-          safeNumber
-      });
-
-      tracker.start();
-
-      return () => {
-          tracker.stop();
+      const syncToDatabase = async (secondsToAdd, overrideSeconds = null) => {
+          const watchedSeconds = overrideSeconds ?? localSeconds;
+          const currentDuration = safeNumber(videoRef.current?.duration, estimatedDuration);
+          const watchedPercentValue = currentDuration > 0 ? Math.min(100, Math.round((watchedSeconds / currentDuration) * 100)) : 0;
+          onProgress?.(video.id, watchedPercentValue, watchedSeconds);
+          try {
+              await setDoc(viewRef, {
+                  userId: user.uid,
+                  userName: userName,
+                  videoId: video.id,
+                  videoTitle: video.title,
+                  viewedAt: serverTimestamp(),
+                  watchedSeconds: increment(secondsToAdd),
+                  estimatedDuration: currentDuration,
+                  watchedPercent: watchedPercentValue,
+                  linkedExamId: video.linkedExamId || null
+              }, { merge: true });
+          } catch (e) { console.error("Sync error:", e); }
       };
-  }, [
-      user?.uid,
-      video?.id,
-      video?.title,
-      userName,
-      videoId,
-      video?.durationSeconds,
-      video?.estimatedDurationMinutes,
-      video?.linkedExamId,
-      onProgress
-  ]);
+      syncToDatabase(0, 0);
+
+      timerInterval = setInterval(() => {
+          let isPlaying = true;
+          if (!videoId && videoRef.current) isPlaying = !videoRef.current.paused && !videoRef.current.ended;
+          if (!document.hidden && isPlaying) {
+              localSeconds += 1;
+              const currentDuration = safeNumber(videoRef.current?.duration, estimatedDuration);
+              const currentPercent = currentDuration > 0 ? Math.min(100, Math.round((localSeconds / currentDuration) * 100)) : 0;
+              onProgress?.(video.id, currentPercent, localSeconds);
+              if (localSeconds - lastSyncedSeconds >= 15) { syncToDatabase(localSeconds - lastSyncedSeconds); lastSyncedSeconds = localSeconds; }
+          }
+      }, 1000);
+      return () => { clearInterval(timerInterval); const remaining = localSeconds - lastSyncedSeconds; if (remaining > 0) syncToDatabase(remaining); };
+  }, [user, video.id, video.title, userName, videoId, video.durationSeconds, video.estimatedDurationMinutes, video.linkedExamId, onProgress]);
 
   const changeSpeed = (rate) => { if(videoRef.current) videoRef.current.playbackRate = rate; setShowSettings(false); };
 
@@ -1183,35 +1178,9 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
         <div className="w-full relative flex items-center justify-center bg-black overflow-hidden" style={{ height: showNotes ? '50vh' : '100%', md: { height: '100%' } }}>
           <div className="watermark-video">{userName} - {video.grade} — منصة النحاس</div>
           {videoId ? (
-            <YouTubeTrackedPlayer
-              videoId={videoId}
-              video={video}
-              user={user}
-              userName={userName}
-              db={db}
-              doc={doc}
-              collection={collection}
-              setDoc={setDoc}
-              addDoc={addDoc}
-              updateDoc={updateDoc}
-              serverTimestamp={serverTimestamp}
-              increment={increment}
-              onProgress={onProgress}
-              safeNumber={safeNumber}
-            />
+            <iframe className="w-full h-full" src={youtubeEmbedUrl} title="Video" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
           ) : (
-             <video
-               ref={videoRef}
-               controls
-               controlsList="nodownload"
-               className="w-full h-full object-contain relative z-40"
-               src={finalUrl}
-               playsInline
-               preload="auto"
-               disablePictureInPicture
-             >
-               المتصفح لا يدعم هذا الفيديو.
-             </video>
+             <video ref={videoRef} controls controlsList="nodownload" className="w-full h-full object-contain relative z-40" src={finalUrl} playsInline preload="auto" disablePictureInPicture>المتصفح لا يدعم هذا الفيديو.</video>
           )}
         </div>
       </div>
@@ -6208,7 +6177,6 @@ const AdminDashboard = ({ user }) => {
   const [liveData, setLiveData] = useState({ title: '', liveUrl: '', grade: '3sec', passcode: '', allowedEmails: '', sessionType: 'jitsi', embedUrl: '', scheduledAt: '', isOptional: true });
   const [activeLiveSessions, setActiveLiveSessions] = useState([]);
     const [videoViewsPhase3, setVideoViewsPhase3] = useState([]);
-  const [videoWatchSessionsPhase4, setVideoWatchSessionsPhase4] = useState([]);
 const [editingUser, setEditingUser] = useState(null);
   const [replyTexts, setReplyTexts] = useState({});
   const [examBuilder, setExamBuilder] = useState({ title: '', grade: '3sec', duration: 60, startTime: '', endTime: '', questions: [], accessCode: '', isPremium: false });
@@ -7294,19 +7262,6 @@ const [editingUser, setEditingUser] = useState(null);
   };
   const deleteQuote = async (id) => { if(window.confirm("حذف هذه الحكمة؟")) await deleteDoc(doc(db, 'quotes', id)); };
 
-
-  useEffect(() => {
-      const unsubWatchSessions = onSnapshot(collection(db, 'video_watch_sessions'), (snap) => {
-          const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          rows.sort((a, b) => (b.openedAtMs || b.openedAt?.seconds || 0) - (a.openedAtMs || a.openedAt?.seconds || 0));
-          setVideoWatchSessionsPhase4(rows);
-      }, (error) => {
-          console.warn('phase4 video watch sessions listener blocked:', error?.message);
-          setVideoWatchSessionsPhase4([]);
-      });
-      return () => unsubWatchSessions();
-  }, []);
-
   const filteredPendingUsers = pendingUsers.filter(u => adminGradeFilter === 'all' || u.grade === adminGradeFilter);
   const filteredActiveUsers = activeUsersList.filter(u => adminGradeFilter === 'all' || u.grade === adminGradeFilter);
   const filteredContentList = contentList.filter(c => adminGradeFilter === 'all' || c.grade === adminGradeFilter);
@@ -7662,9 +7617,9 @@ const [editingUser, setEditingUser] = useState(null);
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-4 md:p-6 relative z-10">
         <div className="glass-panel p-4 rounded-xl h-fit space-y-2 flex md:flex-col overflow-x-auto md:overflow-x-visible whitespace-nowrap scrollbar-hide">
-          {['dashboard', 'phase4_video_analytics', 'phase3_parent', 'phase3_content_map', 'phase3_mobile_perf', 'users', 'all_users', 'subscriptions', 'payments', 'security_center', 'ai_analytics', 'live_ai', 'app_convert', 'ai_lab', 'ai_insights', 'leaderboard', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'question-analytics', 'smart_hw', 'content', 'notifications', 'student-messages', 'messages'].map(tab => (
+          {['dashboard', 'phase3_parent', 'phase3_content_map', 'phase3_mobile_perf', 'users', 'all_users', 'subscriptions', 'payments', 'security_center', 'ai_analytics', 'live_ai', 'app_convert', 'ai_lab', 'ai_insights', 'leaderboard', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'question-analytics', 'smart_hw', 'content', 'notifications', 'student-messages', 'messages'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 transition-all ${activeTab===tab?'bg-amber-100 text-amber-700 shadow-sm border-b-4 md:border-b-0 md:border-r-4 border-amber-500':'hover:bg-slate-50 text-slate-600'}`}>
-              {tab === 'dashboard' ? 'Dashboard' : tab === 'phase4_video_analytics' ? 'تحليل المشاهدة' : tab === 'phase3_parent' ? 'ولي الأمر V3' : tab === 'phase3_content_map' ? 'تنظيم المحتوى V3' : tab === 'phase3_mobile_perf' ? 'الموبايل والأداء V3' : tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'payments' ? 'طلبات الدفع' : tab === 'security_center' ? 'مركز الحماية' : tab === 'ai_analytics' ? 'تحليلات AI' : tab === 'live_ai' ? 'البث المباشر + Live AI' : tab === 'app_convert' ? 'تحويل App' : tab === 'ai_lab' ? 'AI Lab' : tab === 'ai_insights' ? 'AI Insights' : tab === 'leaderboard' ? 'لوحة الشرف' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'question-analytics' ? 'تحليل الأسئلة' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'student-messages' ? 'رسائل الطلاب' : tab === 'messages' ? 'الرسائل' : 'الإعدادات'}
+              {tab === 'dashboard' ? 'Dashboard' : tab === 'phase3_parent' ? 'ولي الأمر V3' : tab === 'phase3_content_map' ? 'تنظيم المحتوى V3' : tab === 'phase3_mobile_perf' ? 'الموبايل والأداء V3' : tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'payments' ? 'طلبات الدفع' : tab === 'security_center' ? 'مركز الحماية' : tab === 'ai_analytics' ? 'تحليلات AI' : tab === 'live_ai' ? 'البث المباشر + Live AI' : tab === 'app_convert' ? 'تحويل App' : tab === 'ai_lab' ? 'AI Lab' : tab === 'ai_insights' ? 'AI Insights' : tab === 'leaderboard' ? 'لوحة الشرف' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'question-analytics' ? 'تحليل الأسئلة' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'student-messages' ? 'رسائل الطلاب' : tab === 'messages' ? 'الرسائل' : 'الإعدادات'}
             </button>
           ))}
         </div>
@@ -7672,16 +7627,6 @@ const [editingUser, setEditingUser] = useState(null);
         <div className="md:col-span-3 w-full overflow-hidden">
           {activeTab === 'dashboard' && (<div className="space-y-8"><AdminProDashboard users={activeUsersList} exams={examsList} results={examResults} content={contentList} subscriptionCodes={subscriptionCodes} liveSessions={activeLiveSessions} hwResults={hwResults} adminGradeFilter={adminGradeFilter} /><AdminOverviewPhase2 users={[...pendingUsers, ...activeUsersList]} results={examResults} paymentRequests={paymentRequestsPhase2} liveSessions={activeLiveSessions} content={contentList} mistakes={[]} onOpenStudents={() => setActiveTab('all_users')} onOpenPayments={() => setActiveTab('subscriptions')} onOpenResults={() => setActiveTab('results')} onOpenContent={() => setActiveTab('content')} /></div>)}
 
-
-
-          {activeTab === 'phase4_video_analytics' && (
-            <VideoWatchAnalyticsPhase4
-              users={[...pendingUsers, ...activeUsersList]}
-              content={contentList}
-              videoViews={videoViewsPhase3}
-              watchSessions={videoWatchSessionsPhase4}
-            />
-          )}
 
           {activeTab === 'phase3_parent' && (
             <ParentProgressPhase3

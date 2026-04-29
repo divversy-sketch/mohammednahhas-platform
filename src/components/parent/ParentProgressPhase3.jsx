@@ -263,7 +263,6 @@ export default function ParentProgressPhase3({
   results = [],
   mistakes = [],
   videoViews = [],
-  watchSessions = [],
   content = [],
   onOpenStudent
 }) {
@@ -273,7 +272,7 @@ export default function ParentProgressPhase3({
 
   const rows = useMemo(
     () => buildStudentRows({ users, results, mistakes, videoViews, content }),
-    [users, results, mistakes, videoViews, watchSessions, content]
+    [users, results, mistakes, videoViews, content]
   );
 
   const filtered = useMemo(() => {
