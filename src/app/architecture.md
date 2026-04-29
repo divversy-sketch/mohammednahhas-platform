@@ -1,16 +1,14 @@
-# Nahhas Pro architecture
+# تقسيم App.jsx
 
-This version keeps the legacy `App.jsx` working while moving high-risk UI pieces into feature modules.
+تم تحويل `src/App.jsx` إلى ملف دخول صغير يقوم بتصدير التطبيق من `src/app/AppRoot.jsx`.
 
-## Active feature modules
+## الملفات التي تم فصلها في هذه المرحلة
 
-- `features/lectures/` lecture player, zoom/cinema controls, watermark motion, video performance CSS.
-- `features/student/` mobile bottom navigation and student-facing shell components.
-- `features/messaging/` reserved for desktop-only messaging UI.
-- `features/exams/` reserved for exam runner/review components.
-- `features/admin/` reserved for admin dashboard sections.
-- `shared/` cross-feature utilities and visual helpers.
+- `src/app/AppRoot.jsx`: جسم التطبيق الرئيسي كما هو مع الحفاظ على السلوك.
+- `src/shared/components/DesignSystemLoader.jsx`: تحميل الخطوط و Tailwind و CSS العام.
+- `src/shared/constants/grades.jsx`: خيارات الصفوف وتسميات الصفوف.
+- `src/shared/utils/phone.js`: دوال تنسيق والتحقق من أرقام الهاتف المصرية.
 
-## Migration rule
+## الهدف
 
-Do not add new large JSX blocks directly into `App.jsx`. Add the feature under `src/features/<domain>` and only wire it from `App.jsx`.
+هذه مرحلة تقسيم آمنة تحافظ على البناء الحالي، وتجهز المشروع لنقل الداشبورد، الامتحانات، الفيديو، والرسائل إلى features مستقلة تدريجيًا بدون كسر build.
