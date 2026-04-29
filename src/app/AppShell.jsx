@@ -695,8 +695,6 @@ const WisdomBox = () => {
 
 const Announcements = () => {
     const [announcements, setAnnouncements] = useState([]);
-  const [paymentRequestsPhase2, setPaymentRequestsPhase2] = useState([]);
-  const [platformNotificationsPhase2, setPlatformNotificationsPhase2] = useState([]);
     useEffect(() => {
         const q = query(collection(db, 'announcements'), orderBy('createdAt', 'desc'));
         return onSnapshot(q, snap => setAnnouncements(snap.docs.map(d => ({id: d.id, ...d.data()}))));
@@ -7263,6 +7261,111 @@ const [editingUser, setEditingUser] = useState(null);
       setNewQuote({ text: '', source: '' });
   };
   const deleteQuote = async (id) => { if(window.confirm("حذف هذه الحكمة؟")) await deleteDoc(doc(db, 'quotes', id)); };
+
+
+  const approvePhase2PaymentRequest = async (req) => {
+      if (!req?.id) return;
+      const days = Number(req.days || req.planDays || req.durationDays || 30);
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + (Number.isFinite(days) ? days : 30));
+
+      try {
+          const batch = writeBatch(db);
+          batch.update(doc(db, 'payment_requests', req.id), {
+              status: 'approved',
+              approvedAt: serverTimestamp(),
+              approvedBy: user?.email || 'admin'
+          });
+
+          if (req.userId) {
+              batch.set(doc(db, 'users', req.userId), {
+                  subscriptionStatus: 'premium',
+                  subscriptionExpiry: expiryDate,
+                  status: 'active',
+                  lastPaymentRequestId: req.id,
+                  updatedAt: serverTimestamp()
+              }, { merge: true });
+          }
+
+          await batch.commit();
+          alert('تم قبول الطلب وتفعيل الاشتراك بنجاح.');
+      } catch (error) {
+          console.error('phase2 approve payment error:', error);
+          alert('تعذر قبول الطلب. تحقق من الصلاحيات أو اتصال Firebase.');
+      }
+  };
+
+  const rejectPhase2PaymentRequest = async (req) => {
+      if (!req?.id) return;
+      const reason = prompt('سبب الرفض اختياري:', '');
+      try {
+          await updateDoc(doc(db, 'payment_requests', req.id), {
+              status: 'rejected',
+              rejectReason: reason || '',
+              rejectedAt: serverTimestamp(),
+              rejectedBy: user?.email || 'admin'
+          });
+          alert('تم رفض الطلب.');
+      } catch (error) {
+          console.error('phase2 reject payment error:', error);
+          alert('تعذر رفض الطلب.');
+      }
+  };
+
+  const extendPhase2StudentSubscription = async (req) => {
+      const studentId = req?.userId || req?.studentId;
+      if (!studentId) return alert('لا يوجد userId مرتبط بهذا الطلب.');
+      const days = prompt('كم يوم تريد تمديد الاشتراك؟', '30');
+      if (!days || isNaN(days)) return;
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + parseInt(days, 10));
+      try {
+          await setDoc(doc(db, 'users', studentId), {
+              subscriptionStatus: 'premium',
+              subscriptionExpiry: expiryDate,
+              status: 'active',
+              updatedAt: serverTimestamp()
+          }, { merge: true });
+          alert(`تم تمديد الاشتراك لمدة ${days} يوم.`);
+      } catch (error) {
+          console.error('phase2 extend subscription error:', error);
+          alert('تعذر تمديد الاشتراك.');
+      }
+  };
+
+  const createPhase2Notification = async (payload) => {
+      try {
+          await addDoc(collection(db, 'notifications'), {
+              ...payload,
+              body: payload.body || payload.text || '',
+              text: payload.body || payload.text || '',
+              createdBy: user?.email || 'admin',
+              createdAt: serverTimestamp()
+          });
+          await addDoc(collection(db, 'announcements'), {
+              text: `${payload.title || 'تنبيه'}: ${payload.body || payload.text || ''}`,
+              targetGrade: payload.targetGrade || 'all',
+              type: payload.type || 'announcement',
+              createdAt: serverTimestamp()
+          });
+          alert('تم إرسال الإشعار داخل المنصة.');
+      } catch (error) {
+          console.error('phase2 create notification error:', error);
+          alert('تعذر إرسال الإشعار.');
+      }
+  };
+
+  const markPhase2NotificationReviewed = async (notification) => {
+      if (!notification?.id) return;
+      try {
+          await updateDoc(doc(db, 'notifications', notification.id), {
+              reviewedByAdmin: true,
+              reviewedAt: serverTimestamp()
+          });
+      } catch (error) {
+          console.warn('phase2 mark notification reviewed blocked:', error?.message);
+      }
+  };
 
   const filteredPendingUsers = pendingUsers.filter(u => adminGradeFilter === 'all' || u.grade === adminGradeFilter);
   const filteredActiveUsers = activeUsersList.filter(u => adminGradeFilter === 'all' || u.grade === adminGradeFilter);

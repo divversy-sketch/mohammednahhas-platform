@@ -220,8 +220,8 @@ const buildWhatsAppMessage = (row) => {
     ? `${row.latestExam} - ${row.latestPercentage}% بتاريخ ${formatDate(row.latestResultDate)}`
     : "لا توجد نتيجة امتحان حتى الآن";
 
-  const videosText = row.videoViews.length
-    ? row.videoViews
+  const videosText = (row.videoViews || []).length
+    ? (row.videoViews || [])
         .slice(0, 5)
         .map((v, i) => {
           const duration = v.durationSeconds ? ` من ${formatDuration(v.durationSeconds)}` : "";
@@ -479,13 +479,13 @@ function StudentDetailsModal({ row, onClose, onWhatsApp }) {
               <PlayCircle className="text-blue-600" /> مشاهدة الفيديوهات
             </h4>
 
-            {row.videoViews.length === 0 ? (
+            {(row.videoViews || []).length === 0 ? (
               <div className="bg-white border rounded-2xl p-6 text-center text-slate-500 font-bold">
                 لا توجد مشاهدات فيديو مسجلة لهذا الطالب.
               </div>
             ) : (
               <div className="space-y-3">
-                {row.videoViews.map((v, i) => (
+                {(row.videoViews || []).map((v, i) => (
                   <div key={`${v.videoId || v.contentId || i}`} className="bg-white border rounded-2xl p-4">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-3">
                       <div>
