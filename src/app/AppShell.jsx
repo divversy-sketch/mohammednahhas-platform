@@ -28,6 +28,8 @@ import NotificationsCenterPhase2 from '../components/notifications/Notifications
 import ParentProgressPhase3 from '../components/parent/ParentProgressPhase3';
 import ContentOrganizerPhase3 from '../components/admin/ContentOrganizerPhase3';
 import MobilePerformancePhase3 from '../components/admin/MobilePerformancePhase3';
+import { createVideoWatchTracker } from '../utils/videoWatchTracker';
+import YouTubeTrackedPlayer from '../components/video/YouTubeTrackedPlayer';
 
 const getAdminAIHeaders = async () => {
   const token = await auth?.currentUser?.getIdToken?.();
@@ -1066,46 +1068,48 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
   }, [user, video.id]);
 
   useEffect(() => {
-      if (!user || !video.id) return;
-      const viewId = `${user.uid}_${video.id}`;
-      const viewRef = doc(db, 'video_views', viewId);
-      let timerInterval; let localSeconds = 0; let lastSyncedSeconds = 0;
-      const estimatedDuration = safeNumber(video.durationSeconds, safeNumber(video.estimatedDurationMinutes, 0) * 60);
+      if (!user || !video?.id) return;
 
-      const syncToDatabase = async (secondsToAdd, overrideSeconds = null) => {
-          const watchedSeconds = overrideSeconds ?? localSeconds;
-          const currentDuration = safeNumber(videoRef.current?.duration, estimatedDuration);
-          const watchedPercentValue = currentDuration > 0 ? Math.min(100, Math.round((watchedSeconds / currentDuration) * 100)) : 0;
-          onProgress?.(video.id, watchedPercentValue, watchedSeconds);
-          try {
-              await setDoc(viewRef, {
-                  userId: user.uid,
-                  userName: userName,
-                  videoId: video.id,
-                  videoTitle: video.title,
-                  viewedAt: serverTimestamp(),
-                  watchedSeconds: increment(secondsToAdd),
-                  estimatedDuration: currentDuration,
-                  watchedPercent: watchedPercentValue,
-                  linkedExamId: video.linkedExamId || null
-              }, { merge: true });
-          } catch (e) { console.error("Sync error:", e); }
+      const estimatedDuration = safeNumber(
+          video.durationSeconds,
+          safeNumber(video.estimatedDurationMinutes, 0) * 60
+      );
+
+      const tracker = createVideoWatchTracker({
+          db,
+          doc,
+          collection,
+          setDoc,
+          addDoc,
+          updateDoc,
+          serverTimestamp,
+          increment,
+          user,
+          userName,
+          video,
+          videoId,
+          videoRef,
+          estimatedDuration,
+          onProgress,
+          safeNumber
+      });
+
+      tracker.start();
+
+      return () => {
+          tracker.stop();
       };
-      syncToDatabase(0, 0);
-
-      timerInterval = setInterval(() => {
-          let isPlaying = true;
-          if (!videoId && videoRef.current) isPlaying = !videoRef.current.paused && !videoRef.current.ended;
-          if (!document.hidden && isPlaying) {
-              localSeconds += 1;
-              const currentDuration = safeNumber(videoRef.current?.duration, estimatedDuration);
-              const currentPercent = currentDuration > 0 ? Math.min(100, Math.round((localSeconds / currentDuration) * 100)) : 0;
-              onProgress?.(video.id, currentPercent, localSeconds);
-              if (localSeconds - lastSyncedSeconds >= 15) { syncToDatabase(localSeconds - lastSyncedSeconds); lastSyncedSeconds = localSeconds; }
-          }
-      }, 1000);
-      return () => { clearInterval(timerInterval); const remaining = localSeconds - lastSyncedSeconds; if (remaining > 0) syncToDatabase(remaining); };
-  }, [user, video.id, video.title, userName, videoId, video.durationSeconds, video.estimatedDurationMinutes, video.linkedExamId, onProgress]);
+  }, [
+      user?.uid,
+      video?.id,
+      video?.title,
+      userName,
+      videoId,
+      video?.durationSeconds,
+      video?.estimatedDurationMinutes,
+      video?.linkedExamId,
+      onProgress
+  ]);
 
   const changeSpeed = (rate) => { if(videoRef.current) videoRef.current.playbackRate = rate; setShowSettings(false); };
 
@@ -1178,9 +1182,35 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
         <div className="w-full relative flex items-center justify-center bg-black overflow-hidden" style={{ height: showNotes ? '50vh' : '100%', md: { height: '100%' } }}>
           <div className="watermark-video">{userName} - {video.grade} — منصة النحاس</div>
           {videoId ? (
-            <iframe className="w-full h-full" src={youtubeEmbedUrl} title="Video" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
+            <YouTubeTrackedPlayer
+              videoId={videoId}
+              video={video}
+              user={user}
+              userName={userName}
+              db={db}
+              doc={doc}
+              collection={collection}
+              setDoc={setDoc}
+              addDoc={addDoc}
+              updateDoc={updateDoc}
+              serverTimestamp={serverTimestamp}
+              increment={increment}
+              onProgress={onProgress}
+              safeNumber={safeNumber}
+            />
           ) : (
-             <video ref={videoRef} controls controlsList="nodownload" className="w-full h-full object-contain relative z-40" src={finalUrl} playsInline preload="auto" disablePictureInPicture>المتصفح لا يدعم هذا الفيديو.</video>
+             <video
+               ref={videoRef}
+               controls
+               controlsList="nodownload"
+               className="w-full h-full object-contain relative z-40"
+               src={finalUrl}
+               playsInline
+               preload="auto"
+               disablePictureInPicture
+             >
+               المتصفح لا يدعم هذا الفيديو.
+             </video>
           )}
         </div>
       </div>
