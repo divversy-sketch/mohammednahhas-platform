@@ -21,6 +21,13 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { auth, db, savePushTokenForUser, setupForegroundPushListener } from '../services/firebase';
 import { isVisibleLiveSession } from '../utils/liveSessions';
+import HomeDashboardPhase1 from '../components/student/HomeDashboardPhase1';
+import AdminOverviewPhase2 from '../components/admin/AdminOverviewPhase2';
+import SubscriptionManagerPhase2 from '../components/admin/SubscriptionManagerPhase2';
+import NotificationsCenterPhase2 from '../components/notifications/NotificationsCenterPhase2';
+import ParentProgressPhase3 from '../components/parent/ParentProgressPhase3';
+import ContentOrganizerPhase3 from '../components/admin/ContentOrganizerPhase3';
+import MobilePerformancePhase3 from '../components/admin/MobilePerformancePhase3';
 
 const getAdminAIHeaders = async () => {
   const token = await auth?.currentUser?.getIdToken?.();
@@ -688,6 +695,8 @@ const WisdomBox = () => {
 
 const Announcements = () => {
     const [announcements, setAnnouncements] = useState([]);
+  const [paymentRequestsPhase2, setPaymentRequestsPhase2] = useState([]);
+  const [platformNotificationsPhase2, setPlatformNotificationsPhase2] = useState([]);
     useEffect(() => {
         const q = query(collection(db, 'announcements'), orderBy('createdAt', 'desc'));
         return onSnapshot(q, snap => setAnnouncements(snap.docs.map(d => ({id: d.id, ...d.data()}))));
@@ -6183,6 +6192,8 @@ const AdminDashboard = ({ user }) => {
   const [newStudentNotification, setNewStudentNotification] = useState({ title: '', text: '', grade: 'all', clickUrl: '/' }); 
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [announcements, setAnnouncements] = useState([]);
+  const [paymentRequestsPhase2, setPaymentRequestsPhase2] = useState([]);
+  const [platformNotificationsPhase2, setPlatformNotificationsPhase2] = useState([]);
   
   const [autoReplies, setAutoReplies] = useState([]);
   const [newAutoReply, setNewAutoReply] = useState({ keywords: '', response: '', isActive: true });
@@ -6313,6 +6324,30 @@ const AdminDashboard = ({ user }) => {
   useEffect(() => {
       const q = query(collection(db, 'announcements'), orderBy('createdAt', 'desc'));
       const u = onSnapshot(q, s => setAnnouncements(s.docs.map(d => ({id: d.id, ...d.data()}))));
+      return u;
+  }, []);
+
+  useEffect(() => {
+      const u = onSnapshot(collection(db, 'payment_requests'), (snap) => {
+          const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          rows.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+          setPaymentRequestsPhase2(rows);
+      }, (error) => {
+          console.warn('phase2 payment requests listener blocked:', error?.message);
+          setPaymentRequestsPhase2([]);
+      });
+      return u;
+  }, []);
+
+  useEffect(() => {
+      const u = onSnapshot(collection(db, 'notifications'), (snap) => {
+          const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          rows.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+          setPlatformNotificationsPhase2(rows);
+      }, (error) => {
+          console.warn('phase2 notifications listener blocked:', error?.message);
+          setPlatformNotificationsPhase2([]);
+      });
       return u;
   }, []);
   // Auto replies removed permanently.
@@ -7571,15 +7606,75 @@ const AdminDashboard = ({ user }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-4 md:p-6 relative z-10">
         <div className="glass-panel p-4 rounded-xl h-fit space-y-2 flex md:flex-col overflow-x-auto md:overflow-x-visible whitespace-nowrap scrollbar-hide">
-          {['dashboard', 'users', 'all_users', 'subscriptions', 'payments', 'security_center', 'ai_analytics', 'live_ai', 'app_convert', 'ai_lab', 'ai_insights', 'leaderboard', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'question-analytics', 'smart_hw', 'content', 'notifications', 'student-messages', 'messages'].map(tab => (
+          {['dashboard', 'phase2_dashboard', 'phase2_subscriptions', 'phase2_notifications', 'phase3_parent', 'phase3_content_map', 'phase3_mobile_perf', 'users', 'all_users', 'subscriptions', 'payments', 'security_center', 'ai_analytics', 'live_ai', 'app_convert', 'ai_lab', 'ai_insights', 'leaderboard', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'question-analytics', 'smart_hw', 'content', 'notifications', 'student-messages', 'messages'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 transition-all ${activeTab===tab?'bg-amber-100 text-amber-700 shadow-sm border-b-4 md:border-b-0 md:border-r-4 border-amber-500':'hover:bg-slate-50 text-slate-600'}`}>
-              {tab === 'dashboard' ? 'Dashboard' : tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'payments' ? 'طلبات الدفع' : tab === 'security_center' ? 'مركز الحماية' : tab === 'ai_analytics' ? 'تحليلات AI' : tab === 'live_ai' ? 'البث المباشر + Live AI' : tab === 'app_convert' ? 'تحويل App' : tab === 'ai_lab' ? 'AI Lab' : tab === 'ai_insights' ? 'AI Insights' : tab === 'leaderboard' ? 'لوحة الشرف' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'question-analytics' ? 'تحليل الأسئلة' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'student-messages' ? 'رسائل الطلاب' : tab === 'messages' ? 'الرسائل' : 'الإعدادات'}
+              {tab === 'dashboard' ? 'Dashboard' : tab === 'phase2_dashboard' ? 'لوحة الأدمن V2' : tab === 'phase2_subscriptions' ? 'الاشتراكات V2' : tab === 'phase2_notifications' ? 'الإشعارات V2' : tab === 'phase3_parent' ? 'ولي الأمر V3' : tab === 'phase3_content_map' ? 'تنظيم المحتوى V3' : tab === 'phase3_mobile_perf' ? 'الموبايل والأداء V3' : tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'payments' ? 'طلبات الدفع' : tab === 'security_center' ? 'مركز الحماية' : tab === 'ai_analytics' ? 'تحليلات AI' : tab === 'live_ai' ? 'البث المباشر + Live AI' : tab === 'app_convert' ? 'تحويل App' : tab === 'ai_lab' ? 'AI Lab' : tab === 'ai_insights' ? 'AI Insights' : tab === 'leaderboard' ? 'لوحة الشرف' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'question-analytics' ? 'تحليل الأسئلة' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'student-messages' ? 'رسائل الطلاب' : tab === 'messages' ? 'الرسائل' : 'الإعدادات'}
             </button>
           ))}
         </div>
 
         <div className="md:col-span-3 w-full overflow-hidden">
           {activeTab === 'dashboard' && <AdminProDashboard users={activeUsersList} exams={examsList} results={examResults} content={contentList} subscriptionCodes={subscriptionCodes} liveSessions={activeLiveSessions} hwResults={hwResults} adminGradeFilter={adminGradeFilter} />}
+
+
+          {activeTab === 'phase2_dashboard' && (
+            <AdminOverviewPhase2
+              users={[...pendingUsers, ...activeUsersList]}
+              results={examResults}
+              paymentRequests={paymentRequestsPhase2}
+              liveSessions={activeLiveSessions}
+              content={contentList}
+              mistakes={[]}
+              onOpenStudents={() => setActiveTab('all_users')}
+              onOpenPayments={() => setActiveTab('phase2_subscriptions')}
+              onOpenResults={() => setActiveTab('results')}
+              onOpenContent={() => setActiveTab('content')}
+            />
+          )}
+
+          {activeTab === 'phase2_subscriptions' && (
+            <SubscriptionManagerPhase2
+              users={[...pendingUsers, ...activeUsersList]}
+              paymentRequests={paymentRequestsPhase2}
+              onApproveRequest={approvePhase2PaymentRequest}
+              onRejectRequest={rejectPhase2PaymentRequest}
+              onExtendStudent={extendPhase2StudentSubscription}
+            />
+          )}
+
+          {activeTab === 'phase2_notifications' && (
+            <NotificationsCenterPhase2
+              notifications={platformNotificationsPhase2}
+              users={[...pendingUsers, ...activeUsersList]}
+              onCreateNotification={createPhase2Notification}
+              onMarkRead={markPhase2NotificationReviewed}
+            />
+          )}
+
+          {activeTab === 'phase3_parent' && (
+            <ParentProgressPhase3
+              users={[...pendingUsers, ...activeUsersList]}
+              results={examResults}
+              mistakes={[]}
+              onOpenStudent={(row) => {
+                setActiveTab('all_users');
+                alert(`افتح بيانات الطالب من قائمة الطلاب: ${row.name}`);
+              }}
+            />
+          )}
+
+          {activeTab === 'phase3_content_map' && (
+            <ContentOrganizerPhase3
+              content={contentList}
+              exams={examsList}
+              onOpenContent={() => setActiveTab('content')}
+              onOpenExam={() => setActiveTab('exams')}
+            />
+          )}
+
+          {activeTab === 'phase3_mobile_perf' && (
+            <MobilePerformancePhase3 />
+          )}
 
           {activeTab === 'users' && <div className="glass-panel p-4 md:p-6 rounded-xl"><h2 className="font-bold mb-4 font-arabic text-xl">طلبات الانضمام</h2>{filteredPendingUsers.map(u=><div key={u.id} className="border p-4 mb-2 rounded-lg flex flex-col md:flex-row gap-3 justify-between bg-white/50 backdrop-blur-sm"><div><p className="font-bold">{u.name}</p><p className="text-sm">{u.grade}</p></div><div className="flex gap-2"><button onClick={()=>handleApprove(u.id)} className="bg-green-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-green-500/50 transition flex-1"><Check className="mx-auto"/></button><button onClick={()=>handleReject(u.id)} className="bg-red-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-red-500/50 transition flex-1"><X className="mx-auto"/></button></div></div>)}</div>}
 
@@ -8856,8 +8951,22 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
         {activeTab === 'home' && (
             <div className="space-y-8">
-                <StudentLevelHomePanel userResults={examResults} mistakes={mistakes} content={content} onOpenMistakes={() => setActiveTab('mistakes_bank')} onStartMistakesExam={startMistakesExam} />
-                <StudentStudyPlanPanel userResults={examResults} mistakes={mistakes} content={content} onOpenMistakes={() => setActiveTab('mistakes_bank')} onStartMistakesExam={startMistakesExam} />
+                <HomeDashboardPhase1
+                    userData={userData}
+                    results={examResults}
+                    mistakes={mistakes}
+                    videoViews={videoViews}
+                    onStartMistakesExam={(exam) => {
+                        if (exam) {
+                            setActiveExam(exam);
+                        } else {
+                            startMistakesExam();
+                        }
+                    }}
+                    onGoToExams={() => setActiveTab('exams')}
+                    onGoToContent={() => setActiveTab('content')}
+                    onGoToMistakes={() => setActiveTab('mistakes_bank')}
+                />
                 {liveSessions.length > 0 && (
                     <div className="bg-white border border-red-100 text-slate-800 p-4 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm">
                         <div>
