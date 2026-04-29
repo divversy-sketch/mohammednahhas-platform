@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle, XCircle, Lightbulb } from 'lucide-react';
+import { CheckCircle, XCircle, Lightbulb } from '../../shared/icons/lucide-shim.jsx';
 
 export default function LocalQuestionReview({ question, answer }) {
   const isEssay = question?.type === 'essay';

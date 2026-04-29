@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrainCircuit, CheckCircle, AlertTriangle, Target } from 'lucide-react';
+import { BrainCircuit, CheckCircle, AlertTriangle, Target } from '../../shared/icons/lucide-shim.jsx';
 
 const buildAdvice = (metrics = {}) => {
   const branches = Object.entries(metrics.branchStats || {}).map(([branch, data]) => {

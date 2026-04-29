@@ -17,10 +17,13 @@ import {
   History, Camera, QrCode, FileCheck, MousePointerClick, BarChart3, Layers,
   BrainCircuit, Headphones, DownloadCloud, PenLine, Play, Pause, SkipForward, 
   Target, AlertCircle, Crown, CreditCard, Key, Wand2, WalletCards, Smartphone
-} from 'lucide-react';
+} from './shared/icons/lucide-shim.jsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { auth, db, savePushTokenForUser, setupForegroundPushListener } from './services/firebase';
 import { isVisibleLiveSession } from './utils/liveSessions';
+import SecureVideoPlayer from './features/lectures/SecureVideoPlayer';
+import MobileStudentBottomNav from './features/student/MobileStudentBottomNav';
+import MobileExamHelperStyles from './shared/components/MobileExamHelperStyles';
 
 const getAdminAIHeaders = async () => {
   const token = await auth?.currentUser?.getIdToken?.();
@@ -247,8 +250,9 @@ const DesignSystemLoader = () => {
       @keyframes pulseSlow { 0%, 100% { transform: scale3d(1, 1, 1); opacity: 0.2; } 50% { transform: scale3d(1.1, 1.1, 1); opacity: 0.4; } }
       .animate-pulse-slow { animation: pulseSlow 8s ease-in-out infinite; will-change: transform, opacity; }
       .watermark-text { position: absolute; pointer-events: none; z-index: 9999; color: rgba(0, 0, 0, 0.08); font-weight: 900; font-size: 1.5rem; transform: rotate(-30deg); white-space: nowrap; text-shadow: 0 0 2px rgba(255,255,255,0.5); }
-      .watermark-video { position: absolute; pointer-events: none; z-index: 9999; color: rgba(255, 255, 255, 0.4); font-weight: 900; font-size: 1.5rem; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); white-space: nowrap; animation: moveWatermark 25s linear infinite; }
-      @keyframes moveWatermark { 0% { top: 10%; left: 10%; transform: rotate(-5deg); } 25% { top: 80%; left: 50%; transform: rotate(5deg); } 50% { top: 30%; left: 80%; transform: rotate(-5deg); } 75% { top: 70%; left: 10%; transform: rotate(5deg); } 100% { top: 10%; left: 10%; transform: rotate(-5deg); } }
+      .watermark-video { position: absolute; pointer-events: none; z-index: 9999; color: rgba(255, 255, 255, 0.42); font-weight: 900; font-size: clamp(1rem, 2vw, 1.5rem); text-shadow: 2px 2px 4px rgba(0,0,0,0.8); white-space: nowrap; animation: moveWatermark 46s linear infinite; will-change: transform, opacity; transform: translate3d(8vw, 10vh, 0) rotate(-5deg); backface-visibility: hidden; contain: layout paint; }
+      .video-smooth-frame { transform: translateZ(0); backface-visibility: hidden; will-change: transform; }
+      @keyframes moveWatermark { 0% { transform: translate3d(8vw, 10vh, 0) rotate(-5deg); } 25% { transform: translate3d(48vw, 72vh, 0) rotate(5deg); } 50% { transform: translate3d(78vw, 30vh, 0) rotate(-5deg); } 75% { transform: translate3d(12vw, 68vh, 0) rotate(5deg); } 100% { transform: translate3d(8vw, 10vh, 0) rotate(-5deg); } }
       .no-select { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
       @media (max-width: 768px) {
         button, .mobile-touch-target { min-height: 44px; }
@@ -996,144 +1000,6 @@ const LiveSessionView = ({ session, user, onClose }) => {
 };
 
 
-const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
-  const videoId = getYouTubeID(video.url || video.file);
-  const [showSettings, setShowSettings] = useState(false);
-  const [showNotes, setShowNotes] = useState(false);
-  const [notes, setNotes] = useState([]);
-  const [currentNote, setCurrentNote] = useState("");
-  const videoRef = useRef(null);
-  const finalUrl = video.url || video.file;
-
-  useEffect(() => {
-      if(!user || !video.id) return;
-      const q = query(collection(db, 'video_notes'), where('userId', '==', user.uid), where('videoId', '==', video.id), orderBy('timestamp', 'asc'));
-      const unsub = onSnapshot(q, (snap) => { setNotes(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
-      return () => unsub();
-  }, [user, video.id]);
-
-  useEffect(() => {
-      if (!user || !video.id) return;
-      const viewId = `${user.uid}_${video.id}`;
-      const viewRef = doc(db, 'video_views', viewId);
-      let timerInterval; let localSeconds = 0; let lastSyncedSeconds = 0;
-      const estimatedDuration = safeNumber(video.durationSeconds, safeNumber(video.estimatedDurationMinutes, 0) * 60);
-
-      const syncToDatabase = async (secondsToAdd, overrideSeconds = null) => {
-          const watchedSeconds = overrideSeconds ?? localSeconds;
-          const currentDuration = safeNumber(videoRef.current?.duration, estimatedDuration);
-          const watchedPercentValue = currentDuration > 0 ? Math.min(100, Math.round((watchedSeconds / currentDuration) * 100)) : 0;
-          onProgress?.(video.id, watchedPercentValue, watchedSeconds);
-          try {
-              await setDoc(viewRef, {
-                  userId: user.uid,
-                  userName: userName,
-                  videoId: video.id,
-                  videoTitle: video.title,
-                  viewedAt: serverTimestamp(),
-                  watchedSeconds: increment(secondsToAdd),
-                  estimatedDuration: currentDuration,
-                  watchedPercent: watchedPercentValue,
-                  linkedExamId: video.linkedExamId || null
-              }, { merge: true });
-          } catch (e) { console.error("Sync error:", e); }
-      };
-      syncToDatabase(0, 0);
-
-      timerInterval = setInterval(() => {
-          let isPlaying = true;
-          if (!videoId && videoRef.current) isPlaying = !videoRef.current.paused && !videoRef.current.ended;
-          if (!document.hidden && isPlaying) {
-              localSeconds += 1;
-              const currentDuration = safeNumber(videoRef.current?.duration, estimatedDuration);
-              const currentPercent = currentDuration > 0 ? Math.min(100, Math.round((localSeconds / currentDuration) * 100)) : 0;
-              onProgress?.(video.id, currentPercent, localSeconds);
-              if (localSeconds - lastSyncedSeconds >= 15) { syncToDatabase(localSeconds - lastSyncedSeconds); lastSyncedSeconds = localSeconds; }
-          }
-      }, 1000);
-      return () => { clearInterval(timerInterval); const remaining = localSeconds - lastSyncedSeconds; if (remaining > 0) syncToDatabase(remaining); };
-  }, [user, video.id, video.title, userName, videoId, video.durationSeconds, video.estimatedDurationMinutes, video.linkedExamId, onProgress]);
-
-  const changeSpeed = (rate) => { if(videoRef.current) videoRef.current.playbackRate = rate; setShowSettings(false); };
-
-  const handleAddNote = async (e) => {
-      e.preventDefault();
-      if(!currentNote.trim()) return;
-      let currentTime = 0;
-      if (videoRef.current) currentTime = videoRef.current.currentTime;
-      await addDoc(collection(db, 'video_notes'), { userId: user.uid, videoId: video.id, text: currentNote, timestamp: currentTime, createdAt: serverTimestamp() });
-      setCurrentNote("");
-  };
-
-  const handleJumpToTime = (time) => {
-      if(videoRef.current) { videoRef.current.currentTime = time; videoRef.current.play(); } else if(videoId) { alert("عفواً، ميزة القفز للوقت المحدد تعمل مع الفيديوهات المرفوعة على المنصة فقط وليس يوتيوب."); }
-  };
-
-  const deleteNote = async (noteId) => { if(window.confirm("حذف هذه الملاحظة؟")) await deleteDoc(doc(db, 'video_notes', noteId)); };
-  const formatMinSec = (seconds) => { const m = Math.floor(seconds / 60); const s = Math.floor(seconds % 60); return `${m}:${s.toString().padStart(2, '0')}`; };
-  const youtubeEmbedUrl = videoId ? `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1&showinfo=0&iv_load_policy=3&loop=1&playlist=${videoId}&playsinline=1` : '';
-
-  return (
-    <div className="fixed inset-0 z-[60] bg-black flex flex-col md:flex-row items-center justify-center p-0 md:p-4 font-['Cairo']" dir="rtl">
-      <AnimatePresence>
-          {showNotes && (
-              <motion.div initial={{ opacity: 0, x: 300 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 300 }} className="w-full md:w-80 h-1/2 md:h-full bg-white rounded-t-2xl md:rounded-l-none md:rounded-r-2xl flex flex-col shadow-2xl relative z-[70] overflow-hidden">
-                  <div className="p-4 bg-blue-600 text-white font-bold flex justify-between items-center shadow-md">
-                      <div className="flex items-center gap-2"><PenLine size={20}/> دفتر الملاحظات</div>
-                      <button onClick={() => setShowNotes(false)} className="hover:bg-blue-700 p-1 rounded"><X size={20}/></button>
-                  </div>
-                  <div className="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-3">
-                      {notes.length === 0 ? (
-                          <div className="text-center text-slate-400 mt-10"><PenLine size={40} className="mx-auto mb-2 opacity-50"/><p>لم تضف أي ملاحظات بعد.</p><p className="text-xs mt-1">الملاحظات بتتربط بوقت الفيديو عشان ترجعلها بسرعة.</p></div>
-                      ) : (
-                          notes.map(note => (
-                              <div key={note.id} className="bg-white p-3 rounded-xl shadow-sm border border-slate-200 group">
-                                  <div className="flex justify-between items-start mb-2">
-                                      <button onClick={() => handleJumpToTime(note.timestamp)} className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold hover:bg-blue-200 transition flex items-center gap-1"><Play size={10} fill="currentColor"/> الدقيقة {formatMinSec(note.timestamp)}</button>
-                                      <button onClick={() => deleteNote(note.id)} className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition"><Trash2 size={14}/></button>
-                                  </div>
-                                  <p className="text-sm text-slate-700 font-bold whitespace-pre-wrap">{note.text}</p>
-                              </div>
-                          ))
-                      )}
-                  </div>
-                  <form onSubmit={handleAddNote} className="p-4 bg-white border-t border-slate-200 flex flex-col gap-2">
-                      <textarea className="w-full border-2 border-slate-200 rounded-xl p-2 text-sm focus:border-blue-500 outline-none transition resize-none h-20" placeholder="اكتب ملاحظتك هنا (سيتم حفظها بوقت الفيديو الحالي)..." value={currentNote} onChange={e => setCurrentNote(e.target.value)} />
-                      <button type="submit" className="w-full bg-blue-600 text-white font-bold py-2 rounded-xl shadow-md hover:bg-blue-700 transition">إضافة الملاحظة</button>
-                  </form>
-              </motion.div>
-          )}
-      </AnimatePresence>
-
-      <div className={`w-full h-full md:max-w-7xl bg-black ${showNotes ? 'md:rounded-l-2xl' : 'rounded-xl'} overflow-hidden relative shadow-2xl border border-gray-800 flex flex-col justify-center flex-1 transition-all duration-300`}>
-        <div className="absolute top-4 right-4 z-50 flex gap-4">
-            <button onClick={() => setShowNotes(!showNotes)} className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold backdrop-blur-md transition shadow-lg ${showNotes ? 'bg-blue-600 text-white' : 'bg-black/50 text-white hover:bg-black/80 border border-white/20'}`}>
-                <PenLine size={18}/> <span className="hidden md:inline">ملاحظاتي</span>
-            </button>
-            <div className="relative">
-                <button onClick={() => setShowSettings(!showSettings)} className="bg-black/50 hover:bg-black/80 text-white p-2 rounded-full backdrop-blur-sm transition border border-white/20"><GearIcon size={24}/></button>
-                {showSettings && (
-                    <div className="absolute top-12 left-0 bg-white text-black rounded-lg shadow-xl py-2 w-40 z-50 text-sm font-bold">
-                        <div className="px-4 py-2 border-b text-gray-400 text-xs">سرعة التشغيل</div>
-                        {[0.5, 1, 1.25, 1.5, 2].map(rate => ( <button key={rate} onClick={() => changeSpeed(rate)} className="block w-full text-right px-4 py-2 hover:bg-gray-100">{rate}x</button> ))}
-                    </div>
-                )}
-            </div>
-            <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white p-2 rounded-full shadow-lg"><X size={24}/></button>
-        </div>
-
-        <div className="w-full relative flex items-center justify-center bg-black overflow-hidden" style={{ height: showNotes ? '50vh' : '100%', md: { height: '100%' } }}>
-          <div className="watermark-video">{userName} - {video.grade} — منصة النحاس</div>
-          {videoId ? (
-            <iframe className="w-full h-full" src={youtubeEmbedUrl} title="Video" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
-          ) : (
-             <video ref={videoRef} controls controlsList="nodownload" className="w-full h-full object-contain relative z-40" src={finalUrl} playsInline preload="auto" disablePictureInPicture>المتصفح لا يدعم هذا الفيديو.</video>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const PomodoroFocusMode = ({ onClose }) => {
     const [timeLeft, setTimeLeft] = useState(25 * 60);
@@ -4933,60 +4799,6 @@ const StudentSmartPerformanceReport = ({ userResults = [], content = [] }) => {
   );
 };
 
-const MobileStudentBottomNav = ({ activeTab, setActiveTab, onMessageClick }) => {
-  const items = [
-    { key: 'home', label: 'الرئيسية', icon: Layout },
-    { key: 'videos', label: 'المحاضرات', icon: PlayCircle },
-    { key: 'exams', label: 'الامتحانات', icon: ClipboardList },
-    { key: 'logout', label: 'خروج', icon: LogOut }
-  ];
-
-  const handleClick = (key) => {
-    if (key === 'logout') return signOut(auth);
-    if (key === 'messages' && typeof onMessageClick === 'function') return onMessageClick();
-    setActiveTab?.(key);
-  };
-
-  return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 z-[9990] bg-white border-t border-slate-200 shadow-[0_-8px_24px_rgba(0,0,0,0.08)] px-2 py-2">
-      <div className="grid grid-cols-4 gap-1">
-        {items.map(item => {
-          const Icon = item.icon;
-          const active = activeTab === item.key;
-          return (
-            <button key={item.key} onClick={() => handleClick(item.key)} className={`flex flex-col items-center justify-center gap-1 rounded-2xl py-2 text-[11px] font-black transition ${active ? 'bg-amber-600 text-white' : 'text-slate-500 hover:bg-amber-50'}`}>
-              <Icon size={20}/>
-              <span>{item.label}</span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
-const MobileExamHelperStyles = () => (
-  <style>{`
-    @media (max-width: 768px) {
-      body { padding-bottom: 74px; }
-      .mobile-sticky-actions {
-        position: sticky;
-        bottom: 0;
-        z-index: 80;
-        background: rgba(255,255,255,.95);
-        backdrop-filter: blur(10px);
-        border-top: 1px solid #e2e8f0;
-        padding: 10px;
-        margin: 0 -1rem;
-      }
-      .mobile-readable-card {
-        max-height: 38vh;
-        overflow: auto;
-      }
-    }
-  `}</style>
-);
-
 const AdminStudentMessaging = ({ users = [], adminGradeFilter = 'all' }) => {
   const [conversations, setConversations] = useState([]);
   const [selectedStudentId, setSelectedStudentId] = useState('');
@@ -8189,7 +8001,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   const [exams, setExams] = useState([]);
   const [activeExam, setActiveExam] = useState(null);
   const [playingVideo, setPlayingVideo] = useState(null);
-  const [playingHtml, setPlayingHtml] = useState(null);
+  const [playingHtml, setPlayingHtml] = useState(null);
   const [examResults, setExamResults] = useState([]);
   const [hwResults, setHwResults] = useState([]); 
   const [assignments, setAssignments] = useState([]);
@@ -8568,13 +8380,13 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
   return (
     <div className="bg-slate-50 relative font-['Cairo'] min-h-screen block" dir="rtl">
-      <StudentAdminMessagePopup user={user} userData={userData} />
+      <div className="hidden md:block"><StudentAdminMessagePopup user={user} userData={userData} /></div>
 
-      <MobileStudentBottomNav activeTab={activeTab} setActiveTab={setActiveTab} onMessageClick={() => setShowStudentMessageComposer(true)} />
+      <MobileStudentBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
 
       <button
         onClick={() => setShowStudentMessageComposer(true)}
-        className="fixed bottom-24 left-5 z-[9998] bg-amber-600 text-white px-4 py-3 rounded-full shadow-2xl hover:bg-amber-700 transition flex items-center gap-2 font-black"
+        className="hidden md:flex fixed bottom-24 left-5 z-[9998] bg-amber-600 text-white px-4 py-3 rounded-full shadow-2xl hover:bg-amber-700 transition flex items-center gap-2 font-black"
         title="مراسلة الإدارة"
       >
         <MessageCircle size={22}/>
@@ -8582,6 +8394,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
       </button>
 
       {showStudentMessageComposer && (
+        <div className="hidden md:block">
         <div className="fixed inset-0 z-[99999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto border-t-8 border-amber-500">
             <div className="bg-slate-900 text-white p-4 flex items-center justify-between">
@@ -8599,6 +8412,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
               />
             </div>
           </div>
+        </div>
         </div>
       )}
       {playingVideo && <SecureVideoPlayer video={playingVideo} user={user} userName={userData?.name} onClose={() => setPlayingVideo(null)} onProgress={handleVideoProgress} />}
@@ -8629,7 +8443,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
           )}
           {!isBannedExam && (
               <>
-                <div onClick={() => {setActiveTab('exams'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><ClipboardList/> الامتحانات</div>
+                <div onClick={() => {setActiveTab('exams'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><ClipboardList/> الامتحانات</div>
                 <div onClick={() => {setActiveTab('assignments'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='assignments'?'bg-emerald-100 text-emerald-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-emerald-600'}`}><FileCheck/> الواجبات</div>
                 <div onClick={() => {setActiveTab('smart_hw_results'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='smart_hw_results'?'bg-blue-100 text-blue-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-blue-600'}`}><QrCode/> سجل الالواجبات</div>
                 <div onClick={() => {setActiveTab('mistakes_bank'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='mistakes_bank'?'bg-red-100 text-red-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-red-600'}`}><BrainCircuit/> بنك الأخطاء</div>
@@ -9121,7 +8935,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 const LandingPage = ({ onAuthClick, installPrompt }) => {
   const [publicContent, setPublicContent] = useState([]);
   const [playingVideo, setPlayingVideo] = useState(null); 
-  const [playingHtml, setPlayingHtml] = useState(null);
+  const [playingHtml, setPlayingHtml] = useState(null);
   
   useEffect(() => { const u = onSnapshot(query(collection(db, 'content'), where('isPublic', '==', true)), s => setPublicContent(s.docs.map(d=>d.data()))); return u; }, []);
   const openFacebook = () => window.open("https://www.facebook.com/share/17aiUQWKf5/", "_blank");
