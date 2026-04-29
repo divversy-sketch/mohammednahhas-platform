@@ -28,7 +28,6 @@ import NotificationsCenterPhase2 from '../components/notifications/Notifications
 import ParentProgressPhase3 from '../components/parent/ParentProgressPhase3';
 import ContentOrganizerPhase3 from '../components/admin/ContentOrganizerPhase3';
 import MobilePerformancePhase3 from '../components/admin/MobilePerformancePhase3';
-import SmartVideoPlayerPhase5 from '../components/video/SmartVideoPlayerPhase5';
 import VideoLibraryPhase5 from '../components/admin/VideoLibraryPhase5';
 
 const getAdminAIHeaders = async () => {
@@ -254,7 +253,7 @@ const DesignSystemLoader = () => {
       @keyframes floatChar { 0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); } 50% { transform: translate3d(0, -30px, 0) rotate(10deg); } }
       .floating-char { animation: floatChar ease-in-out infinite; will-change: transform; }
       @keyframes pulseSlow { 0%, 100% { transform: scale3d(1, 1, 1); opacity: 0.2; } 50% { transform: scale3d(1.1, 1.1, 1); opacity: 0.4; } }
-      .animate-pulse-slow { animation: pulseSlow 8s ease-in-out infinite; will-change: transform, opacity; }
+      .-slow { animation: pulseSlow 8s ease-in-out infinite; will-change: transform, opacity; }
       .watermark-text { position: absolute; pointer-events: none; z-index: 9999; color: rgba(0, 0, 0, 0.08); font-weight: 900; font-size: 1.5rem; transform: rotate(-30deg); white-space: nowrap; text-shadow: 0 0 2px rgba(255,255,255,0.5); }
       .watermark-video { position: absolute; pointer-events: none; z-index: 9999; color: rgba(255, 255, 255, 0.4); font-weight: 900; font-size: 1.5rem; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); white-space: nowrap; animation: moveWatermark 25s linear infinite; }
       @keyframes moveWatermark { 0% { top: 10%; left: 10%; transform: rotate(-5deg); } 25% { top: 80%; left: 50%; transform: rotate(5deg); } 50% { top: 30%; left: 80%; transform: rotate(-5deg); } 75% { top: 70%; left: 10%; transform: rotate(5deg); } 100% { top: 10%; left: 10%; transform: rotate(-5deg); } }
@@ -666,8 +665,8 @@ const FloatingArabicBackground = React.memo(() => (
     {['أ', 'ب', 'ج', 'د', 'هـ', 'و', 'ز', 'ح', 'ط', 'ي', 'ض', 'ع'].map((char, i) => (
         <div key={i} className="absolute text-amber-500/15 font-arabic font-bold select-none floating-char" style={{ left: `${(i * 8.5) % 90 + 5}vw`, top: `${(i * 13) % 90 + 5}vh`, fontSize: `${(i % 3) + 3}rem`, animationDelay: `${i * 0.5}s`, animationDuration: `${15 + (i % 5)}s` }}>{char}</div>
     ))}
-    <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-amber-400/10 rounded-full blur-xl animate-pulse-slow" />
-    <div className="absolute bottom-1/3 right-1/4 w-96 h-96 bg-blue-400/10 rounded-full blur-xl animate-pulse-slow" style={{ animationDelay: '2s' }} />
+    <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-amber-400/10 rounded-full blur-xl -slow" />
+    <div className="absolute bottom-1/3 right-1/4 w-96 h-96 bg-blue-400/10 rounded-full blur-xl -slow" style={{ animationDelay: '2s' }} />
   </div>
 ));
 
@@ -709,7 +708,7 @@ const Announcements = () => {
             <div className="relative z-10 space-y-2">
                 {announcements.map((a, i) => (
                     <div key={i} className="text-sm border-b border-blue-800 last:border-0 pb-1 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>{a.text}
+                        <span className="w-1.5 h-1.5 bg-green-400 rounded-full "></span>{a.text}
                     </div>
                 ))}
             </div>
@@ -827,7 +826,7 @@ const ChatWidget = ({ user }) => {
         {isOpen && (
           <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 50 }} className="fixed bottom-24 right-6 z-50 w-80 bg-white/95 backdrop-blur rounded-2xl shadow-2xl border border-white/50 overflow-hidden flex flex-col font-['Cairo']" style={{ height: '450px' }}>
             <div className="bg-gradient-to-r from-amber-600 to-amber-700 p-4 text-white font-bold flex justify-between items-center shadow-md">
-              <div className="flex items-center gap-2"><div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div><span>مساعد النحاس</span></div>
+              <div className="flex items-center gap-2"><div className="w-2 h-2 bg-green-400 rounded-full "></div><span>مساعد النحاس</span></div>
               <div className="flex gap-2"><Facebook size={18} onClick={openFacebook} className="cursor-pointer hover:text-blue-200"/><Phone size={18} onClick={openWhatsApp} className="cursor-pointer hover:text-green-200"/></div>
             </div>
             <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50 space-y-2">
@@ -990,7 +989,7 @@ const LiveSessionView = ({ session, user, onClose }) => {
       <div className="flex-1 flex flex-col min-h-0">
         <div className="bg-gradient-to-r from-red-600 to-red-800 p-3 text-white flex justify-between items-center shadow-lg">
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 bg-white rounded-full animate-pulse shadow-[0_0_10px_white]"></span>
+            <span className="w-3 h-3 bg-white rounded-full  shadow-[0_0_10px_white]"></span>
             <h2 className="font-bold">محاضرة مباشرة: {session?.title}</h2>
           </div>
           <button onClick={onClose} className="text-sm bg-black/30 hover:bg-black/50 px-3 py-1 rounded transition">العودة للمنصة</button>
@@ -1055,6 +1054,7 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
   const videoId = getYouTubeID(video.url || video.file);
   const [showSettings, setShowSettings] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
+  const [isVideoFullscreen, setIsVideoFullscreen] = useState(false);
   const [notes, setNotes] = useState([]);
   const [currentNote, setCurrentNote] = useState("");
   const videoRef = useRef(null);
@@ -1068,63 +1068,69 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
   }, [user, video.id]);
 
   useEffect(() => {
-      if (!user || !video?.id) return;
+      if (!user || !video.id) return;
+      const viewId = `${user.uid}_${video.id}`;
+      const viewRef = doc(db, 'video_views', viewId);
+      let timerInterval; let localSeconds = 0; let lastSyncedSeconds = 0;
+      const estimatedDuration = safeNumber(video.durationSeconds, safeNumber(video.estimatedDurationMinutes, 0) * 60);
 
-      const viewRef = doc(db, 'video_views', `${user.uid}_${video.id}`);
-      setDoc(viewRef, {
-          userId: user.uid,
-          userEmail: user.email || '',
-          userName: userName || user.displayName || user.email || 'طالب',
-          videoId: video.id,
-          videoTitle: video.title || '',
-          videoType: videoId ? 'youtube' : 'direct',
-          lastOpenedAt: serverTimestamp(),
-          openCount: increment(1),
-          status: 'opened'
-      }, { merge: true }).catch((e) => console.warn('video open log blocked:', e?.message));
-
-      // تتبع بسيط جدًا للفيديوهات المباشرة فقط بدون ضغط:
-      // يحفظ آخر موضع كل 20 ثانية حتى يظهر زر "أكمل من حيث توقفت".
-      if (videoId || !videoRef.current) return;
-
-      let timer = null;
-      const savePosition = () => {
-          const current = safeNumber(videoRef.current?.currentTime, 0);
-          const duration = safeNumber(videoRef.current?.duration, safeNumber(video.durationSeconds, safeNumber(video.estimatedDurationMinutes, 0) * 60));
-          const percent = duration > 0 ? Math.min(100, Math.round((current / duration) * 100)) : 0;
-          onProgress?.(video.id, percent, current);
-          setDoc(viewRef, {
-              resumeAtSeconds: current,
-              lastPositionSeconds: current,
-              watchedPercent: percent,
-              durationSeconds: duration,
-              lastSeenAt: serverTimestamp(),
-              status: percent >= 95 ? 'completed' : 'paused'
-          }, { merge: true }).catch(() => {});
-      };
-
-      const onLoaded = async () => {
+      const syncToDatabase = async (secondsToAdd, overrideSeconds = null) => {
+          const watchedSeconds = overrideSeconds ?? localSeconds;
+          const currentDuration = safeNumber(videoRef.current?.duration, estimatedDuration);
+          const watchedPercentValue = currentDuration > 0 ? Math.min(100, Math.round((watchedSeconds / currentDuration) * 100)) : 0;
+          onProgress?.(video.id, watchedPercentValue, watchedSeconds);
           try {
-              const { getDoc } = await import('firebase/firestore');
-              const snap = await getDoc(viewRef);
-              const resumeAt = safeNumber(snap.data()?.resumeAtSeconds || snap.data()?.lastPositionSeconds, 0);
-              if (resumeAt > 3 && videoRef.current?.duration && resumeAt < videoRef.current.duration - 5) {
-                  videoRef.current.currentTime = resumeAt;
-              }
-          } catch {}
+              await setDoc(viewRef, {
+                  userId: user.uid,
+                  userName: userName,
+                  videoId: video.id,
+                  videoTitle: video.title,
+                  viewedAt: serverTimestamp(),
+                  watchedSeconds: increment(secondsToAdd),
+                  estimatedDuration: currentDuration,
+                  watchedPercent: watchedPercentValue,
+                  linkedExamId: video.linkedExamId || null
+              }, { merge: true });
+          } catch (e) { console.error("Sync error:", e); }
       };
+      syncToDatabase(0, 0);
 
-      videoRef.current.addEventListener('loadedmetadata', onLoaded);
-      timer = setInterval(savePosition, 20000);
-
-      return () => {
-          clearInterval(timer);
-          savePosition();
-          try { videoRef.current?.removeEventListener('loadedmetadata', onLoaded); } catch {}
-      };
-  }, [user?.uid, video?.id, video?.title, userName, videoId, onProgress]);
+      timerInterval = setInterval(() => {
+          let isPlaying = true;
+          if (!videoId && videoRef.current) isPlaying = !videoRef.current.paused && !videoRef.current.ended;
+          if (!document.hidden && isPlaying) {
+              localSeconds += 1;
+              const currentDuration = safeNumber(videoRef.current?.duration, estimatedDuration);
+              const currentPercent = currentDuration > 0 ? Math.min(100, Math.round((localSeconds / currentDuration) * 100)) : 0;
+              onProgress?.(video.id, currentPercent, localSeconds);
+              if (localSeconds - lastSyncedSeconds >= 15) { syncToDatabase(localSeconds - lastSyncedSeconds); lastSyncedSeconds = localSeconds; }
+          }
+      }, 1000);
+      return () => { clearInterval(timerInterval); const remaining = localSeconds - lastSyncedSeconds; if (remaining > 0) syncToDatabase(remaining); };
+  }, [user, video.id, video.title, userName, videoId, video.durationSeconds, video.estimatedDurationMinutes, video.linkedExamId, onProgress]);
 
   const changeSpeed = (rate) => { if(videoRef.current) videoRef.current.playbackRate = rate; setShowSettings(false); };
+
+  const toggleVideoFullscreen = async () => {
+      const el = document.getElementById('nahhas-video-stage');
+      try {
+          if (!document.fullscreenElement) {
+              await el?.requestFullscreen?.();
+              setIsVideoFullscreen(true);
+          } else {
+              await document.exitFullscreen?.();
+              setIsVideoFullscreen(false);
+          }
+      } catch (error) {
+          setIsVideoFullscreen(prev => !prev);
+      }
+  };
+
+  useEffect(() => {
+      const handleFullscreenChange = () => setIsVideoFullscreen(Boolean(document.fullscreenElement));
+      document.addEventListener('fullscreenchange', handleFullscreenChange);
+      return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
 
   const handleAddNote = async (e) => {
       e.preventDefault();
@@ -1175,50 +1181,46 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
           )}
       </AnimatePresence>
 
-      <div className={`w-full h-full md:max-w-7xl bg-black ${showNotes ? 'md:rounded-l-2xl' : 'rounded-xl'} overflow-hidden relative shadow-2xl border border-gray-800 flex flex-col justify-center flex-1 transition-all duration-300`}>
-        <div className="absolute top-4 right-4 z-50 flex gap-4">
-            <button onClick={() => setShowNotes(!showNotes)} className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold backdrop-blur-md transition shadow-lg ${showNotes ? 'bg-blue-600 text-white' : 'bg-black/50 text-white hover:bg-black/80 border border-white/20'}`}>
-                <PenLine size={18}/> <span className="hidden md:inline">ملاحظاتي</span>
-            </button>
-            <div className="relative">
-                <button onClick={() => setShowSettings(!showSettings)} className="bg-black/50 hover:bg-black/80 text-white p-2 rounded-full backdrop-blur-sm transition border border-white/20"><GearIcon size={24}/></button>
-                {showSettings && (
-                    <div className="absolute top-12 left-0 bg-white text-black rounded-lg shadow-xl py-2 w-40 z-50 text-sm font-bold">
-                        <div className="px-4 py-2 border-b text-gray-400 text-xs">سرعة التشغيل</div>
-                        {[0.5, 1, 1.25, 1.5, 2].map(rate => ( <button key={rate} onClick={() => changeSpeed(rate)} className="block w-full text-right px-4 py-2 hover:bg-gray-100">{rate}x</button> ))}
-                    </div>
-                )}
+      <div id="nahhas-video-stage" className={`w-full ${isVideoFullscreen ? 'h-screen rounded-none' : 'h-full md:max-w-7xl'} bg-black ${showNotes ? 'md:rounded-l-2xl' : 'md:rounded-xl'} overflow-hidden relative shadow-2xl border border-gray-800 flex flex-col justify-center flex-1 transition-colors duration-150`}>
+        <div className="absolute top-3 right-3 left-3 z-50 flex items-center justify-between gap-2 pointer-events-none">
+            <div className="flex gap-2 pointer-events-auto">
+                <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white p-2.5 rounded-full shadow-lg"><X size={22}/></button>
+                <button onClick={() => setShowNotes(!showNotes)} className={`flex items-center gap-2 px-3 py-2 rounded-full font-bold backdrop-blur-md transition shadow-lg ${showNotes ? 'bg-blue-600 text-white' : 'bg-black/45 text-white hover:bg-black/70 border border-white/15'}`}>
+                    <PenLine size={17}/> <span className="hidden sm:inline">ملاحظاتي</span>
+                </button>
             </div>
-            <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white p-2 rounded-full shadow-lg"><X size={24}/></button>
+
+            <div className="flex gap-2 pointer-events-auto">
+                <button onClick={toggleVideoFullscreen} className="bg-white/95 hover:bg-white text-slate-950 px-3 py-2 rounded-full backdrop-blur-sm transition shadow-lg font-black text-xs md:text-sm">
+                    {isVideoFullscreen ? 'تصغير' : 'تكبير'}
+                </button>
+                <div className="relative">
+                    <button onClick={() => setShowSettings(!showSettings)} className="bg-black/45 hover:bg-black/70 text-white p-2 rounded-full backdrop-blur-sm transition border border-white/15"><GearIcon size={22}/></button>
+                    {showSettings && (
+                        <div className="absolute top-12 left-0 bg-white text-black rounded-lg shadow-xl py-2 w-40 z-50 text-sm font-bold">
+                            <div className="px-4 py-2 border-b text-gray-400 text-xs">سرعة التشغيل</div>
+                            {[0.5, 1, 1.25, 1.5, 2].map(rate => ( <button key={rate} onClick={() => changeSpeed(rate)} className="block w-full text-right px-4 py-2 hover:bg-gray-100">{rate}x</button> ))}
+                        </div>
+                    )}
+                </div>
+            </div>
         </div>
 
-        <div className="w-full relative flex items-center justify-center bg-black overflow-hidden" style={{ height: showNotes ? '50vh' : '100%', md: { height: '100%' } }}>
-          <div className="watermark-video">{userName} - {video.grade} — منصة النحاس</div>
+        <div className="w-full relative flex items-center justify-center bg-black overflow-hidden flex-1 min-h-[62vh] md:min-h-0">
+          <div className="watermark-video opacity-70 text-xs md:text-sm">{userName} - {video.grade} — منصة النحاس</div>
           {videoId ? (
-            <SmartVideoPlayerPhase5
-              video={video}
-              user={user}
-              userName={userName}
-              db={db}
-              doc={doc}
-              setDoc={setDoc}
-              serverTimestamp={serverTimestamp}
-              mode="youtube"
-              onProgress={onProgress}
-            />
+            <iframe
+              className="w-full h-full min-h-[62vh] md:min-h-0"
+              src={youtubeEmbedUrl}
+              title="Video"
+              frameBorder="0"
+              loading="lazy"
+              referrerPolicy="strict-origin-when-cross-origin"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+              allowFullScreen
+            ></iframe>
           ) : (
-             <video
-               ref={videoRef}
-               controls
-               controlsList="nodownload"
-               className="w-full h-full object-contain relative z-40"
-               src={finalUrl}
-               playsInline
-               preload="auto"
-               disablePictureInPicture
-             >
-               المتصفح لا يدعم هذا الفيديو.
-             </video>
+             <video ref={videoRef} controls controlsList="nodownload" className="w-full h-full min-h-[62vh] md:min-h-0 object-contain relative z-40" src={finalUrl} playsInline preload="metadata" disablePictureInPicture>المتصفح لا يدعم هذا الفيديو.</video>
           )}
         </div>
       </div>
@@ -5480,7 +5482,7 @@ const StudentAdminMessagePopup = ({ user, userData }) => {
             <h2 className="text-2xl font-black flex items-center gap-2"><MessageCircle className="text-amber-400"/> رسالة مهمة من الإدارة</h2>
             <p className="text-slate-300 text-sm mt-1">يرجى قراءة الرسالة قبل متابعة استخدام المنصة.</p>
           </div>
-          <span className="bg-red-600 text-white text-xs px-3 py-1 rounded-full font-black animate-pulse">جديدة</span>
+          <span className="bg-red-600 text-white text-xs px-3 py-1 rounded-full font-black ">جديدة</span>
         </div>
 
         <div className="p-5">
@@ -7300,7 +7302,6 @@ const [editingUser, setEditingUser] = useState(null);
   };
   const deleteQuote = async (id) => { if(window.confirm("حذف هذه الحكمة؟")) await deleteDoc(doc(db, 'quotes', id)); };
 
-
   const filteredPendingUsers = pendingUsers.filter(u => adminGradeFilter === 'all' || u.grade === adminGradeFilter);
   const filteredActiveUsers = activeUsersList.filter(u => adminGradeFilter === 'all' || u.grade === adminGradeFilter);
   const filteredContentList = contentList.filter(c => adminGradeFilter === 'all' || c.grade === adminGradeFilter);
@@ -7668,17 +7669,16 @@ const [editingUser, setEditingUser] = useState(null);
 
 
 
-
           {activeTab === 'phase5_video_library' && (
             <VideoLibraryPhase5
               content={contentList}
               onOpenContent={(item) => {
-                setSelectedContent(item);
+                setActiveTab('content');
+                alert(`الفيديو موجود في إدارة المحتوى: ${item.title || 'فيديو'}`);
               }}
               onGoContentManager={() => setActiveTab('content')}
             />
           )}
-
 
           {activeTab === 'phase3_parent' && (
             <ParentProgressPhase3
@@ -8860,15 +8860,6 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
       <MobileStudentBottomNav activeTab={activeTab} setActiveTab={setActiveTab} onMessageClick={() => setShowStudentMessageComposer(true)} />
 
-      <button
-        onClick={() => setShowStudentMessageComposer(true)}
-        className="fixed bottom-24 left-5 z-[9998] bg-amber-600 text-white px-4 py-3 rounded-full shadow-2xl hover:bg-amber-700 transition flex items-center gap-2 font-black"
-        title="مراسلة الإدارة"
-      >
-        <MessageCircle size={22}/>
-        <span className="hidden md:inline">مراسلة الإدارة</span>
-      </button>
-
       {showStudentMessageComposer && (
         <div className="fixed inset-0 z-[99999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto border-t-8 border-amber-500">
@@ -8940,7 +8931,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
             <div className="flex items-center gap-3">
                 {isPremium && <span className="hidden md:flex bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-bold items-center gap-1 border border-amber-200"><Crown size={14}/> VIP صالح حتى: {userData?.subscriptionExpiry?.toDate().toLocaleDateString('ar-EG')}</span>}
                 <button onClick={() => {requestNotificationPermission(); setShowNotifications(!showNotifications); setHasNewNotif(false);}} className="relative p-2 glass-panel rounded-full shadow-sm hover:bg-white transition">
-                    <Bell className="text-slate-600"/>{hasNewNotif && <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>}
+                    <Bell className="text-slate-600"/>{hasNewNotif && <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-white "></span>}
                 </button>
             </div>
             {showNotifications && (
