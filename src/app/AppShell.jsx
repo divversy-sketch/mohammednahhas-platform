@@ -6178,7 +6178,8 @@ const AdminDashboard = ({ user }) => {
   const [newContent, setNewContent] = useState({ title: '', url: '', type: 'video', videoSection: 'explanation', isPublic: false, grade: '3sec', allowedEmails: '', isPremium: false, linkedExamId: '', estimatedDurationMinutes: '', branch: '' });
   const [liveData, setLiveData] = useState({ title: '', liveUrl: '', grade: '3sec', passcode: '', allowedEmails: '', sessionType: 'jitsi', embedUrl: '', scheduledAt: '', isOptional: true });
   const [activeLiveSessions, setActiveLiveSessions] = useState([]);
-  const [editingUser, setEditingUser] = useState(null);
+    const [videoViewsPhase3, setVideoViewsPhase3] = useState([]);
+const [editingUser, setEditingUser] = useState(null);
   const [replyTexts, setReplyTexts] = useState({});
   const [examBuilder, setExamBuilder] = useState({ title: '', grade: '3sec', duration: 60, startTime: '', endTime: '', questions: [], accessCode: '', isPremium: false });
   const [bulkText, setBulkText] = useState('');
@@ -6276,7 +6277,19 @@ const AdminDashboard = ({ user }) => {
           else { setActiveTab('users'); }
       };
       window.addEventListener('popstate', handlePopState);
-      return () => window.removeEventListener('popstate', handlePopState);
+    
+  useEffect(() => {
+      const unsubVideoViews = onSnapshot(collection(db, 'video_views'), (snap) => {
+          const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          setVideoViewsPhase3(rows);
+      }, (error) => {
+          console.warn('phase3 video views listener blocked:', error?.message);
+          setVideoViewsPhase3([]);
+      });
+      return () => unsubVideoViews();
+  }, []);
+
+  return () => window.removeEventListener('popstate', handlePopState);
   }, [activeTab]);
 
   useEffect(() => {
@@ -7617,7 +7630,19 @@ const AdminDashboard = ({ user }) => {
           {activeTab === 'dashboard' && (<div className="space-y-8"><AdminProDashboard users={activeUsersList} exams={examsList} results={examResults} content={contentList} subscriptionCodes={subscriptionCodes} liveSessions={activeLiveSessions} hwResults={hwResults} adminGradeFilter={adminGradeFilter} /><AdminOverviewPhase2 users={[...pendingUsers, ...activeUsersList]} results={examResults} paymentRequests={paymentRequestsPhase2} liveSessions={activeLiveSessions} content={contentList} mistakes={[]} onOpenStudents={() => setActiveTab('all_users')} onOpenPayments={() => setActiveTab('subscriptions')} onOpenResults={() => setActiveTab('results')} onOpenContent={() => setActiveTab('content')} /></div>)}
 
 
-          {activeTab === 'phase3_parent' && <ParentProgressPhase3 users={[...pendingUsers, ...activeUsersList]} results={examResults} mistakes={[]} onOpenStudent={(row) => { setActiveTab('all_users'); alert(`افتح بيانات الطالب من قائمة الطلاب: ${row.name}`); }} />}
+          {activeTab === 'phase3_parent' && (
+            <ParentProgressPhase3
+              users={[...pendingUsers, ...activeUsersList]}
+              results={examResults}
+              mistakes={[]}
+              videoViews={videoViewsPhase3}
+              content={contentList}
+              onOpenStudent={(row) => {
+                setActiveTab('all_users');
+                alert(`افتح بيانات الطالب من قائمة الطلاب: ${row.name}`);
+              }}
+            />
+          )}
 
           {activeTab === 'phase3_content_map' && <ContentOrganizerPhase3 content={contentList} exams={examsList} onOpenContent={() => setActiveTab('content')} onOpenExam={() => setActiveTab('exams')} />}
 
