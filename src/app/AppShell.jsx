@@ -7606,75 +7606,22 @@ const AdminDashboard = ({ user }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-4 md:p-6 relative z-10">
         <div className="glass-panel p-4 rounded-xl h-fit space-y-2 flex md:flex-col overflow-x-auto md:overflow-x-visible whitespace-nowrap scrollbar-hide">
-          {['dashboard', 'phase2_dashboard', 'phase2_subscriptions', 'phase2_notifications', 'phase3_parent', 'phase3_content_map', 'phase3_mobile_perf', 'users', 'all_users', 'subscriptions', 'payments', 'security_center', 'ai_analytics', 'live_ai', 'app_convert', 'ai_lab', 'ai_insights', 'leaderboard', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'question-analytics', 'smart_hw', 'content', 'notifications', 'student-messages', 'messages'].map(tab => (
+          {['dashboard', 'phase3_parent', 'phase3_content_map', 'phase3_mobile_perf', 'users', 'all_users', 'subscriptions', 'payments', 'security_center', 'ai_analytics', 'live_ai', 'app_convert', 'ai_lab', 'ai_insights', 'leaderboard', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'question-analytics', 'smart_hw', 'content', 'notifications', 'student-messages', 'messages'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 transition-all ${activeTab===tab?'bg-amber-100 text-amber-700 shadow-sm border-b-4 md:border-b-0 md:border-r-4 border-amber-500':'hover:bg-slate-50 text-slate-600'}`}>
-              {tab === 'dashboard' ? 'Dashboard' : tab === 'phase2_dashboard' ? 'لوحة الأدمن V2' : tab === 'phase2_subscriptions' ? 'الاشتراكات V2' : tab === 'phase2_notifications' ? 'الإشعارات V2' : tab === 'phase3_parent' ? 'ولي الأمر V3' : tab === 'phase3_content_map' ? 'تنظيم المحتوى V3' : tab === 'phase3_mobile_perf' ? 'الموبايل والأداء V3' : tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'payments' ? 'طلبات الدفع' : tab === 'security_center' ? 'مركز الحماية' : tab === 'ai_analytics' ? 'تحليلات AI' : tab === 'live_ai' ? 'البث المباشر + Live AI' : tab === 'app_convert' ? 'تحويل App' : tab === 'ai_lab' ? 'AI Lab' : tab === 'ai_insights' ? 'AI Insights' : tab === 'leaderboard' ? 'لوحة الشرف' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'question-analytics' ? 'تحليل الأسئلة' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'student-messages' ? 'رسائل الطلاب' : tab === 'messages' ? 'الرسائل' : 'الإعدادات'}
+              {tab === 'dashboard' ? 'Dashboard' : tab === 'phase3_parent' ? 'ولي الأمر V3' : tab === 'phase3_content_map' ? 'تنظيم المحتوى V3' : tab === 'phase3_mobile_perf' ? 'الموبايل والأداء V3' : tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'payments' ? 'طلبات الدفع' : tab === 'security_center' ? 'مركز الحماية' : tab === 'ai_analytics' ? 'تحليلات AI' : tab === 'live_ai' ? 'البث المباشر + Live AI' : tab === 'app_convert' ? 'تحويل App' : tab === 'ai_lab' ? 'AI Lab' : tab === 'ai_insights' ? 'AI Insights' : tab === 'leaderboard' ? 'لوحة الشرف' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'question-analytics' ? 'تحليل الأسئلة' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'student-messages' ? 'رسائل الطلاب' : tab === 'messages' ? 'الرسائل' : 'الإعدادات'}
             </button>
           ))}
         </div>
 
         <div className="md:col-span-3 w-full overflow-hidden">
-          {activeTab === 'dashboard' && <AdminProDashboard users={activeUsersList} exams={examsList} results={examResults} content={contentList} subscriptionCodes={subscriptionCodes} liveSessions={activeLiveSessions} hwResults={hwResults} adminGradeFilter={adminGradeFilter} />}
+          {activeTab === 'dashboard' && (<div className="space-y-8"><AdminProDashboard users={activeUsersList} exams={examsList} results={examResults} content={contentList} subscriptionCodes={subscriptionCodes} liveSessions={activeLiveSessions} hwResults={hwResults} adminGradeFilter={adminGradeFilter} /><AdminOverviewPhase2 users={[...pendingUsers, ...activeUsersList]} results={examResults} paymentRequests={paymentRequestsPhase2} liveSessions={activeLiveSessions} content={contentList} mistakes={[]} onOpenStudents={() => setActiveTab('all_users')} onOpenPayments={() => setActiveTab('subscriptions')} onOpenResults={() => setActiveTab('results')} onOpenContent={() => setActiveTab('content')} /></div>)}
 
 
-          {activeTab === 'phase2_dashboard' && (
-            <AdminOverviewPhase2
-              users={[...pendingUsers, ...activeUsersList]}
-              results={examResults}
-              paymentRequests={paymentRequestsPhase2}
-              liveSessions={activeLiveSessions}
-              content={contentList}
-              mistakes={[]}
-              onOpenStudents={() => setActiveTab('all_users')}
-              onOpenPayments={() => setActiveTab('phase2_subscriptions')}
-              onOpenResults={() => setActiveTab('results')}
-              onOpenContent={() => setActiveTab('content')}
-            />
-          )}
+          {activeTab === 'phase3_parent' && <ParentProgressPhase3 users={[...pendingUsers, ...activeUsersList]} results={examResults} mistakes={[]} onOpenStudent={(row) => { setActiveTab('all_users'); alert(`افتح بيانات الطالب من قائمة الطلاب: ${row.name}`); }} />}
 
-          {activeTab === 'phase2_subscriptions' && (
-            <SubscriptionManagerPhase2
-              users={[...pendingUsers, ...activeUsersList]}
-              paymentRequests={paymentRequestsPhase2}
-              onApproveRequest={approvePhase2PaymentRequest}
-              onRejectRequest={rejectPhase2PaymentRequest}
-              onExtendStudent={extendPhase2StudentSubscription}
-            />
-          )}
+          {activeTab === 'phase3_content_map' && <ContentOrganizerPhase3 content={contentList} exams={examsList} onOpenContent={() => setActiveTab('content')} onOpenExam={() => setActiveTab('exams')} />}
 
-          {activeTab === 'phase2_notifications' && (
-            <NotificationsCenterPhase2
-              notifications={platformNotificationsPhase2}
-              users={[...pendingUsers, ...activeUsersList]}
-              onCreateNotification={createPhase2Notification}
-              onMarkRead={markPhase2NotificationReviewed}
-            />
-          )}
-
-          {activeTab === 'phase3_parent' && (
-            <ParentProgressPhase3
-              users={[...pendingUsers, ...activeUsersList]}
-              results={examResults}
-              mistakes={[]}
-              onOpenStudent={(row) => {
-                setActiveTab('all_users');
-                alert(`افتح بيانات الطالب من قائمة الطلاب: ${row.name}`);
-              }}
-            />
-          )}
-
-          {activeTab === 'phase3_content_map' && (
-            <ContentOrganizerPhase3
-              content={contentList}
-              exams={examsList}
-              onOpenContent={() => setActiveTab('content')}
-              onOpenExam={() => setActiveTab('exams')}
-            />
-          )}
-
-          {activeTab === 'phase3_mobile_perf' && (
-            <MobilePerformancePhase3 />
-          )}
+          {activeTab === 'phase3_mobile_perf' && <MobilePerformancePhase3 />}
 
           {activeTab === 'users' && <div className="glass-panel p-4 md:p-6 rounded-xl"><h2 className="font-bold mb-4 font-arabic text-xl">طلبات الانضمام</h2>{filteredPendingUsers.map(u=><div key={u.id} className="border p-4 mb-2 rounded-lg flex flex-col md:flex-row gap-3 justify-between bg-white/50 backdrop-blur-sm"><div><p className="font-bold">{u.name}</p><p className="text-sm">{u.grade}</p></div><div className="flex gap-2"><button onClick={()=>handleApprove(u.id)} className="bg-green-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-green-500/50 transition flex-1"><Check className="mx-auto"/></button><button onClick={()=>handleReject(u.id)} className="bg-red-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-red-500/50 transition flex-1"><X className="mx-auto"/></button></div></div>)}</div>}
 
