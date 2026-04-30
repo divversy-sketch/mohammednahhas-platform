@@ -156,3 +156,39 @@
     transition: none;
   }
 }
+
+/* Adaptive performance mode: lighter video UI on weak devices and mobile. */
+.perf-low .lecture-player-shell {
+  transition: none !important;
+}
+
+.perf-low .lecture-media-frame {
+  transition: none !important;
+  will-change: auto;
+}
+
+.perf-low .lecture-action-btn,
+.perf-low .lecture-buffering {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.22);
+}
+
+.perf-low .watermark-video.smooth-watermark {
+  animation-duration: 96s !important;
+  opacity: 0.82;
+  will-change: transform;
+}
+
+.is-tab-hidden .watermark-video.smooth-watermark,
+.is-tab-hidden .lecture-spinner {
+  animation-play-state: paused !important;
+}
+
+@media (max-width: 640px) {
+  .watermark-video.smooth-watermark {
+    animation-duration: 86s !important;
+    font-size: clamp(0.75rem, 3vw, 1.05rem);
+    opacity: 0.75;
+  }
+}
