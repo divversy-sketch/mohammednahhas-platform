@@ -164,7 +164,7 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
       if (!document.hidden && isPlaying) {
         localSeconds = Math.max(localSeconds + 1, Math.round(videoRef.current?.currentTime || 0));
         lastPositionRef.current = localSeconds;
-        if (resumeStorageKey) { try { localStorage.setItem(resumeStorageKey, String(localSeconds)); } catch (e) {} }
+        if (resumeStorageKey) { try { localStorage.setItem(resumeStorageKey, String(localSeconds)); localStorage.setItem(`nahhas-latest-video-${user.uid}`, JSON.stringify({ videoId: video.id, title: video.title || 'محاضرة', grade: video.grade || '', watchedSeconds: localSeconds, updatedAt: Date.now() })); } catch (e) {} }
         const currentDuration = safeNumber(videoRef.current?.duration, estimatedDuration);
         const currentPercent = currentDuration > 0 ? Math.min(100, Math.round((localSeconds / currentDuration) * 100)) : 0;
         onProgress?.(video.id, currentPercent, localSeconds);
@@ -315,7 +315,7 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
                   const current = Math.round(videoRef.current?.currentTime || 0);
                   if (current > 0 && Math.abs(current - lastPositionRef.current) >= 4) {
                     lastPositionRef.current = current;
-                    if (resumeStorageKey) { try { localStorage.setItem(resumeStorageKey, String(current)); } catch (e) {} }
+                    if (resumeStorageKey) { try { localStorage.setItem(resumeStorageKey, String(current)); localStorage.setItem(`nahhas-latest-video-${user.uid}`, JSON.stringify({ videoId: video.id, title: video.title || 'محاضرة', grade: video.grade || '', watchedSeconds: current, updatedAt: Date.now() })); } catch (e) {} }
                   }
                 }}
               >المتصفح لا يدعم هذا الفيديو.</video>

@@ -4581,6 +4581,20 @@ const AdminProDashboard = ({ users = [], exams = [], results = [], content = [],
   const activeCodes = subscriptionCodes.filter(c => !c.used);
   const usedCodes = subscriptionCodes.filter(c => c.used);
 
+  const quickReports = useMemo(() => {
+    const now = Date.now();
+    const dayMs = 24 * 60 * 60 * 1000;
+    const completed = filteredResults.filter(r => r.status === 'completed');
+    const todayResults = completed.filter(r => {
+      const d = r.submittedAt?.toDate ? r.submittedAt.toDate() : (r.submittedAt ? new Date(r.submittedAt) : null);
+      return d && !Number.isNaN(d.getTime()) && now - d.getTime() <= dayMs;
+    });
+    const activeToday = new Set(todayResults.map(r => r.studentId || r.studentName).filter(Boolean)).size;
+    const lowScores = completed.filter(r => getResultPercentage(r) < 60).length;
+    const completionRate = exams.length > 0 && filteredUsers.length > 0 ? Math.round((completed.length / Math.max(1, exams.length * filteredUsers.length)) * 100) : 0;
+    return { activeToday, todayResults: todayResults.length, lowScores, completionRate };
+  }, [filteredResults, filteredUsers.length, exams.length]);
+
   const StatCard = ({ title, value, icon, hint, tone = 'bg-white' }) => (
     <div className={`${tone} border border-white/70 rounded-3xl p-5 shadow-sm`}>
       <div className="flex items-center justify-between gap-3">
@@ -4609,6 +4623,13 @@ const AdminProDashboard = ({ users = [], exams = [], results = [], content = [],
         <StatCard title="متوسط التحصيل" value={`${dashboard.avg}%`} icon={<Target size={22}/>} hint={`${dashboard.completedCount} نتيجة مكتملة`} tone="bg-emerald-50" />
         <StatCard title="حالات تحتاج قرار أمني" value={dashboard.securityHolds.length} icon={<ShieldAlert size={22}/>} hint="محاولات موقوفة بسبب تنبيهات" tone="bg-red-50" />
         <StatCard title="اشتراكات VIP" value={premiumUsers.length} icon={<Crown size={22}/>} hint={`${activeCodes.length} كود متاح • ${usedCodes.length} مستخدم`} tone="bg-amber-50" />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-sm"><p className="text-xs font-bold text-slate-500">نشاط آخر 24 ساعة</p><p className="text-2xl font-black text-slate-900 mt-1">{quickReports.activeToday} طالب</p><p className="text-xs text-slate-400 mt-1">{quickReports.todayResults} نتيجة جديدة</p></div>
+        <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-sm"><p className="text-xs font-bold text-slate-500">نسبة إكمال الامتحانات</p><p className="text-2xl font-black text-blue-700 mt-1">{quickReports.completionRate}%</p><p className="text-xs text-slate-400 mt-1">تقدير سريع حسب الطلاب والامتحانات</p></div>
+        <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-sm"><p className="text-xs font-bold text-slate-500">نتائج أقل من 60%</p><p className="text-2xl font-black text-red-700 mt-1">{quickReports.lowScores}</p><p className="text-xs text-slate-400 mt-1">تحتاج متابعة أو مراجعة</p></div>
+        <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-sm"><p className="text-xs font-bold text-slate-500">توصية اليوم</p><p className="text-sm font-black text-slate-800 mt-2 leading-relaxed">{dashboard.avg < 70 ? 'ركز على أضعف الفروع وأرسل واجب قصير.' : 'الأداء جيد، حافظ على المتابعة اليومية.'}</p></div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -7277,6 +7298,76 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
       });
   };
 
+
+  const latestVideoActivity = (() => {
+      const byView = [...videoViews].sort((a, b) => (b.viewedAt?.seconds || b.updatedAt || b.watchedSeconds || 0) - (a.viewedAt?.seconds || a.updatedAt || a.watchedSeconds || 0))[0];
+      let localActivity = null;
+      try {
+          const raw = user?.uid ? localStorage.getItem('nahhas-latest-video-' + user.uid) : '';
+          localActivity = raw ? JSON.parse(raw) : null;
+      } catch (e) {}
+      const picked = byView || localActivity;
+      if (!picked) return null;
+      const videoId = picked.videoId;
+      const videoItem = videos.find(v => v.id === videoId) || (localActivity?.videoId === videoId ? videos.find(v => v.id === localActivity.videoId) : null);
+      if (!videoItem) return null;
+      const watchedSeconds = safeNumber(picked.lastPositionSeconds, safeNumber(picked.watchedSeconds, safeNumber(localActivity?.watchedSeconds, 0)));
+      return {
+          video: videoItem,
+          watchedSeconds,
+          percent: getVideoWatchPercent(videoItem)
+      };
+  })();
+
+  const latestCompletedResult = examResults.find(r => r.status === 'completed') || examResults[0] || null;
+
+  const submittedAssignmentIds = new Set((assignmentSubmissions || []).map(s => s.assignmentId));
+  const pendingAssignmentsCount = (assignments || []).filter(a => !submittedAssignmentIds.has(a.id)).length;
+
+  const StudentContinueCard = () => {
+      const lastPct = latestCompletedResult ? getResultPercentage(latestCompletedResult) : null;
+      return (
+        <section className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <div className="xl:col-span-2 bg-gradient-to-br from-slate-950 via-slate-900 to-amber-900 text-white rounded-3xl p-5 md:p-6 shadow-xl overflow-hidden relative border border-white/10">
+            <div className="absolute -left-16 -top-16 w-48 h-48 bg-amber-400/20 rounded-full blur-3xl"></div>
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
+              <div>
+                <p className="text-amber-200 text-sm font-bold mb-2">أكمل من حيث توقفت</p>
+                <h3 className="text-2xl md:text-3xl font-black leading-relaxed">{latestVideoActivity?.video?.title || 'ابدأ محاضرتك التالية'}</h3>
+                <p className="text-slate-300 text-sm mt-2">{latestVideoActivity ? ('آخر موضع مشاهدة: ' + formatWatchTime(Math.round(latestVideoActivity.watchedSeconds || 0))) : 'كل محاضراتك وملفاتك المهمة جاهزة من هنا.'}</p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 shrink-0">
+                {latestVideoActivity ? (
+                  <button onClick={() => setPlayingVideo(latestVideoActivity.video)} className="bg-amber-400 text-slate-950 px-6 py-3 rounded-2xl font-black shadow-lg hover:bg-amber-300 transition flex items-center justify-center gap-2"><Play size={18} fill="currentColor"/> استكمال</button>
+                ) : (
+                  <button onClick={() => setActiveTab('videos')} className="bg-amber-400 text-slate-950 px-6 py-3 rounded-2xl font-black shadow-lg hover:bg-amber-300 transition flex items-center justify-center gap-2"><PlayCircle size={18}/> فتح المحاضرات</button>
+                )}
+                <button onClick={() => setActiveTab('performance')} className="bg-white/10 text-white border border-white/20 px-6 py-3 rounded-2xl font-bold hover:bg-white/15 transition flex items-center justify-center gap-2"><BarChart3 size={18}/> أدائي</button>
+              </div>
+            </div>
+            {latestVideoActivity && (
+              <div className="relative z-10 mt-5">
+                <div className="h-3 bg-white/15 rounded-full overflow-hidden"><div className="h-full bg-amber-300 rounded-full transition-all" style={{ width: String(Math.min(100, latestVideoActivity.percent || 0)) + '%' }} /></div>
+                <p className="text-xs text-amber-100 mt-2 font-bold">نسبة المشاهدة: {latestVideoActivity.percent || 0}%</p>
+              </div>
+            )}
+          </div>
+          <div className="grid grid-cols-2 xl:grid-cols-1 gap-4">
+            <div className="bg-white rounded-3xl p-5 border border-blue-100 shadow-sm"><p className="text-xs font-bold text-blue-600 mb-1">آخر نتيجة</p><p className="text-3xl font-black text-slate-900">{lastPct !== null ? String(lastPct) + '%' : '—'}</p><p className="text-xs text-slate-500 mt-1">{latestCompletedResult?.examTitle || 'لا توجد نتائج بعد'}</p></div>
+            <div className="bg-white rounded-3xl p-5 border border-emerald-100 shadow-sm"><p className="text-xs font-bold text-emerald-600 mb-1">واجبات مطلوبة</p><p className="text-3xl font-black text-slate-900">{pendingAssignmentsCount}</p><p className="text-xs text-slate-500 mt-1">اضغط من القائمة لفتح الواجبات</p></div>
+          </div>
+        </section>
+      );
+  };
+
+  const StudentCompactHome = () => (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm flex items-center justify-between"><div><p className="text-sm text-slate-500 font-bold">المحاضرات</p><p className="text-3xl font-black text-blue-700">{videos.length}</p></div><PlayCircle className="text-blue-200 w-14 h-14"/></div>
+      <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm flex items-center justify-between"><div><p className="text-sm text-slate-500 font-bold">الامتحانات</p><p className="text-3xl font-black text-amber-700">{exams.length}</p></div><ClipboardList className="text-amber-200 w-14 h-14"/></div>
+      <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm flex items-center justify-between"><div><p className="text-sm text-slate-500 font-bold">نتائجي</p><p className="text-3xl font-black text-emerald-700">{examResults.length}</p></div><Target className="text-emerald-200 w-14 h-14"/></div>
+    </div>
+  );
+
   const handleJoinLive = (session) => {
       if (session.passcode) {
           const code = prompt('أدخل كود البث المباشر');
@@ -7563,8 +7654,8 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
         {activeTab === 'home' && (
             <div className="space-y-8 page-soft-enter">
-                <StudentSmartPerformanceReport userResults={examResults} content={content} />
-                <StudentLocalHomeCoach userResults={examResults} content={content} />
+                <StudentContinueCard />
+                <StudentCompactHome />
                 {liveSessions.length > 0 && (
                     <div className="bg-white border border-red-100 text-slate-800 p-4 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm">
                         <div>
