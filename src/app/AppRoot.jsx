@@ -7438,6 +7438,31 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
     } else { alert("كود خاطئ!"); }
   };
 
+  const studentFirstName = String(userData?.name || user?.displayName || 'طالب').split(' ')[0];
+  const StudentTopGreeting = () => (
+    <section className="student-sticky-hero bg-white/95 backdrop-blur-xl border border-amber-100 rounded-3xl shadow-xl p-4 md:p-5 mb-6 overflow-hidden relative">
+      <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl md:text-3xl font-black text-slate-900 font-arabic flex flex-wrap items-center gap-2">
+            منور يا <span className="text-amber-600">{studentFirstName}</span> 👋
+            <span className="text-sm font-normal text-slate-500 bg-slate-100 px-3 py-1 rounded-full font-sans">{getGradeLabel(userData?.grade)}</span>
+            {isPremium ? (
+              <span className="bg-amber-100 text-amber-700 text-xs px-3 py-1 rounded-full font-bold flex items-center gap-1 shadow-sm"><Crown size={14}/> حساب VIP</span>
+            ) : (
+              <button className="bg-slate-100 hover:bg-amber-50 text-slate-600 hover:text-amber-700 text-xs px-3 py-1 rounded-full font-bold flex items-center gap-1 transition" onClick={()=>setActiveTab('subscription')}>مجاني (رقي حسابك)</button>
+            )}
+          </h2>
+          <p className="text-sm text-slate-500 mt-2 font-bold">كل أدواتك المهمة هتفضل تحت الترحيب مباشرة مهما زودنا أقسام جديدة.</p>
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-center min-w-[220px]">
+          <div className="bg-amber-50 rounded-2xl p-3 border border-amber-100"><p className="text-xl font-black text-amber-700">{videos.length}</p><p className="text-[11px] text-amber-800 font-bold">محاضرة</p></div>
+          <div className="bg-blue-50 rounded-2xl p-3 border border-blue-100"><p className="text-xl font-black text-blue-700">{exams.length}</p><p className="text-[11px] text-blue-800 font-bold">امتحان</p></div>
+          <div className="bg-emerald-50 rounded-2xl p-3 border border-emerald-100"><p className="text-xl font-black text-emerald-700">{examResults.length}</p><p className="text-[11px] text-emerald-800 font-bold">نتيجة</p></div>
+        </div>
+      </div>
+    </section>
+  );
+
   return (
     <div className="bg-slate-50 relative font-['Cairo'] min-h-screen block" dir="rtl">
       <div className="hidden md:block"><StudentAdminMessagePopup user={user} userData={userData} /></div>
@@ -7527,8 +7552,10 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
             )}
         </div>
 
+        <StudentTopGreeting />
+
         {activeTab === 'home' && (
-            <div className="space-y-8">
+            <div className="space-y-8 page-soft-enter">
                 <StudentSmartPerformanceReport userResults={examResults} content={content} />
                 <StudentLocalHomeCoach userResults={examResults} content={content} />
                 {liveSessions.length > 0 && (
@@ -7543,16 +7570,6 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                 <WisdomBox />
                 <Announcements />
                 <PWAInstallBox installPrompt={installPrompt} />
-                <h2 className="text-3xl font-bold text-slate-800 font-arabic flex flex-wrap items-center gap-2">
-                    منور يا <span className="text-amber-600">{String(userData?.name || 'طالب').split(' ')[0]}</span> 👋 
-                    <span className="text-sm font-normal text-slate-500 bg-slate-200 px-3 py-1 rounded-full font-sans">{getGradeLabel(userData?.grade)}</span>
-                    {isPremium ? (
-                        <span className="bg-amber-100 text-amber-700 text-xs px-3 py-1 rounded-full font-bold flex items-center gap-1 shadow-sm"><Crown size={14}/> حساب VIP</span>
-                    ) : (
-                        <span className="bg-slate-200 text-slate-600 text-xs px-3 py-1 rounded-full font-bold flex items-center gap-1 cursor-pointer" onClick={()=>setActiveTab('subscription')}>مجاني (رقي حسابك)</span>
-                    )}
-                </h2>
-                
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
                     <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedContent && setActiveTab('videos')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}>
                         <h3 className="relative z-10 text-xl font-bold mb-2 text-blue-900 group-hover:text-blue-600 transition">المحاضرات</h3>
@@ -8533,7 +8550,18 @@ function App() {
     return () => unsubAuth();
   }, []);
 
-  if (authLoading || (user && loading)) return <div className="h-screen flex items-center justify-center bg-slate-50"><Loader2 className="animate-spin text-amber-600 w-12 h-12"/></div>;
+  if (authLoading || (user && loading)) return (
+    <div className="h-screen live-loading-screen flex items-center justify-center font-['Cairo']" dir="rtl">
+      <div className="live-loader-card bg-white/90 border border-amber-100 rounded-3xl shadow-2xl p-8 w-[88%] max-w-sm text-center relative overflow-hidden">
+        <div className="live-loader-orb w-20 h-20 rounded-full bg-gradient-to-br from-amber-400 to-amber-700 mx-auto mb-5 flex items-center justify-center text-white shadow-xl">
+          <Loader2 className="animate-spin w-9 h-9" />
+        </div>
+        <h2 className="text-2xl font-black text-slate-900 mb-2">منصة النحاس التعليمية</h2>
+        <p className="text-slate-500 font-bold">بنجهز تجربتك التعليمية...</p>
+        <div className="mt-5 h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full w-2/3 bg-gradient-to-l from-amber-400 to-amber-700 rounded-full animate-pulse" /></div>
+      </div>
+    </div>
+  );
 
   return (
     <AppErrorBoundary>

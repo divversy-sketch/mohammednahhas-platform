@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { addDoc, collection, deleteDoc, doc, increment, onSnapshot, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDoc, increment, onSnapshot, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { Settings as GearIcon, Maximize2, Minimize2, PenLine, Play, RefreshCw, Search, Shrink, Trash2, X } from '../../shared/icons/lucide-shim.jsx';
 import { db } from '../../services/firebase';
 import { getYouTubeID, safeNumber } from '../../shared/utils/media';
@@ -16,11 +16,15 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
   const [notes, setNotes] = useState([]);
   const [currentNote, setCurrentNote] = useState('');
   const [isBuffering, setIsBuffering] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [resumeHint, setResumeHint] = useState('');
 
   const playerShellRef = useRef(null);
   const videoRef = useRef(null);
   const finalUrl = video?.url || video?.file;
   const videoId = getYouTubeID(finalUrl);
+  const resumeStorageKey = user?.uid && video?.id ? `nahhas-video-resume-${user.uid}-${video.id}` : '';
+  const lastPositionRef = useRef(0);
 
   const watermarkText = useMemo(() => `${userName || 'طالب'} - ${video?.grade || ''} — منصة النحاس`, [userName, video?.grade]);
   const youtubeEmbedUrl = useMemo(() => {
@@ -91,6 +95,38 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
   }, [user, video?.id]);
 
   useEffect(() => {
+    if (!user || !video?.id || videoId) return undefined;
+    let cancelled = false;
+    const restorePosition = async () => {
+      let savedSeconds = 0;
+      try {
+        const localValue = resumeStorageKey ? Number(localStorage.getItem(resumeStorageKey) || 0) : 0;
+        savedSeconds = Number.isFinite(localValue) ? localValue : 0;
+        const viewSnap = await getDoc(doc(db, 'video_views', `${user.uid}_${video.id}`));
+        const dbSeconds = safeNumber(viewSnap.data()?.lastPositionSeconds, 0);
+        savedSeconds = Math.max(savedSeconds, dbSeconds);
+      } catch (e) {
+        // Firestore rules can block this on some installs; local resume still works.
+      }
+      if (!cancelled && videoRef.current && savedSeconds > 8) {
+        const apply = () => {
+          if (!videoRef.current) return;
+          const duration = safeNumber(videoRef.current.duration, 0);
+          const safeTime = duration > 0 ? Math.min(savedSeconds, Math.max(0, duration - 8)) : savedSeconds;
+          videoRef.current.currentTime = safeTime;
+          lastPositionRef.current = safeTime;
+          setResumeHint(`تم استكمال المحاضرة من الدقيقة ${formatMinSec(safeTime)}`);
+          setTimeout(() => setResumeHint(''), 4200);
+        };
+        if (videoRef.current.readyState >= 1) apply();
+        else videoRef.current.addEventListener('loadedmetadata', apply, { once: true });
+      }
+    };
+    restorePosition();
+    return () => { cancelled = true; };
+  }, [user, video?.id, videoId, resumeStorageKey]);
+
+  useEffect(() => {
     if (!user || !video?.id) return undefined;
     const viewRef = doc(db, 'video_views', `${user.uid}_${video.id}`);
     let timerInterval;
@@ -111,6 +147,7 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
           videoTitle: video.title,
           viewedAt: serverTimestamp(),
           watchedSeconds: increment(secondsToAdd),
+          lastPositionSeconds: Math.round(videoRef.current?.currentTime || watchedSeconds || 0),
           estimatedDuration: currentDuration,
           watchedPercent: watchedPercentValue,
           linkedExamId: video.linkedExamId || null
@@ -125,7 +162,9 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
       let isPlaying = true;
       if (!videoId && videoRef.current) isPlaying = !videoRef.current.paused && !videoRef.current.ended;
       if (!document.hidden && isPlaying) {
-        localSeconds += 1;
+        localSeconds = Math.max(localSeconds + 1, Math.round(videoRef.current?.currentTime || 0));
+        lastPositionRef.current = localSeconds;
+        if (resumeStorageKey) { try { localStorage.setItem(resumeStorageKey, String(localSeconds)); } catch (e) {} }
         const currentDuration = safeNumber(videoRef.current?.duration, estimatedDuration);
         const currentPercent = currentDuration > 0 ? Math.min(100, Math.round((localSeconds / currentDuration) * 100)) : 0;
         onProgress?.(video.id, currentPercent, localSeconds);
@@ -144,6 +183,7 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
   }, [user, video?.id, video?.title, userName, videoId, video?.durationSeconds, video?.estimatedDurationMinutes, video?.linkedExamId, onProgress]);
 
   const changeSpeed = (rate) => {
+    setPlaybackRate(rate);
     if (videoRef.current) videoRef.current.playbackRate = rate;
     setShowSettings(false);
   };
@@ -234,7 +274,7 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
               {showSettings && (
                 <div className="absolute top-12 left-0 bg-white text-black rounded-lg shadow-xl py-2 w-40 z-[90] text-sm font-bold">
                   <div className="px-4 py-2 border-b text-gray-400 text-xs">سرعة التشغيل</div>
-                  {PLAYBACK_RATES.map(rate => (<button key={rate} onClick={() => changeSpeed(rate)} className="block w-full text-right px-4 py-2 hover:bg-gray-100">{rate}x</button>))}
+                  {PLAYBACK_RATES.map(rate => (<button key={rate} onClick={() => changeSpeed(rate)} className={`block w-full text-right px-4 py-2 hover:bg-gray-100 ${playbackRate === rate ? 'bg-amber-50 text-amber-700' : ''}`}>{rate}x</button>))}
                   {videoId && <p className="px-4 py-2 text-[10px] text-slate-400 border-t">سرعة يوتيوب من إعدادات المشغل نفسه.</p>}
                 </div>
               )}
@@ -245,6 +285,7 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
 
         <div className={`lecture-stage ${showNotes ? 'has-notes-open' : ''}`}>
           <div className="watermark-video smooth-watermark">{watermarkText}</div>
+          {resumeHint && <div className="lecture-resume-toast z-[76]">{resumeHint}</div>}
           {isBuffering && !videoId && (
             <div className="lecture-buffering z-[75]">
               <div className="lecture-spinner" />
@@ -268,6 +309,15 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
                 onStalled={() => setIsBuffering(true)}
                 onCanPlay={() => setIsBuffering(false)}
                 onPlaying={() => setIsBuffering(false)}
+                onLoadedMetadata={() => { if (videoRef.current) videoRef.current.playbackRate = playbackRate; }}
+                onRateChange={() => setPlaybackRate(videoRef.current?.playbackRate || 1)}
+                onTimeUpdate={() => {
+                  const current = Math.round(videoRef.current?.currentTime || 0);
+                  if (current > 0 && Math.abs(current - lastPositionRef.current) >= 4) {
+                    lastPositionRef.current = current;
+                    if (resumeStorageKey) { try { localStorage.setItem(resumeStorageKey, String(current)); } catch (e) {} }
+                  }
+                }}
               >المتصفح لا يدعم هذا الفيديو.</video>
             )}
           </div>

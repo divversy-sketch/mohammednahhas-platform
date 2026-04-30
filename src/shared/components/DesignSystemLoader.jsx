@@ -10,7 +10,7 @@ const shouldUseLowPerformanceMode = () => {
   const smallScreen = window.matchMedia?.('(max-width: 768px)').matches;
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const slowConnection = ['slow-2g', '2g', '3g'].includes(connection);
-  return reducedMotion || saveData || slowConnection || cores <= 4 || memory <= 4 || smallScreen;
+  return reducedMotion || saveData || slowConnection || ((cores <= 2 || memory <= 2) && smallScreen);
 };
 
 const DesignSystemLoader = () => {
@@ -81,14 +81,28 @@ const DesignSystemLoader = () => {
       .video-smooth-frame { transform: translateZ(0); backface-visibility: hidden; will-change: transform; contain: layout paint; }
       @keyframes moveWatermark { 0% { transform: translate3d(8vw, 10vh, 0) rotate(-5deg); } 25% { transform: translate3d(48vw, 72vh, 0) rotate(5deg); } 50% { transform: translate3d(78vw, 30vh, 0) rotate(-5deg); } 75% { transform: translate3d(12vw, 68vh, 0) rotate(5deg); } 100% { transform: translate3d(8vw, 10vh, 0) rotate(-5deg); } }
       .no-select { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
+      @keyframes softEntrance { from { opacity: 0; transform: translate3d(0, 12px, 0) scale(.985); } to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); } }
+      @keyframes softGlow { 0%,100% { box-shadow: 0 18px 45px rgba(217,119,6,.10); } 50% { box-shadow: 0 22px 60px rgba(217,119,6,.18); } }
+      @keyframes shimmerLine { 0% { transform: translateX(115%); } 100% { transform: translateX(-115%); } }
+      .page-soft-enter { animation: softEntrance .38s cubic-bezier(.2,.8,.2,1) both; }
+      .student-sticky-hero { position: sticky; top: .75rem; z-index: 25; animation: softEntrance .36s cubic-bezier(.2,.8,.2,1) both, softGlow 7s ease-in-out infinite; }
+      .student-sticky-hero::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; overflow: hidden; background: linear-gradient(105deg, transparent 20%, rgba(255,255,255,.32), transparent 80%); transform: translateX(115%); animation: shimmerLine 5.5s ease-in-out infinite; }
+      .live-loading-screen { position: relative; overflow: hidden; background: radial-gradient(circle at 50% 38%, #fff7ed 0%, #f8fafc 48%, #e2e8f0 100%); }
+      .live-loader-card { animation: softEntrance .42s ease both, softGlow 5s ease-in-out infinite; }
+      .live-loader-orb { animation: pulseSlow 2.8s ease-in-out infinite; }
+      @media (max-width: 768px) { .student-sticky-hero { top: .5rem; } }
+      .perf-low .student-sticky-hero { animation: softEntrance .25s ease both; }
+      .perf-low .student-sticky-hero::after { animation-duration: 8s; opacity: .55; }
+
       .perf-low body { scroll-behavior: auto; }
-      .perf-low .glass-panel, .perf-low .glass-card { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important; }
-      .perf-low .glass-card { transition: none !important; transform: none !important; contain: layout paint; }
-      .perf-low .glass-card:hover { transform: none !important; box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important; }
-      .perf-low .text-gradient-gold { animation: none !important; background-size: 100% auto; }
-      .perf-low .floating-char { animation: none !important; opacity: 0.06 !important; }
-      .perf-low .floating-char:nth-of-type(n+7), .perf-low .animate-pulse-slow { display: none !important; }
-      .perf-low .watermark-video { animation-duration: 90s !important; text-shadow: 1px 1px 2px rgba(0,0,0,0.75); }
+      .perf-low .glass-panel, .perf-low .glass-card { backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); box-shadow: 0 3px 12px rgba(0,0,0,0.06) !important; }
+      .perf-low .glass-card { transition: transform 160ms ease, box-shadow 160ms ease !important; contain: layout paint; }
+      .perf-low .glass-card:hover { transform: translateY(-2px) !important; box-shadow: 0 7px 18px rgba(217,119,6,0.10) !important; }
+      .perf-low .text-gradient-gold { animation-duration: 8s !important; }
+      .perf-low .floating-char { animation-duration: 32s !important; opacity: 0.075 !important; }
+      .perf-low .floating-char:nth-of-type(n+7) { display: none !important; }
+      .perf-low .animate-pulse-slow { animation-duration: 16s !important; opacity: 0.6; }
+      .perf-low .watermark-video { animation-duration: 94s !important; text-shadow: 1px 1px 2px rgba(0,0,0,0.75); }
       .perf-low iframe, .perf-low video { transform: translateZ(0); backface-visibility: hidden; }
       .is-tab-hidden .floating-char, .is-tab-hidden .animate-pulse-slow, .is-tab-hidden .watermark-video { animation-play-state: paused !important; }
       @media (max-width: 768px) {
