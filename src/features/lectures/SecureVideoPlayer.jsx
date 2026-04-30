@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { addDoc, collection, deleteDoc, doc, increment, onSnapshot, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
-import { Settings as GearIcon, Maximize2, Minimize2, PenLine, Play, Search, Shrink, Trash2, X } from '../../shared/icons/lucide-shim.jsx';
+import { Settings as GearIcon, Maximize2, Minimize2, PenLine, Play, RefreshCw, Search, Shrink, Trash2, X } from '../../shared/icons/lucide-shim.jsx';
 import { db } from '../../services/firebase';
 import { getYouTubeID, safeNumber } from '../../shared/utils/media';
 import './lecture-player.css';
@@ -15,6 +15,7 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
   const [showNotes, setShowNotes] = useState(false);
   const [notes, setNotes] = useState([]);
   const [currentNote, setCurrentNote] = useState('');
+  const [isBuffering, setIsBuffering] = useState(false);
 
   const playerShellRef = useRef(null);
   const videoRef = useRef(null);
@@ -40,15 +41,35 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
 
   const toggleFullscreen = async () => {
     const target = playerShellRef.current;
+    const nativeVideo = videoRef.current;
+
     try {
       if (!document.fullscreenElement && target?.requestFullscreen) {
         await target.requestFullscreen();
-      } else if (document.exitFullscreen) {
-        await document.exitFullscreen();
+        return;
       }
+      if (document.fullscreenElement && document.exitFullscreen) {
+        await document.exitFullscreen();
+        return;
+      }
+      // iPhone/Safari fallback: native video fullscreen when HTML fullscreen is unavailable.
+      if (nativeVideo?.webkitEnterFullscreen) nativeVideo.webkitEnterFullscreen();
+      else setIsFullscreen(v => !v);
     } catch (e) {
-      setIsFullscreen(v => !v);
+      if (nativeVideo?.webkitEnterFullscreen) nativeVideo.webkitEnterFullscreen();
+      else setIsFullscreen(v => !v);
     }
+  };
+
+  const reloadVideo = () => {
+    if (videoRef.current) {
+      const currentTime = videoRef.current.currentTime || 0;
+      videoRef.current.load();
+      videoRef.current.currentTime = currentTime;
+      videoRef.current.play?.().catch(() => {});
+      return;
+    }
+    window.location.reload();
   };
 
   useEffect(() => {
@@ -190,37 +211,64 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
       </AnimatePresence>
 
       <div ref={playerShellRef} className={`lecture-player-shell w-full h-full md:max-w-7xl bg-black ${showNotes ? 'md:rounded-l-2xl' : 'rounded-xl'} overflow-hidden relative shadow-2xl border border-gray-800 flex flex-col justify-center flex-1 ${isFullscreen ? 'is-fullscreen !max-w-none !rounded-none' : ''}`}>
-        <div className="absolute top-4 right-4 z-50 flex gap-2 md:gap-4 flex-wrap">
-          <button onClick={() => setShowNotes(!showNotes)} className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold backdrop-blur-md transition shadow-lg ${showNotes ? 'bg-blue-600 text-white' : 'bg-black/50 text-white hover:bg-black/80 border border-white/20'}`}>
-            <PenLine size={18}/> <span className="hidden md:inline">ملاحظاتي</span>
-          </button>
-          <button onClick={() => setIsZoomed(v => !v)} className={`lecture-action-btn ${isZoomed ? 'bg-amber-500 text-black' : 'bg-black/50 text-white'}`} title={isZoomed ? 'إلغاء تكبير الصورة' : 'تكبير الصورة أثناء المشاهدة'}>
-            {isZoomed ? <Shrink size={22}/> : <Search size={22}/>}
-            <span className="hidden lg:inline">{isZoomed ? 'تصغير الصورة' : 'تكبير الصورة'}</span>
-          </button>
-          <button onClick={toggleFullscreen} className="lecture-action-btn bg-black/50 text-white" title={isFullscreen ? 'تصغير العرض' : 'ملء الشاشة'}>
-            {isFullscreen ? <Minimize2 size={24}/> : <Maximize2 size={24}/>}
-          </button>
-          <div className="relative">
-            <button onClick={() => setShowSettings(!showSettings)} className="lecture-action-btn bg-black/50 text-white"><GearIcon size={24}/></button>
-            {showSettings && (
-              <div className="absolute top-12 left-0 bg-white text-black rounded-lg shadow-xl py-2 w-40 z-50 text-sm font-bold">
-                <div className="px-4 py-2 border-b text-gray-400 text-xs">سرعة التشغيل</div>
-                {PLAYBACK_RATES.map(rate => (<button key={rate} onClick={() => changeSpeed(rate)} className="block w-full text-right px-4 py-2 hover:bg-gray-100">{rate}x</button>))}
-                {videoId && <p className="px-4 py-2 text-[10px] text-slate-400 border-t">سرعة يوتيوب من إعدادات المشغل نفسه.</p>}
-              </div>
+        <div className="lecture-controls-layer absolute top-3 right-3 left-3 z-[80] flex gap-2 md:gap-3 flex-wrap items-start justify-between pointer-events-none">
+          <div className="flex gap-2 md:gap-3 flex-wrap pointer-events-auto">
+            <button onClick={() => setShowNotes(!showNotes)} className={`lecture-action-btn ${showNotes ? 'bg-blue-600 text-white' : 'bg-black/55 text-white'}`}>
+              <PenLine size={18}/> <span className="hidden md:inline">ملاحظاتي</span>
+            </button>
+            <button onClick={() => setIsZoomed(v => !v)} className={`lecture-action-btn ${isZoomed ? 'bg-amber-500 text-black' : 'bg-black/55 text-white'}`} title={isZoomed ? 'إلغاء تكبير الصورة' : 'تكبير الصورة أثناء المشاهدة'}>
+              {isZoomed ? <Shrink size={22}/> : <Search size={22}/>}<span className="hidden sm:inline">{isZoomed ? 'تصغير الصورة' : 'تكبير الصورة'}</span>
+            </button>
+            <button onClick={toggleFullscreen} className="lecture-action-btn bg-black/55 text-white" title={isFullscreen ? 'تصغير العرض' : 'ملء الشاشة'}>
+              {isFullscreen ? <Minimize2 size={23}/> : <Maximize2 size={23}/>}<span className="hidden sm:inline">{isFullscreen ? 'تصغير' : 'ملء الشاشة'}</span>
+            </button>
+            {!videoId && (
+              <button onClick={reloadVideo} className="lecture-action-btn bg-black/55 text-white" title="إعادة تحميل الفيديو إذا توقف مؤقتًا">
+                <RefreshCw size={20}/><span className="hidden md:inline">تحديث</span>
+              </button>
             )}
           </div>
-          <button onClick={onClose} className="bg-red-600 hover:bg-red-700 text-white p-2 rounded-full shadow-lg"><X size={24}/></button>
+          <div className="flex gap-2 pointer-events-auto">
+            <div className="relative">
+              <button onClick={() => setShowSettings(!showSettings)} className="lecture-action-btn bg-black/55 text-white"><GearIcon size={23}/></button>
+              {showSettings && (
+                <div className="absolute top-12 left-0 bg-white text-black rounded-lg shadow-xl py-2 w-40 z-[90] text-sm font-bold">
+                  <div className="px-4 py-2 border-b text-gray-400 text-xs">سرعة التشغيل</div>
+                  {PLAYBACK_RATES.map(rate => (<button key={rate} onClick={() => changeSpeed(rate)} className="block w-full text-right px-4 py-2 hover:bg-gray-100">{rate}x</button>))}
+                  {videoId && <p className="px-4 py-2 text-[10px] text-slate-400 border-t">سرعة يوتيوب من إعدادات المشغل نفسه.</p>}
+                </div>
+              )}
+            </div>
+            <button onClick={onClose} className="lecture-action-btn bg-red-600 hover:bg-red-700 text-white"><X size={23}/></button>
+          </div>
         </div>
 
         <div className={`lecture-stage ${showNotes ? 'has-notes-open' : ''}`}>
           <div className="watermark-video smooth-watermark">{watermarkText}</div>
+          {isBuffering && !videoId && (
+            <div className="lecture-buffering z-[75]">
+              <div className="lecture-spinner" />
+              <span>جاري تحميل جزء من الفيديو...</span>
+            </div>
+          )}
           <div className={`lecture-media-frame ${isZoomed ? 'is-zoomed' : ''}`}>
             {videoId ? (
-              <iframe className="w-full h-full video-smooth-frame" loading="eager" src={youtubeEmbedUrl} title="Video" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen />
+              <iframe className="w-full h-full video-smooth-frame" loading="eager" src={youtubeEmbedUrl} title="Video" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen" allowFullScreen />
             ) : (
-              <video ref={videoRef} controls controlsList="nodownload noplaybackrate" className="w-full h-full object-contain relative z-40 video-smooth-frame" src={finalUrl} playsInline preload="auto" disablePictureInPicture>المتصفح لا يدعم هذا الفيديو.</video>
+              <video
+                ref={videoRef}
+                controls
+                controlsList="nodownload noplaybackrate"
+                className="w-full h-full object-contain relative z-40 video-smooth-frame"
+                src={finalUrl}
+                playsInline
+                preload="auto"
+                disablePictureInPicture
+                onWaiting={() => setIsBuffering(true)}
+                onStalled={() => setIsBuffering(true)}
+                onCanPlay={() => setIsBuffering(false)}
+                onPlaying={() => setIsBuffering(false)}
+              >المتصفح لا يدعم هذا الفيديو.</video>
             )}
           </div>
         </div>

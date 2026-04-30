@@ -1,6 +1,19 @@
 .lecture-player-shell {
   transition: max-width 220ms ease, border-radius 220ms ease;
   isolation: isolate;
+  -webkit-font-smoothing: antialiased;
+}
+
+.lecture-player-shell:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  max-width: none !important;
+  border-radius: 0 !important;
+  border: 0 !important;
+}
+
+.lecture-controls-layer {
+  padding-top: max(env(safe-area-inset-top, 0px), 0px);
 }
 
 .lecture-stage {
@@ -13,6 +26,7 @@
   overflow: hidden;
   background: #000;
   touch-action: manipulation;
+  contain: layout paint;
 }
 
 .lecture-stage.has-notes-open {
@@ -30,7 +44,7 @@
   z-index: 40;
   transform: translate3d(0, 0, 0) scale(1);
   transform-origin: center center;
-  transition: transform 260ms ease, filter 260ms ease;
+  transition: transform 240ms cubic-bezier(.2,.8,.2,1), filter 240ms ease;
   will-change: transform;
   backface-visibility: hidden;
 }
@@ -46,19 +60,30 @@
 .lecture-action-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  border: 1px solid rgba(255,255,255,0.2);
+  justify-content: center;
+  gap: 0.45rem;
+  border: 1px solid rgba(255,255,255,0.18);
   border-radius: 9999px;
-  padding: 0.5rem 0.75rem;
-  min-height: 2.5rem;
+  padding: 0.55rem 0.75rem;
+  min-height: 2.65rem;
+  min-width: 2.65rem;
   font-weight: 900;
-  box-shadow: 0 12px 30px rgba(0,0,0,0.25);
-  backdrop-filter: blur(8px);
-  transition: transform 160ms ease, background 160ms ease, color 160ms ease;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.28);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: transform 150ms ease, background 150ms ease, color 150ms ease, opacity 150ms ease;
 }
 
 .lecture-action-btn:hover { transform: translateY(-1px); }
 .lecture-action-btn:active { transform: translateY(0) scale(0.98); }
+
+@media (max-width: 640px) {
+  .lecture-action-btn {
+    padding: 0.5rem;
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+}
 
 .video-smooth-frame {
   transform: translate3d(0, 0, 0);
@@ -67,9 +92,67 @@
   contain: layout paint size;
 }
 
-.smooth-watermark {
-  animation-duration: 46s !important;
-  animation-timing-function: linear !important;
-  transform: translate3d(8vw, 10vh, 0) rotate(-5deg);
-  will-change: transform, opacity;
+/* Override any old global watermark style and keep movement GPU-only. */
+.watermark-video.smooth-watermark {
+  position: absolute;
+  z-index: 70;
+  pointer-events: none;
+  color: rgba(255, 255, 255, 0.36);
+  font-weight: 900;
+  font-size: clamp(0.9rem, 2vw, 1.45rem);
+  line-height: 1;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.85);
+  white-space: nowrap;
+  animation: smoothLectureWatermark 58s linear infinite !important;
+  will-change: transform;
+  transform: translate3d(8vw, 12vh, 0) rotate(-5deg);
+  backface-visibility: hidden;
+  contain: layout paint;
+}
+
+@keyframes smoothLectureWatermark {
+  0%   { transform: translate3d(8vw, 12vh, 0) rotate(-5deg); }
+  20%  { transform: translate3d(58vw, 18vh, 0) rotate(4deg); }
+  40%  { transform: translate3d(72vw, 72vh, 0) rotate(-4deg); }
+  60%  { transform: translate3d(22vw, 78vh, 0) rotate(4deg); }
+  80%  { transform: translate3d(12vw, 38vh, 0) rotate(-3deg); }
+  100% { transform: translate3d(8vw, 12vh, 0) rotate(-5deg); }
+}
+
+.lecture-buffering {
+  position: absolute;
+  inset: auto auto 5.5rem auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  background: rgba(15, 23, 42, 0.82);
+  color: #fff;
+  padding: 0.75rem 1rem;
+  border-radius: 9999px;
+  font-weight: 900;
+  box-shadow: 0 15px 40px rgba(0,0,0,0.35);
+  backdrop-filter: blur(10px);
+}
+
+.lecture-spinner {
+  width: 1.1rem;
+  height: 1.1rem;
+  border: 3px solid rgba(255,255,255,0.35);
+  border-top-color: #fff;
+  border-radius: 9999px;
+  animation: lectureSpin 0.8s linear infinite;
+}
+
+@keyframes lectureSpin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .watermark-video.smooth-watermark {
+    animation-duration: 90s !important;
+  }
+  .lecture-media-frame,
+  .lecture-action-btn {
+    transition: none;
+  }
 }
