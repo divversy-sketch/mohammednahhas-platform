@@ -7258,6 +7258,11 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
       setIsCharging(false);
   };
 
+  const videos = content.filter(c => c.type === 'video');
+  const filesAndLinks = content.filter(c => c.type === 'file' || c.type === 'link');
+  const htmls = content.filter(c => c.type === 'html');
+  const interactiveExams = content.filter(c => c.type === 'interactive_exam');
+
   const handlePremiumClick = (callback) => {
       if(!isPremium) {
           alert("عفواً يا بطل، هذا المحتوى مخصص للطلاب المشتركين في الباقة المدفوعة (VIP). يرجى شحن حسابك أو التواصل مع المستر لترقية حسابك!");
@@ -7417,11 +7422,6 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   if (isBannedAll) return (
       <div className="h-screen flex flex-col items-center justify-center bg-red-50 text-center p-6"><Ban size={80} className="text-red-600 mb-4" /><h2 className="text-3xl font-bold text-red-800 mb-2 font-arabic">تم حظر حسابك</h2><p className="text-red-600 mb-6 font-bold">يرجى التواصل مع الإدارة أو المستر لمعرفة السبب.</p><button onClick={()=>signOut(auth)} className="bg-white text-red-600 px-6 py-2 rounded-full font-bold shadow-md hover:bg-red-100">تسجيل الخروج</button></div>
   );
-
-  const videos = content.filter(c => c.type === 'video');
-  const filesAndLinks = content.filter(c => c.type === 'file' || c.type === 'link');
-  const htmls = content.filter(c => c.type === 'html');
-  const interactiveExams = content.filter(c => c.type === 'interactive_exam');
 
   const startExamWithCode = async (exam, options = {}) => {
     if (isBannedExam) return alert("أنت محظور من دخول الامتحانات.");
