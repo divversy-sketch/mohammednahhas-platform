@@ -1,8 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, doc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { CheckCircle, DownloadCloud, Feather, Quote, Megaphone, Trophy, Star, X, MessageCircle, Facebook, Phone, Send } from '../../shared/icons/lucide-shim.jsx';
+
+const safeNumber = (value, fallback = 0) => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : fallback;
+};
+
+const extractAllQuestions = (exam) => (exam?.questions || []).flatMap(block =>
+  (block?.subQuestions || []).map(q => ({ ...q, blockText: block?.text || '', branch: q?.branch || 'عام' }))
+);
 
 const PWAInstallBox = ({ installPrompt }) => {
     const [isStandalone, setIsStandalone] = useState(false);

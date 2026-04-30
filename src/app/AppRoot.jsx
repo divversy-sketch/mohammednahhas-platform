@@ -216,6 +216,12 @@ const safeNumber = (value, fallback = 0) => {
     return Number.isFinite(num) ? num : fallback;
 };
 
+const getResultPercentage = (result) => {
+    const total = safeNumber(result?.total ?? result?.totalPossible, 0);
+    if (safeNumber(result?.percentage, -1) >= 0) return safeNumber(result.percentage, 0);
+    return total > 0 ? Math.round((safeNumber(result?.score ?? result?.totalScore, 0) / total) * 100) : 0;
+};
+
 const VIDEO_EXAM_UNLOCK_PERCENT = 75;
 
 const getQuestionMaxScore = (q) => safeNumber(q?.maxScore ?? q?.mark ?? q?.points, q?.type === 'essay' ? 10 : 1);
