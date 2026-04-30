@@ -7305,7 +7305,12 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
 
   const latestVideoActivity = (() => {
-      const byView = [...videoViews].sort((a, b) => (b.viewedAt?.seconds || b.updatedAt || b.watchedSeconds || 0) - (a.viewedAt?.seconds || a.updatedAt || a.watchedSeconds || 0))[0];
+      const views = Array.isArray(videoViews) ? videoViews : [];
+      const byView = [...views].sort((a, b) => {
+          const bTime = safeNumber(b?.viewedAt?.seconds, safeNumber(b?.updatedAt, safeNumber(b?.lastPositionSeconds, safeNumber(b?.watchedSeconds, 0))));
+          const aTime = safeNumber(a?.viewedAt?.seconds, safeNumber(a?.updatedAt, safeNumber(a?.lastPositionSeconds, safeNumber(a?.watchedSeconds, 0))));
+          return bTime - aTime;
+      })[0];
       let localActivity = null;
       try {
           const raw = user?.uid ? localStorage.getItem('nahhas-latest-video-' + user.uid) : '';
@@ -7317,36 +7322,117 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
       const videoItem = videos.find(v => v.id === videoId) || (localActivity?.videoId === videoId ? videos.find(v => v.id === localActivity.videoId) : null);
       if (!videoItem) return null;
       const watchedSeconds = safeNumber(picked.lastPositionSeconds, safeNumber(picked.watchedSeconds, safeNumber(localActivity?.watchedSeconds, 0)));
+      const percent = Math.max(0, Math.min(100, getVideoWatchPercent(videoItem)));
       return {
           video: videoItem,
           watchedSeconds,
-          percent: getVideoWatchPercent(videoItem)
+          percent,
+          isCompleted: percent >= 95
       };
   })();
 
   const latestCompletedResult = examResults.find(r => r.status === 'completed') || examResults[0] || null;
-
+  const inProgressExamResult = examResults.find(r => ['in_progress', 'security_hold'].includes(r.status));
+  const inProgressExam = inProgressExamResult ? exams.find(e => e.id === inProgressExamResult.examId) : null;
   const submittedAssignmentIds = new Set((assignmentSubmissions || []).map(s => s.assignmentId));
-  const pendingAssignmentsCount = (assignments || []).filter(a => !submittedAssignmentIds.has(a.id)).length;
+  const pendingAssignments = (assignments || []).filter(a => !submittedAssignmentIds.has(a.id));
+  const pendingAssignmentsCount = pendingAssignments.length;
+  const completedVideoCount = (videos || []).filter(v => getVideoWatchPercent(v) >= VIDEO_EXAM_UNLOCK_PERCENT).length;
+  const videoCompletionPercent = videos.length > 0 ? Math.round((completedVideoCount / videos.length) * 100) : 0;
+  const completedExamResults = (examResults || []).filter(r => r.status === 'completed');
+  const averageScore = completedExamResults.length > 0
+      ? Math.round(completedExamResults.reduce((sum, r) => sum + getResultPercentage(r), 0) / completedExamResults.length)
+      : 0;
+  const unseenNotificationCount = notifications.length;
+  const recentNotificationItems = notifications.slice(0, 4);
+
+  const smartWeakBranches = (() => {
+      const totals = {};
+      completedExamResults.slice(0, 8).forEach(result => {
+          const stats = result.performanceAnalysis?.branchStats || result.branchStats || result.branchAnalysis || {};
+          Object.entries(stats).forEach(([branch, data]) => {
+              totals[branch] = totals[branch] || { earned: 0, possible: 0, wrong: 0 };
+              totals[branch].earned += safeNumber(data.earned, 0);
+              totals[branch].possible += safeNumber(data.possible, safeNumber(data.total, 0));
+              totals[branch].wrong += safeNumber(data.wrong, 0);
+          });
+      });
+      return Object.entries(totals)
+          .map(([branch, data]) => ({
+              branch,
+              pct: data.possible > 0 ? Math.round((data.earned / data.possible) * 100) : 0,
+              wrong: data.wrong
+          }))
+          .filter(item => item.pct < 75 || item.wrong > 0)
+          .sort((a, b) => a.pct - b.pct)
+          .slice(0, 3);
+  })();
+
+  const nextStudyAction = (() => {
+      if (latestVideoActivity && !latestVideoActivity.isCompleted) {
+          return {
+              title: 'استكمل آخر محاضرة',
+              text: latestVideoActivity.video?.title || 'محاضرة محفوظة',
+              action: () => setPlayingVideo(latestVideoActivity.video),
+              button: 'استكمال الآن',
+              icon: <Play size={18} fill="currentColor" />,
+              tone: 'from-amber-400 to-orange-500 text-slate-950'
+          };
+      }
+      if (inProgressExam) {
+          return {
+              title: 'استكمل امتحانك',
+              text: inProgressExam.title || 'امتحان محفوظ',
+              action: () => startExamWithCode(inProgressExam, { skipCode: true }),
+              button: 'دخول الامتحان',
+              icon: <ClipboardList size={18} />,
+              tone: 'from-blue-500 to-indigo-600 text-white'
+          };
+      }
+      if (pendingAssignments[0]) {
+          return {
+              title: 'عندك واجب مطلوب',
+              text: pendingAssignments[0].title || 'واجب جديد',
+              action: () => setActiveTab('assignments'),
+              button: 'فتح الواجبات',
+              icon: <QrCode size={18} />,
+              tone: 'from-emerald-500 to-teal-600 text-white'
+          };
+      }
+      return {
+          title: 'ابدأ خطوة جديدة',
+          text: videos[0]?.title || 'افتح المحاضرات المتاحة لك',
+          action: () => setActiveTab('videos'),
+          button: 'فتح المحاضرات',
+          icon: <PlayCircle size={18} />,
+          tone: 'from-slate-900 to-slate-700 text-white'
+      };
+  })();
 
   const StudentContinueCard = () => {
-      const lastPct = latestCompletedResult ? getResultPercentage(latestCompletedResult) : null;
+      const currentTitle = latestVideoActivity?.video?.title || inProgressExam?.title || pendingAssignments[0]?.title || 'ابدأ مذاكرتك التالية';
+      const currentSubtitle = latestVideoActivity
+          ? ('آخر موضع مشاهدة: ' + formatWatchTime(Math.round(latestVideoActivity.watchedSeconds || 0)))
+          : inProgressExam
+            ? 'عندك محاولة امتحان محفوظة تقدر تكملها.'
+            : pendingAssignments[0]
+              ? 'ابدأ الواجب المطلوب قبل تراكم المهام.'
+              : 'كل أدواتك المهمة جاهزة بضغطة واحدة.';
       return (
         <section className="grid grid-cols-1 xl:grid-cols-3 gap-4">
           <div className="xl:col-span-2 bg-gradient-to-br from-slate-950 via-slate-900 to-amber-900 text-white rounded-3xl p-5 md:p-6 shadow-xl overflow-hidden relative border border-white/10">
             <div className="absolute -left-16 -top-16 w-48 h-48 bg-amber-400/20 rounded-full blur-3xl"></div>
+            <div className="absolute right-8 bottom-4 opacity-10"><GraduationCap size={130}/></div>
             <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
-              <div>
-                <p className="text-amber-200 text-sm font-bold mb-2">أكمل من حيث توقفت</p>
-                <h3 className="text-2xl md:text-3xl font-black leading-relaxed">{latestVideoActivity?.video?.title || 'ابدأ محاضرتك التالية'}</h3>
-                <p className="text-slate-300 text-sm mt-2">{latestVideoActivity ? ('آخر موضع مشاهدة: ' + formatWatchTime(Math.round(latestVideoActivity.watchedSeconds || 0))) : 'كل محاضراتك وملفاتك المهمة جاهزة من هنا.'}</p>
+              <div className="min-w-0">
+                <p className="text-amber-200 text-sm font-bold mb-2 flex items-center gap-2"><Sparkles size={16}/> أكمل من حيث توقفت</p>
+                <h3 className="text-2xl md:text-3xl font-black leading-relaxed truncate md:whitespace-normal">{currentTitle}</h3>
+                <p className="text-slate-300 text-sm mt-2 leading-relaxed">{currentSubtitle}</p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 shrink-0">
-                {latestVideoActivity ? (
-                  <button onClick={() => setPlayingVideo(latestVideoActivity.video)} className="bg-amber-400 text-slate-950 px-6 py-3 rounded-2xl font-black shadow-lg hover:bg-amber-300 transition flex items-center justify-center gap-2"><Play size={18} fill="currentColor"/> استكمال</button>
-                ) : (
-                  <button onClick={() => setActiveTab('videos')} className="bg-amber-400 text-slate-950 px-6 py-3 rounded-2xl font-black shadow-lg hover:bg-amber-300 transition flex items-center justify-center gap-2"><PlayCircle size={18}/> فتح المحاضرات</button>
-                )}
+                <button onClick={nextStudyAction.action} className={`bg-gradient-to-r ${nextStudyAction.tone} px-6 py-3 rounded-2xl font-black shadow-lg hover:scale-[1.02] transition flex items-center justify-center gap-2`}>
+                  {nextStudyAction.icon} {nextStudyAction.button}
+                </button>
                 <button onClick={() => setActiveTab('performance')} className="bg-white/10 text-white border border-white/20 px-6 py-3 rounded-2xl font-bold hover:bg-white/15 transition flex items-center justify-center gap-2"><BarChart3 size={18}/> أدائي</button>
               </div>
             </div>
@@ -7358,18 +7444,97 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
             )}
           </div>
           <div className="grid grid-cols-2 xl:grid-cols-1 gap-4">
-            <div className="bg-white rounded-3xl p-5 border border-blue-100 shadow-sm"><p className="text-xs font-bold text-blue-600 mb-1">آخر نتيجة</p><p className="text-3xl font-black text-slate-900">{lastPct !== null ? String(lastPct) + '%' : '—'}</p><p className="text-xs text-slate-500 mt-1">{latestCompletedResult?.examTitle || 'لا توجد نتائج بعد'}</p></div>
-            <div className="bg-white rounded-3xl p-5 border border-emerald-100 shadow-sm"><p className="text-xs font-bold text-emerald-600 mb-1">واجبات مطلوبة</p><p className="text-3xl font-black text-slate-900">{pendingAssignmentsCount}</p><p className="text-xs text-slate-500 mt-1">اضغط من القائمة لفتح الواجبات</p></div>
+            <button onClick={() => setActiveTab('performance')} className="text-right bg-white rounded-3xl p-5 border border-blue-100 shadow-sm hover:shadow-md transition"><p className="text-xs font-bold text-blue-600 mb-1">متوسط أدائك</p><p className="text-3xl font-black text-slate-900">{completedExamResults.length ? String(averageScore) + '%' : '—'}</p><p className="text-xs text-slate-500 mt-1">{latestCompletedResult?.examTitle || 'ابدأ أول امتحان لتظهر النتائج'}</p></button>
+            <button onClick={() => setActiveTab('assignments')} className="text-right bg-white rounded-3xl p-5 border border-emerald-100 shadow-sm hover:shadow-md transition"><p className="text-xs font-bold text-emerald-600 mb-1">واجبات مطلوبة</p><p className="text-3xl font-black text-slate-900">{pendingAssignmentsCount}</p><p className="text-xs text-slate-500 mt-1">{pendingAssignments[0]?.title || 'لا توجد واجبات معلقة'}</p></button>
           </div>
         </section>
       );
   };
 
+  const StudentSmartDashboard = () => (
+    <section className="glass-panel rounded-3xl p-5 md:p-6 border border-white/60">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
+        <div>
+          <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2"><BrainCircuit className="text-amber-600"/> لوحة الطالب الذكية</h2>
+          <p className="text-sm text-slate-500 mt-1">ملخص سريع يساعدك تبدأ من أهم خطوة بدون زحمة.</p>
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          <button onClick={() => setActiveTab('videos')} className="bg-blue-50 text-blue-700 px-4 py-2 rounded-xl font-bold text-sm whitespace-nowrap">المحاضرات</button>
+          <button onClick={() => setActiveTab('exams')} className="bg-amber-50 text-amber-700 px-4 py-2 rounded-xl font-bold text-sm whitespace-nowrap">الامتحانات</button>
+          <button onClick={() => setActiveTab('assignments')} className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl font-bold text-sm whitespace-nowrap">الواجبات</button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+        <div className="bg-white rounded-2xl p-4 border border-slate-100"><p className="text-xs text-slate-500 font-bold">تقدم المحاضرات</p><p className="text-3xl font-black text-blue-700 mt-1">{videoCompletionPercent}%</p><p className="text-xs text-slate-400 mt-1">{completedVideoCount}/{videos.length} مكتملة</p></div>
+        <div className="bg-white rounded-2xl p-4 border border-slate-100"><p className="text-xs text-slate-500 font-bold">متوسط الامتحانات</p><p className="text-3xl font-black text-emerald-700 mt-1">{completedExamResults.length ? averageScore + '%' : '—'}</p><p className="text-xs text-slate-400 mt-1">{completedExamResults.length} امتحان مكتمل</p></div>
+        <div className="bg-white rounded-2xl p-4 border border-slate-100"><p className="text-xs text-slate-500 font-bold">واجبات مطلوبة</p><p className="text-3xl font-black text-amber-700 mt-1">{pendingAssignmentsCount}</p><p className="text-xs text-slate-400 mt-1">تابعها قبل المحاضرة القادمة</p></div>
+        <div className="bg-white rounded-2xl p-4 border border-slate-100"><p className="text-xs text-slate-500 font-bold">تنبيهات جديدة</p><p className="text-3xl font-black text-purple-700 mt-1">{unseenNotificationCount}</p><p className="text-xs text-slate-400 mt-1">آخر تحديثات المنصة</p></div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 bg-slate-950 text-white rounded-3xl p-5 relative overflow-hidden">
+          <div className="absolute -top-12 -left-12 w-40 h-40 bg-amber-400/20 rounded-full blur-3xl"></div>
+          <p className="text-amber-200 text-sm font-bold mb-2">خطة اليوم المقترحة</p>
+          <h3 className="text-xl md:text-2xl font-black mb-2">{nextStudyAction.title}</h3>
+          <p className="text-slate-300 text-sm leading-relaxed mb-4">{nextStudyAction.text}</p>
+          <button onClick={nextStudyAction.action} className={`bg-gradient-to-r ${nextStudyAction.tone} px-5 py-3 rounded-2xl font-black shadow flex items-center gap-2 w-full sm:w-auto justify-center`}>{nextStudyAction.icon} {nextStudyAction.button}</button>
+        </div>
+        <div className="bg-white rounded-3xl p-5 border border-slate-100">
+          <h3 className="font-black text-slate-800 flex items-center gap-2 mb-3"><Target className="text-red-500"/> ركز على</h3>
+          {smartWeakBranches.length === 0 ? (
+            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 text-emerald-700 text-sm font-bold leading-relaxed">أداؤك مستقر. راجع آخر أخطائك وحافظ على الاستمرارية.</div>
+          ) : (
+            <div className="space-y-2">
+              {smartWeakBranches.map(item => (
+                <div key={item.branch} className="bg-red-50/70 border border-red-100 rounded-2xl p-3">
+                  <div className="flex items-center justify-between gap-2"><span className="font-black text-red-800">{item.branch}</span><span className="text-xs bg-white text-red-700 px-2 py-1 rounded-full font-bold">{item.pct}%</span></div>
+                  <p className="text-xs text-red-600 mt-1">{item.wrong} أخطاء تحتاج مراجعة.</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+
+  const StudentNotificationCenter = () => (
+    <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="lg:col-span-2 bg-white rounded-3xl p-5 border border-slate-100 shadow-sm">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 className="text-xl font-black text-slate-900 flex items-center gap-2"><Bell className="text-amber-600"/> مركز الإشعارات</h3>
+            <p className="text-sm text-slate-500 mt-1">آخر رسائل الإدارة والمحاضرات والامتحانات في مكان واحد.</p>
+          </div>
+          <button onClick={() => { setShowNotifications(true); setHasNewNotif(false); }} className="bg-slate-900 text-white px-5 py-2 rounded-xl font-bold hover:bg-slate-800 transition">عرض الكل</button>
+        </div>
+        <div className="space-y-2">
+          {recentNotificationItems.length === 0 ? (
+            <div className="bg-slate-50 rounded-2xl p-5 text-center text-slate-500 font-bold">لا توجد إشعارات جديدة حاليًا.</div>
+          ) : recentNotificationItems.map((n, i) => (
+            <div key={n.id || i} className="bg-slate-50 border border-slate-100 rounded-2xl p-3 flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0"><Bell size={17}/></div>
+              <div className="min-w-0"><p className="font-black text-slate-800 truncate">{n.title || 'تنبيه جديد'}</p><p className="text-sm text-slate-600 leading-relaxed">{n.text || n.body}</p></div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="bg-gradient-to-br from-amber-50 to-white rounded-3xl p-5 border border-amber-100 shadow-sm">
+        <h3 className="font-black text-slate-900 flex items-center gap-2 mb-2"><Smartphone className="text-amber-600"/> إشعارات الهاتف</h3>
+        <p className="text-sm text-slate-600 leading-relaxed mb-4">فعّل التنبيهات عشان توصلك المحاضرات والامتحانات الجديدة فورًا.</p>
+        <button onClick={enableMobilePushNotifications} disabled={pushStatus === 'loading' || pushStatus === 'granted'} className={`w-full py-3 rounded-2xl font-black transition ${pushStatus === 'granted' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-600 text-white hover:bg-amber-700'}`}>
+          {pushStatus === 'loading' ? 'جارٍ التفعيل...' : pushStatus === 'granted' ? 'الإشعارات مفعلة' : 'تفعيل الإشعارات'}
+        </button>
+      </div>
+    </section>
+  );
+
   const StudentCompactHome = () => (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm flex items-center justify-between"><div><p className="text-sm text-slate-500 font-bold">المحاضرات</p><p className="text-3xl font-black text-blue-700">{videos.length}</p></div><PlayCircle className="text-blue-200 w-14 h-14"/></div>
-      <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm flex items-center justify-between"><div><p className="text-sm text-slate-500 font-bold">الامتحانات</p><p className="text-3xl font-black text-amber-700">{exams.length}</p></div><ClipboardList className="text-amber-200 w-14 h-14"/></div>
-      <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm flex items-center justify-between"><div><p className="text-sm text-slate-500 font-bold">نتائجي</p><p className="text-3xl font-black text-emerald-700">{examResults.length}</p></div><Target className="text-emerald-200 w-14 h-14"/></div>
+      <button onClick={()=> !isBannedContent && setActiveTab('videos')} className="text-right bg-white rounded-3xl p-5 border border-slate-100 shadow-sm flex items-center justify-between hover:shadow-md transition"><div><p className="text-sm text-slate-500 font-bold">المحاضرات</p><p className="text-3xl font-black text-blue-700">{videos.length}</p></div><PlayCircle className="text-blue-200 w-14 h-14"/></button>
+      <button onClick={()=> !isBannedExam && setActiveTab('exams')} className="text-right bg-white rounded-3xl p-5 border border-slate-100 shadow-sm flex items-center justify-between hover:shadow-md transition"><div><p className="text-sm text-slate-500 font-bold">الامتحانات</p><p className="text-3xl font-black text-amber-700">{exams.length}</p></div><ClipboardList className="text-amber-200 w-14 h-14"/></button>
+      <button onClick={()=> setActiveTab('performance')} className="text-right bg-white rounded-3xl p-5 border border-slate-100 shadow-sm flex items-center justify-between hover:shadow-md transition"><div><p className="text-sm text-slate-500 font-bold">نتائجي</p><p className="text-3xl font-black text-emerald-700">{examResults.length}</p></div><Target className="text-emerald-200 w-14 h-14"/></button>
     </div>
   );
 
@@ -7655,6 +7820,8 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
         {activeTab === 'home' && (
             <div className="space-y-8 page-soft-enter">
                 <StudentContinueCard />
+                <StudentSmartDashboard />
+                <StudentNotificationCenter />
                 <StudentCompactHome />
                 {liveSessions.length > 0 && (
                     <div className="bg-white border border-red-100 text-slate-800 p-4 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm">
