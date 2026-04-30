@@ -90,6 +90,11 @@ const DesignSystemLoader = () => {
       .live-loading-screen { position: relative; overflow: hidden; background: radial-gradient(circle at 50% 38%, #fff7ed 0%, #f8fafc 48%, #e2e8f0 100%); }
       .live-loader-card { animation: softEntrance .42s ease both, softGlow 5s ease-in-out infinite; }
       .live-loader-orb { animation: pulseSlow 2.8s ease-in-out infinite; }
+
+      @keyframes gearSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      @keyframes gearSpinReverse { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
+      .gear-loader-main { animation: gearSpin 1.15s linear infinite; transform-origin: center; will-change: transform; }
+      .gear-loader-small { animation: gearSpinReverse 1.35s linear infinite; transform-origin: center; will-change: transform; }
       @media (max-width: 768px) { .student-sticky-hero { top: .5rem; } }
       .perf-low .student-sticky-hero { animation: softEntrance .25s ease both; }
       .perf-low .student-sticky-hero::after { animation-duration: 8s; opacity: .55; }

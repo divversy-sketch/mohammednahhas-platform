@@ -222,6 +222,14 @@ const getResultPercentage = (result) => {
     return total > 0 ? Math.round((safeNumber(result?.score ?? result?.totalScore, 0) / total) * 100) : 0;
 };
 
+const getGradeBadge = (percentage = 0) => {
+    const pct = safeNumber(percentage, 0);
+    if (pct >= 85) return { text: 'ممتاز', tone: 'text-emerald-700 bg-emerald-50 border-emerald-200' };
+    if (pct >= 70) return { text: 'جيد جدًا', tone: 'text-blue-700 bg-blue-50 border-blue-200' };
+    if (pct >= 50) return { text: 'جيد', tone: 'text-amber-700 bg-amber-50 border-amber-200' };
+    return { text: 'يحتاج مراجعة', tone: 'text-red-700 bg-red-50 border-red-200' };
+};
+
 const VIDEO_EXAM_UNLOCK_PERCENT = 75;
 
 const getQuestionMaxScore = (q) => safeNumber(q?.maxScore ?? q?.mark ?? q?.points, q?.type === 'essay' ? 10 : 1);
@@ -7452,7 +7460,6 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
               <button className="bg-slate-100 hover:bg-amber-50 text-slate-600 hover:text-amber-700 text-xs px-3 py-1 rounded-full font-bold flex items-center gap-1 transition" onClick={()=>setActiveTab('subscription')}>مجاني (رقي حسابك)</button>
             )}
           </h2>
-          <p className="text-sm text-slate-500 mt-2 font-bold">كل أدواتك المهمة هتفضل تحت الترحيب مباشرة مهما زودنا أقسام جديدة.</p>
         </div>
         <div className="grid grid-cols-3 gap-2 text-center min-w-[220px]">
           <div className="bg-amber-50 rounded-2xl p-3 border border-amber-100"><p className="text-xl font-black text-amber-700">{videos.length}</p><p className="text-[11px] text-amber-800 font-bold">محاضرة</p></div>
@@ -8553,12 +8560,12 @@ function App() {
   if (authLoading || (user && loading)) return (
     <div className="h-screen live-loading-screen flex items-center justify-center font-['Cairo']" dir="rtl">
       <div className="live-loader-card bg-white/90 border border-amber-100 rounded-3xl shadow-2xl p-8 w-[88%] max-w-sm text-center relative overflow-hidden">
-        <div className="live-loader-orb w-20 h-20 rounded-full bg-gradient-to-br from-amber-400 to-amber-700 mx-auto mb-5 flex items-center justify-center text-white shadow-xl">
-          <Loader2 className="animate-spin w-9 h-9" />
+        <div className="live-loader-orb w-20 h-20 rounded-full bg-gradient-to-br from-amber-400 to-amber-700 mx-auto mb-5 flex items-center justify-center text-white shadow-xl relative">
+          <GearIcon className="gear-loader-main w-10 h-10" />
+          <GearIcon className="gear-loader-small w-5 h-5 absolute -bottom-1 -left-1 text-amber-100" />
         </div>
         <h2 className="text-2xl font-black text-slate-900 mb-2">منصة النحاس التعليمية</h2>
         <p className="text-slate-500 font-bold">بنجهز تجربتك التعليمية...</p>
-        <div className="mt-5 h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full w-2/3 bg-gradient-to-l from-amber-400 to-amber-700 rounded-full animate-pulse" /></div>
       </div>
     </div>
   );
