@@ -3019,16 +3019,58 @@ const AIExamBuilderPanel = ({ userData = null }) => {
   );
 };
 
-const AIStudentChatCoach = ({ user, userData, examResults = [] }) => {
+const AIStudentChatCoach = ({ user, userData, examResults = [], mistakes = [], content = [], onOpenPerformance, onOpenVideos }) => {
   const [messages, setMessages] = useState([
-    { role: 'assistant', text: 'أهلًا 👋 أنا المدرب الذكي. اسألني عن أي سؤال أو خطة مذاكرة أو سبب ضعفك في فرع معين.' }
+    { role: 'assistant', text: 'أهلًا يا بطل 👋 أنا المساعد الدراسي. اسألني عن سؤال، قاعدة، خطة مذاكرة، أو سبب تكرار أخطائك.' }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const send = async () => {
-    if (!input.trim()) return;
-    const nextMessages = [...messages, { role: 'user', text: input.trim() }];
+  const recentResults = (examResults || []).slice(0, 5).map(r => ({
+    examTitle: r.examTitle,
+    percentage: getResultPercentage(r),
+    branchAnalysis: r.branchAnalysis || r.branchStats || r.performanceAnalysis?.branchStats || {}
+  }));
+
+  const localFallbackAnswer = (question = '') => {
+    const q = String(question || '').toLowerCase();
+    const weakBranches = [];
+    recentResults.forEach(result => {
+      Object.entries(result.branchAnalysis || {}).forEach(([branch, data]) => {
+        const possible = safeNumber(data.possible, safeNumber(data.total, 0));
+        const earned = safeNumber(data.earned, safeNumber(data.correct, 0));
+        const pct = possible > 0 ? Math.round((earned / possible) * 100) : safeNumber(data.percentage, 0);
+        if (pct > 0 && pct < 75) weakBranches.push({ branch, pct, wrong: safeNumber(data.wrong, 0) });
+      });
+    });
+    weakBranches.sort((a, b) => a.pct - b.pct);
+    const weakest = weakBranches[0];
+    const latest = recentResults[0];
+    if (q.includes('خطة') || q.includes('اذاكر') || q.includes('أذاكر')) {
+      return weakest
+        ? `خطة مختصرة: ١) راجع قاعدة ${weakest.branch} لمدة 15 دقيقة. ٢) حل 5 أسئلة قصيرة عليها. ٣) راجع الخطأ واكتب سببه. ٤) ادخل اختبار قصير بعد المراجعة.`
+        : 'خطة اليوم: استكمل آخر محاضرة، ثم حل اختبار قصير، وبعدها راجع أي خطأ ظهر في النتيجة.';
+    }
+    if (q.includes('ضعف') || q.includes('غلط') || q.includes('أخطاء') || q.includes('اخطاء')) {
+      return weakest
+        ? `أوضح نقطة تحتاج تركيز الآن هي ${weakest.branch} بنسبة تقريبية ${weakest.pct}%. السبب غالبًا إن القاعدة لم تثبت قبل الحل. ابدأ بمراجعة القاعدة ثم حل أسئلة قليلة بجودة.`
+        : 'لا توجد نقطة ضعف واضحة من النتائج الحالية. ادخل اختبار قصير بعد كل محاضرة عشان التحليل يبقى أدق.';
+    }
+    if (latest) return `آخر نتيجة عندك كانت ${latest.percentage}% في ${latest.examTitle || 'امتحان'}. لو سؤالك عن درس معين اكتب اسم الدرس أو ابعت نص السؤال، وأنا أساعدك بخطوات بسيطة.`;
+    return 'اكتب لي اسم الدرس أو نص السؤال، ولو لسه مفيش نتائج عندك ابدأ بمحاضرة قصيرة ثم اختبار بسيط عشان أقدر أديك توصية أدق.';
+  };
+
+  const quickPrompts = [
+    'اعمل لي خطة مذاكرة للنهارده',
+    'إيه أكثر فرع محتاج أراجعه؟',
+    'ازاي أحسن نتيجتي في الامتحان الجاي؟',
+    'اشرح لي سبب تكرار أخطائي'
+  ];
+
+  const send = async (forcedText = '') => {
+    const text = String(forcedText || input || '').trim();
+    if (!text) return;
+    const nextMessages = [...messages, { role: 'user', text }];
     setMessages(nextMessages);
     setInput('');
     setLoading(true);
@@ -3041,47 +3083,83 @@ const AIStudentChatCoach = ({ user, userData, examResults = [] }) => {
           language: 'ar-EG',
           studentName: userData?.name || user?.displayName || '',
           grade: userData?.grade || '',
-          question: input.trim(),
+          question: text,
           chatHistory: nextMessages.slice(-8),
-          recentResults: (examResults || []).slice(0, 5).map(r => ({
-            examTitle: r.examTitle,
-            percentage: getResultPercentage(r),
-            branchAnalysis: r.branchAnalysis || r.branchStats || {}
-          }))
+          recentResults,
+          recentMistakes: (mistakes || []).slice(0, 8).map(m => ({
+            branch: m.question?.branch,
+            question: m.question?.text,
+            studentAnswer: m.question?.studentAnswerText,
+            correctAnswer: m.question?.correctAnswerText
+          })),
+          availableContent: (content || []).slice(0, 10).map(c => ({ title: c.title, branch: c.branch, type: c.type }))
         })
       });
-      const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error || 'تعذر رد AI.');
-      const answer = data.analysis?.answer || data.analysis?.summary || data.analysis?.explanation || 'تم.';
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.ok === false) throw new Error(data.error || 'تعذر رد AI.');
+      const answer = data.analysis?.answer || data.analysis?.summary || data.analysis?.explanation || data.data?.answer || 'تم.';
       setMessages(prev => [...prev, { role: 'assistant', text: answer }]);
     } catch (error) {
-      setMessages(prev => [...prev, { role: 'assistant', text: 'تعذر تشغيل المدرب الذكي الآن. جرّب بعد قليل.' }]);
+      setMessages(prev => [...prev, { role: 'assistant', text: localFallbackAnswer(text) }]);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="glass-panel rounded-2xl p-5 border-t-4 border-sky-600">
-      <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2 mb-4"><Bot className="text-sky-600"/> شات المدرب الذكي</h2>
-      <div className="bg-slate-50 border rounded-2xl p-4 max-h-[460px] overflow-y-auto space-y-3 mb-3">
-        {messages.map((m, idx) => (
-          <div key={idx} className={`flex ${m.role === 'user' ? 'justify-start' : 'justify-end'}`}>
-            <div className={`max-w-[85%] rounded-2xl p-3 text-sm font-bold ${m.role === 'user' ? 'bg-white border text-slate-800' : 'bg-sky-600 text-white'}`}>
-              {m.text}
+    <div className="space-y-5 page-soft-enter">
+      <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-sky-950 text-white rounded-[2rem] p-6 md:p-8 relative overflow-hidden shadow-2xl">
+        <div className="absolute -top-20 -left-20 w-56 h-56 bg-sky-500/20 blur-3xl rounded-full" />
+        <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-amber-500/10 blur-3xl rounded-full" />
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+          <div>
+            <p className="text-sky-200 font-black mb-2 flex items-center gap-2"><Sparkles size={18}/> مساعدك الدراسي الذكي</p>
+            <h2 className="text-3xl md:text-4xl font-black mb-3">اسأل، افهم، وذاكر بخطة أوضح</h2>
+            <p className="text-slate-300 leading-relaxed max-w-2xl">المساعد يستخدم نتائجك وأخطائك الأخيرة عشان يديك ردود عملية، ومعاه بديل محلي لو خدمة AI عليها ضغط.</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 min-w-[260px]">
+            <button onClick={onOpenPerformance} className="bg-white/10 border border-white/10 rounded-2xl p-4 text-right hover:bg-white/15 transition"><BarChart3 className="text-amber-300 mb-2"/><p className="font-black">أدائي</p><p className="text-xs text-slate-300">افتح التحليل</p></button>
+            <button onClick={onOpenVideos} className="bg-white/10 border border-white/10 rounded-2xl p-4 text-right hover:bg-white/15 transition"><PlayCircle className="text-sky-300 mb-2"/><p className="font-black">المحاضرات</p><p className="text-xs text-slate-300">ابدأ مراجعة</p></button>
+          </div>
+        </div>
+      </div>
+
+      <div className="glass-panel rounded-3xl p-5 md:p-6 border-t-4 border-sky-600">
+        <div className="flex flex-col lg:flex-row gap-5">
+          <div className="flex-1 min-w-0">
+            <div className="bg-slate-50 border rounded-3xl p-4 h-[470px] overflow-y-auto space-y-3 mb-3">
+              {messages.map((m, idx) => (
+                <div key={idx} className={`flex ${m.role === 'user' ? 'justify-start' : 'justify-end'}`}>
+                  <div className={`max-w-[88%] rounded-2xl p-3 text-sm font-bold leading-relaxed whitespace-pre-wrap ${m.role === 'user' ? 'bg-white border text-slate-800' : 'bg-sky-600 text-white shadow-md'}`}>
+                    {m.text}
+                  </div>
+                </div>
+              ))}
+              {loading && <p className="text-center text-slate-400 font-bold">المساعد يكتب الآن...</p>}
+            </div>
+            <div className="flex flex-col md:flex-row gap-2">
+              <textarea rows={2} className="flex-1 border rounded-2xl p-3 resize-none focus:border-sky-500 outline-none" placeholder="اكتب سؤالك هنا... مثال: مش فاهم قاعدة كان وأخواتها" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{ if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }} />
+              <button disabled={loading} onClick={() => send()} className="bg-sky-600 text-white px-7 py-3 rounded-2xl font-black hover:bg-sky-700 disabled:opacity-50 flex items-center justify-center gap-2"><Send size={18}/> إرسال</button>
             </div>
           </div>
-        ))}
-        {loading && <p className="text-center text-slate-400 font-bold">AI يكتب الآن...</p>}
-      </div>
-      <div className="flex flex-col md:flex-row gap-2">
-        <input className="flex-1 border rounded-xl p-3" placeholder="اسأل المدرب الذكي..." value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{ if(e.key === 'Enter') send(); }} />
-        <button onClick={send} className="bg-sky-600 text-white px-6 py-3 rounded-xl font-black">إرسال</button>
+
+          <aside className="w-full lg:w-80 space-y-3">
+            <div className="bg-white rounded-3xl border border-slate-100 p-4">
+              <h3 className="font-black text-slate-900 mb-3 flex items-center gap-2"><Bot className="text-sky-600"/> أسئلة سريعة</h3>
+              <div className="space-y-2">
+                {quickPrompts.map((q, i) => <button key={i} onClick={() => send(q)} className="w-full text-right bg-slate-50 hover:bg-sky-50 border border-slate-100 hover:border-sky-100 rounded-2xl p-3 text-sm font-bold text-slate-700 transition">{q}</button>)}
+              </div>
+            </div>
+            <div className="bg-amber-50 border border-amber-100 rounded-3xl p-4 text-amber-800">
+              <h3 className="font-black mb-2">نصيحة استخدام</h3>
+              <p className="text-sm font-bold leading-relaxed">اكتب السؤال محددًا: اسم الدرس + المشكلة + مثال لو متاح. كل ما السؤال أوضح، الرد يكون أدق.</p>
+            </div>
+          </aside>
+        </div>
       </div>
     </div>
   );
 };
-
 
 const RealAIBox = ({ title = 'AI الحقيقي', payload = {}, compact = false }) => {
   const [loadingAI, setLoadingAI] = useState(false);
@@ -7777,7 +7855,8 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
         </div>
         <div className="space-y-2 flex-1 overflow-y-auto pr-2">
           <button onClick={() => {setActiveTab('home'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='home'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><User/> الرئيسية</button>
-          
+          <button onClick={() => {setActiveTab('ai_coach'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='ai_coach'?'bg-sky-100 text-sky-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-sky-600'}`}><Bot/> المساعد الدراسي</button>
+
           <button onClick={() => {setActiveTab('subscription'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='subscription'?'bg-red-100 text-red-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-red-600'}`}><Crown/> الباقة والاشتراك</button>
 
           {!isBannedContent && (
@@ -7807,6 +7886,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
         <div className="flex justify-between items-center mb-6 relative">
             <div className="flex gap-2">
                 {installPrompt && ( <button onClick={installPrompt} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full font-bold shadow-lg shadow-green-500/30 transition flex items-center gap-2"><DownloadCloud size={18}/><span className="hidden md:inline">تثبيت التطبيق</span></button> )}
+                <button onClick={() => setActiveTab('ai_coach')} className="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-full font-bold shadow-lg shadow-sky-500/20 transition flex items-center gap-2"><Bot size={18}/><span className="hidden md:inline">المساعد</span></button>
                 <button onClick={() => setShowFocusMode(true)} className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-full font-bold shadow-lg transition flex items-center gap-2"><Headphones size={18}/><span className="hidden md:inline">التركيز</span></button>
             </div>
             <div className="flex items-center gap-3">
@@ -7841,6 +7921,13 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
         {activeTab === 'home' && (
             <div className="space-y-6 page-soft-enter">
                 <StudentContinueCard />
+                <button onClick={() => setActiveTab('ai_coach')} className="w-full bg-white border border-sky-100 rounded-3xl p-4 shadow-sm hover:shadow-md transition text-right flex items-center justify-between gap-4">
+                    <div>
+                        <p className="font-black text-slate-900 flex items-center gap-2"><Bot className="text-sky-600"/> المساعد الدراسي الذكي</p>
+                        <p className="text-sm text-slate-500 mt-1">اسأل عن سؤال، خطة مذاكرة، أو سبب أخطائك.</p>
+                    </div>
+                    <span className="bg-sky-600 text-white px-4 py-2 rounded-2xl font-black whitespace-nowrap">فتح</span>
+                </button>
                 {liveSessions.length > 0 && (
                     <div className="bg-white border border-red-100 text-slate-800 p-4 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm">
                         <div>
@@ -7874,6 +7961,18 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                     </div>
                 </div>
             </div>
+        )}
+
+        {activeTab === 'ai_coach' && (
+            <AIStudentChatCoach
+                user={user}
+                userData={userData}
+                examResults={examResults}
+                mistakes={mistakes}
+                content={content}
+                onOpenPerformance={() => setActiveTab('performance')}
+                onOpenVideos={() => setActiveTab('videos')}
+            />
         )}
 
         {activeTab === 'subscription' && (
