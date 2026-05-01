@@ -32,6 +32,8 @@ import { PWAInstallBox, ModernLogo, FloatingArabicBackground, WisdomBox, Announc
 import PomodoroFocusMode from '../features/study/PomodoroFocusMode';
 import InteractiveViewer from '../features/content/InteractiveViewer';
 import SmartHomeworkScanner from '../features/homework/SmartHomeworkScanner';
+import AIStudyEnhancementPanel from '../features/student/AIStudyEnhancementPanel';
+import StudyStreakFocusCard from '../features/student/StudyStreakFocusCard';
 
 const getAdminAIHeaders = async () => {
   const token = await auth?.currentUser?.getIdToken?.();
@@ -3070,6 +3072,11 @@ const AIStudentChatCoach = ({ user, userData, examResults = [], mistakes = [], c
   const send = async (forcedText = '') => {
     const text = String(forcedText || input || '').trim();
     if (!text) return;
+    try {
+      const memoryKey = "nahhas_ai_memory_" + (user?.uid || user?.email || "guest");
+      const previous = JSON.parse(localStorage.getItem(memoryKey) || "{}");
+      localStorage.setItem(memoryKey, JSON.stringify({ ...previous, lastQuestion: text, questionsCount: safeNumber(previous.questionsCount, 0) + 1, lastUpdated: new Date().toISOString() }));
+    } catch {}
     const nextMessages = [...messages, { role: 'user', text }];
     setMessages(nextMessages);
     setInput('');
@@ -3085,6 +3092,7 @@ const AIStudentChatCoach = ({ user, userData, examResults = [], mistakes = [], c
           grade: userData?.grade || '',
           question: text,
           chatHistory: nextMessages.slice(-8),
+          studentMemory: (() => { try { return JSON.parse(localStorage.getItem("nahhas_ai_memory_" + (user?.uid || user?.email || "guest")) || "{}"); } catch { return {}; } })(),
           recentResults,
           recentMistakes: (mistakes || []).slice(0, 8).map(m => ({
             branch: m.question?.branch,
@@ -7921,6 +7929,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
         {activeTab === 'home' && (
             <div className="space-y-6 page-soft-enter">
                 <StudentContinueCard />
+                <StudyStreakFocusCard user={user} onStartFocus={() => setShowFocusMode(true)} />
                 <button onClick={() => setActiveTab('ai_coach')} className="w-full bg-white border border-sky-100 rounded-3xl p-4 shadow-sm hover:shadow-md transition text-right flex items-center justify-between gap-4">
                     <div>
                         <p className="font-black text-slate-900 flex items-center gap-2"><Bot className="text-sky-600"/> المساعد الدراسي الذكي</p>
@@ -7964,15 +7973,18 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
         )}
 
         {activeTab === 'ai_coach' && (
-            <AIStudentChatCoach
-                user={user}
-                userData={userData}
-                examResults={examResults}
-                mistakes={mistakes}
-                content={content}
-                onOpenPerformance={() => setActiveTab('performance')}
-                onOpenVideos={() => setActiveTab('videos')}
-            />
+            <div className="space-y-5">
+              <AIStudentChatCoach
+                  user={user}
+                  userData={userData}
+                  examResults={examResults}
+                  mistakes={mistakes}
+                  content={content}
+                  onOpenPerformance={() => setActiveTab('performance')}
+                  onOpenVideos={() => setActiveTab('videos')}
+              />
+              <AIStudyEnhancementPanel user={user} userData={userData} examResults={examResults} mistakes={mistakes} content={content} />
+            </div>
         )}
 
         {activeTab === 'subscription' && (
