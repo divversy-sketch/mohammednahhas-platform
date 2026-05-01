@@ -28,12 +28,11 @@ import DesignSystemLoader from '../shared/components/DesignSystemLoader';
 import { GradeOptions, getGradeLabel } from '../shared/constants/grades';
 import { normalizeEgyptPhone, isValidEgyptPhone, validateEgyptianPhones } from '../shared/utils/phone';
 import { AdminStudentMessaging, StudentMessagesPanel, StudentAdminMessagePopup } from '../features/messages/StudentMessages';
+import { AdminRafiqPanel, StudentRafiqAssistant } from '../features/rafiq/RafiqArabic';
 import { PWAInstallBox, ModernLogo, FloatingArabicBackground, WisdomBox, Announcements, Leaderboard, ChatWidget } from '../features/home/HomeWidgets';
 import PomodoroFocusMode from '../features/study/PomodoroFocusMode';
 import InteractiveViewer from '../features/content/InteractiveViewer';
 import SmartHomeworkScanner from '../features/homework/SmartHomeworkScanner';
-import AIStudyEnhancementPanel from '../features/student/AIStudyEnhancementPanel';
-import StudyStreakFocusCard from '../features/student/StudyStreakFocusCard';
 
 const getAdminAIHeaders = async () => {
   const token = await auth?.currentUser?.getIdToken?.();
@@ -3021,63 +3020,16 @@ const AIExamBuilderPanel = ({ userData = null }) => {
   );
 };
 
-const AIStudentChatCoach = ({ user, userData, examResults = [], mistakes = [], content = [], onOpenPerformance, onOpenVideos }) => {
+const AIStudentChatCoach = ({ user, userData, examResults = [] }) => {
   const [messages, setMessages] = useState([
-    { role: 'assistant', text: 'أهلًا يا بطل 👋 أنا المساعد الدراسي. اسألني عن سؤال، قاعدة، خطة مذاكرة، أو سبب تكرار أخطائك.' }
+    { role: 'assistant', text: 'أهلًا 👋 أنا المدرب الذكي. اسألني عن أي سؤال أو خطة مذاكرة أو سبب ضعفك في فرع معين.' }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const recentResults = (examResults || []).slice(0, 5).map(r => ({
-    examTitle: r.examTitle,
-    percentage: getResultPercentage(r),
-    branchAnalysis: r.branchAnalysis || r.branchStats || r.performanceAnalysis?.branchStats || {}
-  }));
-
-  const localFallbackAnswer = (question = '') => {
-    const q = String(question || '').toLowerCase();
-    const weakBranches = [];
-    recentResults.forEach(result => {
-      Object.entries(result.branchAnalysis || {}).forEach(([branch, data]) => {
-        const possible = safeNumber(data.possible, safeNumber(data.total, 0));
-        const earned = safeNumber(data.earned, safeNumber(data.correct, 0));
-        const pct = possible > 0 ? Math.round((earned / possible) * 100) : safeNumber(data.percentage, 0);
-        if (pct > 0 && pct < 75) weakBranches.push({ branch, pct, wrong: safeNumber(data.wrong, 0) });
-      });
-    });
-    weakBranches.sort((a, b) => a.pct - b.pct);
-    const weakest = weakBranches[0];
-    const latest = recentResults[0];
-    if (q.includes('خطة') || q.includes('اذاكر') || q.includes('أذاكر')) {
-      return weakest
-        ? `خطة مختصرة: ١) راجع قاعدة ${weakest.branch} لمدة 15 دقيقة. ٢) حل 5 أسئلة قصيرة عليها. ٣) راجع الخطأ واكتب سببه. ٤) ادخل اختبار قصير بعد المراجعة.`
-        : 'خطة اليوم: استكمل آخر محاضرة، ثم حل اختبار قصير، وبعدها راجع أي خطأ ظهر في النتيجة.';
-    }
-    if (q.includes('ضعف') || q.includes('غلط') || q.includes('أخطاء') || q.includes('اخطاء')) {
-      return weakest
-        ? `أوضح نقطة تحتاج تركيز الآن هي ${weakest.branch} بنسبة تقريبية ${weakest.pct}%. السبب غالبًا إن القاعدة لم تثبت قبل الحل. ابدأ بمراجعة القاعدة ثم حل أسئلة قليلة بجودة.`
-        : 'لا توجد نقطة ضعف واضحة من النتائج الحالية. ادخل اختبار قصير بعد كل محاضرة عشان التحليل يبقى أدق.';
-    }
-    if (latest) return `آخر نتيجة عندك كانت ${latest.percentage}% في ${latest.examTitle || 'امتحان'}. لو سؤالك عن درس معين اكتب اسم الدرس أو ابعت نص السؤال، وأنا أساعدك بخطوات بسيطة.`;
-    return 'اكتب لي اسم الدرس أو نص السؤال، ولو لسه مفيش نتائج عندك ابدأ بمحاضرة قصيرة ثم اختبار بسيط عشان أقدر أديك توصية أدق.';
-  };
-
-  const quickPrompts = [
-    'اعمل لي خطة مذاكرة للنهارده',
-    'إيه أكثر فرع محتاج أراجعه؟',
-    'ازاي أحسن نتيجتي في الامتحان الجاي؟',
-    'اشرح لي سبب تكرار أخطائي'
-  ];
-
-  const send = async (forcedText = '') => {
-    const text = String(forcedText || input || '').trim();
-    if (!text) return;
-    try {
-      const memoryKey = "nahhas_ai_memory_" + (user?.uid || user?.email || "guest");
-      const previous = JSON.parse(localStorage.getItem(memoryKey) || "{}");
-      localStorage.setItem(memoryKey, JSON.stringify({ ...previous, lastQuestion: text, questionsCount: safeNumber(previous.questionsCount, 0) + 1, lastUpdated: new Date().toISOString() }));
-    } catch {}
-    const nextMessages = [...messages, { role: 'user', text }];
+  const send = async () => {
+    if (!input.trim()) return;
+    const nextMessages = [...messages, { role: 'user', text: input.trim() }];
     setMessages(nextMessages);
     setInput('');
     setLoading(true);
@@ -3090,84 +3042,47 @@ const AIStudentChatCoach = ({ user, userData, examResults = [], mistakes = [], c
           language: 'ar-EG',
           studentName: userData?.name || user?.displayName || '',
           grade: userData?.grade || '',
-          question: text,
+          question: input.trim(),
           chatHistory: nextMessages.slice(-8),
-          studentMemory: (() => { try { return JSON.parse(localStorage.getItem("nahhas_ai_memory_" + (user?.uid || user?.email || "guest")) || "{}"); } catch { return {}; } })(),
-          recentResults,
-          recentMistakes: (mistakes || []).slice(0, 8).map(m => ({
-            branch: m.question?.branch,
-            question: m.question?.text,
-            studentAnswer: m.question?.studentAnswerText,
-            correctAnswer: m.question?.correctAnswerText
-          })),
-          availableContent: (content || []).slice(0, 10).map(c => ({ title: c.title, branch: c.branch, type: c.type }))
+          recentResults: (examResults || []).slice(0, 5).map(r => ({
+            examTitle: r.examTitle,
+            percentage: getResultPercentage(r),
+            branchAnalysis: r.branchAnalysis || r.branchStats || {}
+          }))
         })
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.ok === false) throw new Error(data.error || 'تعذر رد AI.');
-      const answer = data.analysis?.answer || data.analysis?.summary || data.analysis?.explanation || data.data?.answer || 'تم.';
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'تعذر رد AI.');
+      const answer = data.analysis?.answer || data.analysis?.summary || data.analysis?.explanation || 'تم.';
       setMessages(prev => [...prev, { role: 'assistant', text: answer }]);
     } catch (error) {
-      setMessages(prev => [...prev, { role: 'assistant', text: localFallbackAnswer(text) }]);
+      setMessages(prev => [...prev, { role: 'assistant', text: 'تعذر تشغيل المدرب الذكي الآن. جرّب بعد قليل.' }]);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="space-y-5 page-soft-enter">
-      <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-sky-950 text-white rounded-[2rem] p-6 md:p-8 relative overflow-hidden shadow-2xl">
-        <div className="absolute -top-20 -left-20 w-56 h-56 bg-sky-500/20 blur-3xl rounded-full" />
-        <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-amber-500/10 blur-3xl rounded-full" />
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-          <div>
-            <p className="text-sky-200 font-black mb-2 flex items-center gap-2"><Sparkles size={18}/> مساعدك الدراسي الذكي</p>
-            <h2 className="text-3xl md:text-4xl font-black mb-3">اسأل، افهم، وذاكر بخطة أوضح</h2>
-            <p className="text-slate-300 leading-relaxed max-w-2xl">المساعد يستخدم نتائجك وأخطائك الأخيرة عشان يديك ردود عملية، ومعاه بديل محلي لو خدمة AI عليها ضغط.</p>
+    <div className="glass-panel rounded-2xl p-5 border-t-4 border-sky-600">
+      <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2 mb-4"><Bot className="text-sky-600"/> شات المدرب الذكي</h2>
+      <div className="bg-slate-50 border rounded-2xl p-4 max-h-[460px] overflow-y-auto space-y-3 mb-3">
+        {messages.map((m, idx) => (
+          <div key={idx} className={`flex ${m.role === 'user' ? 'justify-start' : 'justify-end'}`}>
+            <div className={`max-w-[85%] rounded-2xl p-3 text-sm font-bold ${m.role === 'user' ? 'bg-white border text-slate-800' : 'bg-sky-600 text-white'}`}>
+              {m.text}
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 min-w-[260px]">
-            <button onClick={onOpenPerformance} className="bg-white/10 border border-white/10 rounded-2xl p-4 text-right hover:bg-white/15 transition"><BarChart3 className="text-amber-300 mb-2"/><p className="font-black">أدائي</p><p className="text-xs text-slate-300">افتح التحليل</p></button>
-            <button onClick={onOpenVideos} className="bg-white/10 border border-white/10 rounded-2xl p-4 text-right hover:bg-white/15 transition"><PlayCircle className="text-sky-300 mb-2"/><p className="font-black">المحاضرات</p><p className="text-xs text-slate-300">ابدأ مراجعة</p></button>
-          </div>
-        </div>
+        ))}
+        {loading && <p className="text-center text-slate-400 font-bold">AI يكتب الآن...</p>}
       </div>
-
-      <div className="glass-panel rounded-3xl p-5 md:p-6 border-t-4 border-sky-600">
-        <div className="flex flex-col lg:flex-row gap-5">
-          <div className="flex-1 min-w-0">
-            <div className="bg-slate-50 border rounded-3xl p-4 h-[470px] overflow-y-auto space-y-3 mb-3">
-              {messages.map((m, idx) => (
-                <div key={idx} className={`flex ${m.role === 'user' ? 'justify-start' : 'justify-end'}`}>
-                  <div className={`max-w-[88%] rounded-2xl p-3 text-sm font-bold leading-relaxed whitespace-pre-wrap ${m.role === 'user' ? 'bg-white border text-slate-800' : 'bg-sky-600 text-white shadow-md'}`}>
-                    {m.text}
-                  </div>
-                </div>
-              ))}
-              {loading && <p className="text-center text-slate-400 font-bold">المساعد يكتب الآن...</p>}
-            </div>
-            <div className="flex flex-col md:flex-row gap-2">
-              <textarea rows={2} className="flex-1 border rounded-2xl p-3 resize-none focus:border-sky-500 outline-none" placeholder="اكتب سؤالك هنا... مثال: مش فاهم قاعدة كان وأخواتها" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{ if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }} />
-              <button disabled={loading} onClick={() => send()} className="bg-sky-600 text-white px-7 py-3 rounded-2xl font-black hover:bg-sky-700 disabled:opacity-50 flex items-center justify-center gap-2"><Send size={18}/> إرسال</button>
-            </div>
-          </div>
-
-          <aside className="w-full lg:w-80 space-y-3">
-            <div className="bg-white rounded-3xl border border-slate-100 p-4">
-              <h3 className="font-black text-slate-900 mb-3 flex items-center gap-2"><Bot className="text-sky-600"/> أسئلة سريعة</h3>
-              <div className="space-y-2">
-                {quickPrompts.map((q, i) => <button key={i} onClick={() => send(q)} className="w-full text-right bg-slate-50 hover:bg-sky-50 border border-slate-100 hover:border-sky-100 rounded-2xl p-3 text-sm font-bold text-slate-700 transition">{q}</button>)}
-              </div>
-            </div>
-            <div className="bg-amber-50 border border-amber-100 rounded-3xl p-4 text-amber-800">
-              <h3 className="font-black mb-2">نصيحة استخدام</h3>
-              <p className="text-sm font-bold leading-relaxed">اكتب السؤال محددًا: اسم الدرس + المشكلة + مثال لو متاح. كل ما السؤال أوضح، الرد يكون أدق.</p>
-            </div>
-          </aside>
-        </div>
+      <div className="flex flex-col md:flex-row gap-2">
+        <input className="flex-1 border rounded-xl p-3" placeholder="اسأل المدرب الذكي..." value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{ if(e.key === 'Enter') send(); }} />
+        <button onClick={send} className="bg-sky-600 text-white px-6 py-3 rounded-xl font-black">إرسال</button>
       </div>
     </div>
   );
 };
+
 
 const RealAIBox = ({ title = 'AI الحقيقي', payload = {}, compact = false }) => {
   const [loadingAI, setLoadingAI] = useState(false);
@@ -6381,15 +6296,17 @@ const AdminDashboard = ({ user }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-4 md:p-6 relative z-10">
         <div className="glass-panel p-4 rounded-xl h-fit space-y-2 flex md:flex-col overflow-x-auto md:overflow-x-visible whitespace-nowrap scrollbar-hide">
-          {['dashboard', 'users', 'all_users', 'subscriptions', 'payments', 'security_center', 'ai_analytics', 'live_ai', 'app_convert', 'ai_lab', 'ai_insights', 'leaderboard', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'question-analytics', 'smart_hw', 'content', 'notifications', 'student-messages', 'messages'].map(tab => (
+          {['dashboard', 'users', 'all_users', 'subscriptions', 'payments', 'security_center', 'rafiq_arabic', 'ai_analytics', 'live_ai', 'app_convert', 'ai_lab', 'ai_insights', 'leaderboard', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'question-analytics', 'smart_hw', 'content', 'notifications', 'student-messages', 'messages'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 transition-all ${activeTab===tab?'bg-amber-100 text-amber-700 shadow-sm border-b-4 md:border-b-0 md:border-r-4 border-amber-500':'hover:bg-slate-50 text-slate-600'}`}>
-              {tab === 'dashboard' ? 'Dashboard' : tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'payments' ? 'طلبات الدفع' : tab === 'security_center' ? 'مركز الحماية' : tab === 'ai_analytics' ? 'تحليلات AI' : tab === 'live_ai' ? 'البث المباشر + Live AI' : tab === 'app_convert' ? 'تحويل App' : tab === 'ai_lab' ? 'AI Lab' : tab === 'ai_insights' ? 'AI Insights' : tab === 'leaderboard' ? 'لوحة الشرف' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'question-analytics' ? 'تحليل الأسئلة' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'student-messages' ? 'رسائل الطلاب' : tab === 'messages' ? 'الرسائل' : 'الإعدادات'}
+              {tab === 'dashboard' ? 'Dashboard' : tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'payments' ? 'طلبات الدفع' : tab === 'security_center' ? 'مركز الحماية' : tab === 'rafiq_arabic' ? 'رفيقك في العربي' : tab === 'ai_analytics' ? 'تحليلات AI' : tab === 'live_ai' ? 'البث المباشر + Live AI' : tab === 'app_convert' ? 'تحويل App' : tab === 'ai_lab' ? 'AI Lab' : tab === 'ai_insights' ? 'AI Insights' : tab === 'leaderboard' ? 'لوحة الشرف' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'question-analytics' ? 'تحليل الأسئلة' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'student-messages' ? 'رسائل الطلاب' : tab === 'messages' ? 'الرسائل' : 'الإعدادات'}
             </button>
           ))}
         </div>
 
         <div className="md:col-span-3 w-full overflow-hidden">
           {activeTab === 'dashboard' && <AdminProDashboard users={activeUsersList} exams={examsList} results={examResults} content={contentList} subscriptionCodes={subscriptionCodes} liveSessions={activeLiveSessions} hwResults={hwResults} adminGradeFilter={adminGradeFilter} />}
+
+          {activeTab === 'rafiq_arabic' && <AdminRafiqPanel adminGradeFilter={adminGradeFilter} />}
 
           {activeTab === 'users' && <div className="glass-panel p-4 md:p-6 rounded-xl"><h2 className="font-bold mb-4 font-arabic text-xl">طلبات الانضمام</h2>{filteredPendingUsers.map(u=><div key={u.id} className="border p-4 mb-2 rounded-lg flex flex-col md:flex-row gap-3 justify-between bg-white/50 backdrop-blur-sm"><div><p className="font-bold">{u.name}</p><p className="text-sm">{u.grade}</p></div><div className="flex gap-2"><button onClick={()=>handleApprove(u.id)} className="bg-green-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-green-500/50 transition flex-1"><Check className="mx-auto"/></button><button onClick={()=>handleReject(u.id)} className="bg-red-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-red-500/50 transition flex-1"><X className="mx-auto"/></button></div></div>)}</div>}
 
@@ -7123,7 +7040,7 @@ const AdminDashboard = ({ user }) => {
                 <textarea className="border p-3 rounded-xl min-h-[120px]" placeholder="اكتب نص الإشعار... مثال: تم فتح امتحان فيديو جديد" value={newStudentNotification.text} onChange={e=>setNewStudentNotification({...newStudentNotification, text:e.target.value})} />
                 <input className="border p-3 rounded-xl" placeholder="رابط الفتح داخل المنصة / اتركه /" value={newStudentNotification.clickUrl} onChange={e=>setNewStudentNotification({...newStudentNotification, clickUrl:e.target.value})} />
                 <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-xl text-sm font-bold">
-                  ملاحظة: تظهر الرسائل المهمة داخل حسابات الطلاب في المنصة.
+                  ملاحظة: الإشعار يظهر داخل المنصة فورًا. تم إيقاف Push Notifications مؤقتًا للحفاظ على السلاسة ومنع رسائل VAPID.
                 </div>
                 <button className="bg-amber-600 text-white py-3 rounded-xl font-bold hover:bg-amber-700 flex items-center justify-center gap-2"><Send size={18}/> إرسال الإشعار</button>
               </form>
@@ -7180,8 +7097,6 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [hasNewNotif, setHasNewNotif] = useState(false);
   const [pushStatus, setPushStatus] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported');
-  const [aiAnalysis, setAiAnalysis] = useState(null);
-  const [aiAnalysisLoading, setAiAnalysisLoading] = useState(false);
   const [editFormData, setEditFormData] = useState({ name: '', phone: '', parentPhone: '', grade: '' });
   const [showFocusMode, setShowFocusMode] = useState(false);
   const [scanningHwId, setScanningHwId] = useState(null);
@@ -7429,61 +7344,6 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
           .slice(0, 3);
   })();
 
-  const studentIntelligence = (() => {
-      const weak = smartWeakBranches[0] || null;
-      const lastPct = latestCompletedResult ? getResultPercentage(latestCompletedResult) : null;
-      const progress = Math.round((videoCompletionPercent + (completedExamResults.length ? averageScore : 0)) / (completedExamResults.length ? 2 : 1));
-      const messages = [];
-      if (weak) messages.push(`أكثر فرع يحتاج تركيز الآن: ${weak.branch}. ابدأ بمراجعة قصيرة ثم حل 5 أسئلة عليه.`);
-      else if (completedExamResults.length > 0) messages.push('أداؤك مستقر. حافظ على المراجعة اليومية القصيرة حتى لا تتراكم الأخطاء.');
-      else messages.push('ابدأ بأول محاضرة ثم اختبر نفسك باختبار قصير لتظهر توصيات أدق.');
-      if (pendingAssignmentsCount > 0) messages.push(`عندك ${pendingAssignmentsCount} واجب مطلوب. خلص واحد منهم قبل فتح درس جديد.`);
-      if (latestVideoActivity && !latestVideoActivity.isCompleted) messages.push('عندك محاضرة غير مكتملة. استكمالها أفضل من بدء محتوى جديد.');
-      if (lastPct !== null && lastPct < 60) messages.push('آخر نتيجة أقل من المطلوب. راجع الأخطاء قبل دخول امتحان جديد.');
-      if (lastPct !== null && lastPct >= 85) messages.push('آخر نتيجة ممتازة. مناسب تدخل تدريب أصعب أو امتحان شامل.');
-      return { progress: Math.max(0, Math.min(100, progress || 0)), primaryMessage: messages[0], hints: messages.slice(0, 3), weakBranch: weak, nextFocus: weak?.branch || pendingAssignments[0]?.title || latestVideoActivity?.video?.title || 'المحاضرة التالية' };
-  })();
-
-  const adaptiveStudyPlan = (() => {
-      const focusBranch = studentIntelligence.weakBranch?.branch;
-      const plan = [];
-      if (latestVideoActivity && !latestVideoActivity.isCompleted) plan.push({ label: '10 دقائق', title: 'استكمال المحاضرة المفتوحة', text: latestVideoActivity.video?.title || 'آخر محاضرة', action: () => setPlayingVideo(latestVideoActivity.video), cta: 'استكمال' });
-      else plan.push({ label: '15 دقيقة', title: focusBranch ? `مراجعة فرع ${focusBranch}` : 'مراجعة سريعة', text: focusBranch ? 'راجع القاعدة والأمثلة قبل الحل.' : 'راجع ملخص آخر درس.', action: () => setActiveTab('videos'), cta: 'فتح المحاضرات' });
-      plan.push({ label: '10 دقائق', title: 'حل تدريب قصير', text: focusBranch ? `ركز على أسئلة ${focusBranch}` : 'اختبر نفسك على آخر درس.', action: () => setActiveTab('exams'), cta: 'فتح الامتحانات' });
-      plan.push({ label: '5 دقائق', title: 'مراجعة الأخطاء', text: smartWeakBranches.length ? 'اقرأ سبب الخطأ واكتب القاعدة.' : 'راجع أي أخطاء سابقة قبل الإغلاق.', action: () => setActiveTab('performance'), cta: 'بنك الأخطاء' });
-      return plan;
-  })();
-
-  const buildLocalAIMistakeAnalysis = () => {
-      const weak = smartWeakBranches[0];
-      const avg = completedExamResults.length ? averageScore : 0;
-      const mistakeCount = mistakes.length || smartWeakBranches.reduce((sum, item) => sum + safeNumber(item.wrong, 0), 0);
-      return {
-          summary: weak ? `تحليل الأداء يوضح أن أكثر نقطة تحتاج علاج هي ${weak.branch} بنسبة ${weak.pct}%.` : completedExamResults.length ? `متوسطك الحالي ${avg}% ولا توجد نقطة ضعف واضحة جدًا من آخر النتائج.` : 'لا توجد نتائج كافية بعد. ادخل امتحانًا قصيرًا ليظهر تحليل أدق.',
-          reasons: weak ? [`تكرار الأخطاء في ${weak.branch}.`, 'غالبًا تحتاج مراجعة القاعدة قبل الحل.', 'حل أسئلة كثيرة بدون مراجعة السبب قد يكرر نفس الخطأ.'] : ['الأداء العام مستقر أو البيانات غير كافية.', 'أفضل خطوة الآن هي اختبار قصير بعد كل محاضرة.'],
-          recommendations: [weak ? `راجع درس ${weak.branch} ثم حل 5 أسئلة مباشرة.` : 'ابدأ باختبار قصير لتحديد نقاط الضعف.', pendingAssignmentsCount > 0 ? 'أنهِ واجبًا واحدًا اليوم حتى لا تتراكم المهام.' : 'حافظ على مراجعة يومية قصيرة.', latestVideoActivity && !latestVideoActivity.isCompleted ? 'استكمل المحاضرة المفتوحة قبل البدء في درس جديد.' : 'ادخل امتحانًا قصيرًا بعد المراجعة.'],
-          mistakeCount
-      };
-  };
-
-  const generateAIMistakeAnalysis = async () => {
-      setAiAnalysisLoading(true);
-      setAiAnalysis(null);
-      const fallback = buildLocalAIMistakeAnalysis();
-      try {
-          const data = await callPlatformAIWithRetry({
-              mode: 'student_error_analysis', grade: userData?.grade || '', studentName: userData?.name || user?.displayName || 'طالب', averageScore,
-              weakBranches: smartWeakBranches,
-              recentResults: completedExamResults.slice(0, 5).map(r => ({ examTitle: r.examTitle, percentage: getResultPercentage(r), score: r.score, total: r.total })),
-              mistakes: mistakes.slice(0, 8).map(m => ({ branch: m.question?.branch, text: m.question?.text, correctAnswerText: m.question?.correctAnswerText, studentAnswerText: m.question?.studentAnswerText })),
-              instruction: 'اكتب تحليل أخطاء مختصر جدًا للطالب بالعربية، مع أسباب وتوصيات عملية بدون إطالة.'
-          }, 1);
-          const ai = data.analysis || data.data || data;
-          setAiAnalysis({ summary: ai.summary || ai.answer || fallback.summary, reasons: Array.isArray(ai.reasons) ? ai.reasons : fallback.reasons, recommendations: Array.isArray(ai.recommendations) ? ai.recommendations : fallback.recommendations, source: 'ai' });
-      } catch (e) { setAiAnalysis({ ...fallback, source: 'local' }); }
-      finally { setAiAnalysisLoading(false); }
-  };
-
   const nextStudyAction = (() => {
       if (latestVideoActivity && !latestVideoActivity.isCompleted) {
           return {
@@ -7533,43 +7393,35 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
             ? 'عندك محاولة امتحان محفوظة تقدر تكملها.'
             : pendingAssignments[0]
               ? 'ابدأ الواجب المطلوب قبل تراكم المهام.'
-              : 'اختار أول خطوة مناسبة ليك من الخطة.';
+              : 'كل أدواتك المهمة جاهزة بضغطة واحدة.';
       return (
-        <section className="bg-gradient-to-br from-slate-950 via-slate-900 to-amber-900 text-white rounded-3xl p-5 md:p-6 shadow-xl overflow-hidden relative border border-white/10">
-          <div className="absolute -left-16 -top-16 w-48 h-48 bg-amber-400/20 rounded-full blur-3xl"></div>
-          <div className="absolute right-8 bottom-4 opacity-10"><GraduationCap size={130}/></div>
-          <div className="relative z-10 grid grid-cols-1 xl:grid-cols-3 gap-5 items-stretch">
-            <div className="xl:col-span-2 flex flex-col justify-between gap-5">
-              <div>
+        <section className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <div className="xl:col-span-2 bg-gradient-to-br from-slate-950 via-slate-900 to-amber-900 text-white rounded-3xl p-5 md:p-6 shadow-xl overflow-hidden relative border border-white/10">
+            <div className="absolute -left-16 -top-16 w-48 h-48 bg-amber-400/20 rounded-full blur-3xl"></div>
+            <div className="absolute right-8 bottom-4 opacity-10"><GraduationCap size={130}/></div>
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
+              <div className="min-w-0">
                 <p className="text-amber-200 text-sm font-bold mb-2 flex items-center gap-2"><Sparkles size={16}/> أكمل من حيث توقفت</p>
                 <h3 className="text-2xl md:text-3xl font-black leading-relaxed truncate md:whitespace-normal">{currentTitle}</h3>
                 <p className="text-slate-300 text-sm mt-2 leading-relaxed">{currentSubtitle}</p>
               </div>
-              {latestVideoActivity && (
-                <div>
-                  <div className="h-3 bg-white/15 rounded-full overflow-hidden"><div className="h-full bg-amber-300 rounded-full transition-all" style={{ width: String(Math.min(100, latestVideoActivity.percent || 0)) + '%' }} /></div>
-                  <p className="text-xs text-amber-100 mt-2 font-bold">نسبة المشاهدة: {latestVideoActivity.percent || 0}%</p>
-                </div>
-              )}
-              <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex flex-col sm:flex-row gap-3 shrink-0">
                 <button onClick={nextStudyAction.action} className={`bg-gradient-to-r ${nextStudyAction.tone} px-6 py-3 rounded-2xl font-black shadow-lg hover:scale-[1.02] transition flex items-center justify-center gap-2`}>
                   {nextStudyAction.icon} {nextStudyAction.button}
                 </button>
                 <button onClick={() => setActiveTab('performance')} className="bg-white/10 text-white border border-white/20 px-6 py-3 rounded-2xl font-bold hover:bg-white/15 transition flex items-center justify-center gap-2"><BarChart3 size={18}/> أدائي</button>
               </div>
             </div>
-            <div className="bg-white/10 border border-white/10 rounded-3xl p-4">
-              <p className="text-amber-200 text-sm font-black mb-3">خطة اليوم</p>
-              <div className="space-y-3">
-                {adaptiveStudyPlan.map((step, idx) => (
-                  <button key={idx} onClick={step.action} className="w-full text-right bg-white/10 hover:bg-white/15 border border-white/10 rounded-2xl p-3 transition">
-                    <span className="text-[11px] text-amber-200 font-bold">{step.label}</span>
-                    <p className="font-black text-white mt-1">{step.title}</p>
-                    <p className="text-xs text-slate-300 mt-1 leading-relaxed">{step.text}</p>
-                  </button>
-                ))}
+            {latestVideoActivity && (
+              <div className="relative z-10 mt-5">
+                <div className="h-3 bg-white/15 rounded-full overflow-hidden"><div className="h-full bg-amber-300 rounded-full transition-all" style={{ width: String(Math.min(100, latestVideoActivity.percent || 0)) + '%' }} /></div>
+                <p className="text-xs text-amber-100 mt-2 font-bold">نسبة المشاهدة: {latestVideoActivity.percent || 0}%</p>
               </div>
-            </div>
+            )}
+          </div>
+          <div className="grid grid-cols-2 xl:grid-cols-1 gap-4">
+            <button onClick={() => setActiveTab('performance')} className="text-right bg-white rounded-3xl p-5 border border-blue-100 shadow-sm hover:shadow-md transition"><p className="text-xs font-bold text-blue-600 mb-1">متوسط أدائك</p><p className="text-3xl font-black text-slate-900">{completedExamResults.length ? String(averageScore) + '%' : '—'}</p><p className="text-xs text-slate-500 mt-1">{latestCompletedResult?.examTitle || 'ابدأ أول امتحان لتظهر النتائج'}</p></button>
+            <button onClick={() => setActiveTab('assignments')} className="text-right bg-white rounded-3xl p-5 border border-emerald-100 shadow-sm hover:shadow-md transition"><p className="text-xs font-bold text-emerald-600 mb-1">واجبات مطلوبة</p><p className="text-3xl font-black text-slate-900">{pendingAssignmentsCount}</p><p className="text-xs text-slate-500 mt-1">{pendingAssignments[0]?.title || 'لا توجد واجبات معلقة'}</p></button>
           </div>
         </section>
       );
@@ -7580,7 +7432,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
         <div>
           <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2"><BrainCircuit className="text-amber-600"/> لوحة الطالب الذكية</h2>
-          <p className="text-sm text-slate-500 mt-1">{studentIntelligence.primaryMessage}</p>
+          <p className="text-sm text-slate-500 mt-1">ملخص سريع يساعدك تبدأ من أهم خطوة بدون زحمة.</p>
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1">
           <button onClick={() => setActiveTab('videos')} className="bg-blue-50 text-blue-700 px-4 py-2 rounded-xl font-bold text-sm whitespace-nowrap">المحاضرات</button>
@@ -7588,46 +7440,66 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
           <button onClick={() => setActiveTab('assignments')} className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl font-bold text-sm whitespace-nowrap">الواجبات</button>
         </div>
       </div>
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
         <div className="bg-white rounded-2xl p-4 border border-slate-100"><p className="text-xs text-slate-500 font-bold">تقدم المحاضرات</p><p className="text-3xl font-black text-blue-700 mt-1">{videoCompletionPercent}%</p><p className="text-xs text-slate-400 mt-1">{completedVideoCount}/{videos.length} مكتملة</p></div>
         <div className="bg-white rounded-2xl p-4 border border-slate-100"><p className="text-xs text-slate-500 font-bold">متوسط الامتحانات</p><p className="text-3xl font-black text-emerald-700 mt-1">{completedExamResults.length ? averageScore + '%' : '—'}</p><p className="text-xs text-slate-400 mt-1">{completedExamResults.length} امتحان مكتمل</p></div>
         <div className="bg-white rounded-2xl p-4 border border-slate-100"><p className="text-xs text-slate-500 font-bold">واجبات مطلوبة</p><p className="text-3xl font-black text-amber-700 mt-1">{pendingAssignmentsCount}</p><p className="text-xs text-slate-400 mt-1">تابعها قبل المحاضرة القادمة</p></div>
-        <div className="bg-white rounded-2xl p-4 border border-slate-100"><p className="text-xs text-slate-500 font-bold">تقدمك العام</p><p className="text-3xl font-black text-purple-700 mt-1">{studentIntelligence.progress}%</p><p className="text-xs text-slate-400 mt-1">محاضرات + امتحانات</p></div>
+        <div className="bg-white rounded-2xl p-4 border border-slate-100"><p className="text-xs text-slate-500 font-bold">تنبيهات جديدة</p><p className="text-3xl font-black text-purple-700 mt-1">{unseenNotificationCount}</p><p className="text-xs text-slate-400 mt-1">آخر تحديثات المنصة</p></div>
       </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 bg-slate-950 text-white rounded-3xl p-5 relative overflow-hidden">
           <div className="absolute -top-12 -left-12 w-40 h-40 bg-amber-400/20 rounded-full blur-3xl"></div>
-          <p className="text-amber-200 text-sm font-bold mb-2">خطة اليوم المتغيرة تلقائيًا</p>
+          <p className="text-amber-200 text-sm font-bold mb-2">خطة اليوم المقترحة</p>
           <h3 className="text-xl md:text-2xl font-black mb-2">{nextStudyAction.title}</h3>
           <p className="text-slate-300 text-sm leading-relaxed mb-4">{nextStudyAction.text}</p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-            {adaptiveStudyPlan.map((step, idx) => (
-              <button key={idx} onClick={step.action} className="text-right bg-white/10 hover:bg-white/15 border border-white/10 rounded-2xl p-3 transition">
-                <span className="text-[11px] text-amber-200 font-bold">{step.label}</span>
-                <p className="font-black text-white mt-1">{step.title}</p>
-                <p className="text-xs text-slate-300 mt-1 leading-relaxed">{step.text}</p>
-              </button>
-            ))}
-          </div>
           <button onClick={nextStudyAction.action} className={`bg-gradient-to-r ${nextStudyAction.tone} px-5 py-3 rounded-2xl font-black shadow flex items-center gap-2 w-full sm:w-auto justify-center`}>{nextStudyAction.icon} {nextStudyAction.button}</button>
         </div>
         <div className="bg-white rounded-3xl p-5 border border-slate-100">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <h3 className="font-black text-slate-800 flex items-center gap-2"><Target className="text-red-500"/> تحليل الأخطاء</h3>
-            <button onClick={generateAIMistakeAnalysis} disabled={aiAnalysisLoading} className="bg-slate-900 text-white px-3 py-2 rounded-xl text-xs font-black disabled:opacity-60">{aiAnalysisLoading ? 'جاري...' : 'تحليل AI'}</button>
-          </div>
-          {aiAnalysis ? (
-            <div className="space-y-3">
-              <div className="bg-amber-50 border border-amber-100 rounded-2xl p-3 text-amber-900 text-sm font-bold leading-relaxed">{aiAnalysis.summary}</div>
-              <div className="space-y-2">{(aiAnalysis.recommendations || []).slice(0, 3).map((rec, idx) => <div key={idx} className="bg-slate-50 border border-slate-100 rounded-xl p-2 text-xs text-slate-700 font-bold leading-relaxed">{rec}</div>)}</div>
-              <p className="text-[11px] text-slate-400">{aiAnalysis.source === 'ai' ? 'تحليل مولد بالذكاء الاصطناعي' : 'تحليل محلي احتياطي عند ضغط AI'}</p>
-            </div>
-          ) : smartWeakBranches.length === 0 ? (
-            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 text-emerald-700 text-sm font-bold leading-relaxed">لا توجد نقطة ضعف واضحة الآن. اضغط تحليل AI بعد ظهور نتائج أكثر للحصول على توصيات أدق.</div>
+          <h3 className="font-black text-slate-800 flex items-center gap-2 mb-3"><Target className="text-red-500"/> ركز على</h3>
+          {smartWeakBranches.length === 0 ? (
+            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 text-emerald-700 text-sm font-bold leading-relaxed">أداؤك مستقر. راجع آخر أخطائك وحافظ على الاستمرارية.</div>
           ) : (
-            <div className="space-y-2">{smartWeakBranches.map(item => <div key={item.branch} className="bg-red-50/70 border border-red-100 rounded-2xl p-3"><div className="flex items-center justify-between gap-2"><span className="font-black text-red-800">{item.branch}</span><span className="text-xs bg-white text-red-700 px-2 py-1 rounded-full font-bold">{item.pct}%</span></div><p className="text-xs text-red-600 mt-1">{item.wrong} أخطاء تحتاج مراجعة.</p></div>)}</div>
+            <div className="space-y-2">
+              {smartWeakBranches.map(item => (
+                <div key={item.branch} className="bg-red-50/70 border border-red-100 rounded-2xl p-3">
+                  <div className="flex items-center justify-between gap-2"><span className="font-black text-red-800">{item.branch}</span><span className="text-xs bg-white text-red-700 px-2 py-1 rounded-full font-bold">{item.pct}%</span></div>
+                  <p className="text-xs text-red-600 mt-1">{item.wrong} أخطاء تحتاج مراجعة.</p>
+                </div>
+              ))}
+            </div>
           )}
         </div>
+      </div>
+    </section>
+  );
+
+  const StudentNotificationCenter = () => (
+    <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="lg:col-span-2 bg-white rounded-3xl p-5 border border-slate-100 shadow-sm">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 className="text-xl font-black text-slate-900 flex items-center gap-2"><Bell className="text-amber-600"/> مركز الإشعارات</h3>
+            <p className="text-sm text-slate-500 mt-1">آخر رسائل الإدارة والمحاضرات والامتحانات في مكان واحد.</p>
+          </div>
+          <button onClick={() => { setShowNotifications(true); setHasNewNotif(false); }} className="bg-slate-900 text-white px-5 py-2 rounded-xl font-bold hover:bg-slate-800 transition">عرض الكل</button>
+        </div>
+        <div className="space-y-2">
+          {recentNotificationItems.length === 0 ? (
+            <div className="bg-slate-50 rounded-2xl p-5 text-center text-slate-500 font-bold">لا توجد إشعارات جديدة حاليًا.</div>
+          ) : recentNotificationItems.map((n, i) => (
+            <div key={n.id || i} className="bg-slate-50 border border-slate-100 rounded-2xl p-3 flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0"><Bell size={17}/></div>
+              <div className="min-w-0"><p className="font-black text-slate-800 truncate">{n.title || 'تنبيه جديد'}</p><p className="text-sm text-slate-600 leading-relaxed">{n.text || n.body}</p></div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="bg-gradient-to-br from-slate-50 to-white rounded-3xl p-5 border border-slate-100 shadow-sm">
+        <h3 className="font-black text-slate-900 flex items-center gap-2 mb-2"><Bell className="text-amber-600"/> تنبيهات داخل المنصة</h3>
+        <p className="text-sm text-slate-600 leading-relaxed mb-4">تم إيقاف Push Notifications مؤقتًا لتخفيف المنصة ومنع رسائل VAPID. ستظهر رسائل الإدارة هنا داخل حساب الطالب.</p>
+        <div className="bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-2xl p-3 text-sm font-black">النظام الداخلي للتنبيهات يعمل بدون طلب صلاحيات من المتصفح.</div>
       </div>
     </section>
   );
@@ -7805,19 +7677,8 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   };
 
   const studentFirstName = String(userData?.name || user?.displayName || 'طالب').split(' ')[0];
-  const openingMessage = (() => {
-      const weak = smartWeakBranches[0];
-      const messages = [];
-      if (latestVideoActivity && !latestVideoActivity.isCompleted) messages.push('كمل من آخر نقطة وسيب الجديد بعد ما تخلص القديم.');
-      if (weak) messages.push(`ركز اليوم على ${weak.branch} عشان ترفع مستواك بسرعة.`);
-      if (pendingAssignmentsCount > 0) messages.push(`عندك ${pendingAssignmentsCount} واجب محتاج يتقفل قبل ما يتراكم.`);
-      if (completedExamResults.length && averageScore >= 85) messages.push('مستواك ممتاز، جرّب تدريب أصعب النهارده.');
-      messages.push('ابدأ بخطوة صغيرة وثابتة، المهم الاستمرار.');
-      return messages[new Date().getDate() % messages.length];
-  })();
-
   const StudentTopGreeting = () => (
-    <section className="bg-white border border-amber-100 rounded-3xl shadow-sm p-4 md:p-5 mb-6 overflow-hidden relative">
+    <section className="student-sticky-hero bg-white/95 backdrop-blur-xl border border-amber-100 rounded-3xl shadow-xl p-4 md:p-5 mb-6 overflow-hidden relative">
       <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl md:text-3xl font-black text-slate-900 font-arabic flex flex-wrap items-center gap-2">
@@ -7829,12 +7690,11 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
               <button className="bg-slate-100 hover:bg-amber-50 text-slate-600 hover:text-amber-700 text-xs px-3 py-1 rounded-full font-bold flex items-center gap-1 transition" onClick={()=>setActiveTab('subscription')}>مجاني (رقي حسابك)</button>
             )}
           </h2>
-          <p className="text-sm md:text-base text-slate-500 font-bold mt-2 leading-relaxed">{openingMessage}</p>
         </div>
         <div className="grid grid-cols-3 gap-2 text-center min-w-[220px]">
-          <button onClick={() => !isBannedContent && setActiveTab('videos')} className="bg-amber-50 rounded-2xl p-3 border border-amber-100 hover:bg-amber-100 transition"><p className="text-xl font-black text-amber-700">{videos.length}</p><p className="text-[11px] text-amber-800 font-bold">محاضرة</p></button>
-          <button onClick={() => !isBannedExam && setActiveTab('exams')} className="bg-blue-50 rounded-2xl p-3 border border-blue-100 hover:bg-blue-100 transition"><p className="text-xl font-black text-blue-700">{exams.length}</p><p className="text-[11px] text-blue-800 font-bold">امتحان</p></button>
-          <button onClick={() => setActiveTab('performance')} className="bg-emerald-50 rounded-2xl p-3 border border-emerald-100 hover:bg-emerald-100 transition"><p className="text-xl font-black text-emerald-700">{examResults.length}</p><p className="text-[11px] text-emerald-800 font-bold">نتيجة</p></button>
+          <div className="bg-amber-50 rounded-2xl p-3 border border-amber-100"><p className="text-xl font-black text-amber-700">{videos.length}</p><p className="text-[11px] text-amber-800 font-bold">محاضرة</p></div>
+          <div className="bg-blue-50 rounded-2xl p-3 border border-blue-100"><p className="text-xl font-black text-blue-700">{exams.length}</p><p className="text-[11px] text-blue-800 font-bold">امتحان</p></div>
+          <div className="bg-emerald-50 rounded-2xl p-3 border border-emerald-100"><p className="text-xl font-black text-emerald-700">{examResults.length}</p><p className="text-[11px] text-emerald-800 font-bold">نتيجة</p></div>
         </div>
       </div>
     </section>
@@ -7863,8 +7723,8 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
         </div>
         <div className="space-y-2 flex-1 overflow-y-auto pr-2">
           <button onClick={() => {setActiveTab('home'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='home'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><User/> الرئيسية</button>
-          <button onClick={() => {setActiveTab('ai_coach'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='ai_coach'?'bg-sky-100 text-sky-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-sky-600'}`}><Bot/> المساعد الدراسي</button>
-
+          <button onClick={() => {setActiveTab('rafiq_arabic'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='rafiq_arabic'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><BrainCircuit/> رفيقك في العربي</button>
+          
           <button onClick={() => {setActiveTab('subscription'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='subscription'?'bg-red-100 text-red-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-red-600'}`}><Crown/> الباقة والاشتراك</button>
 
           {!isBannedContent && (
@@ -7894,7 +7754,6 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
         <div className="flex justify-between items-center mb-6 relative">
             <div className="flex gap-2">
                 {installPrompt && ( <button onClick={installPrompt} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full font-bold shadow-lg shadow-green-500/30 transition flex items-center gap-2"><DownloadCloud size={18}/><span className="hidden md:inline">تثبيت التطبيق</span></button> )}
-                <button onClick={() => setActiveTab('ai_coach')} className="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-full font-bold shadow-lg shadow-sky-500/20 transition flex items-center gap-2"><Bot size={18}/><span className="hidden md:inline">المساعد</span></button>
                 <button onClick={() => setShowFocusMode(true)} className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-full font-bold shadow-lg transition flex items-center gap-2"><Headphones size={18}/><span className="hidden md:inline">التركيز</span></button>
             </div>
             <div className="flex items-center gap-3">
@@ -7927,15 +7786,14 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
         <StudentTopGreeting />
 
         {activeTab === 'home' && (
-            <div className="space-y-6 page-soft-enter">
+            <div className="space-y-8 page-soft-enter">
                 <StudentContinueCard />
-                <StudyStreakFocusCard user={user} onStartFocus={() => setShowFocusMode(true)} />
-                <button onClick={() => setActiveTab('ai_coach')} className="w-full bg-white border border-sky-100 rounded-3xl p-4 shadow-sm hover:shadow-md transition text-right flex items-center justify-between gap-4">
-                    <div>
-                        <p className="font-black text-slate-900 flex items-center gap-2"><Bot className="text-sky-600"/> المساعد الدراسي الذكي</p>
-                        <p className="text-sm text-slate-500 mt-1">اسأل عن سؤال، خطة مذاكرة، أو سبب أخطائك.</p>
-                    </div>
-                    <span className="bg-sky-600 text-white px-4 py-2 rounded-2xl font-black whitespace-nowrap">فتح</span>
+                <StudentSmartDashboard />
+                <StudentNotificationCenter />
+                <StudentCompactHome />
+                <button onClick={() => setActiveTab('rafiq_arabic')} className="w-full bg-gradient-to-r from-slate-950 via-slate-900 to-amber-900 text-white rounded-[2rem] p-5 md:p-6 shadow-xl border border-amber-500/20 text-right flex items-center justify-between gap-4 hover:shadow-2xl transition">
+                  <div><p className="text-amber-200 text-sm font-black mb-1">جديد</p><h3 className="text-2xl font-black">اسأل رفيقك في العربي</h3><p className="text-slate-300 text-sm mt-1">يرد من شرح المستر الموجود داخل المنصة فقط.</p></div>
+                  <BrainCircuit className="text-amber-300 w-12 h-12 shrink-0" />
                 </button>
                 {liveSessions.length > 0 && (
                     <div className="bg-white border border-red-100 text-slate-800 p-4 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm">
@@ -7946,12 +7804,41 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                         <button onClick={() => setActiveTab('online_live')} className="bg-red-600 text-white px-6 py-2 rounded-full font-bold shadow-md hover:bg-red-700 transition w-full md:w-auto">عرض المحاضرات</button>
                     </div>
                 )}
+                <WisdomBox />
                 <Announcements />
                 <PWAInstallBox installPrompt={installPrompt} />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedContent && setActiveTab('videos')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}>
+                        <h3 className="relative z-10 text-xl font-bold mb-2 text-blue-900 group-hover:text-blue-600 transition">المحاضرات</h3>
+                        <p className="relative z-10 text-3xl font-black text-blue-600">{videos.length}</p><PlayCircle className="absolute -bottom-6 -left-6 text-blue-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
+                    </motion.div>
+                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedContent && setActiveTab('files')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}>
+                        <h3 className="relative z-10 text-xl font-bold mb-2 text-amber-900 group-hover:text-amber-600 transition">الملفات</h3>
+                        <p className="relative z-10 text-3xl font-black text-amber-600">{filesAndLinks.length}</p><FileText className="absolute -bottom-6 -left-6 text-amber-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
+                    </motion.div>
+                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedContent && setActiveTab('htmls')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}>
+                        <h3 className="relative z-10 text-xl font-bold mb-2 text-purple-900 group-hover:text-purple-600 transition">تفاعلي</h3>
+                        <p className="relative z-10 text-3xl font-black text-purple-600">{htmls.length}</p><Code className="absolute -bottom-6 -left-6 text-purple-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
+                    </motion.div>
+                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedExam && setActiveTab('exams')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedExam ? 'opacity-50 grayscale' : ''}`}>
+                        <h3 className="relative z-10 text-xl font-bold mb-2 text-slate-900 group-hover:text-slate-600 transition">الامتحانات</h3>
+                        <p className="relative z-10 text-3xl font-black text-slate-600">{exams.length}</p><ClipboardList className="absolute -bottom-6 -left-6 text-slate-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
+                    </motion.div>
+                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> !isBannedExam && setActiveTab('assignments')} className={`glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group ${isBannedExam ? 'opacity-50 grayscale' : ''}`}>
+                        <h3 className="relative z-10 text-xl font-bold mb-2 text-blue-900 group-hover:text-blue-600 transition">الواجبات</h3>
+                        <p className="relative z-10 text-3xl font-black text-blue-600">{assignments.length}</p><QrCode className="absolute -bottom-6 -left-6 text-blue-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
+                    </motion.div>
+                    <motion.div whileHover={{ scale: 1.02 }} onClick={()=> setActiveTab('performance')} className="glass-card p-8 rounded-3xl relative overflow-hidden cursor-pointer group">
+                        <h3 className="relative z-10 text-xl font-bold mb-2 text-indigo-900 group-hover:text-indigo-600 transition">تحليل الأداء</h3>
+                        <p className="relative z-10 text-3xl font-black text-indigo-600">{examResults.length}</p><BarChart3 className="absolute -bottom-6 -left-6 text-indigo-200 opacity-50 w-40 h-40 group-hover:scale-110 transition"/>
+                    </motion.div>
+                </div>
                 <Leaderboard />
                 <PerformanceOverview examResults={examResults} content={content} />
             </div>
         )}
+
+        {activeTab === 'rafiq_arabic' && <StudentRafiqAssistant user={user} userData={userData} />}
 
         {activeTab === 'performance' && (
             <div className="space-y-6">
@@ -7969,21 +7856,6 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                         })}
                     </div>
                 </div>
-            </div>
-        )}
-
-        {activeTab === 'ai_coach' && (
-            <div className="space-y-5">
-              <AIStudentChatCoach
-                  user={user}
-                  userData={userData}
-                  examResults={examResults}
-                  mistakes={mistakes}
-                  content={content}
-                  onOpenPerformance={() => setActiveTab('performance')}
-                  onOpenVideos={() => setActiveTab('videos')}
-              />
-              <AIStudyEnhancementPanel user={user} userData={userData} examResults={examResults} mistakes={mistakes} content={content} />
             </div>
         )}
 
