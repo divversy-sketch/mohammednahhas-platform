@@ -7094,6 +7094,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [hasNewNotif, setHasNewNotif] = useState(false);
   const [pushStatus, setPushStatus] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported');
+  const [homeWarmup, setHomeWarmup] = useState(true);
   const [editFormData, setEditFormData] = useState({ name: '', phone: '', parentPhone: '', grade: '' });
   const [showFocusMode, setShowFocusMode] = useState(false);
   const [scanningHwId, setScanningHwId] = useState(null);
@@ -7115,6 +7116,12 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
       return () => window.removeEventListener('popstate', handlePopState);
 
   }, [activeTab]);
+
+  useEffect(() => {
+      setHomeWarmup(true);
+      const timer = setTimeout(() => setHomeWarmup(false), 520);
+      return () => clearTimeout(timer);
+  }, [user?.uid]);
 
   useEffect(() => {
     if(!userData) return;
@@ -7382,6 +7389,144 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
       };
   })();
 
+  const unfinishedVideos = (videos || []).filter(v => getVideoWatchPercent(v) < VIDEO_EXAM_UNLOCK_PERCENT);
+  const suggestedVideo = unfinishedVideos.find(v => v.id !== latestVideoActivity?.video?.id) || unfinishedVideos[0] || videos[0] || null;
+  const completedExamIds = new Set((examResults || []).filter(r => r.status === 'completed').map(r => r.examId));
+  const suggestedExam = (exams || []).find(exam => !completedExamIds.has(exam.id)) || null;
+
+  const smartStudyPlan = (() => {
+      const steps = [];
+      if (latestVideoActivity && !latestVideoActivity.isCompleted) {
+          steps.push({
+              title: 'استكمال آخر محاضرة',
+              text: latestVideoActivity.video?.title || 'محاضرة محفوظة',
+              badge: String(latestVideoActivity.percent || 0) + '%',
+              icon: <Play size={16} fill="currentColor" />,
+              action: () => setPlayingVideo(latestVideoActivity.video),
+              button: 'استكمال'
+          });
+      } else if (suggestedVideo) {
+          steps.push({
+              title: 'ابدأ محاضرة مناسبة',
+              text: suggestedVideo.title || 'محاضرة جديدة',
+              badge: 'درس',
+              icon: <Video size={16} />,
+              action: () => setPlayingVideo(suggestedVideo),
+              button: 'مشاهدة'
+          });
+      }
+      if (smartWeakBranches[0]) {
+          steps.push({
+              title: 'مراجعة نقطة ضعف',
+              text: 'راجع فرع ' + smartWeakBranches[0].branch + ' لأن نسبتك فيه ' + smartWeakBranches[0].pct + '%',
+              badge: 'مهم',
+              icon: <Target size={16} />,
+              action: () => setActiveTab('mistakes_bank'),
+              button: 'راجع الأخطاء'
+          });
+      }
+      if (pendingAssignments[0]) {
+          steps.push({
+              title: 'تسليم واجب مطلوب',
+              text: pendingAssignments[0].title || 'واجب جديد',
+              badge: String(pendingAssignmentsCount),
+              icon: <QrCode size={16} />,
+              action: () => setActiveTab('assignments'),
+              button: 'فتح الواجب'
+          });
+      }
+      if (suggestedExam) {
+          steps.push({
+              title: 'اختبار قصير للقياس',
+              text: suggestedExam.title || 'امتحان متاح',
+              badge: 'قياس',
+              icon: <ClipboardList size={16} />,
+              action: () => setActiveTab('exams'),
+              button: 'الامتحانات'
+          });
+      }
+      if (steps.length === 0) {
+          steps.push({
+              title: 'حافظ على مستواك',
+              text: 'راجع آخر نتيجة وافتح بنك الأخطاء للمراجعة السريعة.',
+              badge: 'مراجعة',
+              icon: <Trophy size={16} />,
+              action: () => setActiveTab('performance'),
+              button: 'عرض الأداء'
+          });
+      }
+      return steps.slice(0, 4);
+  })();
+
+  const StudentHomeSkeleton = () => (
+    <section className="grid grid-cols-1 lg:grid-cols-3 gap-4 smart-card-enter" aria-label="تحميل لوحة الطالب">
+      <div className="lg:col-span-2 bg-white rounded-3xl p-5 border border-slate-100 shadow-sm">
+        <div className="smart-skeleton h-5 w-36 mb-4"></div>
+        <div className="smart-skeleton h-9 w-3/4 mb-3"></div>
+        <div className="smart-skeleton h-4 w-full mb-2"></div>
+        <div className="smart-skeleton h-4 w-2/3"></div>
+      </div>
+      <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm space-y-3">
+        <div className="smart-skeleton h-5 w-28"></div>
+        <div className="smart-skeleton h-16 w-full"></div>
+        <div className="smart-skeleton h-16 w-full"></div>
+      </div>
+    </section>
+  );
+
+  const StudentStudyPlanPanel = () => (
+    <section className="bg-white rounded-3xl p-5 md:p-6 border border-slate-100 shadow-sm smart-card-enter">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
+        <div>
+          <h3 className="text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2"><Calendar className="text-amber-600"/> خطة مذاكرة اليوم</h3>
+          <p className="text-sm text-slate-500 mt-1">خطة قصيرة مبنية على آخر مشاهدة، الواجبات، والنتائج بدون تحميل زائد على الموقع.</p>
+        </div>
+        <span className="bg-amber-50 text-amber-700 border border-amber-100 px-4 py-2 rounded-full text-xs font-black">{smartStudyPlan.length} خطوات</span>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+        {smartStudyPlan.map((step, idx) => (
+          <button key={idx} onClick={step.action} className="smart-study-step text-right bg-slate-50 hover:bg-white border border-slate-100 hover:border-amber-200 rounded-2xl p-4">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <div className="w-9 h-9 rounded-xl bg-white text-amber-700 border border-amber-100 flex items-center justify-center shadow-sm">{step.icon}</div>
+              <span className="text-[11px] bg-white text-slate-600 border border-slate-100 rounded-full px-2 py-1 font-black">{step.badge}</span>
+            </div>
+            <p className="font-black text-slate-900 mb-1">{step.title}</p>
+            <p className="text-xs text-slate-500 leading-relaxed min-h-[34px]">{step.text}</p>
+            <span className="inline-flex mt-3 text-xs font-black text-amber-700">{step.button} ←</span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+
+  const StudentSmartContentPanel = () => (
+    <section className="grid grid-cols-1 lg:grid-cols-3 gap-4 smart-card-enter">
+      <div className="lg:col-span-2 bg-gradient-to-br from-white to-amber-50/60 rounded-3xl p-5 border border-amber-100 shadow-sm">
+        <div className="flex items-center gap-2 mb-3"><Sparkles className="text-amber-600"/><h3 className="text-xl font-black text-slate-900">مقترح ذكي لك</h3></div>
+        <p className="text-sm text-slate-600 leading-relaxed mb-4">{suggestedVideo ? 'ابدأ بهذا الدرس لأنه أقرب محتوى مناسب لتقدمك الحالي.' : 'ابدأ من المحاضرات المتاحة لك، وسيظهر هنا اقتراح أدق بعد أول مشاهدة.'}</p>
+        {suggestedVideo ? (
+          <div className="bg-white rounded-2xl border border-amber-100 p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div>
+              <p className="font-black text-slate-900">{suggestedVideo.title}</p>
+              <p className="text-xs text-slate-500 mt-1">نسبة المشاهدة الحالية: {getVideoWatchPercent(suggestedVideo)}%</p>
+            </div>
+            <button onClick={() => setPlayingVideo(suggestedVideo)} className="bg-slate-900 text-white px-5 py-2 rounded-xl font-black hover:bg-slate-800 transition flex items-center justify-center gap-2"><Play size={16}/> فتح الدرس</button>
+          </div>
+        ) : (
+          <button onClick={() => setActiveTab('videos')} className="bg-slate-900 text-white px-5 py-2 rounded-xl font-black">فتح المحاضرات</button>
+        )}
+      </div>
+      <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm">
+        <h3 className="font-black text-slate-900 mb-3 flex items-center gap-2"><Clock className="text-blue-600"/> ملخص سريع</h3>
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between bg-slate-50 rounded-xl p-3"><span className="text-slate-500 font-bold">تقدم الفيديو</span><b>{videoCompletionPercent}%</b></div>
+          <div className="flex justify-between bg-slate-50 rounded-xl p-3"><span className="text-slate-500 font-bold">متوسط الامتحانات</span><b>{completedExamResults.length ? averageScore + '%' : '—'}</b></div>
+          <div className="flex justify-between bg-slate-50 rounded-xl p-3"><span className="text-slate-500 font-bold">واجبات معلقة</span><b>{pendingAssignmentsCount}</b></div>
+        </div>
+      </div>
+    </section>
+  );
+
   const StudentContinueCard = () => {
       const currentTitle = latestVideoActivity?.video?.title || inProgressExam?.title || pendingAssignments[0]?.title || 'ابدأ مذاكرتك التالية';
       const currentSubtitle = latestVideoActivity
@@ -7429,7 +7574,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
         <div>
           <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2"><BrainCircuit className="text-amber-600"/> لوحة الطالب الذكية</h2>
-          <p className="text-sm text-slate-500 mt-1">ملخص سريع يساعدك تبدأ من أهم خطوة بدون زحمة.</p>
+          <p className="text-sm text-slate-500 mt-1">ملخص سريع لأهم مؤشراتك بدون زحمة أو تحميل زائد.</p>
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1">
           <button onClick={() => setActiveTab('videos')} className="bg-blue-50 text-blue-700 px-4 py-2 rounded-xl font-bold text-sm whitespace-nowrap">المحاضرات</button>
@@ -7448,7 +7593,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 bg-slate-950 text-white rounded-3xl p-5 relative overflow-hidden">
           <div className="absolute -top-12 -left-12 w-40 h-40 bg-amber-400/20 rounded-full blur-3xl"></div>
-          <p className="text-amber-200 text-sm font-bold mb-2">خطة اليوم المقترحة</p>
+          <p className="text-amber-200 text-sm font-bold mb-2">الخطوة الأهم الآن</p>
           <h3 className="text-xl md:text-2xl font-black mb-2">{nextStudyAction.title}</h3>
           <p className="text-slate-300 text-sm leading-relaxed mb-4">{nextStudyAction.text}</p>
           <button onClick={nextStudyAction.action} className={`bg-gradient-to-r ${nextStudyAction.tone} px-5 py-3 rounded-2xl font-black shadow flex items-center gap-2 w-full sm:w-auto justify-center`}>{nextStudyAction.icon} {nextStudyAction.button}</button>
@@ -7783,8 +7928,11 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
         {activeTab === 'home' && (
             <div className="space-y-8 page-soft-enter">
+                {homeWarmup && <StudentHomeSkeleton />}
                 <StudentContinueCard />
+                <StudentStudyPlanPanel />
                 <StudentSmartDashboard />
+                <StudentSmartContentPanel />
                 <StudentNotificationCenter />
                 <StudentCompactHome />
                 {liveSessions.length > 0 && (
