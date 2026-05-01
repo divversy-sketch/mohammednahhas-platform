@@ -155,6 +155,70 @@ const rankQuestions = (items = [], { answer, question, userGrade, excludeIds = [
 
 const shuffle = (arr = []) => [...arr].sort(() => Math.random() - 0.5);
 
+
+const extractLessonSections = (content = '') => {
+  const raw = String(content || '').replace(/\r/g, '').trim();
+  if (!raw) return [];
+  const lines = raw.split('\n');
+  const sections = [];
+  let currentTitle = 'شرح عام';
+  let buffer = [];
+  const push = () => {
+    const text = buffer.join('\n').trim();
+    if (text) sections.push({ title: currentTitle, text, searchable: normalizeArabic([currentTitle, text].join(' ')) });
+    buffer = [];
+  };
+  lines.forEach((line) => {
+    const clean = line.trim();
+    const looksLikeHeading = clean && clean.length <= 70 && (
+      /^#{1,4}\s+/.test(clean) ||
+      /^[-–—]{2,}/.test(clean) ||
+      /^(النقطه|النقطة|الجزء|اولا|أولا|ثانيا|ثالثا|رابعا|خامسا|تعريف|مثال|قاعدة)[:：\-]/i.test(clean) ||
+      /^\[[^\]]+\]$/.test(clean)
+    );
+    if (looksLikeHeading) {
+      push();
+      currentTitle = clean.replace(/^#{1,4}\s+/, '').replace(/^\[|\]$/g, '').trim();
+    } else {
+      buffer.push(line);
+    }
+  });
+  push();
+  if (sections.length === 0) return [{ title: 'شرح عام', text: raw, searchable: normalizeArabic(raw) }];
+  return sections;
+};
+
+const findBestLessonPoint = (content = '', question = '', fallbackTitle = '') => {
+  const sections = extractLessonSections(content);
+  const words = tokenize(question);
+  const ranked = sections.map((section) => {
+    let score = 0;
+    const titleNorm = normalizeArabic(section.title);
+    words.forEach((w) => {
+      if (section.searchable.includes(w)) score += 1;
+      if (titleNorm.includes(w)) score += 4;
+    });
+    return { ...section, score };
+  }).sort((a, b) => b.score - a.score);
+  const best = ranked[0];
+  if (!best || best.score <= 0) return { pointTitle: fallbackTitle || 'شرح عام', pointText: getAnswerFromContent(content, question) };
+  return { pointTitle: best.title || fallbackTitle || 'شرح عام', pointText: getAnswerFromContent(best.text, question) || best.text.slice(0, 1600) };
+};
+
+const makeSimplerExplanation = (text = '') => {
+  const source = String(text || '').trim();
+  if (!source) return '';
+  const sentences = source.split(/(?<=[.!؟])\s+|\n+/g).map((x) => x.trim()).filter(Boolean).slice(0, 6);
+  const bullets = sentences.map((sentence) => `• ${sentence.replace(/^[-•\s]+/, '')}`);
+  return [
+    'خلينا نبسطها خطوة خطوة:',
+    ...bullets,
+    'الخلاصة: ركّز على الكلمة الأساسية في السؤال، ثم طبّق القاعدة على المثال.'
+  ].join('\n');
+};
+
+const buildQuestionSignature = (question = '') => normalizeArabic(question).split(' ').slice(0, 10).join(' ');
+
 const RafiqHeader = ({ compact = false }) => (
   <div className={`bg-gradient-to-r from-slate-950 via-slate-900 to-amber-950 text-white rounded-[2rem] ${compact ? 'p-5' : 'p-7'} shadow-xl border border-amber-500/20 overflow-hidden relative`}>
     <div className="absolute -left-16 -top-16 w-44 h-44 bg-amber-400/20 blur-3xl rounded-full" />
@@ -294,6 +358,8 @@ export const StudentRafiqAssistant = ({ user, userData }) => {
   const [loading, setLoading] = useState(true);
   const [quiz, setQuiz] = useState([]);
   const [selected, setSelected] = useState({});
+  const [simplerText, setSimplerText] = useState('');
+  const [feedbackSent, setFeedbackSent] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -313,18 +379,63 @@ export const StudentRafiqAssistant = ({ user, userData }) => {
 
   const allQuestions = useMemo(() => [...bankQuestions, ...examQuestions], [bankQuestions, examQuestions]);
 
+  const logInteraction = async ({ type, payload = {} }) => {
+    try {
+      await addDoc(collection(db, 'rafiq_interactions'), {
+        type,
+        studentId: user?.uid || '',
+        studentName: userData?.name || user?.displayName || '',
+        grade: userData?.grade || 'all',
+        question: question.trim(),
+        questionSignature: buildQuestionSignature(question),
+        answerTitle: answer?.title || '',
+        lesson: answer?.lesson || '',
+        pointTitle: answer?.pointTitle || '',
+        createdAt: serverTimestamp(),
+        ...payload
+      });
+    } catch {}
+  };
+
   const ask = async () => {
     if (!question.trim()) return;
-    setQuiz([]); setSelected({}); setExampleQuestions([]); setExampleIds([]);
+    setQuiz([]); setSelected({}); setExampleQuestions([]); setExampleIds([]); setSimplerText(''); setFeedbackSent(false);
     const userGrade = userData?.grade || 'all';
-    const ranked = explanations.map((item) => ({ item, score: scoreExplanation(item, question, userGrade) })).filter((x) => x.score > 0).sort((a, b) => b.score - a.score);
+    const ranked = explanations
+      .map((item) => ({ item, score: scoreExplanation(item, question, userGrade) }))
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score);
+
     if (ranked.length === 0) {
       setAnswer({ missing: true, title: 'النقطة غير موجودة حاليًا', text: 'النقطة دي مش موجودة في شرح المستر المتاح حاليًا. تم تسجيلها كموضوع يحتاج إضافة شرح لاحقًا.', lesson: '' });
       try { await addDoc(collection(db, 'rafiq_unanswered_questions'), { studentId: user?.uid || '', studentName: userData?.name || user?.displayName || '', grade: userGrade, question, createdAt: serverTimestamp() }); } catch {}
       return;
     }
+
     const best = ranked[0].item;
-    setAnswer({ missing: false, title: best.title || best.lesson || 'شرح المستر', lesson: best.lesson || '', branch: best.branch || 'عام', text: getAnswerFromContent(best.content, question), source: 'من مكتبة شرح المستر' });
+    const point = findBestLessonPoint(best.content, question, best.lesson || best.title || 'شرح عام');
+    const newAnswer = {
+      missing: false,
+      title: best.title || best.lesson || 'شرح المستر',
+      lesson: best.lesson || '',
+      branch: best.branch || 'عام',
+      pointTitle: point.pointTitle,
+      text: point.pointText,
+      source: 'من مكتبة شرح المستر'
+    };
+    setAnswer(newAnswer);
+    try {
+      await addDoc(collection(db, 'rafiq_answered_questions'), {
+        studentId: user?.uid || '',
+        studentName: userData?.name || user?.displayName || '',
+        grade: userGrade,
+        question,
+        lesson: newAnswer.lesson,
+        branch: newAnswer.branch,
+        pointTitle: newAnswer.pointTitle,
+        createdAt: serverTimestamp()
+      });
+    } catch {}
   };
 
   const showMoreExamples = () => {
@@ -335,6 +446,36 @@ export const StudentRafiqAssistant = ({ user, userData }) => {
     if (examples.length === 0) return alert('لا توجد أمثلة مرتبطة بهذه النقطة في أسئلة المستر أو الامتحانات حتى الآن.');
     setExampleQuestions(examples);
     setExampleIds(examples.map((q) => q.id));
+    logInteraction({ type: 'examples_requested', payload: { exampleIds: examples.map((q) => q.id), examplesCount: examples.length } });
+  };
+
+  const explainSimpler = () => {
+    if (!answer || answer.missing) return;
+    const simplified = makeSimplerExplanation(answer.text);
+    setSimplerText(simplified);
+    logInteraction({ type: 'simpler_requested' });
+  };
+
+  const sendUnderstanding = async (understood) => {
+    if (!answer || feedbackSent) return;
+    setFeedbackSent(true);
+    await logInteraction({ type: understood ? 'understood' : 'not_understood', payload: { understood } });
+    if (!understood) {
+      try {
+        await addDoc(collection(db, 'rafiq_student_weak_points'), {
+          studentId: user?.uid || '',
+          studentName: userData?.name || user?.displayName || '',
+          grade: userData?.grade || 'all',
+          lesson: answer.lesson || '',
+          branch: answer.branch || '',
+          pointTitle: answer.pointTitle || answer.title || '',
+          question,
+          createdAt: serverTimestamp(),
+          status: 'needs_review'
+        });
+      } catch {}
+      if (!simplerText) setSimplerText(makeSimplerExplanation(answer.text));
+    }
   };
 
   const generateQuiz = () => {
@@ -344,13 +485,45 @@ export const StudentRafiqAssistant = ({ user, userData }) => {
     const quizQuestions = shuffle(ranked).slice(0, 6);
     if (quizQuestions.length === 0) return alert('لا توجد أسئلة كافية مرتبطة بهذه النقطة بعد استبعاد أمثلة الشرح. ارفع أسئلة أكثر من لوحة الأدمن.');
     setQuiz(quizQuestions); setSelected({});
+    logInteraction({ type: 'quiz_generated', payload: { quizIds: quizQuestions.map((q) => q.id), quizCount: quizQuestions.length } });
   };
   const correctCount = quiz.reduce((sum, q) => sum + (selected[q.id] === q.correctIdx ? 1 : 0), 0);
 
   return <div className="space-y-6 page-soft-enter">
     <RafiqHeader compact />
-    <div className="bg-white rounded-3xl p-5 md:p-7 border border-slate-100 shadow-sm"><div className="flex flex-col md:flex-row gap-3"><input value={question} onChange={(e) => setQuestion(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && ask()} className="flex-1 border-2 border-slate-100 focus:border-amber-400 rounded-2xl p-4 font-bold outline-none" placeholder="اسأل رفيقك: مش فاهم النعت، إزاي أعرب الحال، الفرق بين التشبيه والاستعارة..." /><button onClick={ask} disabled={loading} className="bg-slate-950 hover:bg-slate-900 text-white px-6 py-4 rounded-2xl font-black flex items-center justify-center gap-2 disabled:opacity-60">{loading ? <Loader2 className="animate-spin"/> : <Search/>} اسأل رفيقك</button></div><p className="text-xs text-slate-400 mt-3 font-bold">الرد الأساسي يعتمد على شرح المستر. الأمثلة الإضافية قد تأتي من أسئلة الامتحانات، ولن تتكرر في الاختبار بعدها.</p></div>
-    {answer && <div className={`rounded-3xl p-6 border shadow-sm ${answer.missing ? 'bg-amber-50 border-amber-200' : 'bg-white border-emerald-100'}`}><div className="flex items-start justify-between gap-3 mb-4"><div><p className={`text-xs font-black mb-1 ${answer.missing ? 'text-amber-700' : 'text-emerald-700'}`}>{answer.source || 'مطلوب إضافة شرح'}</p><h3 className="text-2xl font-black text-slate-900">{answer.title}</h3>{!answer.missing && <p className="text-sm text-slate-500 mt-1">{answer.branch} {answer.lesson ? `— ${answer.lesson}` : ''}</p>}</div>{answer.missing ? <XCircle className="text-amber-600"/> : <Sparkles className="text-emerald-600"/>}</div><div className="bg-slate-50 rounded-2xl p-5 leading-loose text-slate-800 whitespace-pre-wrap font-bold">{answer.text}</div>{!answer.missing && <div className="mt-5 flex flex-col md:flex-row gap-3"><button onClick={showMoreExamples} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl font-black flex items-center gap-2"><Lightbulb/> أمثلة أكثر</button><button onClick={generateQuiz} className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-3 rounded-2xl font-black flex items-center gap-2"><ClipboardList/> اختبرني على النقطة دي</button></div>}</div>}
+    <div className="bg-white rounded-3xl p-5 md:p-7 border border-slate-100 shadow-sm">
+      <div className="flex flex-col md:flex-row gap-3">
+        <input value={question} onChange={(e) => setQuestion(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && ask()} className="flex-1 border-2 border-slate-100 focus:border-amber-400 rounded-2xl p-4 font-bold outline-none" placeholder="اسأل رفيقك: مش فاهم النعت الحقيقي، الفرق بين الحال والنعت، إزاي أطلع الاستعارة..." />
+        <button onClick={ask} disabled={loading} className="bg-slate-950 hover:bg-slate-900 text-white px-6 py-4 rounded-2xl font-black flex items-center justify-center gap-2 disabled:opacity-60">{loading ? <Loader2 className="animate-spin"/> : <Search/>} اسأل رفيقك</button>
+      </div>
+      <p className="text-xs text-slate-400 mt-3 font-bold">الرد يعتمد على شرح المستر أولًا، والأمثلة تأتي من أسئلة المستر والامتحانات بدون تكرارها في الاختبار الحالي.</p>
+    </div>
+    {answer && <div className={`rounded-3xl p-6 border shadow-sm ${answer.missing ? 'bg-amber-50 border-amber-200' : 'bg-white border-emerald-100'}`}>
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <p className={`text-xs font-black mb-1 ${answer.missing ? 'text-amber-700' : 'text-emerald-700'}`}>{answer.source || 'مطلوب إضافة شرح'}</p>
+          <h3 className="text-2xl font-black text-slate-900">{answer.title}</h3>
+          {!answer.missing && <p className="text-sm text-slate-500 mt-1">{answer.branch} {answer.lesson ? `— ${answer.lesson}` : ''}</p>}
+          {!answer.missing && answer.pointTitle && <p className="inline-flex mt-3 bg-amber-50 text-amber-800 border border-amber-100 rounded-full px-4 py-1 text-xs font-black">النقطة المطابقة: {answer.pointTitle}</p>}
+        </div>
+        {answer.missing ? <XCircle className="text-amber-600"/> : <Sparkles className="text-emerald-600"/>}
+      </div>
+      <div className="bg-slate-50 rounded-2xl p-5 leading-loose text-slate-800 whitespace-pre-wrap font-bold">{answer.text}</div>
+      {simplerText && <div className="mt-4 bg-blue-50 border border-blue-100 rounded-2xl p-5 leading-loose text-blue-900 whitespace-pre-wrap font-bold">{simplerText}</div>}
+      {!answer.missing && <div className="mt-5 flex flex-col md:flex-row flex-wrap gap-3">
+        <button onClick={explainSimpler} className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-2xl font-black flex items-center gap-2"><BrainCircuit/> افهمني أكتر</button>
+        <button onClick={showMoreExamples} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl font-black flex items-center gap-2"><Lightbulb/> أمثلة أكثر</button>
+        <button onClick={generateQuiz} className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-3 rounded-2xl font-black flex items-center gap-2"><ClipboardList/> اختبرني على النقطة دي</button>
+      </div>}
+      {!answer.missing && <div className="mt-5 bg-slate-50 border border-slate-100 rounded-2xl p-4">
+        <p className="text-sm font-black text-slate-700 mb-3">هل الشرح وضح لك النقطة؟</p>
+        <div className="flex gap-2">
+          <button disabled={feedbackSent} onClick={() => sendUnderstanding(true)} className="bg-emerald-600 disabled:opacity-60 text-white px-4 py-2 rounded-xl font-black">نعم فهمت</button>
+          <button disabled={feedbackSent} onClick={() => sendUnderstanding(false)} className="bg-rose-600 disabled:opacity-60 text-white px-4 py-2 rounded-xl font-black">لا، محتاج أبسط</button>
+        </div>
+        {feedbackSent && <p className="text-xs text-slate-500 mt-2 font-bold">تم تسجيل إجابتك لتحسين متابعة نقاط ضعفك.</p>}
+      </div>}
+    </div>}
     {exampleQuestions.length > 0 && <div className="bg-blue-50 rounded-3xl p-6 border border-blue-100 shadow-sm"><h3 className="text-xl font-black text-blue-900 flex items-center gap-2 mb-4"><Lightbulb/> أمثلة من أسئلة المستر والامتحانات</h3><div className="space-y-3">{exampleQuestions.map((q, idx) => <div key={q.id || idx} className="bg-white border border-blue-100 rounded-2xl p-4"><p className="font-black text-slate-900 mb-2">مثال {idx + 1}: {q.question}</p>{q.options?.length > 0 && <p className="text-sm text-slate-700 mb-2"><b>الإجابة:</b> {q.options[q.correctIdx] || q.options[0]}</p>}{q.explanation && <p className="text-sm text-blue-800 leading-relaxed"><b>الشرح:</b> {q.explanation}</p>}<p className="text-[11px] text-slate-400 mt-2">لن يظهر هذا السؤال في الاختبار الحالي بعد استخدامه كمثال.</p></div>)}</div></div>}
     {quiz.length > 0 && <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm"><div className="flex items-center justify-between gap-3 mb-5"><h3 className="text-xl font-black text-slate-900 flex items-center gap-2"><ClipboardList className="text-amber-600"/> اختبار سريع من أسئلة المستر</h3><span className="bg-slate-900 text-white px-4 py-2 rounded-full font-black text-sm">{correctCount}/{quiz.length}</span></div><div className="space-y-4">{quiz.map((q, idx) => <div key={q.id || idx} className="border border-slate-100 rounded-2xl p-4 bg-slate-50/70"><p className="font-black text-slate-900 mb-3">{idx + 1}. {q.question}</p><div className="grid grid-cols-1 md:grid-cols-2 gap-2">{(q.options || []).map((opt, optIdx) => { const picked = selected[q.id] === optIdx; const revealed = selected[q.id] !== undefined; const correct = q.correctIdx === optIdx; return <button key={optIdx} onClick={() => setSelected((prev) => ({ ...prev, [q.id]: optIdx }))} className={`text-right p-3 rounded-xl border font-bold transition ${revealed && correct ? 'bg-emerald-50 border-emerald-300 text-emerald-800' : picked ? 'bg-amber-50 border-amber-300 text-amber-800' : 'bg-white border-slate-200 text-slate-700 hover:border-amber-200'}`}>{opt}</button>; })}</div>{selected[q.id] !== undefined && q.explanation && <p className="mt-3 text-sm bg-white rounded-xl p-3 text-slate-600 leading-relaxed"><b>الشرح:</b> {q.explanation}</p>}</div>)}</div></div>}
   </div>;
