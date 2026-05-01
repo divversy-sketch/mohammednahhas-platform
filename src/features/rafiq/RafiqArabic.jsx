@@ -96,18 +96,53 @@ const scoreExplanation = (item, question, userGrade) => {
 };
 
 const splitChunks = (content = '') => String(content || '').trim().split(/\n{2,}|(?<=[.!؟])\s+/g).map((c) => c.trim()).filter((c) => c.length > 25);
-const getAnswerFromContent = (content = '', question = '', max = 1600) => {
+
+const trimLongTeacherText = (text = '', max = 12000) => {
+  const clean = String(text || '').trim();
+  if (clean.length <= max) return clean;
+  return clean.slice(0, max).trim() + '\n\n[تم اختصار جزء من الشرح لطول النص. اضغط افهمني أكتر أو اسأل عن نقطة أدق لعرض تفاصيل أكثر.]';
+};
+
+const getAnswerFromContent = (content = '', question = '', max = 12000) => {
   const clean = String(content || '').trim();
   if (!clean) return '';
-  const chunks = splitChunks(clean);
-  if (chunks.length === 0) return clean.slice(0, max);
-  const words = tokenize(question);
-  const ranked = chunks.map((chunk) => {
-    const n = normalizeArabic(chunk);
-    return { chunk, score: words.reduce((sum, w) => sum + (n.includes(w) ? 1 : 0), 0) };
-  }).sort((a, b) => b.score - a.score);
-  const best = ranked.filter((r) => r.score > 0).slice(0, 4).map((r) => r.chunk);
-  return (best.length ? best : chunks.slice(0, 2)).join('\n\n').slice(0, max);
+  // لا نختصر شرح المستر إلى فقرتين؛ نعرض القسم كاملًا عشان الأمثلة والتفاصيل تظهر كما رُفعت.
+  return trimLongTeacherText(clean, max);
+};
+
+const extractContentExamples = (content = '') => {
+  const lines = String(content || '').replace(/\r/g, '').split('\n');
+  const examples = [];
+  let buffer = [];
+  const isExampleStart = (line = '') => {
+    const clean = line.trim();
+    return /^(مثال|مثال سريع|تدريب|السؤال|\d+[-–.)])/.test(clean) || /^[-•*]\s*(مثال|تدريب)/.test(clean);
+  };
+  const isHardBreak = (line = '') => /^[-–—_=*#]{3,}$/.test(line.trim()) || line.trim().startsWith('@');
+  const flush = () => {
+    const text = buffer.join('\n').trim();
+    if (text.length > 15) {
+      examples.push({
+        id: 'content_example_' + examples.length + '_' + buildQuestionSignature(text),
+        source: 'teacher_content',
+        question: text.split('\n')[0].replace(/^\d+[-–.)]\s*/, '').trim(),
+        explanation: text,
+        options: [],
+        correctIdx: 0,
+        includeInQuiz: false
+      });
+    }
+    buffer = [];
+  };
+  lines.forEach((rawLine) => {
+    const line = rawLine.trim();
+    if (!line) { if (buffer.length) buffer.push(rawLine); return; }
+    if (isHardBreak(line)) { flush(); return; }
+    if (isExampleStart(line) && buffer.length) flush();
+    if (isExampleStart(line) || buffer.length) buffer.push(rawLine);
+  });
+  flush();
+  return examples.slice(0, 20);
 };
 
 const parseCsvLine = (line) => {
@@ -385,18 +420,35 @@ const findBestLessonPoint = (content = '', question = '', fallbackTitle = '', ex
     return { ...section, score };
   }).sort((a, b) => b.score - a.score);
   const best = ranked[0];
-  if (!best || best.score <= 0) return { pointTitle: fallbackTitle || 'شرح عام', pointAliases: [], pointText: getAnswerFromContent(content, question) };
-  return { pointTitle: best.title || fallbackTitle || 'شرح عام', pointAliases: best.aliases || [], pointText: getAnswerFromContent(best.text, question) || best.text.slice(0, 1800) };
+  if (!best || best.score <= 0) {
+    const fallbackText = getAnswerFromContent(content, question);
+    return { pointTitle: fallbackTitle || 'شرح عام', pointAliases: [], pointText: fallbackText, fullPointText: fallbackText };
+  }
+  const fullText = String(best.text || '').trim();
+  return {
+    pointTitle: best.title || fallbackTitle || 'شرح عام',
+    pointAliases: best.aliases || [],
+    pointText: getAnswerFromContent(fullText, question),
+    fullPointText: fullText
+  };
 };
 
 const makeSimplerExplanation = (text = '', studentProfile = {}) => {
   const source = String(text || '').trim();
   if (!source) return '';
-  const sentences = source.split(/(?<=[.!؟])\s+|\n+/g).map((x) => x.trim()).filter(Boolean).slice(0, 7);
   const intro = studentProfile?.weakPoint
-    ? `خلينا نشرحها بطريقة أبسط لأن واضح إن نقطة "${studentProfile.weakPoint}" محتاجة تثبيت:`
-    : 'خلينا نبسطها خطوة خطوة:';
-  return [intro, ...sentences.map((sentence) => `• ${sentence.replace(/^[-•\s]+/, '')}`), 'الخلاصة: اقرأ السؤال، حدد الكلمة المطلوبة، ثم طبّق القاعدة على المثال.'].join('\n');
+    ? `تمام، هنفهمها بهدوء من نفس شرح المستر لأن نقطة "${studentProfile.weakPoint}" محتاجة تثبيت:`
+    : 'تمام، هنفهمها بهدوء من نفس شرح المستر:';
+  const cleanLines = source
+    .split(/\n+/g)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => !/^[-–—_=*#]{3,}$/.test(line));
+  const detailed = cleanLines.slice(0, 45).map((line) => {
+    if (/^(\d+[-–.)]|مثال|تريكة|قاعدة|الخلاصة|الشرح|النوع|الإجابة|السبب)/.test(line)) return line;
+    return `• ${line.replace(/^[-•\s]+/, '')}`;
+  });
+  return [intro, ...detailed, 'لو تحب، اضغط "أمثلة أكثر" عشان أطلع لك أمثلة من نفس شرح المستر وأسئلته.'].join('\n');
 };
 
 const getStudentName = (user, userData) => userData?.name || user?.displayName || 'يا بطل';
@@ -830,6 +882,7 @@ export const StudentRafiqAssistant = ({ user, userData }) => {
       pointTitle: point.pointTitle,
       pointAliases: point.pointAliases || [],
       text: point.pointText,
+      fullText: point.fullPointText || point.pointText,
       source: 'من مكتبة شرح المستر'
     };
     setAnswer(newAnswer);
@@ -843,9 +896,12 @@ export const StudentRafiqAssistant = ({ user, userData }) => {
 
   const showMoreExamples = () => {
     if (!answer || answer.missing) return;
-    const ranked = rankQuestions(allQuestions, { answer, question, userGrade: userData?.grade || 'all', excludeIds: [], allowExamples: true });
-    const examples = shuffle(ranked).slice(0, 6);
-    if (examples.length === 0) return alert('لا توجد أمثلة مرتبطة بهذه النقطة في أسئلة المستر أو الامتحانات حتى الآن.');
+    // الأولوية لأمثلة المستر المكتوبة داخل الشرح نفسه، ثم أسئلة المستر والامتحانات.
+    const contentExamples = extractContentExamples(answer.fullText || answer.text || '');
+    const ranked = rankQuestions(allQuestions, { answer, question, userGrade: userData?.grade || 'all', excludeIds: contentExamples.map((q) => q.id), allowExamples: true });
+    const bankExamples = shuffle(ranked).slice(0, Math.max(0, 6 - contentExamples.length));
+    const examples = [...contentExamples.slice(0, 6), ...bankExamples].slice(0, 8);
+    if (examples.length === 0) return alert('لا توجد أمثلة مرتبطة بهذه النقطة في شرح المستر أو أسئلته حتى الآن.');
     setExampleQuestions(examples);
     setExampleIds(examples.map((q) => q.id));
     logInteraction({ type: 'examples_requested', payload: { exampleIds: examples.map((q) => q.id), examplesCount: examples.length } });
@@ -853,7 +909,7 @@ export const StudentRafiqAssistant = ({ user, userData }) => {
 
   const explainSimpler = () => {
     if (!answer || answer.missing) return;
-    setSimplerText(makeSimplerExplanation(answer.text, { weakPoint: topWeakPoint }));
+    setSimplerText(makeSimplerExplanation(answer.fullText || answer.text, { weakPoint: topWeakPoint }));
     logInteraction({ type: 'simpler_requested' });
   };
 
@@ -914,7 +970,7 @@ export const StudentRafiqAssistant = ({ user, userData }) => {
       {!answer.missing && <div className="mt-5 flex flex-col md:flex-row flex-wrap gap-3"><button onClick={explainSimpler} className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-2xl font-black flex items-center gap-2"><BrainCircuit/> افهمني أكتر</button><button onClick={showMoreExamples} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl font-black flex items-center gap-2"><Lightbulb/> أمثلة أكثر</button><button onClick={generatePersonalLesson} className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-2xl font-black flex items-center gap-2"><GraduationCap/> اعملي درس مخصص</button><button onClick={generateQuiz} className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-3 rounded-2xl font-black flex items-center gap-2"><ClipboardList/> اختبرني على النقطة دي</button></div>}
       {!answer.missing && <div className="mt-5 bg-slate-50 border border-slate-100 rounded-2xl p-4"><p className="text-sm font-black text-slate-700 mb-3">هل الشرح وضح لك النقطة؟</p><div className="flex gap-2"><button disabled={feedbackSent} onClick={() => sendUnderstanding(true)} className="bg-emerald-600 disabled:opacity-60 text-white px-4 py-2 rounded-xl font-black">نعم فهمت</button><button disabled={feedbackSent} onClick={() => sendUnderstanding(false)} className="bg-rose-600 disabled:opacity-60 text-white px-4 py-2 rounded-xl font-black">لا، محتاج أبسط</button></div>{feedbackSent && <p className="text-xs text-slate-500 mt-2 font-bold">تم تسجيل إجابتك لتحسين متابعة نقاط ضعفك.</p>}</div>}
     </div>}
-    {exampleQuestions.length > 0 && <div className="bg-blue-50 rounded-3xl p-6 border border-blue-100 shadow-sm"><h3 className="text-xl font-black text-blue-900 flex items-center gap-2 mb-4"><Lightbulb/> أمثلة من أسئلة المستر والامتحانات</h3><div className="space-y-3">{exampleQuestions.map((q, idx) => <div key={q.id || idx} className="bg-white border border-blue-100 rounded-2xl p-4"><p className="font-black text-slate-900 mb-2">مثال {idx + 1}: {q.question}</p>{q.options?.length > 0 && <p className="text-sm text-slate-700 mb-2"><b>الإجابة:</b> {q.options[q.correctIdx] || q.options[0]}</p>}{q.explanation && <p className="text-sm text-blue-800 leading-relaxed"><b>الشرح:</b> {q.explanation}</p>}<p className="text-[11px] text-slate-400 mt-2">لن يظهر هذا السؤال في الاختبار الحالي بعد استخدامه كمثال.</p></div>)}</div></div>}
+    {exampleQuestions.length > 0 && <div className="bg-blue-50 rounded-3xl p-6 border border-blue-100 shadow-sm"><h3 className="text-xl font-black text-blue-900 flex items-center gap-2 mb-4"><Lightbulb/> أمثلة من شرح المستر وأسئلته</h3><div className="space-y-3">{exampleQuestions.map((q, idx) => <div key={q.id || idx} className="bg-white border border-blue-100 rounded-2xl p-4"><p className="font-black text-slate-900 mb-2">مثال {idx + 1}: {q.question}</p>{q.options?.length > 0 && <p className="text-sm text-slate-700 mb-2"><b>الإجابة:</b> {q.options[q.correctIdx] || q.options[0]}</p>}{q.explanation && <p className="text-sm text-blue-800 leading-relaxed whitespace-pre-wrap"><b>الشرح:</b> {q.explanation}</p>}<p className="text-[11px] text-slate-400 mt-2">هذا المثال للشرح فقط ولن يدخل في الاختبار الحالي.</p></div>)}</div></div>}
     {quiz.length > 0 && <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm"><div className="flex items-center justify-between gap-3 mb-5"><h3 className="text-xl font-black text-slate-900 flex items-center gap-2"><ClipboardList className="text-amber-600"/> اختبار سريع من أسئلة المستر</h3><span className="bg-slate-900 text-white px-4 py-2 rounded-full font-black text-sm">{correctCount}/{quiz.length}</span></div><div className="space-y-4">{quiz.map((q, idx) => <div key={q.id || idx} className="border border-slate-100 rounded-2xl p-4 bg-slate-50/70"><p className="font-black text-slate-900 mb-3">{idx + 1}. {q.question}</p><div className="grid grid-cols-1 md:grid-cols-2 gap-2">{(q.options || []).map((opt, optIdx) => { const picked = selected[q.id] === optIdx; const revealed = selected[q.id] !== undefined; const correct = q.correctIdx === optIdx; return <button key={optIdx} onClick={() => setSelected((prev) => ({ ...prev, [q.id]: optIdx }))} className={`text-right p-3 rounded-xl border font-bold transition ${revealed && correct ? 'bg-emerald-50 border-emerald-300 text-emerald-800' : picked ? 'bg-amber-50 border-amber-300 text-amber-800' : 'bg-white border-slate-200 text-slate-700 hover:border-amber-200'}`}>{opt}</button>; })}</div>{selected[q.id] !== undefined && q.explanation && <p className="mt-3 text-sm bg-white rounded-xl p-3 text-slate-600 leading-relaxed"><b>الشرح:</b> {q.explanation}</p>}</div>)}</div></div>}
   </div>;
 };
