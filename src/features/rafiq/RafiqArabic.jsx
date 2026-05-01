@@ -157,25 +157,86 @@ const rankQuestions = (items = [], { answer, question, userGrade, excludeIds = [
     .map((x) => x.q);
 };
 
+const splitAliasParts = (value = '') => String(value || '')
+  .split(/[|،,؛]/g)
+  .map((part) => part.trim())
+  .filter(Boolean);
+
+const buildAliasGroup = (canonical = '', aliases = []) => {
+  const cleanCanonical = String(canonical || '').replace(/^@/, '').replace(/_/g, ' ').trim();
+  const cleanAliases = uniqueList([cleanCanonical, ...aliases.map((part) => String(part || '').replace(/^@/, '').replace(/_/g, ' ').trim())]);
+  return cleanAliases.length ? { canonical: cleanCanonical || cleanAliases[0], aliases: cleanAliases, normalizedAliases: cleanAliases.map(normalizeArabic).filter(Boolean) } : null;
+};
+
 const parseOpeningAliasGroups = (value = '') => {
   const groups = [];
   String(value || '').split(/\r?\n/g).forEach((line) => {
     const clean = line.trim();
     if (!clean.startsWith('@')) return;
-    const parts = clean.slice(1).split('|').map((part) => part.trim()).filter(Boolean);
-    if (parts.length === 0) return;
-    const canonical = parts[0].replace(/_/g, ' ').trim();
-    const aliases = uniqueList([canonical, ...parts.slice(1).map((part) => part.replace(/_/g, ' ').trim())]);
-    groups.push({ canonical, aliases, normalizedAliases: aliases.map(normalizeArabic).filter(Boolean) });
+    const raw = clean.slice(1).trim();
+    const parts = splitAliasParts(raw);
+    const group = buildAliasGroup(parts[0] || raw, parts.slice(1));
+    if (group) groups.push(group);
   });
   return groups;
+};
+
+const parseOpeningAliasGroupsDeep = (value = '') => {
+  const lines = String(value || '').replace(/\r/g, '').split('\n');
+  const groups = [];
+  let active = null;
+  let collectAliasesForActive = false;
+  const flush = () => {
+    if (active) {
+      const group = buildAliasGroup(active.canonical, active.aliases);
+      if (group) groups.push(group);
+    }
+    active = null;
+    collectAliasesForActive = false;
+  };
+  for (let i = 0; i < lines.length; i += 1) {
+    const clean = String(lines[i] || '').trim();
+    if (!clean) continue;
+    if (clean.startsWith('@')) {
+      flush();
+      const raw = clean.slice(1).trim();
+      const parts = splitAliasParts(raw);
+      active = { canonical: parts[0] || raw, aliases: parts.slice(1) };
+      collectAliasesForActive = false;
+      continue;
+    }
+    if (!active) continue;
+    const norm = normalizeArabic(clean);
+    if (norm.includes('كلمات افتتاحيه') || norm.includes('كلمات للبحث') || norm.includes('افتتاحيات') || norm.includes('مرادفات')) {
+      collectAliasesForActive = true;
+      continue;
+    }
+    if (isSectionSeparatorLine(clean)) {
+      collectAliasesForActive = false;
+      continue;
+    }
+    if (collectAliasesForActive) {
+      const aliases = splitAliasParts(clean).map((part) => part.replace(/[🔹•✅⭐📌]/g, '').trim()).filter(Boolean);
+      if (aliases.length) active.aliases.push(...aliases);
+      collectAliasesForActive = false;
+    }
+  }
+  flush();
+  const byKey = new Map();
+  groups.forEach((group) => {
+    const key = normalizeArabic(group.canonical);
+    const prev = byKey.get(key);
+    if (!prev) byKey.set(key, group);
+    else byKey.set(key, buildAliasGroup(prev.canonical, [...(prev.aliases || []), ...(group.aliases || [])]));
+  });
+  return [...byKey.values()].filter(Boolean);
 };
 
 const aliasGroupsToText = (groups = []) => groups
   .map((group) => '@' + String(group.canonical || '').replace(/\s+/g, '_') + ' | ' + (group.aliases || []).join(' | '))
   .join('\n');
 
-const collectOpeningAliasGroups = (content = '', extraOpeningKeywords = '') => parseOpeningAliasGroups(String(extraOpeningKeywords || '') + '\n' + String(content || ''));
+const collectOpeningAliasGroups = (content = '', extraOpeningKeywords = '') => parseOpeningAliasGroupsDeep(String(extraOpeningKeywords || '') + '\n' + String(content || ''));
 
 const isSectionSeparatorLine = (line = '') => {
   const clean = String(line || '').trim();
@@ -205,61 +266,45 @@ const findAliasGroupInQuestion = (question = '', groups = []) => {
 const extractLessonSections = (content = '', extraOpeningKeywords = '') => {
   const raw = String(content || '').replace(/\r/g, '').trim();
   if (!raw) return [];
-  const aliasGroups = collectOpeningAliasGroups(raw, extraOpeningKeywords);
+  const globalGroups = collectOpeningAliasGroups(raw, extraOpeningKeywords);
   const lines = raw.split('\n');
   const sections = [];
   let currentTitle = 'شرح عام';
   let currentAliases = [];
   let buffer = [];
-  let nextLineIsHeading = false;
-
+  let insideOpeningKeywordBlock = false;
   const push = () => {
-    const text = buffer.join('\n').trim();
-    if (text) sections.push({ title: currentTitle, aliases: currentAliases, text, searchable: normalizeArabic([currentTitle, currentAliases.join(' '), text].join(' ')) });
+    const text = buffer.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    if (text) sections.push({ title: currentTitle, aliases: uniqueList(currentAliases), text, searchable: normalizeArabic([currentTitle, currentAliases.join(' '), text].join(' ')) });
     buffer = [];
   };
-
   const setTitle = (title, aliases = []) => {
-    currentTitle = String(title || 'شرح عام').replace(/^#{1,4}\s+/, '').replace(/^\[|\]$/g, '').replace(/^@/, '').replace(/_/g, ' ').trim() || 'شرح عام';
+    currentTitle = String(title || 'شرح عام').replace(/^#{1,4}\s+/, '').replace(/^\[|\]$/g, '').replace(/^@/, '').replace(/_/g, ' ').replace(/[🔹•✅⭐📌]/g, '').trim() || 'شرح عام';
     currentAliases = uniqueList(aliases);
   };
-
-  lines.forEach((line) => {
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i] || '';
     const clean = line.trim();
-    if (!clean) { buffer.push(line); return; }
-
+    if (!clean) { if (!insideOpeningKeywordBlock) buffer.push(line); continue; }
     if (clean.startsWith('@')) {
-      const groups = parseOpeningAliasGroups(clean);
-      if (groups[0]) {
-        push();
-        setTitle(groups[0].canonical, groups[0].aliases);
-        nextLineIsHeading = false;
-        return;
-      }
-    }
-
-    const aliasGroup = findAliasGroupForLine(clean, aliasGroups);
-    const looksLikeHeading = clean && clean.length <= 100 && (
-      /^#{1,4}\s+/.test(clean) ||
-      /^(النقطه|النقطة|الجزء|اولا|أولا|ثانيا|ثالثا|رابعا|خامسا|تعريف|معنى|ما هي|ما هو|انواع|أنواع|اقسام|أقسام|مثال|قاعدة|ملحوظة|تدريب)[:：\-]?/i.test(clean) ||
-      /^\[[^\]]+\]$/.test(clean)
-    );
-
-    if (isSectionSeparatorLine(clean)) {
       push();
-      nextLineIsHeading = true;
-      return;
+      const rawLine = clean.slice(1).trim();
+      const parts = splitAliasParts(rawLine);
+      const directGroup = buildAliasGroup(parts[0] || rawLine, parts.slice(1));
+      const deepGroup = globalGroups.find((group) => normalizeArabic(group.canonical) === normalizeArabic(directGroup?.canonical || rawLine));
+      setTitle(deepGroup?.canonical || directGroup?.canonical || rawLine, deepGroup?.aliases || directGroup?.aliases || []);
+      insideOpeningKeywordBlock = false;
+      continue;
     }
-
-    if (aliasGroup || nextLineIsHeading || looksLikeHeading) {
-      push();
-      setTitle(aliasGroup?.canonical || clean, aliasGroup?.aliases || []);
-      nextLineIsHeading = false;
-      return;
-    }
-
+    const norm = normalizeArabic(clean);
+    if (norm.includes('كلمات افتتاحيه') || norm.includes('كلمات للبحث') || norm.includes('افتتاحيات') || norm.includes('مرادفات')) { insideOpeningKeywordBlock = true; continue; }
+    if (insideOpeningKeywordBlock) { if (isSectionSeparatorLine(clean)) insideOpeningKeywordBlock = false; continue; }
+    if (isSectionSeparatorLine(clean)) { insideOpeningKeywordBlock = false; continue; }
+    const aliasGroup = findAliasGroupForLine(clean, globalGroups);
+    const looksLikeClearHeading = clean.length <= 90 && (/^#{1,4}\s+/.test(clean) || /^\[[^\]]+\]$/.test(clean) || /^(النقطه|النقطة|الجزء|اولا|أولا|ثانيا|ثالثا|رابعا|خامسا)[:：\-]/i.test(clean));
+    if (aliasGroup || looksLikeClearHeading) { push(); setTitle(aliasGroup?.canonical || clean, aliasGroup?.aliases || []); continue; }
     buffer.push(line);
-  });
+  }
   push();
   if (sections.length === 0) return [{ title: 'شرح عام', aliases: [], text: raw, searchable: normalizeArabic(raw) }];
   return sections;
@@ -450,6 +495,25 @@ const RafiqHeader = ({ compact = false }) => (
   </div>
 );
 
+const cleanForFirestore = (value) => {
+  if (Array.isArray(value)) return value.map(cleanForFirestore).filter((item) => item !== undefined);
+  if (value && typeof value === 'object' && !(value instanceof Date)) return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, cleanForFirestore(v)]).filter(([, v]) => v !== undefined));
+  if (value === undefined) return '';
+  return value;
+};
+
+const buildExplanationPayload = ({ form, title, content, keywords, openingKeywords, source = 'admin' }) => cleanForFirestore({
+  grade: form.grade || 'all',
+  branch: form.branch || 'عام',
+  lesson: form.lesson || title || '',
+  title: title || form.lesson || 'شرح',
+  keywords: uniqueList(keywords || []),
+  openingKeywords: openingKeywords || '',
+  content: String(content || ''),
+  searchableText: normalizeArabic([title, form.lesson, form.branch, (keywords || []).join(' '), openingKeywords, content].join(' ')),
+  source
+});
+
 export const AdminRafiqPanel = ({ adminGradeFilter = 'all' }) => {
   const [form, setForm] = useState({ grade: adminGradeFilter || 'all', branch: 'عام', lesson: '', title: '', keywords: '', openingKeywords: '', content: '' });
   const [csvText, setCsvText] = useState('');
@@ -500,39 +564,25 @@ export const AdminRafiqPanel = ({ adminGradeFilter = 'all' }) => {
       const incomingKey = lessonKeyOf(form);
       const existing = snap.docs.map((d) => ({ id: d.id, ...d.data() })).find((item) => lessonKeyOf(item) === incomingKey);
       const nowTitle = form.title.trim() || form.lesson.trim();
-      const newKeywords = parseKeywords(form.keywords);
       const newOpeningAliasGroups = collectOpeningAliasGroups(form.content, form.openingKeywords);
       const newOpeningAliasText = aliasGroupsToText(newOpeningAliasGroups);
+      const newKeywords = uniqueList([...parseKeywords(form.keywords), ...newOpeningAliasGroups.flatMap((group) => group.aliases || []), form.lesson, form.branch]);
+      const oldContent = existing ? String(existing.content || '').trim() : '';
+      const addition = String(form.content || '').trim();
+      const mergedContent = existing ? (oldContent.includes(addition) ? oldContent : (oldContent + "\n\n---\nإضافة جديدة من المستر:\n" + addition).trim()) : addition;
+      const mergedOpeningKeywords = existing ? uniqueList([existing.openingKeywords || '', newOpeningAliasText]).join('\n') : (newOpeningAliasText || form.openingKeywords || '');
+      const mergedKeywords = existing ? uniqueList([...(parseKeywords(existing.keywords) || []), ...newKeywords]) : newKeywords;
+      const payload = buildExplanationPayload({ form, title: existing?.title || nowTitle, content: mergedContent, keywords: mergedKeywords, openingKeywords: mergedOpeningKeywords, source: existing ? 'admin_merge' : 'admin' });
       if (existing) {
-        const oldContent = String(existing.content || '').trim();
-        const addition = String(form.content || '').trim();
-        const mergedContent = oldContent.includes(addition)
-          ? oldContent
-          : `${oldContent}\n\n---\nإضافة جديدة من المستر:\n${addition}`.trim();
-        const mergedKeywords = uniqueList([...(parseKeywords(existing.keywords) || []), ...newKeywords, ...newOpeningAliasGroups.flatMap((group) => group.aliases || []), form.lesson, form.branch]);
-        const mergedOpeningKeywords = uniqueList([existing.openingKeywords || '', newOpeningAliasText]).join('\n');
-        await updateDoc(doc(db, 'lesson_explanations', existing.id), {
-          title: existing.title || nowTitle,
-          content: mergedContent,
-          keywords: mergedKeywords,
-          openingKeywords: mergedOpeningKeywords,
-          openingAliasGroups: collectOpeningAliasGroups(mergedContent, mergedOpeningKeywords),
-          searchableText: normalizeArabic([existing.title || nowTitle, form.lesson, form.branch, mergedKeywords.join(' '), mergedOpeningKeywords, mergedContent].join(' ')),
-          updatedAt: serverTimestamp(),
-          lastMergeSource: 'admin_file_or_text'
-        });
-        setMessage(`تم دمج الإضافة الجديدة مع شرح درس: ${form.lesson || nowTitle}`);
+        try {
+          await updateDoc(doc(db, 'lesson_explanations', existing.id), { ...payload, updatedAt: serverTimestamp(), lastMergeSource: 'admin_file_or_text' });
+          setMessage("تم دمج الإضافة الجديدة مع شرح درس: " + (form.lesson || nowTitle));
+        } catch (updateError) {
+          await addDoc(collection(db, 'lesson_explanations'), { ...payload, supersedesId: existing.id, createdAt: serverTimestamp(), updatedAt: serverTimestamp(), source: 'admin_merge_fallback' });
+          setMessage("تم حفظ نسخة مدمجة جديدة لدرس: " + (form.lesson || nowTitle));
+        }
       } else {
-        await addDoc(collection(db, 'lesson_explanations'), {
-          ...form,
-          title: nowTitle,
-          keywords: uniqueList([...newKeywords, ...newOpeningAliasGroups.flatMap((group) => group.aliases || []), form.lesson, form.branch]),
-          openingKeywords: newOpeningAliasText || form.openingKeywords || '',
-          openingAliasGroups: newOpeningAliasGroups,
-          searchableText: normalizeArabic([nowTitle, form.lesson, form.branch, form.keywords, newOpeningAliasText, form.content].join(' ')),
-          createdAt: serverTimestamp(),
-          source: 'admin'
-        });
+        await addDoc(collection(db, 'lesson_explanations'), { ...payload, createdAt: serverTimestamp() });
         setMessage('تم حفظ شرح جديد من المستر بنجاح.');
       }
       setForm((prev) => ({ ...prev, title: '', keywords: '', openingKeywords: '', content: '' }));
@@ -587,7 +637,7 @@ export const AdminRafiqPanel = ({ adminGradeFilter = 'all' }) => {
           placeholder={'خريطة افتتاحيات الأقسام والمرادفات:\n@تعريف_الكناية | تعريف الكناية | معنى الكناية | ما هي الكناية | مقدمة الكناية\n@انواع_الكناية | أنواع الكناية | أقسام الكناية | صفة موصوف نسبة'}
         />
         <div className="bg-blue-50 border border-blue-100 rounded-2xl p-3 text-xs text-blue-800 font-bold leading-relaxed mb-3">
-          استخدم @ لتعريف مجموعة مرادفات لنفس النقطة. أي خط يبدأ بـ @ داخل الملف يصبح عنوان قسم، وأي فاصل مثل --- أو === أو كلمة "فاصل" يجعل السطر التالي عنوان قسم جديد.
+          استخدم @ لتعريف قسم جديد. يمكنك كتابة المرادفات في نفس السطر بعد | أو تحت سطر "كلمات افتتاحية للبحث:". الفواصل مثل === و--- تُقبل للقراءة ولا تكسر الحفظ، والإيموجي والمسافات والسطور الطويلة مسموحة.
         </div>
         <label className="mb-3 flex flex-col items-center justify-center gap-2 border-2 border-dashed border-amber-200 bg-amber-50/60 rounded-3xl p-5 cursor-pointer hover:bg-amber-50 transition">
           <FileText className="text-amber-700" />
