@@ -21,8 +21,37 @@ const normalizeArabic = (value = '') => String(value || '')
 
 const tokenize = (value = '') => normalizeArabic(value).split(' ').map((w) => w.trim()).filter((w) => w.length > 2);
 const parseKeywords = (value = '') => Array.isArray(value) ? value : String(value || '').split(/[،,\n]/g).map((k) => k.trim()).filter(Boolean);
-const gradeMatches = (itemGrade, userGrade) => !itemGrade || itemGrade === 'all' || !userGrade || itemGrade === userGrade;
-const lessonKeyOf = (item = {}) => normalizeArabic([item.grade || 'all', item.branch || 'عام', item.lesson || item.title || ''].join('|'));
+
+const GRADE_ALIASES = {
+  'all': ['all', 'كل الصفوف', 'عام'],
+  '1prep': ['1prep', 'اولي اعدادي', 'اولى اعدادى', 'الصف الاول الاعدادي', 'الاول الاعدادي'],
+  '2prep': ['2prep', 'تانيه اعدادي', 'ثانيه اعدادي', 'الصف الثاني الاعدادي', 'الثاني الاعدادي'],
+  '3prep': ['3prep', 'تالته اعدادي', 'ثالثه اعدادي', 'الصف الثالث الاعدادي', 'الثالث الاعدادي'],
+  '1sec': ['1sec', 'اولي ثانوي', 'اولى ثانوى', 'الصف الاول الثانوي', 'الاول الثانوي'],
+  '2sec': ['2sec', 'تانيه ثانوي', 'ثانيه ثانوي', 'الصف الثاني الثانوي', 'الثاني الثانوي'],
+  '3sec': ['3sec', 'تالته ثانوي', 'ثالثه ثانوي', 'الصف الثالث الثانوي', 'الثالث الثانوي']
+};
+
+const normalizeGrade = (value = '') => {
+  const raw = String(value || '').trim();
+  const norm = normalizeArabic(raw);
+  if (!norm) return '';
+  for (const [code, aliases] of Object.entries(GRADE_ALIASES)) {
+    if (aliases.map(normalizeArabic).includes(norm)) return code;
+  }
+  return raw;
+};
+
+const gradeMatches = (itemGrade, userGrade) => {
+  const item = normalizeGrade(itemGrade || 'all');
+  const user = normalizeGrade(userGrade || '');
+  if (!item || item === 'all' || !user || user === 'all') return true;
+  if (item === user) return true;
+  const itemKnown = Object.prototype.hasOwnProperty.call(GRADE_ALIASES, item);
+  const userKnown = Object.prototype.hasOwnProperty.call(GRADE_ALIASES, user);
+  return !(itemKnown && userKnown);
+};
+const lessonKeyOf = (item = {}) => normalizeArabic([normalizeGrade(item.grade || 'all'), item.branch || 'عام', item.lesson || item.title || ''].join('|'));
 const uniqueList = (items = []) => [...new Set(items.map((x) => String(x || '').trim()).filter(Boolean))];
 const shuffle = (arr = []) => [...arr].sort(() => Math.random() - 0.5);
 const buildQuestionSignature = (question = '') => normalizeArabic(question).split(' ').slice(0, 10).join(' ');
@@ -31,13 +60,38 @@ const scoreExplanation = (item, question, userGrade) => {
   if (!gradeMatches(item.grade, userGrade)) return -1;
   const qNorm = normalizeArabic(question);
   const words = tokenize(question);
-  const haystack = normalizeArabic([item.title, item.lesson, item.branch, parseKeywords(item.keywords).join(' '), item.content].join(' '));
+  const keywordText = parseKeywords(item.keywords).join(' ');
+  const openingAliasText = String(item.openingKeywords || '');
+  const haystack = normalizeArabic([
+    item.title, item.lesson, item.branch, keywordText, openingAliasText, item.content, item.searchableText
+  ].join(' '));
   let score = 0;
-  if (item.grade === userGrade) score += 4;
-  if (item.lesson && qNorm.includes(normalizeArabic(item.lesson))) score += 9;
-  if (item.branch && qNorm.includes(normalizeArabic(item.branch))) score += 5;
-  parseKeywords(item.keywords).forEach((kw) => { const n = normalizeArabic(kw); if (n && qNorm.includes(n)) score += 7; });
-  words.forEach((w) => { if (haystack.includes(w)) score += 1; });
+
+  if (normalizeGrade(item.grade) === normalizeGrade(userGrade)) score += 4;
+
+  const titleNorm = normalizeArabic(item.title || '');
+  const lessonNorm = normalizeArabic(item.lesson || '');
+  const branchNorm = normalizeArabic(item.branch || '');
+
+  if (lessonNorm && (qNorm === lessonNorm || qNorm.includes(lessonNorm) || lessonNorm.includes(qNorm))) score += 25;
+  if (titleNorm && (qNorm === titleNorm || qNorm.includes(titleNorm) || titleNorm.includes(qNorm))) score += 18;
+  if (branchNorm && qNorm.includes(branchNorm)) score += 4;
+
+  parseKeywords(item.keywords).forEach((kw) => {
+    const n = normalizeArabic(kw);
+    if (!n) return;
+    if (qNorm === n || qNorm.includes(n) || n.includes(qNorm)) score += 10;
+  });
+
+  collectOpeningAliasGroups(item.content || '', item.openingKeywords || '').forEach((group) => {
+    (group.normalizedAliases || []).forEach((alias) => {
+      if (!alias) return;
+      if (qNorm === alias || qNorm.includes(alias) || alias.includes(qNorm)) score += 14;
+    });
+  });
+
+  words.forEach((w) => { if (haystack.includes(w)) score += 2; });
+  if (qNorm && haystack.includes(qNorm)) score += 12;
   return score;
 };
 
@@ -514,6 +568,31 @@ const buildExplanationPayload = ({ form, title, content, keywords, openingKeywor
   source
 });
 
+const safeErrorMessage = (error) => {
+  const message = String(error?.message || error?.code || error || 'حدث خطأ غير معروف');
+  return message.length > 260 ? message.slice(0, 260) + '...' : message;
+};
+
+const safeDocs = async (q, label = 'Firestore query') => {
+  try {
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  } catch (error) {
+    console.warn(`${label} failed:`, safeErrorMessage(error));
+    return [];
+  }
+};
+
+const dedupeByIdOrLesson = (items = []) => {
+  const seen = new Set();
+  return items.filter((item) => {
+    const key = item.id || lessonKeyOf(item) || normalizeArabic([item.title, item.lesson, item.content].join('|')).slice(0, 120);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
 export const AdminRafiqPanel = ({ adminGradeFilter = 'all' }) => {
   const [form, setForm] = useState({ grade: adminGradeFilter || 'all', branch: 'عام', lesson: '', title: '', keywords: '', openingKeywords: '', content: '' });
   const [csvText, setCsvText] = useState('');
@@ -525,11 +604,17 @@ export const AdminRafiqPanel = ({ adminGradeFilter = 'all' }) => {
   useEffect(() => {
     let active = true;
     Promise.all([
-      getDocs(query(collection(db, 'lesson_explanations'), limit(500))),
-      getDocs(query(collection(db, 'rafiq_question_bank'), limit(500))),
-      getDocs(query(collection(db, 'exams'), limit(500))),
-      getDocs(query(collection(db, 'rafiq_student_weak_points'), limit(500)))
-    ]).then(([exSnap, qSnap, examSnap, weakSnap]) => { if (active) setStats({ explanations: exSnap.size, questions: qSnap.size, exams: examSnap.size, weak: weakSnap.size }); }).catch(() => {});
+      safeDocs(query(collection(db, 'lesson_explanations'), limit(700)), 'admin lesson_explanations'),
+      safeDocs(query(collection(db, 'rafiq_lessons'), limit(700)), 'admin rafiq_lessons'),
+      safeDocs(query(collection(db, 'rafiq_question_bank'), limit(700)), 'admin rafiq_question_bank'),
+      safeDocs(query(collection(db, 'rafiq_questions'), limit(700)), 'admin rafiq_questions'),
+      safeDocs(query(collection(db, 'exams'), limit(500)), 'admin exams'),
+      safeDocs(query(collection(db, 'rafiq_student_weak_points'), limit(500)), 'admin rafiq_student_weak_points')
+    ]).then(([exDocs, legacyExDocs, qDocs, legacyQDocs, examDocs, weakDocs]) => {
+      const allExDocs = dedupeByIdOrLesson([...exDocs, ...legacyExDocs]);
+      const allQDocs = [...qDocs, ...legacyQDocs];
+      if (active) setStats({ explanations: allExDocs.length, questions: allQDocs.length, exams: examDocs.length, weak: weakDocs.length });
+    }).catch(() => {});
     return () => { active = false; };
   }, [message]);
 
@@ -586,7 +671,7 @@ export const AdminRafiqPanel = ({ adminGradeFilter = 'all' }) => {
         setMessage('تم حفظ شرح جديد من المستر بنجاح.');
       }
       setForm((prev) => ({ ...prev, title: '', keywords: '', openingKeywords: '', content: '' }));
-    } catch (error) { alert('تعذر حفظ/دمج الشرح: ' + (error?.message || error)); }
+    } catch (error) { alert('تعذر حفظ/دمج الشرح: ' + safeErrorMessage(error)); }
     finally { setLoading(false); }
   };
 
@@ -606,7 +691,7 @@ export const AdminRafiqPanel = ({ adminGradeFilter = 'all' }) => {
       await batch.commit();
       setCsvText('');
       setMessage(`تم رفع ${rows.length} سؤال إلى بنك رفيقك في العربي.`);
-    } catch (error) { alert('تعذر رفع الأسئلة: ' + (error?.message || error)); }
+    } catch (error) { alert('تعذر رفع الأسئلة: ' + safeErrorMessage(error)); }
     finally { setLoading(false); }
   };
 
@@ -678,18 +763,23 @@ export const StudentRafiqAssistant = ({ user, userData }) => {
   useEffect(() => {
     let active = true;
     Promise.all([
-      getDocs(query(collection(db, 'lesson_explanations'), orderBy('createdAt', 'desc'), limit(900))),
-      getDocs(query(collection(db, 'rafiq_question_bank'), orderBy('createdAt', 'desc'), limit(1700))),
-      getDocs(query(collection(db, 'exams'), orderBy('createdAt', 'desc'), limit(450))),
-      getDocs(query(collection(db, 'rafiq_student_weak_points'), orderBy('createdAt', 'desc'), limit(600)))
-    ]).then(([exSnap, qSnap, examSnap, weakSnap]) => {
+      safeDocs(query(collection(db, 'lesson_explanations'), limit(1200)), 'student lesson_explanations'),
+      safeDocs(query(collection(db, 'rafiq_lessons'), limit(1200)), 'student rafiq_lessons'),
+      safeDocs(query(collection(db, 'rafiq_question_bank'), limit(2200)), 'student rafiq_question_bank'),
+      safeDocs(query(collection(db, 'rafiq_questions'), limit(2200)), 'student rafiq_questions'),
+      safeDocs(query(collection(db, 'exams'), limit(600)), 'student exams'),
+      safeDocs(query(collection(db, 'rafiq_student_weak_points'), limit(600)), 'student rafiq_student_weak_points')
+    ]).then(([exDocs, legacyExDocs, qDocs, legacyQDocs, examDocs, weakDocs]) => {
       if (!active) return;
-      setExplanations(exSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-      setBankQuestions(qSnap.docs.map((d) => ({ id: d.id, source: 'bank', ...d.data() })));
-      setExamQuestions(examSnap.docs.flatMap((d) => flattenExamQuestions({ id: d.id, ...d.data() })));
+      const newestFirst = (a, b) => Number(b?.createdAt?.seconds || 0) - Number(a?.createdAt?.seconds || 0);
+      const allExDocs = dedupeByIdOrLesson([...exDocs, ...legacyExDocs]);
+      const allQDocs = [...qDocs, ...legacyQDocs];
+      setExplanations(allExDocs.sort(newestFirst));
+      setBankQuestions(allQDocs.sort(newestFirst).map((d) => ({ source: 'bank', ...d })));
+      setExamQuestions(examDocs.sort(newestFirst).flatMap((d) => flattenExamQuestions(d)));
       const uid = user?.uid || '';
-      setWeakPoints(weakSnap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((w) => !uid || w.studentId === uid).slice(0, 20));
-    }).catch((error) => console.warn('Rafiq load failed:', error?.message || error)).finally(() => active && setLoading(false));
+      setWeakPoints(weakDocs.sort(newestFirst).filter((w) => !uid || w.studentId === uid || w.userId === uid).slice(0, 20));
+    }).catch((error) => console.warn('Rafiq load failed:', safeErrorMessage(error))).finally(() => active && setLoading(false));
     return () => { active = false; };
   }, [user?.uid]);
 
@@ -725,7 +815,7 @@ export const StudentRafiqAssistant = ({ user, userData }) => {
       .sort((a, b) => b.score - a.score);
 
     if (ranked.length === 0) {
-      setAnswer({ missing: true, title: 'النقطة غير موجودة حاليًا', text: 'النقطة دي مش موجودة في شرح المستر المتاح حاليًا. تم تسجيلها كموضوع يحتاج إضافة شرح لاحقًا.', lesson: '' });
+      setAnswer({ missing: true, title: 'النقطة غير موجودة حاليًا', text: explanations.length === 0 ? 'لم يتم تحميل أي شرح محفوظ بعد. تأكد أن الشرح محفوظ في مكتبة رفيقك وأن قواعد Firestore منشورة.' : 'النقطة دي مش موجودة في شرح المستر المتاح حاليًا. جرّب كتابة اسم الدرس أو إحدى الكلمات الافتتاحية، وتم تسجيلها كموضوع يحتاج إضافة شرح لاحقًا.', lesson: '' });
       try { await addDoc(collection(db, 'rafiq_unanswered_questions'), { studentId: user?.uid || '', studentName, grade: userGrade, question, createdAt: serverTimestamp() }); } catch {}
       return;
     }
