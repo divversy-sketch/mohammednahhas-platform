@@ -54,22 +54,14 @@ const formatWatchTime = (totalSeconds) => {
 };
 
 const requestNotificationPermission = () => {
-  if (!("Notification" in window)) return;
-  if (Notification.permission === "default") {
-    Notification.requestPermission().then(permission => {
-      if(permission === "granted") console.log("الإشعارات مفعلة");
-    });
-  }
+  // Browser push notifications are paused for now to avoid VAPID prompts.
+  // In-app Firestore notifications still work inside the platform.
+  return;
 };
 
-const sendSystemNotification = (title, body) => {
-  if (Notification.permission === "granted") {
-    try {
-      new Notification(title, { body: body, icon: "https://cdn-icons-png.flaticon.com/512/3449/3449750.png", vibrate: [200, 100, 200] });
-      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-      audio.volume = 0.5; audio.play().catch(e => {});
-    } catch (e) { console.error("Notification Error:", e); }
-  }
+const sendSystemNotification = () => {
+  // System notifications are disabled temporarily for better UX/performance.
+  return;
 };
 
 const getYouTubeID = (url) => {
@@ -7032,7 +7024,7 @@ const AdminDashboard = ({ user }) => {
             <div className="glass-panel p-4 md:p-6 rounded-2xl space-y-6">
               <div>
                 <h2 className="text-xl font-black text-slate-800 flex items-center gap-2"><Bell className="text-amber-600"/> إرسال إشعار للطلاب</h2>
-                <p className="text-sm text-slate-500 mt-1">الإشعار سيظهر داخل منصة الطالب، ولو الطالب مفعّل إشعارات المتصفح سيظهر له تنبيه أيضًا.</p>
+                <p className="text-sm text-slate-500 mt-1">الإشعار سيظهر داخل منصة الطالب فقط بدون طلب صلاحيات من المتصفح.</p>
               </div>
               <form onSubmit={handleSendStudentNotification} className="grid gap-4 bg-white border rounded-2xl p-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -7045,7 +7037,7 @@ const AdminDashboard = ({ user }) => {
                 <textarea className="border p-3 rounded-xl min-h-[120px]" placeholder="اكتب نص الإشعار... مثال: تم فتح امتحان فيديو جديد" value={newStudentNotification.text} onChange={e=>setNewStudentNotification({...newStudentNotification, text:e.target.value})} />
                 <input className="border p-3 rounded-xl" placeholder="رابط الفتح داخل المنصة / اتركه /" value={newStudentNotification.clickUrl} onChange={e=>setNewStudentNotification({...newStudentNotification, clickUrl:e.target.value})} />
                 <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-xl text-sm font-bold">
-                  ملاحظة: الإشعار سيظهر داخل المنصة فورًا، وسيصل Push للموبايل والكمبيوتر للطلاب الذين فعّلوا الإشعارات بعد تركيب Cloud Function.
+                  ملاحظة: الإشعار يظهر داخل المنصة فورًا. تم إيقاف Push Notifications مؤقتًا للحفاظ على السلاسة ومنع رسائل VAPID.
                 </div>
                 <button className="bg-amber-600 text-white py-3 rounded-xl font-bold hover:bg-amber-700 flex items-center justify-center gap-2"><Send size={18}/> إرسال الإشعار</button>
               </form>
@@ -7191,28 +7183,9 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   }, [userData, user]);
 
 
-  useEffect(() => {
-    let unsubscribe = null;
-    setupForegroundPushListener((payload) => {
-      const title = payload?.notification?.title || payload?.data?.title || 'تنبيه جديد';
-      const body = payload?.notification?.body || payload?.data?.body || payload?.data?.text || '';
-      setNotifications(prev => [{ id: `push_${Date.now()}`, title, text: body, createdAt: { toDate: () => new Date() } }, ...prev].slice(0, 20));
-      setHasNewNotif(true);
-    }).then(unsub => { unsubscribe = unsub; });
-    return () => { if (typeof unsubscribe === 'function') unsubscribe(); };
-  }, []);
-
   const enableMobilePushNotifications = async () => {
-    try {
-      setPushStatus('loading');
-      await savePushTokenForUser(user, userData);
-      setPushStatus('granted');
-      alert('تم تفعيل إشعارات الموبايل والكمبيوتر بنجاح ✅');
-    } catch (error) {
-      console.error('Push enable failed:', error);
-      setPushStatus(typeof Notification !== 'undefined' ? Notification.permission : 'denied');
-      alert(error?.message || 'تعذر تفعيل الإشعارات');
-    }
+    setPushStatus('disabled');
+    alert('إشعارات المتصفح متوقفة مؤقتًا. ستظهر تنبيهات المنصة داخل حساب الطالب فقط.');
   };
 
   const isPremium = userData.subscriptionStatus === 'premium' && (!userData?.subscriptionExpiry || userData?.subscriptionExpiry.toDate() > new Date());
@@ -7520,12 +7493,10 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
           ))}
         </div>
       </div>
-      <div className="bg-gradient-to-br from-amber-50 to-white rounded-3xl p-5 border border-amber-100 shadow-sm">
-        <h3 className="font-black text-slate-900 flex items-center gap-2 mb-2"><Smartphone className="text-amber-600"/> إشعارات الهاتف</h3>
-        <p className="text-sm text-slate-600 leading-relaxed mb-4">فعّل التنبيهات عشان توصلك المحاضرات والامتحانات الجديدة فورًا.</p>
-        <button onClick={enableMobilePushNotifications} disabled={pushStatus === 'loading' || pushStatus === 'granted'} className={`w-full py-3 rounded-2xl font-black transition ${pushStatus === 'granted' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-600 text-white hover:bg-amber-700'}`}>
-          {pushStatus === 'loading' ? 'جارٍ التفعيل...' : pushStatus === 'granted' ? 'الإشعارات مفعلة' : 'تفعيل الإشعارات'}
-        </button>
+      <div className="bg-gradient-to-br from-slate-50 to-white rounded-3xl p-5 border border-slate-100 shadow-sm">
+        <h3 className="font-black text-slate-900 flex items-center gap-2 mb-2"><Bell className="text-amber-600"/> تنبيهات داخل المنصة</h3>
+        <p className="text-sm text-slate-600 leading-relaxed mb-4">تم إيقاف Push Notifications مؤقتًا لتخفيف المنصة ومنع رسائل VAPID. ستظهر رسائل الإدارة هنا داخل حساب الطالب.</p>
+        <div className="bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-2xl p-3 text-sm font-black">النظام الداخلي للتنبيهات يعمل بدون طلب صلاحيات من المتصفح.</div>
       </div>
     </section>
   );
@@ -7783,23 +7754,16 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
             </div>
             <div className="flex items-center gap-3">
                 {isPremium && <span className="hidden md:flex bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-bold items-center gap-1 border border-amber-200"><Crown size={14}/> VIP صالح حتى: {userData?.subscriptionExpiry?.toDate().toLocaleDateString('ar-EG')}</span>}
-                <button onClick={() => {requestNotificationPermission(); setShowNotifications(!showNotifications); setHasNewNotif(false);}} className="relative p-2 glass-panel rounded-full shadow-sm hover:bg-white transition">
+                <button onClick={() => {setShowNotifications(!showNotifications); setHasNewNotif(false);}} className="relative p-2 glass-panel rounded-full shadow-sm hover:bg-white transition">
                     <Bell className="text-slate-600"/>{hasNewNotif && <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>}
                 </button>
             </div>
             {showNotifications && (
                 <div className="absolute top-12 left-0 w-80 glass-panel rounded-xl shadow-xl border border-white/50 p-4 z-50 max-h-96 overflow-y-auto">
                     <div className="flex items-center justify-between gap-2 mb-3">
-                        <h3 className="font-bold text-sm text-slate-500">الإشعارات</h3>
-                        <span className={`text-[10px] px-2 py-1 rounded-full font-bold ${pushStatus === 'granted' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                          {pushStatus === 'granted' ? 'Push مفعل' : 'Push غير مفعل'}
-                        </span>
+                        <h3 className="font-bold text-sm text-slate-500">تنبيهات المنصة</h3>
+                        <span className="text-[10px] px-2 py-1 rounded-full font-bold bg-emerald-100 text-emerald-700">داخلي</span>
                     </div>
-                    {pushStatus !== 'granted' && (
-                      <button onClick={enableMobilePushNotifications} className="w-full mb-3 bg-amber-600 text-white py-2 rounded-xl text-xs font-bold hover:bg-amber-700">
-                        تفعيل إشعارات الموبايل والكمبيوتر
-                      </button>
-                    )}
                     {notifications.length === 0 ? <p className="text-xs text-slate-400">لا توجد إشعارات جديدة</p> : (
                         <div className="space-y-3">
                             {notifications.map((n, i) => (
