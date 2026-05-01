@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { addDoc, collection, getDocs, limit, orderBy, query, serverTimestamp, writeBatch, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { BookOpen, BrainCircuit, CheckCircle, ClipboardList, Loader2, PlusCircle, Search, Sparkles, UploadCloud, XCircle, Lightbulb } from '../../shared/icons/lucide-shim.jsx';
+import { BookOpen, BrainCircuit, CheckCircle, ClipboardList, Loader2, PlusCircle, Search, Sparkles, UploadCloud, XCircle, Lightbulb, FileText, User, GraduationCap } from '../../shared/icons/lucide-shim.jsx';
 
 const GRADES = [
   ['all', 'كل الصفوف'], ['1prep', 'الصف الأول الإعدادي'], ['2prep', 'الصف الثاني الإعدادي'], ['3prep', 'الصف الثالث الإعدادي'],
@@ -23,8 +23,9 @@ const tokenize = (value = '') => normalizeArabic(value).split(' ').map((w) => w.
 const parseKeywords = (value = '') => Array.isArray(value) ? value : String(value || '').split(/[،,\n]/g).map((k) => k.trim()).filter(Boolean);
 const gradeMatches = (itemGrade, userGrade) => !itemGrade || itemGrade === 'all' || !userGrade || itemGrade === userGrade;
 const lessonKeyOf = (item = {}) => normalizeArabic([item.grade || 'all', item.branch || 'عام', item.lesson || item.title || ''].join('|'));
-
 const uniqueList = (items = []) => [...new Set(items.map((x) => String(x || '').trim()).filter(Boolean))];
+const shuffle = (arr = []) => [...arr].sort(() => Math.random() - 0.5);
+const buildQuestionSignature = (question = '') => normalizeArabic(question).split(' ').slice(0, 10).join(' ');
 
 const scoreExplanation = (item, question, userGrade) => {
   if (!gradeMatches(item.grade, userGrade)) return -1;
@@ -33,25 +34,26 @@ const scoreExplanation = (item, question, userGrade) => {
   const haystack = normalizeArabic([item.title, item.lesson, item.branch, parseKeywords(item.keywords).join(' '), item.content].join(' '));
   let score = 0;
   if (item.grade === userGrade) score += 4;
-  if (item.lesson && qNorm.includes(normalizeArabic(item.lesson))) score += 8;
+  if (item.lesson && qNorm.includes(normalizeArabic(item.lesson))) score += 9;
   if (item.branch && qNorm.includes(normalizeArabic(item.branch))) score += 5;
   parseKeywords(item.keywords).forEach((kw) => { const n = normalizeArabic(kw); if (n && qNorm.includes(n)) score += 7; });
   words.forEach((w) => { if (haystack.includes(w)) score += 1; });
   return score;
 };
 
-const getAnswerFromContent = (content = '', question = '') => {
+const splitChunks = (content = '') => String(content || '').trim().split(/\n{2,}|(?<=[.!؟])\s+/g).map((c) => c.trim()).filter((c) => c.length > 25);
+const getAnswerFromContent = (content = '', question = '', max = 1600) => {
   const clean = String(content || '').trim();
   if (!clean) return '';
-  const chunks = clean.split(/\n{2,}|(?<=[.!؟])\s+/g).map((c) => c.trim()).filter((c) => c.length > 30);
-  if (chunks.length === 0) return clean.slice(0, 1400);
+  const chunks = splitChunks(clean);
+  if (chunks.length === 0) return clean.slice(0, max);
   const words = tokenize(question);
   const ranked = chunks.map((chunk) => {
     const n = normalizeArabic(chunk);
     return { chunk, score: words.reduce((sum, w) => sum + (n.includes(w) ? 1 : 0), 0) };
   }).sort((a, b) => b.score - a.score);
-  const best = ranked.filter((r) => r.score > 0).slice(0, 3).map((r) => r.chunk);
-  return (best.length ? best : chunks.slice(0, 2)).join('\n\n').slice(0, 1600);
+  const best = ranked.filter((r) => r.score > 0).slice(0, 4).map((r) => r.chunk);
+  return (best.length ? best : chunks.slice(0, 2)).join('\n\n').slice(0, max);
 };
 
 const parseCsvLine = (line) => {
@@ -100,9 +102,9 @@ const parseQuestionCsv = (csvText = '') => {
       question: get(row, ['question', 'السؤال']),
       options,
       correctIdx: correctIdx < 0 ? 0 : correctIdx,
-      explanation: get(row, ['explanation', 'شرح', 'الشرح']),
+      explanation: get(row, ['explanation', 'شرح', 'الشرح', 'answerExplanation', 'تعليل']),
       difficulty: get(row, ['difficulty', 'الصعوبة']) || 'medium',
-      tags: parseKeywords(get(row, ['tags', 'keywords', 'كلمات مفتاحية'])),
+      tags: parseKeywords(get(row, ['tags', 'keywords', 'كلمات مفتاحية', 'النقطة'])),
       includeInQuiz: !['false', '0', 'لا', 'no'].includes(includeInQuizRaw)
     };
   }).filter((q) => q.question && q.options.length >= 2);
@@ -131,19 +133,21 @@ const flattenExamQuestions = (exam = {}) => {
   });
 };
 
-const rankQuestions = (items = [], { answer, question, userGrade, excludeIds = [] }) => {
+const rankQuestions = (items = [], { answer, question, userGrade, excludeIds = [], allowExamples = true }) => {
   const lesson = normalizeArabic(answer?.lesson || answer?.title || '');
   const branch = normalizeArabic(answer?.branch || '');
+  const point = normalizeArabic(answer?.pointTitle || '');
   const qWords = tokenize(question);
   const excluded = new Set(excludeIds);
   return items
     .filter((q) => gradeMatches(q.grade, userGrade))
-    .filter((q) => q.includeInQuiz !== false)
+    .filter((q) => allowExamples || q.includeInQuiz !== false)
     .filter((q) => !excluded.has(q.id))
     .map((q) => {
       const hay = normalizeArabic([q.lesson, q.branch, q.question, q.explanation, (q.tags || []).join(' '), q.examTitle].join(' '));
       let score = 0;
       if (lesson && hay.includes(lesson)) score += 10;
+      if (point && hay.includes(point)) score += 8;
       if (branch && hay.includes(branch)) score += 3;
       qWords.forEach((w) => { if (hay.includes(w)) score += 1; });
       return { q, score };
@@ -152,9 +156,6 @@ const rankQuestions = (items = [], { answer, question, userGrade, excludeIds = [
     .sort((a, b) => b.score - a.score)
     .map((x) => x.q);
 };
-
-const shuffle = (arr = []) => [...arr].sort(() => Math.random() - 0.5);
-
 
 const extractLessonSections = (content = '') => {
   const raw = String(content || '').replace(/\r/g, '').trim();
@@ -170,10 +171,10 @@ const extractLessonSections = (content = '') => {
   };
   lines.forEach((line) => {
     const clean = line.trim();
-    const looksLikeHeading = clean && clean.length <= 70 && (
+    const looksLikeHeading = clean && clean.length <= 80 && (
       /^#{1,4}\s+/.test(clean) ||
       /^[-–—]{2,}/.test(clean) ||
-      /^(النقطه|النقطة|الجزء|اولا|أولا|ثانيا|ثالثا|رابعا|خامسا|تعريف|مثال|قاعدة)[:：\-]/i.test(clean) ||
+      /^(النقطه|النقطة|الجزء|اولا|أولا|ثانيا|ثالثا|رابعا|خامسا|تعريف|مثال|قاعدة|ملحوظة|تدريب)[:：\-]/i.test(clean) ||
       /^\[[^\]]+\]$/.test(clean)
     );
     if (looksLikeHeading) {
@@ -202,22 +203,154 @@ const findBestLessonPoint = (content = '', question = '', fallbackTitle = '') =>
   }).sort((a, b) => b.score - a.score);
   const best = ranked[0];
   if (!best || best.score <= 0) return { pointTitle: fallbackTitle || 'شرح عام', pointText: getAnswerFromContent(content, question) };
-  return { pointTitle: best.title || fallbackTitle || 'شرح عام', pointText: getAnswerFromContent(best.text, question) || best.text.slice(0, 1600) };
+  return { pointTitle: best.title || fallbackTitle || 'شرح عام', pointText: getAnswerFromContent(best.text, question) || best.text.slice(0, 1800) };
 };
 
-const makeSimplerExplanation = (text = '') => {
+const makeSimplerExplanation = (text = '', studentProfile = {}) => {
   const source = String(text || '').trim();
   if (!source) return '';
-  const sentences = source.split(/(?<=[.!؟])\s+|\n+/g).map((x) => x.trim()).filter(Boolean).slice(0, 6);
-  const bullets = sentences.map((sentence) => `• ${sentence.replace(/^[-•\s]+/, '')}`);
-  return [
-    'خلينا نبسطها خطوة خطوة:',
-    ...bullets,
-    'الخلاصة: ركّز على الكلمة الأساسية في السؤال، ثم طبّق القاعدة على المثال.'
-  ].join('\n');
+  const sentences = source.split(/(?<=[.!؟])\s+|\n+/g).map((x) => x.trim()).filter(Boolean).slice(0, 7);
+  const intro = studentProfile?.weakPoint
+    ? `خلينا نشرحها بطريقة أبسط لأن واضح إن نقطة "${studentProfile.weakPoint}" محتاجة تثبيت:`
+    : 'خلينا نبسطها خطوة خطوة:';
+  return [intro, ...sentences.map((sentence) => `• ${sentence.replace(/^[-•\s]+/, '')}`), 'الخلاصة: اقرأ السؤال، حدد الكلمة المطلوبة، ثم طبّق القاعدة على المثال.'].join('\n');
 };
 
-const buildQuestionSignature = (question = '') => normalizeArabic(question).split(' ').slice(0, 10).join(' ');
+const getStudentName = (user, userData) => userData?.name || user?.displayName || 'يا بطل';
+
+const buildPersonalLesson = ({ answer, examples = [], weakPoints = [], studentName = 'يا بطل' }) => {
+  if (!answer || answer.missing) return '';
+  const topWeak = weakPoints?.[0]?.pointTitle || weakPoints?.[0]?.lesson || '';
+  const exampleLines = examples.slice(0, 3).map((q, idx) => {
+    const correct = q.options?.[q.correctIdx] || q.options?.[0] || '';
+    return `${idx + 1}. ${q.question}\nالإجابة: ${correct}${q.explanation ? `\nالسبب: ${q.explanation}` : ''}`;
+  }).join('\n\n');
+  return [
+    `${studentName}، ده درس سريع مخصص لك في: ${answer.pointTitle || answer.lesson || answer.title}`,
+    topWeak ? `هنركز أكتر لأن عندك متابعة سابقة على: ${topWeak}` : 'هنمشي خطوة خطوة بدون حشو.',
+    '1) الفكرة الأساسية:',
+    answer.text,
+    exampleLines ? '2) أمثلة محلولة من أسئلة المستر:\n' + exampleLines : '',
+    '3) طريقة الحل:',
+    'اقرأ المطلوب، حدد الكلمة أو الجملة المقصودة، طبق القاعدة، ثم راجع سبب الإجابة.',
+    '4) بعد المراجعة اضغط "اختبرني" عشان نتأكد إن النقطة ثبتت.'
+  ].filter(Boolean).join('\n\n');
+};
+
+const readTextFile = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(String(reader.result || ''));
+  reader.onerror = reject;
+  reader.readAsText(file, 'utf-8');
+});
+
+const readArrayBuffer = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(reader.result);
+  reader.onerror = reject;
+  reader.readAsArrayBuffer(file);
+});
+
+const decodeXmlText = (xml = '') => String(xml || '')
+  .replace(/<w:tab\/>/g, ' ')
+  .replace(/<w:br\/>/g, '\n')
+  .replace(/<\/w:p>/g, '\n')
+  .replace(/<[^>]+>/g, '')
+  .replace(/&amp;/g, '&')
+  .replace(/&lt;/g, '<')
+  .replace(/&gt;/g, '>')
+  .replace(/&quot;/g, '"')
+  .replace(/&#39;/g, "'")
+  .replace(/\n{3,}/g, '\n\n')
+  .trim();
+
+const inflateRaw = async (uint8) => {
+  if (!('DecompressionStream' in window)) throw new Error('المتصفح لا يدعم قراءة DOCX/XLSX مباشرة. استخدم TXT/CSV أو انسخ النص.');
+  const ds = new DecompressionStream('deflate-raw');
+  const writer = ds.writable.getWriter();
+  writer.write(uint8);
+  writer.close();
+  const ab = await new Response(ds.readable).arrayBuffer();
+  return new Uint8Array(ab);
+};
+
+const parseZipEntries = async (arrayBuffer) => {
+  const bytes = new Uint8Array(arrayBuffer);
+  const view = new DataView(arrayBuffer);
+  const decoder = new TextDecoder('utf-8');
+  const entries = {};
+  let pos = 0;
+  while (pos < bytes.length - 30) {
+    const sig = view.getUint32(pos, true);
+    if (sig !== 0x04034b50) { pos += 1; continue; }
+    const method = view.getUint16(pos + 8, true);
+    const compressedSize = view.getUint32(pos + 18, true);
+    const fileNameLength = view.getUint16(pos + 26, true);
+    const extraLength = view.getUint16(pos + 28, true);
+    const nameStart = pos + 30;
+    const name = decoder.decode(bytes.slice(nameStart, nameStart + fileNameLength));
+    const dataStart = nameStart + fileNameLength + extraLength;
+    const dataEnd = dataStart + compressedSize;
+    if (dataEnd > bytes.length || compressedSize <= 0) { pos = dataStart; continue; }
+    const compressed = bytes.slice(dataStart, dataEnd);
+    let data;
+    if (method === 0) data = compressed;
+    else if (method === 8) data = await inflateRaw(compressed);
+    if (data) entries[name] = decoder.decode(data);
+    pos = dataEnd;
+  }
+  return entries;
+};
+
+const extractDocxText = async (file) => {
+  const ab = await readArrayBuffer(file);
+  const entries = await parseZipEntries(ab);
+  const main = entries['word/document.xml'];
+  if (!main) throw new Error('لم أستطع قراءة ملف DOCX.');
+  return decodeXmlText(main);
+};
+
+const extractXlsxText = async (file) => {
+  const ab = await readArrayBuffer(file);
+  const entries = await parseZipEntries(ab);
+  const sharedXml = entries['xl/sharedStrings.xml'] || '';
+  const shared = [...sharedXml.matchAll(/<t[^>]*>(.*?)<\/t>/g)].map((m) => decodeXmlText(m[1]));
+  const sheets = Object.entries(entries).filter(([name]) => /^xl\/worksheets\/sheet\d+\.xml$/.test(name));
+  const rows = [];
+  sheets.forEach(([name, xml]) => {
+    rows.push(`--- ${name.split('/').pop()} ---`);
+    const rowMatches = [...xml.matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g)];
+    rowMatches.forEach((rowMatch) => {
+      const cells = [...rowMatch[1].matchAll(/<c[^>]*(?:t="(s)")?[^>]*>[\s\S]*?<v>(.*?)<\/v>[\s\S]*?<\/c>/g)].map((m) => {
+        const val = decodeXmlText(m[2]);
+        return m[1] === 's' ? (shared[Number(val)] || val) : val;
+      });
+      if (cells.length) rows.push(cells.join(' | '));
+    });
+  });
+  return rows.join('\n').trim();
+};
+
+const extractPdfTextLight = async (file) => {
+  const ab = await readArrayBuffer(file);
+  const text = new TextDecoder('latin1').decode(new Uint8Array(ab));
+  const parts = [];
+  const parenMatches = [...text.matchAll(/\(([^()]{2,300})\)\s*Tj/g)].map((m) => m[1]);
+  const arrayMatches = [...text.matchAll(/\[((?:\([^()]{1,200}\)\s*)+)\]\s*TJ/g)].map((m) => m[1].replace(/[()]/g, ' '));
+  parts.push(...parenMatches, ...arrayMatches);
+  const clean = parts.join('\n').replace(/\\[()]/g, '').replace(/\s{2,}/g, ' ').trim();
+  if (!clean || clean.length < 50) throw new Error('قراءة PDF مباشرة محدودة. لو النص لم يظهر، صدّر الملف TXT أو DOCX وارفعه.');
+  return clean;
+};
+
+const extractTextFromUpload = async (file) => {
+  const name = file.name.toLowerCase();
+  if (name.endsWith('.txt') || name.endsWith('.md') || name.endsWith('.csv')) return readTextFile(file);
+  if (name.endsWith('.docx')) return extractDocxText(file);
+  if (name.endsWith('.xlsx')) return extractXlsxText(file);
+  if (name.endsWith('.pdf')) return extractPdfTextLight(file);
+  return readTextFile(file);
+};
 
 const RafiqHeader = ({ compact = false }) => (
   <div className={`bg-gradient-to-r from-slate-950 via-slate-900 to-amber-950 text-white rounded-[2rem] ${compact ? 'p-5' : 'p-7'} shadow-xl border border-amber-500/20 overflow-hidden relative`}>
@@ -227,7 +360,7 @@ const RafiqHeader = ({ compact = false }) => (
       <div>
         <p className="text-amber-200 font-black text-sm">من شرح المستر فقط</p>
         <h2 className="text-2xl md:text-3xl font-black">رفيقك في العربي</h2>
-        <p className="text-slate-300 text-sm mt-1">اسأل في شرح الدرس، ولو احتجت أمثلة أكثر نجيبها من أسئلة المستر بدون ما تتكرر في الاختبار.</p>
+        <p className="text-slate-300 text-sm mt-1">مدرس مساعد يشرح من محتوى المستر، يبسّط حسب الطالب، ويقترح درسًا مخصصًا بدون هبد.</p>
       </div>
     </div>
   </div>
@@ -237,27 +370,47 @@ export const AdminRafiqPanel = ({ adminGradeFilter = 'all' }) => {
   const [form, setForm] = useState({ grade: adminGradeFilter || 'all', branch: 'عام', lesson: '', title: '', keywords: '', content: '' });
   const [csvText, setCsvText] = useState('');
   const [loading, setLoading] = useState(false);
+  const [fileLoading, setFileLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [stats, setStats] = useState({ explanations: 0, questions: 0, exams: 0 });
+  const [stats, setStats] = useState({ explanations: 0, questions: 0, exams: 0, weak: 0 });
 
   useEffect(() => {
     let active = true;
     Promise.all([
       getDocs(query(collection(db, 'lesson_explanations'), limit(500))),
       getDocs(query(collection(db, 'rafiq_question_bank'), limit(500))),
-      getDocs(query(collection(db, 'exams'), limit(500)))
-    ]).then(([exSnap, qSnap, examSnap]) => { if (active) setStats({ explanations: exSnap.size, questions: qSnap.size, exams: examSnap.size }); }).catch(() => {});
+      getDocs(query(collection(db, 'exams'), limit(500))),
+      getDocs(query(collection(db, 'rafiq_student_weak_points'), limit(500)))
+    ]).then(([exSnap, qSnap, examSnap, weakSnap]) => { if (active) setStats({ explanations: exSnap.size, questions: qSnap.size, exams: examSnap.size, weak: weakSnap.size }); }).catch(() => {});
     return () => { active = false; };
   }, [message]);
 
   const update = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
 
+  const handleExplanationFile = async (file) => {
+    if (!file) return;
+    setFileLoading(true);
+    try {
+      const extracted = await extractTextFromUpload(file);
+      if (!extracted.trim()) return alert('لم أستطع استخراج نص واضح من الملف.');
+      setForm((prev) => ({
+        ...prev,
+        title: prev.title || file.name.replace(/\.[^.]+$/, ''),
+        lesson: prev.lesson || file.name.replace(/\.[^.]+$/, ''),
+        content: prev.content ? `${prev.content}\n\n---\nمحتوى مستخرج من الملف: ${file.name}\n${extracted}` : extracted
+      }));
+      setMessage(`تم استخراج الشرح من الملف: ${file.name}. راجعه ثم اضغط حفظ/دمج.`);
+    } catch (error) {
+      alert(error?.message || 'تعذر قراءة الملف.');
+    } finally { setFileLoading(false); }
+  };
+
   const saveExplanation = async () => {
     if (!form.lesson.trim() && !form.title.trim()) return alert('اكتب اسم الدرس أو عنوان الشرح أولًا.');
-    if (!form.content.trim()) return alert('اكتب محتوى الشرح أولًا.');
+    if (!form.content.trim()) return alert('اكتب محتوى الشرح أو ارفع ملفًا أولًا.');
     setLoading(true);
     try {
-      const snap = await getDocs(query(collection(db, 'lesson_explanations'), limit(700)));
+      const snap = await getDocs(query(collection(db, 'lesson_explanations'), limit(900)));
       const incomingKey = lessonKeyOf(form);
       const existing = snap.docs.map((d) => ({ id: d.id, ...d.data() })).find((item) => lessonKeyOf(item) === incomingKey);
       const nowTitle = form.title.trim() || form.lesson.trim();
@@ -275,7 +428,7 @@ export const AdminRafiqPanel = ({ adminGradeFilter = 'all' }) => {
           keywords: mergedKeywords,
           searchableText: normalizeArabic([existing.title || nowTitle, form.lesson, form.branch, mergedKeywords.join(' '), mergedContent].join(' ')),
           updatedAt: serverTimestamp(),
-          lastMergeSource: 'admin'
+          lastMergeSource: 'admin_file_or_text'
         });
         setMessage(`تم دمج الإضافة الجديدة مع شرح درس: ${form.lesson || nowTitle}`);
       } else {
@@ -319,14 +472,14 @@ export const AdminRafiqPanel = ({ adminGradeFilter = 'all' }) => {
     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
       <div className="bg-white rounded-3xl p-5 border border-amber-100 shadow-sm"><p className="text-sm text-slate-500 font-bold">شروحات محفوظة</p><p className="text-4xl font-black text-amber-700 mt-2">{stats.explanations}</p></div>
       <div className="bg-white rounded-3xl p-5 border border-blue-100 shadow-sm"><p className="text-sm text-slate-500 font-bold">أسئلة بنك رفيق</p><p className="text-4xl font-black text-blue-700 mt-2">{stats.questions}</p></div>
-      <div className="bg-white rounded-3xl p-5 border border-purple-100 shadow-sm"><p className="text-sm text-slate-500 font-bold">امتحانات متاحة للأمثلة</p><p className="text-4xl font-black text-purple-700 mt-2">{stats.exams}</p></div>
-      <div className="bg-emerald-50 rounded-3xl p-5 border border-emerald-100 shadow-sm"><p className="text-sm text-emerald-700 font-black">المرحلة الثانية</p><p className="text-sm text-emerald-800 mt-2 leading-relaxed">دمج الشرح + أمثلة من أسئلة الامتحانات + منع تكرار نفس الأسئلة في اختبار الطالب.</p></div>
+      <div className="bg-white rounded-3xl p-5 border border-purple-100 shadow-sm"><p className="text-sm text-slate-500 font-bold">امتحانات للأمثلة</p><p className="text-4xl font-black text-purple-700 mt-2">{stats.exams}</p></div>
+      <div className="bg-rose-50 rounded-3xl p-5 border border-rose-100 shadow-sm"><p className="text-sm text-rose-700 font-black">نقاط ضعف مسجلة</p><p className="text-4xl font-black text-rose-700 mt-2">{stats.weak}</p></div>
     </div>
     {message && <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl p-4 font-black flex items-center gap-2"><CheckCircle/> {message}</div>}
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
       <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
         <h3 className="text-xl font-black text-slate-900 mb-4 flex items-center gap-2"><BookOpen className="text-amber-600"/> إضافة أو استكمال شرح درس</h3>
-        <div className="bg-amber-50 border border-amber-100 rounded-2xl p-3 text-sm text-amber-800 font-bold mb-4">لو كتبت نفس الصف + الفرع + اسم الدرس، الشرح الجديد هيتدمج مع القديم بدل ما يعمل تكرار.</div>
+        <div className="bg-amber-50 border border-amber-100 rounded-2xl p-3 text-sm text-amber-800 font-bold mb-4">ارفع TXT أو DOCX أو PDF أو Excel/CSV، ولو نفس الصف + الفرع + الدرس موجودين هيتدمج تلقائيًا مع الشرح القديم.</div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
           <select value={form.grade} onChange={(e) => update('grade', e.target.value)} className="border rounded-2xl p-3 font-bold bg-white">{GRADES.map(([v,l]) => <option key={v} value={v}>{l}</option>)}</select>
           <select value={form.branch} onChange={(e) => update('branch', e.target.value)} className="border rounded-2xl p-3 font-bold bg-white">{BRANCHES.map((b) => <option key={b} value={b}>{b}</option>)}</select>
@@ -334,6 +487,13 @@ export const AdminRafiqPanel = ({ adminGradeFilter = 'all' }) => {
           <input value={form.title} onChange={(e) => update('title', e.target.value)} className="border rounded-2xl p-3 font-bold" placeholder="عنوان اختياري للشرح" />
         </div>
         <input value={form.keywords} onChange={(e) => update('keywords', e.target.value)} className="border rounded-2xl p-3 font-bold w-full mb-3" placeholder="كلمات مفتاحية مفصولة بفواصل: نعت، منعوت، إعراب" />
+        <label className="mb-3 flex flex-col items-center justify-center gap-2 border-2 border-dashed border-amber-200 bg-amber-50/60 rounded-3xl p-5 cursor-pointer hover:bg-amber-50 transition">
+          <FileText className="text-amber-700" />
+          <span className="font-black text-amber-800">ارفع ملف شرح TXT / DOCX / PDF / Excel</span>
+          <span className="text-xs text-amber-700">سيتم استخراج النص داخل المتصفح ثم تراجعه قبل الحفظ</span>
+          <input type="file" accept=".txt,.md,.csv,.docx,.xlsx,.pdf" className="hidden" onChange={(e) => handleExplanationFile(e.target.files?.[0])} />
+        </label>
+        {fileLoading && <p className="text-sm font-bold text-blue-700 bg-blue-50 rounded-xl p-3 mb-3 flex items-center gap-2"><Loader2 className="animate-spin"/> جاري قراءة الملف...</p>}
         <textarea value={form.content} onChange={(e) => update('content', e.target.value)} className="border rounded-2xl p-4 w-full min-h-[260px] leading-loose" placeholder="اكتب شرح المستر أو الإضافة الجديدة هنا..." />
         <button disabled={loading} onClick={saveExplanation} className="mt-4 bg-amber-600 hover:bg-amber-700 text-white px-6 py-3 rounded-2xl font-black flex items-center gap-2 disabled:opacity-60">{loading ? <Loader2 className="animate-spin"/> : <PlusCircle/>} حفظ / دمج الشرح</button>
       </div>
@@ -353,53 +513,59 @@ export const StudentRafiqAssistant = ({ user, userData }) => {
   const [explanations, setExplanations] = useState([]);
   const [bankQuestions, setBankQuestions] = useState([]);
   const [examQuestions, setExamQuestions] = useState([]);
+  const [weakPoints, setWeakPoints] = useState([]);
   const [exampleQuestions, setExampleQuestions] = useState([]);
   const [exampleIds, setExampleIds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [quiz, setQuiz] = useState([]);
   const [selected, setSelected] = useState({});
   const [simplerText, setSimplerText] = useState('');
+  const [personalLesson, setPersonalLesson] = useState('');
   const [feedbackSent, setFeedbackSent] = useState(false);
 
   useEffect(() => {
     let active = true;
     Promise.all([
-      getDocs(query(collection(db, 'lesson_explanations'), orderBy('createdAt', 'desc'), limit(700))),
-      getDocs(query(collection(db, 'rafiq_question_bank'), orderBy('createdAt', 'desc'), limit(1500))),
-      getDocs(query(collection(db, 'exams'), orderBy('createdAt', 'desc'), limit(400)))
-    ]).then(([exSnap, qSnap, examSnap]) => {
+      getDocs(query(collection(db, 'lesson_explanations'), orderBy('createdAt', 'desc'), limit(900))),
+      getDocs(query(collection(db, 'rafiq_question_bank'), orderBy('createdAt', 'desc'), limit(1700))),
+      getDocs(query(collection(db, 'exams'), orderBy('createdAt', 'desc'), limit(450))),
+      getDocs(query(collection(db, 'rafiq_student_weak_points'), orderBy('createdAt', 'desc'), limit(600)))
+    ]).then(([exSnap, qSnap, examSnap, weakSnap]) => {
       if (!active) return;
       setExplanations(exSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
       setBankQuestions(qSnap.docs.map((d) => ({ id: d.id, source: 'bank', ...d.data() })));
-      const flattened = examSnap.docs.flatMap((d) => flattenExamQuestions({ id: d.id, ...d.data() }));
-      setExamQuestions(flattened);
+      setExamQuestions(examSnap.docs.flatMap((d) => flattenExamQuestions({ id: d.id, ...d.data() })));
+      const uid = user?.uid || '';
+      setWeakPoints(weakSnap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((w) => !uid || w.studentId === uid).slice(0, 20));
     }).catch((error) => console.warn('Rafiq load failed:', error?.message || error)).finally(() => active && setLoading(false));
     return () => { active = false; };
-  }, []);
+  }, [user?.uid]);
 
   const allQuestions = useMemo(() => [...bankQuestions, ...examQuestions], [bankQuestions, examQuestions]);
+  const studentName = getStudentName(user, userData);
+  const topWeakPoint = weakPoints?.[0]?.pointTitle || weakPoints?.[0]?.lesson || '';
 
   const logInteraction = async ({ type, payload = {} }) => {
     try {
       await addDoc(collection(db, 'rafiq_interactions'), {
         type,
         studentId: user?.uid || '',
-        studentName: userData?.name || user?.displayName || '',
+        studentName,
         grade: userData?.grade || 'all',
         question: question.trim(),
         questionSignature: buildQuestionSignature(question),
         answerTitle: answer?.title || '',
         lesson: answer?.lesson || '',
         pointTitle: answer?.pointTitle || '',
-        createdAt: serverTimestamp(),
-        ...payload
+        payload,
+        createdAt: serverTimestamp()
       });
     } catch {}
   };
 
   const ask = async () => {
-    if (!question.trim()) return;
-    setQuiz([]); setSelected({}); setExampleQuestions([]); setExampleIds([]); setSimplerText(''); setFeedbackSent(false);
+    if (!question.trim()) return alert('اكتب سؤالك الأول.');
+    setAnswer(null); setQuiz([]); setSelected({}); setExampleQuestions([]); setExampleIds([]); setSimplerText(''); setPersonalLesson(''); setFeedbackSent(false);
     const userGrade = userData?.grade || 'all';
     const ranked = explanations
       .map((item) => ({ item, score: scoreExplanation(item, question, userGrade) }))
@@ -408,7 +574,7 @@ export const StudentRafiqAssistant = ({ user, userData }) => {
 
     if (ranked.length === 0) {
       setAnswer({ missing: true, title: 'النقطة غير موجودة حاليًا', text: 'النقطة دي مش موجودة في شرح المستر المتاح حاليًا. تم تسجيلها كموضوع يحتاج إضافة شرح لاحقًا.', lesson: '' });
-      try { await addDoc(collection(db, 'rafiq_unanswered_questions'), { studentId: user?.uid || '', studentName: userData?.name || user?.displayName || '', grade: userGrade, question, createdAt: serverTimestamp() }); } catch {}
+      try { await addDoc(collection(db, 'rafiq_unanswered_questions'), { studentId: user?.uid || '', studentName, grade: userGrade, question, createdAt: serverTimestamp() }); } catch {}
       return;
     }
 
@@ -426,22 +592,15 @@ export const StudentRafiqAssistant = ({ user, userData }) => {
     setAnswer(newAnswer);
     try {
       await addDoc(collection(db, 'rafiq_answered_questions'), {
-        studentId: user?.uid || '',
-        studentName: userData?.name || user?.displayName || '',
-        grade: userGrade,
-        question,
-        lesson: newAnswer.lesson,
-        branch: newAnswer.branch,
-        pointTitle: newAnswer.pointTitle,
-        createdAt: serverTimestamp()
+        studentId: user?.uid || '', studentName, grade: userGrade, question,
+        lesson: newAnswer.lesson, branch: newAnswer.branch, pointTitle: newAnswer.pointTitle, createdAt: serverTimestamp()
       });
     } catch {}
   };
 
   const showMoreExamples = () => {
     if (!answer || answer.missing) return;
-    const userGrade = userData?.grade || 'all';
-    const ranked = rankQuestions(allQuestions, { answer, question, userGrade, excludeIds: [] });
+    const ranked = rankQuestions(allQuestions, { answer, question, userGrade: userData?.grade || 'all', excludeIds: [], allowExamples: true });
     const examples = shuffle(ranked).slice(0, 6);
     if (examples.length === 0) return alert('لا توجد أمثلة مرتبطة بهذه النقطة في أسئلة المستر أو الامتحانات حتى الآن.');
     setExampleQuestions(examples);
@@ -451,9 +610,21 @@ export const StudentRafiqAssistant = ({ user, userData }) => {
 
   const explainSimpler = () => {
     if (!answer || answer.missing) return;
-    const simplified = makeSimplerExplanation(answer.text);
-    setSimplerText(simplified);
+    setSimplerText(makeSimplerExplanation(answer.text, { weakPoint: topWeakPoint }));
     logInteraction({ type: 'simpler_requested' });
+  };
+
+  const generatePersonalLesson = () => {
+    if (!answer || answer.missing) return;
+    let examples = exampleQuestions;
+    if (examples.length === 0) {
+      const ranked = rankQuestions(allQuestions, { answer, question, userGrade: userData?.grade || 'all', excludeIds: [], allowExamples: true });
+      examples = shuffle(ranked).slice(0, 4);
+      setExampleQuestions(examples);
+      setExampleIds(examples.map((q) => q.id));
+    }
+    setPersonalLesson(buildPersonalLesson({ answer, examples, weakPoints, studentName }));
+    logInteraction({ type: 'personal_lesson_generated', payload: { examplesCount: examples.length } });
   };
 
   const sendUnderstanding = async (understood) => {
@@ -463,25 +634,18 @@ export const StudentRafiqAssistant = ({ user, userData }) => {
     if (!understood) {
       try {
         await addDoc(collection(db, 'rafiq_student_weak_points'), {
-          studentId: user?.uid || '',
-          studentName: userData?.name || user?.displayName || '',
-          grade: userData?.grade || 'all',
-          lesson: answer.lesson || '',
-          branch: answer.branch || '',
-          pointTitle: answer.pointTitle || answer.title || '',
-          question,
-          createdAt: serverTimestamp(),
-          status: 'needs_review'
+          studentId: user?.uid || '', studentName, grade: userData?.grade || 'all',
+          lesson: answer.lesson || '', branch: answer.branch || '', pointTitle: answer.pointTitle || answer.title || '',
+          question, createdAt: serverTimestamp(), status: 'needs_review'
         });
       } catch {}
-      if (!simplerText) setSimplerText(makeSimplerExplanation(answer.text));
+      if (!simplerText) setSimplerText(makeSimplerExplanation(answer.text, { weakPoint: answer.pointTitle }));
     }
   };
 
   const generateQuiz = () => {
     if (!answer || answer.missing) return;
-    const userGrade = userData?.grade || 'all';
-    const ranked = rankQuestions(allQuestions, { answer, question, userGrade, excludeIds: exampleIds });
+    const ranked = rankQuestions(allQuestions, { answer, question, userGrade: userData?.grade || 'all', excludeIds: exampleIds, allowExamples: false });
     const quizQuestions = shuffle(ranked).slice(0, 6);
     if (quizQuestions.length === 0) return alert('لا توجد أسئلة كافية مرتبطة بهذه النقطة بعد استبعاد أمثلة الشرح. ارفع أسئلة أكثر من لوحة الأدمن.');
     setQuiz(quizQuestions); setSelected({});
@@ -491,38 +655,21 @@ export const StudentRafiqAssistant = ({ user, userData }) => {
 
   return <div className="space-y-6 page-soft-enter">
     <RafiqHeader compact />
+    {topWeakPoint && <div className="bg-amber-50 border border-amber-100 rounded-3xl p-4 text-amber-900 font-bold flex items-center gap-3"><User/> {studentName}، هنراعي إن عندك نقطة محتاجة تثبيت: <span className="font-black">{topWeakPoint}</span></div>}
     <div className="bg-white rounded-3xl p-5 md:p-7 border border-slate-100 shadow-sm">
       <div className="flex flex-col md:flex-row gap-3">
         <input value={question} onChange={(e) => setQuestion(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && ask()} className="flex-1 border-2 border-slate-100 focus:border-amber-400 rounded-2xl p-4 font-bold outline-none" placeholder="اسأل رفيقك: مش فاهم النعت الحقيقي، الفرق بين الحال والنعت، إزاي أطلع الاستعارة..." />
         <button onClick={ask} disabled={loading} className="bg-slate-950 hover:bg-slate-900 text-white px-6 py-4 rounded-2xl font-black flex items-center justify-center gap-2 disabled:opacity-60">{loading ? <Loader2 className="animate-spin"/> : <Search/>} اسأل رفيقك</button>
       </div>
-      <p className="text-xs text-slate-400 mt-3 font-bold">الرد يعتمد على شرح المستر أولًا، والأمثلة تأتي من أسئلة المستر والامتحانات بدون تكرارها في الاختبار الحالي.</p>
+      <p className="text-xs text-slate-400 mt-3 font-bold">الرد من شرح المستر فقط. الأمثلة من أسئلة المستر والامتحانات، ولا تتكرر في الاختبار الحالي.</p>
     </div>
     {answer && <div className={`rounded-3xl p-6 border shadow-sm ${answer.missing ? 'bg-amber-50 border-amber-200' : 'bg-white border-emerald-100'}`}>
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <div>
-          <p className={`text-xs font-black mb-1 ${answer.missing ? 'text-amber-700' : 'text-emerald-700'}`}>{answer.source || 'مطلوب إضافة شرح'}</p>
-          <h3 className="text-2xl font-black text-slate-900">{answer.title}</h3>
-          {!answer.missing && <p className="text-sm text-slate-500 mt-1">{answer.branch} {answer.lesson ? `— ${answer.lesson}` : ''}</p>}
-          {!answer.missing && answer.pointTitle && <p className="inline-flex mt-3 bg-amber-50 text-amber-800 border border-amber-100 rounded-full px-4 py-1 text-xs font-black">النقطة المطابقة: {answer.pointTitle}</p>}
-        </div>
-        {answer.missing ? <XCircle className="text-amber-600"/> : <Sparkles className="text-emerald-600"/>}
-      </div>
+      <div className="flex items-start justify-between gap-3 mb-4"><div><p className={`text-xs font-black mb-1 ${answer.missing ? 'text-amber-700' : 'text-emerald-700'}`}>{answer.source || 'مطلوب إضافة شرح'}</p><h3 className="text-2xl font-black text-slate-900">{answer.title}</h3>{!answer.missing && <p className="text-sm text-slate-500 mt-1">{answer.branch} {answer.lesson ? `— ${answer.lesson}` : ''}</p>}{!answer.missing && answer.pointTitle && <p className="inline-flex mt-3 bg-amber-50 text-amber-800 border border-amber-100 rounded-full px-4 py-1 text-xs font-black">النقطة المطابقة: {answer.pointTitle}</p>}</div>{answer.missing ? <XCircle className="text-amber-600"/> : <Sparkles className="text-emerald-600"/>}</div>
       <div className="bg-slate-50 rounded-2xl p-5 leading-loose text-slate-800 whitespace-pre-wrap font-bold">{answer.text}</div>
       {simplerText && <div className="mt-4 bg-blue-50 border border-blue-100 rounded-2xl p-5 leading-loose text-blue-900 whitespace-pre-wrap font-bold">{simplerText}</div>}
-      {!answer.missing && <div className="mt-5 flex flex-col md:flex-row flex-wrap gap-3">
-        <button onClick={explainSimpler} className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-2xl font-black flex items-center gap-2"><BrainCircuit/> افهمني أكتر</button>
-        <button onClick={showMoreExamples} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl font-black flex items-center gap-2"><Lightbulb/> أمثلة أكثر</button>
-        <button onClick={generateQuiz} className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-3 rounded-2xl font-black flex items-center gap-2"><ClipboardList/> اختبرني على النقطة دي</button>
-      </div>}
-      {!answer.missing && <div className="mt-5 bg-slate-50 border border-slate-100 rounded-2xl p-4">
-        <p className="text-sm font-black text-slate-700 mb-3">هل الشرح وضح لك النقطة؟</p>
-        <div className="flex gap-2">
-          <button disabled={feedbackSent} onClick={() => sendUnderstanding(true)} className="bg-emerald-600 disabled:opacity-60 text-white px-4 py-2 rounded-xl font-black">نعم فهمت</button>
-          <button disabled={feedbackSent} onClick={() => sendUnderstanding(false)} className="bg-rose-600 disabled:opacity-60 text-white px-4 py-2 rounded-xl font-black">لا، محتاج أبسط</button>
-        </div>
-        {feedbackSent && <p className="text-xs text-slate-500 mt-2 font-bold">تم تسجيل إجابتك لتحسين متابعة نقاط ضعفك.</p>}
-      </div>}
+      {personalLesson && <div className="mt-4 bg-purple-50 border border-purple-100 rounded-2xl p-5 leading-loose text-purple-950 whitespace-pre-wrap font-bold"><div className="flex items-center gap-2 mb-2 text-purple-800 font-black"><GraduationCap/> درس مخصص لك</div>{personalLesson}</div>}
+      {!answer.missing && <div className="mt-5 flex flex-col md:flex-row flex-wrap gap-3"><button onClick={explainSimpler} className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-2xl font-black flex items-center gap-2"><BrainCircuit/> افهمني أكتر</button><button onClick={showMoreExamples} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl font-black flex items-center gap-2"><Lightbulb/> أمثلة أكثر</button><button onClick={generatePersonalLesson} className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-2xl font-black flex items-center gap-2"><GraduationCap/> اعملي درس مخصص</button><button onClick={generateQuiz} className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-3 rounded-2xl font-black flex items-center gap-2"><ClipboardList/> اختبرني على النقطة دي</button></div>}
+      {!answer.missing && <div className="mt-5 bg-slate-50 border border-slate-100 rounded-2xl p-4"><p className="text-sm font-black text-slate-700 mb-3">هل الشرح وضح لك النقطة؟</p><div className="flex gap-2"><button disabled={feedbackSent} onClick={() => sendUnderstanding(true)} className="bg-emerald-600 disabled:opacity-60 text-white px-4 py-2 rounded-xl font-black">نعم فهمت</button><button disabled={feedbackSent} onClick={() => sendUnderstanding(false)} className="bg-rose-600 disabled:opacity-60 text-white px-4 py-2 rounded-xl font-black">لا، محتاج أبسط</button></div>{feedbackSent && <p className="text-xs text-slate-500 mt-2 font-bold">تم تسجيل إجابتك لتحسين متابعة نقاط ضعفك.</p>}</div>}
     </div>}
     {exampleQuestions.length > 0 && <div className="bg-blue-50 rounded-3xl p-6 border border-blue-100 shadow-sm"><h3 className="text-xl font-black text-blue-900 flex items-center gap-2 mb-4"><Lightbulb/> أمثلة من أسئلة المستر والامتحانات</h3><div className="space-y-3">{exampleQuestions.map((q, idx) => <div key={q.id || idx} className="bg-white border border-blue-100 rounded-2xl p-4"><p className="font-black text-slate-900 mb-2">مثال {idx + 1}: {q.question}</p>{q.options?.length > 0 && <p className="text-sm text-slate-700 mb-2"><b>الإجابة:</b> {q.options[q.correctIdx] || q.options[0]}</p>}{q.explanation && <p className="text-sm text-blue-800 leading-relaxed"><b>الشرح:</b> {q.explanation}</p>}<p className="text-[11px] text-slate-400 mt-2">لن يظهر هذا السؤال في الاختبار الحالي بعد استخدامه كمثال.</p></div>)}</div></div>}
     {quiz.length > 0 && <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm"><div className="flex items-center justify-between gap-3 mb-5"><h3 className="text-xl font-black text-slate-900 flex items-center gap-2"><ClipboardList className="text-amber-600"/> اختبار سريع من أسئلة المستر</h3><span className="bg-slate-900 text-white px-4 py-2 rounded-full font-black text-sm">{correctCount}/{quiz.length}</span></div><div className="space-y-4">{quiz.map((q, idx) => <div key={q.id || idx} className="border border-slate-100 rounded-2xl p-4 bg-slate-50/70"><p className="font-black text-slate-900 mb-3">{idx + 1}. {q.question}</p><div className="grid grid-cols-1 md:grid-cols-2 gap-2">{(q.options || []).map((opt, optIdx) => { const picked = selected[q.id] === optIdx; const revealed = selected[q.id] !== undefined; const correct = q.correctIdx === optIdx; return <button key={optIdx} onClick={() => setSelected((prev) => ({ ...prev, [q.id]: optIdx }))} className={`text-right p-3 rounded-xl border font-bold transition ${revealed && correct ? 'bg-emerald-50 border-emerald-300 text-emerald-800' : picked ? 'bg-amber-50 border-amber-300 text-amber-800' : 'bg-white border-slate-200 text-slate-700 hover:border-amber-200'}`}>{opt}</button>; })}</div>{selected[q.id] !== undefined && q.explanation && <p className="mt-3 text-sm bg-white rounded-xl p-3 text-slate-600 leading-relaxed"><b>الشرح:</b> {q.explanation}</p>}</div>)}</div></div>}
