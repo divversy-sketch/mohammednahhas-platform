@@ -99,16 +99,6 @@ const DesignSystemLoader = () => {
       .perf-low .student-sticky-hero { animation: softEntrance .25s ease both; }
       .perf-low .student-sticky-hero::after { animation-duration: 8s; opacity: .55; }
 
-
-      @keyframes smartSkeletonShimmer { 0% { transform: translateX(120%); } 100% { transform: translateX(-120%); } }
-      .smart-skeleton { position: relative; overflow: hidden; background: linear-gradient(90deg, rgba(226,232,240,.62), rgba(248,250,252,.92), rgba(226,232,240,.62)); border-radius: 1rem; }
-      .smart-skeleton::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.75), transparent); transform: translateX(120%); animation: smartSkeletonShimmer 1.35s ease-in-out infinite; }
-      .smart-card-enter { animation: softEntrance .32s cubic-bezier(.2,.8,.2,1) both; }
-      .smart-study-step { transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease; }
-      .smart-study-step:hover { transform: translateY(-2px); box-shadow: 0 12px 24px rgba(15,23,42,.08); }
-      .perf-low .smart-skeleton::after { animation-duration: 2.1s; opacity: .65; }
-      .perf-low .smart-study-step:hover { transform: none; box-shadow: 0 4px 14px rgba(15,23,42,.06); }
-
       .perf-low body { scroll-behavior: auto; }
       .perf-low .glass-panel, .perf-low .glass-card { backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); box-shadow: 0 3px 12px rgba(0,0,0,0.06) !important; }
       .perf-low .glass-card { transition: transform 160ms ease, box-shadow 160ms ease !important; contain: layout paint; }
