@@ -242,6 +242,42 @@ const getGradeBadge = (percentage = 0) => {
 
 const VIDEO_EXAM_UNLOCK_PERCENT = 75;
 
+
+const InlineTabs = ({ tabs = [], defaultTab }) => {
+  const visibleTabs = tabs.filter(Boolean);
+  const [activeKey, setActiveKey] = useState(defaultTab || visibleTabs[0]?.key);
+  const current = visibleTabs.find(tab => tab.key === activeKey) || visibleTabs[0];
+  useEffect(() => {
+    if (visibleTabs.length && !visibleTabs.some(tab => tab.key === activeKey)) {
+      setActiveKey(visibleTabs[0].key);
+    }
+  }, [activeKey, visibleTabs.map(tab => tab.key).join('|')]);
+  if (!visibleTabs.length) return null;
+  return (
+    <div className="space-y-5">
+      <div className="sticky top-0 z-20 bg-white/85 backdrop-blur-xl border border-slate-100 rounded-2xl p-2 shadow-sm overflow-x-auto">
+        <div className="flex gap-2 min-w-max">
+          {visibleTabs.map(tab => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveKey(tab.key)}
+              className={`px-4 py-2.5 rounded-xl font-black text-sm transition whitespace-nowrap ${current?.key === tab.key ? 'bg-amber-600 text-white shadow-lg shadow-amber-500/20' : 'bg-slate-50 text-slate-600 hover:bg-amber-50 hover:text-amber-700'}`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div>{current?.content}</div>
+    </div>
+  );
+};
+
+const TabPaneCard = ({ children, className = '' }) => (
+  <div className={`glass-panel p-4 md:p-6 rounded-2xl ${className}`}>{children}</div>
+);
+
 const getQuestionMaxScore = (q) => safeNumber(q?.maxScore ?? q?.mark ?? q?.points, q?.type === 'essay' ? 10 : 1);
 
 const extractAllQuestions = (exam) => (exam?.questions || []).flatMap(block =>
@@ -6335,12 +6371,15 @@ const AdminDashboard = ({ user }) => {
 
         <div className="md:col-span-3 w-full overflow-hidden">
           {activeTab === 'dashboard' && (
-            <div className="space-y-6">
-              <AdminProDashboard users={activeUsersList} exams={examsList} results={examResults} content={contentList} subscriptionCodes={subscriptionCodes} liveSessions={activeLiveSessions} hwResults={hwResults} adminGradeFilter={adminGradeFilter} />
-              <AdminPerformanceAnalytics examResults={examResults} examsList={examsList} users={activeUsersList} adminGradeFilter={adminGradeFilter} />
-              <AdminQuestionDeepAnalytics examsList={examsList} examResults={examResults} />
-              <LeaderboardPanel examResults={examResults} users={activeUsersList} gradeFilter={adminGradeFilter} />
-            </div>
+            <InlineTabs
+              defaultTab="overview"
+              tabs={[
+                { key: 'overview', label: 'نظرة عامة', content: <AdminProDashboard users={activeUsersList} exams={examsList} results={examResults} content={contentList} subscriptionCodes={subscriptionCodes} liveSessions={activeLiveSessions} hwResults={hwResults} adminGradeFilter={adminGradeFilter} /> },
+                { key: 'performance', label: 'تحليل الأداء', content: <AdminPerformanceAnalytics examResults={examResults} examsList={examsList} users={activeUsersList} adminGradeFilter={adminGradeFilter} /> },
+                { key: 'questions', label: 'تحليل الأسئلة', content: <AdminQuestionDeepAnalytics examsList={examsList} examResults={examResults} /> },
+                { key: 'leaderboard', label: 'لوحة الشرف', content: <LeaderboardPanel examResults={examResults} users={activeUsersList} gradeFilter={adminGradeFilter} /> }
+              ]}
+            />
           )}
 
           {activeTab === 'users' && <div className="glass-panel p-4 md:p-6 rounded-xl"><h2 className="font-bold mb-4 font-arabic text-xl">طلبات الانضمام</h2>{filteredPendingUsers.map(u=><div key={u.id} className="border p-4 mb-2 rounded-lg flex flex-col md:flex-row gap-3 justify-between bg-white/50 backdrop-blur-sm"><div><p className="font-bold">{u.name}</p><p className="text-sm">{u.grade}</p></div><div className="flex gap-2"><button onClick={()=>handleApprove(u.id)} className="bg-green-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-green-500/50 transition flex-1"><Check className="mx-auto"/></button><button onClick={()=>handleReject(u.id)} className="bg-red-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-red-500/50 transition flex-1"><X className="mx-auto"/></button></div></div>)}</div>}
@@ -6601,9 +6640,9 @@ const AdminDashboard = ({ user }) => {
               </div>
           )}
 
-          {activeTab === 'question_bank' && <QuestionBankManager adminGradeFilter={adminGradeFilter} />}
+          {activeTab === 'question_bank' && <InlineTabs tabs={[{ key: 'bank', label: 'إدارة بنك الأسئلة', content: <QuestionBankManager adminGradeFilter={adminGradeFilter} /> }]} />}
 
-          {activeTab === 'assignments' && <AssignmentsManager adminGradeFilter={adminGradeFilter} />}
+          {activeTab === 'assignments' && <InlineTabs tabs={[{ key: 'assignments_admin', label: 'إدارة الواجبات', content: <AssignmentsManager adminGradeFilter={adminGradeFilter} /> }]} />}
 
           {activeTab === 'exams' && (
               <div className="space-y-8">
@@ -6837,7 +6876,7 @@ const AdminDashboard = ({ user }) => {
           
 
           {activeTab === 'security_center' && (
-            <AdvancedAntiCheatInsights examResults={examResults} />
+            <InlineTabs tabs={[{ key: 'anti_cheat', label: 'تنبيهات الحماية', content: <AdvancedAntiCheatInsights examResults={examResults} /> }]} />
           )}
 
           {activeTab === 'live_ai' && (
