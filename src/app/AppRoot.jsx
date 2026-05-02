@@ -27,9 +27,7 @@ import MobileExamHelperStyles from '../shared/components/MobileExamHelperStyles'
 import DesignSystemLoader from '../shared/components/DesignSystemLoader';
 import { GradeOptions, getGradeLabel } from '../shared/constants/grades';
 import { normalizeEgyptPhone, isValidEgyptPhone, validateEgyptianPhones } from '../shared/utils/phone';
-import { AdminStudentMessaging, StudentMessagesPanel, StudentAdminMessagePopup } from '../features/messages/StudentMessages';
-import { AdminRafiqPanel, StudentRafiqAssistant } from '../features/rafiq/RafiqArabic';
-import { PWAInstallBox, ModernLogo, FloatingArabicBackground, WisdomBox, Announcements, Leaderboard, ChatWidget } from '../features/home/HomeWidgets';
+import { PWAInstallBox, ModernLogo, FloatingArabicBackground, WisdomBox, Announcements, Leaderboard } from '../features/home/HomeWidgets';
 import PomodoroFocusMode from '../features/study/PomodoroFocusMode';
 import InteractiveViewer from '../features/content/InteractiveViewer';
 import SmartHomeworkScanner from '../features/homework/SmartHomeworkScanner';
@@ -71,6 +69,25 @@ const getYouTubeID = (url) => {
     const match = url.match(regExp);
     return (match && match[2].length === 11) ? match[2] : null;
 };
+
+const PLATFORM_WHATSAPP_NUMBER = '201500076322';
+
+const openPlatformWhatsApp = (text = 'السلام عليكم، محتاج أتواصل مع إدارة منصة النحاس.') => {
+    window.open(`https://wa.me/${PLATFORM_WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`, '_blank');
+};
+
+const WhatsAppContactButton = ({ compact = false }) => (
+    <button
+        type="button"
+        onClick={() => openPlatformWhatsApp()}
+        className={compact
+            ? "bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full font-black shadow-lg flex items-center gap-2 transition"
+            : "fixed bottom-5 left-5 z-[999] bg-green-600 hover:bg-green-700 text-white px-5 py-3 rounded-full font-black shadow-2xl flex items-center gap-2 transition transform hover:-translate-y-1"}
+        title="التواصل مع الإدارة عبر واتساب"
+    >
+        <MessageCircle size={20}/> واتساب الإدارة
+    </button>
+);
 
 
 const renderBracketHighlightedText = (text = '') => {
@@ -6296,17 +6313,35 @@ const AdminDashboard = ({ user }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-4 md:p-6 relative z-10">
         <div className="glass-panel p-4 rounded-xl h-fit space-y-2 flex md:flex-col overflow-x-auto md:overflow-x-visible whitespace-nowrap scrollbar-hide">
-          {['dashboard', 'users', 'all_users', 'subscriptions', 'payments', 'security_center', 'rafiq_arabic', 'ai_analytics', 'live_ai', 'app_convert', 'ai_lab', 'ai_insights', 'leaderboard', 'question_bank', 'assignments', 'exams', 'results', 'analytics', 'question-analytics', 'smart_hw', 'content', 'notifications', 'student-messages', 'messages'].map(tab => (
+          {[
+            ['dashboard', 'Dashboard شامل'],
+            ['users', 'طلبات الانضمام'],
+            ['all_users', 'الطلاب'],
+            ['payments', 'الاشتراكات والدفع'],
+            ['security_center', 'مركز الحماية'],
+            ['live_ai', 'البث المباشر'],
+            ['app_convert', 'تحويل App'],
+            ['question_bank', 'بنك الأسئلة'],
+            ['assignments', 'الواجبات'],
+            ['exams', 'الامتحانات والنتائج'],
+            ['smart_hw', 'الواجب الذكي QR'],
+            ['content', 'المحتوى']
+          ].map(([tab, label]) => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 transition-all ${activeTab===tab?'bg-amber-100 text-amber-700 shadow-sm border-b-4 md:border-b-0 md:border-r-4 border-amber-500':'hover:bg-slate-50 text-slate-600'}`}>
-              {tab === 'dashboard' ? 'Dashboard' : tab === 'users' ? 'الطلبات' : tab === 'all_users' ? 'الطلاب' : tab === 'subscriptions' ? 'أكواد الاشتراكات' : tab === 'payments' ? 'طلبات الدفع' : tab === 'security_center' ? 'مركز الحماية' : tab === 'rafiq_arabic' ? 'رفيقك في العربي' : tab === 'ai_analytics' ? 'تحليلات AI' : tab === 'live_ai' ? 'البث المباشر + Live AI' : tab === 'app_convert' ? 'تحويل App' : tab === 'ai_lab' ? 'AI Lab' : tab === 'ai_insights' ? 'AI Insights' : tab === 'leaderboard' ? 'لوحة الشرف' : tab === 'question_bank' ? 'بنك الأسئلة' : tab === 'assignments' ? 'الواجبات' : tab === 'exams' ? 'الامتحانات' : tab === 'results' ? 'النتائج' : tab === 'analytics' ? 'تحليل الطلاب' : tab === 'question-analytics' ? 'تحليل الأسئلة' : tab === 'smart_hw' ? 'الواجب الذكي (QR)' : tab === 'live' ? 'البث' : tab === 'content' ? 'المحتوى' : tab === 'notifications' ? 'إشعارات الطلاب' : tab === 'student-messages' ? 'رسائل الطلاب' : tab === 'messages' ? 'الرسائل' : 'الإعدادات'}
+              {label}
             </button>
           ))}
         </div>
 
         <div className="md:col-span-3 w-full overflow-hidden">
-          {activeTab === 'dashboard' && <AdminProDashboard users={activeUsersList} exams={examsList} results={examResults} content={contentList} subscriptionCodes={subscriptionCodes} liveSessions={activeLiveSessions} hwResults={hwResults} adminGradeFilter={adminGradeFilter} />}
-
-          {activeTab === 'rafiq_arabic' && <AdminRafiqPanel adminGradeFilter={adminGradeFilter} />}
+          {activeTab === 'dashboard' && (
+            <div className="space-y-6">
+              <AdminProDashboard users={activeUsersList} exams={examsList} results={examResults} content={contentList} subscriptionCodes={subscriptionCodes} liveSessions={activeLiveSessions} hwResults={hwResults} adminGradeFilter={adminGradeFilter} />
+              <AdminPerformanceAnalytics examResults={examResults} examsList={examsList} users={activeUsersList} adminGradeFilter={adminGradeFilter} />
+              <AdminQuestionDeepAnalytics examsList={examsList} examResults={examResults} />
+              <LeaderboardPanel examResults={examResults} users={activeUsersList} gradeFilter={adminGradeFilter} />
+            </div>
+          )}
 
           {activeTab === 'users' && <div className="glass-panel p-4 md:p-6 rounded-xl"><h2 className="font-bold mb-4 font-arabic text-xl">طلبات الانضمام</h2>{filteredPendingUsers.map(u=><div key={u.id} className="border p-4 mb-2 rounded-lg flex flex-col md:flex-row gap-3 justify-between bg-white/50 backdrop-blur-sm"><div><p className="font-bold">{u.name}</p><p className="text-sm">{u.grade}</p></div><div className="flex gap-2"><button onClick={()=>handleApprove(u.id)} className="bg-green-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-green-500/50 transition flex-1"><Check className="mx-auto"/></button><button onClick={()=>handleReject(u.id)} className="bg-red-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-red-500/50 transition flex-1"><X className="mx-auto"/></button></div></div>)}</div>}
 
@@ -6391,8 +6426,11 @@ const AdminDashboard = ({ user }) => {
               </div>
           )}
 
-          {activeTab === 'subscriptions' && (
-            <SmartSubscriptionManager users={activeUsersList} adminGradeFilter={adminGradeFilter} />
+          {activeTab === 'payments' && (
+            <div className="space-y-6">
+              <AdminPaymentRequestsPanel users={activeUsersList} />
+              <SmartSubscriptionManager users={activeUsersList} adminGradeFilter={adminGradeFilter} />
+            </div>
           )}
 
           {activeTab === 'subscriptions_legacy' && (
@@ -6625,9 +6663,9 @@ const AdminDashboard = ({ user }) => {
               </div>
           )}
 
-          {activeTab === 'analytics' && <AdminPerformanceAnalytics examResults={examResults} examsList={examsList} users={activeUsersList} adminGradeFilter={adminGradeFilter} />}
+          
 
-          {activeTab === 'results' && (
+          {activeTab === 'exams' && (
              <div className="glass-panel p-4 md:p-6 rounded-xl">
                <div className="flex flex-col md:flex-row justify-between md:items-center mb-4 gap-4">
                  <h2 className="font-bold flex items-center gap-2 font-arabic text-xl"><Layout/> نتائج الامتحانات</h2>
@@ -6797,45 +6835,9 @@ const AdminDashboard = ({ user }) => {
           
           
           
-          {activeTab === 'payments' && (
-            <AdminPaymentRequestsPanel users={activeUsersList} />
-          )}
 
           {activeTab === 'security_center' && (
             <AdvancedAntiCheatInsights examResults={examResults} />
-          )}
-
-          
-          {activeTab === 'ai_analytics' && (
-            <AdminAIUsageAnalytics users={activeUsersList} />
-          )}
-
-
-          {false && activeTab === 'live_ai' && (
-            <LiveSessionsAdminPanel adminGradeFilter={adminGradeFilter} />
-          )}
-
-{activeTab === 'app_convert' && (
-            <AppConversionGuidePanel />
-          )}
-
-{activeTab === 'ai_lab' && (
-            <div className="space-y-6">
-              <AIQuestionGeneratorPanel />
-              <AIExamBuilderPanel />
-            </div>
-          )}
-
-{activeTab === 'ai_insights' && (
-            <AdminAIInsightsPanel examResults={examResults} examsList={examsList} content={contentList || []} />
-          )}
-
-{activeTab === 'leaderboard' && (
-            <LeaderboardPanel examResults={examResults} users={activeUsersList} gradeFilter={adminGradeFilter} />
-          )}
-
-{activeTab === 'question-analytics' && (
-            <AdminQuestionDeepAnalytics examsList={examsList} examResults={examResults} />
           )}
 
           {activeTab === 'live_ai' && (
@@ -7021,7 +7023,6 @@ const AdminDashboard = ({ user }) => {
           )}
 
 
-          {activeTab === 'student-messages' && <AdminStudentMessaging users={activeUsersList} adminGradeFilter={adminGradeFilter} />}
 
           {activeTab === 'notifications' && (
             <div className="glass-panel p-4 md:p-6 rounded-2xl space-y-6">
@@ -7053,7 +7054,6 @@ const AdminDashboard = ({ user }) => {
             </div>
           )}
 
-          {activeTab === 'messages' && <StudentMessagesPanel user={user} userData={userData} />}
 
           {/* تم حذف صفحة الرد الآلي وإدارة الحكم من لوحة الأدمن */}
         </div>
@@ -7321,8 +7321,8 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   const averageScore = completedExamResults.length > 0
       ? Math.round(completedExamResults.reduce((sum, r) => sum + getResultPercentage(r), 0) / completedExamResults.length)
       : 0;
-  const unseenNotificationCount = notifications.length;
-  const recentNotificationItems = notifications.slice(0, 4);
+  const unseenNotificationCount = 0;
+  const recentNotificationItems = [];
 
   const smartWeakBranches = (() => {
       const totals = {};
@@ -7482,7 +7482,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
           <div>
             <h3 className="text-xl font-black text-slate-900 flex items-center gap-2"><Bell className="text-amber-600"/> مركز الإشعارات</h3>
-            <p className="text-sm text-slate-500 mt-1">آخر رسائل الإدارة والمحاضرات والامتحانات في مكان واحد.</p>
+            <p className="text-sm text-slate-500 mt-1">المحاضرات والامتحانات والواجبات في مكان واحد، والتواصل عبر واتساب فقط.</p>
           </div>
           <button onClick={() => { setShowNotifications(true); setHasNewNotif(false); }} className="bg-slate-900 text-white px-5 py-2 rounded-xl font-bold hover:bg-slate-800 transition">عرض الكل</button>
         </div>
@@ -7499,7 +7499,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
       </div>
       <div className="bg-gradient-to-br from-slate-50 to-white rounded-3xl p-5 border border-slate-100 shadow-sm">
         <h3 className="font-black text-slate-900 flex items-center gap-2 mb-2"><Bell className="text-amber-600"/> تنبيهات داخل المنصة</h3>
-        <p className="text-sm text-slate-600 leading-relaxed mb-4">تم إيقاف Push Notifications مؤقتًا لتخفيف المنصة ومنع رسائل VAPID. ستظهر رسائل الإدارة هنا داخل حساب الطالب.</p>
+        <p className="text-sm text-slate-600 leading-relaxed mb-4">لأي استفسار أو مشكلة في التفعيل استخدم واتساب الإدارة فقط، بدون رسائل داخلية أو إشعارات داخل المنصة.</p>
         <div className="bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-2xl p-3 text-sm font-black">النظام الداخلي للتنبيهات يعمل بدون طلب صلاحيات من المتصفح.</div>
       </div>
     </section>
@@ -7713,12 +7713,8 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
   return (
     <div className="bg-slate-50 relative font-['Cairo'] min-h-screen block" dir="rtl">
-      <div className="hidden md:block"><StudentAdminMessagePopup user={user} userData={userData} /></div>
 
       <MobileStudentBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
-
-      {/* تم حذف زر مراسلة الإدارة العائم للحفاظ على واجهة الطالب نظيفة وسلسة.
-          تظل رسائل الإدارة المهمة تظهر تلقائياً من خلال StudentAdminMessagePopup على الشاشات الكبيرة. */}
       {playingVideo && <SecureVideoPlayer video={playingVideo} user={user} userName={userData?.name} onClose={() => setPlayingVideo(null)} onProgress={handleVideoProgress} />}
       {playingHtml && <InteractiveViewer content={playingHtml} user={userData} onClose={() => setPlayingHtml(null)} />}
       {/* AI امتحانات الطلاب متوقفة مؤقتًا لتوفير Gemini quota */}
@@ -8217,7 +8213,7 @@ const LandingPage = ({ onAuthClick, installPrompt }) => {
       {playingVideo && <SecureVideoPlayer video={playingVideo} user={null} userName="زائر" onClose={() => setPlayingVideo(null)} />}
       {playingHtml && <InteractiveViewer content={playingHtml} user={null} onClose={() => setPlayingHtml(null)} />}
       <FloatingArabicBackground />
-      <ChatWidget />
+      <WhatsAppContactButton />
       <nav className="relative z-10 flex justify-between items-center p-4 md:p-6 max-w-7xl mx-auto glass-panel mt-4 rounded-full mx-2 md:mx-4 shadow-lg">
         <div className="flex items-center gap-2"><ModernLogo /><span className="text-xl md:text-2xl font-bold font-arabic text-amber-800 hidden md:block">منصة النحاس</span></div>
         <div className="flex gap-2 md:gap-4 items-center">
@@ -8334,7 +8330,7 @@ const AuthPage = ({ onBack }) => {
         </form>
         <button onClick={() => setIsRegister(!isRegister)} className="mt-4 md:mt-6 text-amber-800 font-bold hover:underline w-full text-center block text-sm">{isRegister ? 'تسجيل الدخول' : 'حساب جديد'}</button>
       </motion.div>
-      <ChatWidget />
+      <WhatsAppContactButton />
     </div>
   );
 };
