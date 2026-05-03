@@ -33,7 +33,7 @@ import InteractiveViewer from '../features/content/InteractiveViewer';
 import SmartHomeworkScanner from '../features/homework/SmartHomeworkScanner';
 import { AdminCoursesManager, StudentCoursesHub } from '../features/courses/CourseSystem';
 import { uploadToCloudinary } from '../services/cloudinaryUpload';
-import { uploadToFirebaseContent, detectContentType } from '../services/firebaseContentUpload';
+import { uploadToFirebaseContent, detectContentType, readHtmlFileAsInlineContent } from '../services/firebaseContentUpload';
 
 const getAdminAIHeaders = async () => {
   const token = await auth?.currentUser?.getIdToken?.();
@@ -5729,26 +5729,30 @@ const AdminDashboard = ({ user }) => {
       setUploadProgress(1);
       try {
           // صفحة المحتوى العام منفصلة عن الكورسات:
-          // أي ملف هنا يترفع على Firebase Storage، حتى HTML، عشان يفتح داخل المنصة داخل iframe.
-          const uploaded = await uploadToFirebaseContent(file, {
-              folder: newContent.type || 'general',
-              onProgress: (percent) => setUploadProgress(percent)
-          });
+          // HTML صغير مثل 120KB يتم حفظه كنص داخل Firestore ويفتح داخل المنصة فورًا.
+          // باقي الملفات تترفع على Firebase Storage. الكورسات فقط تستخدم Cloudinary.
           const autoType = detectContentType(file);
+          const uploaded = autoType === 'html'
+            ? await readHtmlFileAsInlineContent(file)
+            : await uploadToFirebaseContent(file, {
+                folder: newContent.type || 'general',
+                onProgress: (percent) => setUploadProgress(percent)
+            });
           setNewContent({
               ...newContent,
               url: uploaded.url,
+              htmlContent: uploaded.htmlContent || '',
               fileName: uploaded.name,
               fileSize: uploaded.size,
               mimeType: uploaded.mimeType,
               firebaseStoragePath: uploaded.path,
-              storageProvider: 'firebase',
-              type: newContent.type === 'video' && autoType !== 'video' ? autoType : (newContent.type || autoType)
+              storageProvider: uploaded.storageProvider || 'firebase',
+              type: autoType === 'html' ? 'html' : (newContent.type === 'video' && autoType !== 'video' ? autoType : (newContent.type || autoType))
           });
           setUploadProgress(100);
           setTimeout(() => setUploadProgress(0), 2000);
       } catch (err) {
-          alert(err?.message || 'فشل رفع الملف على Firebase Storage.');
+          alert(err?.message || 'فشل تجهيز/رفع الملف.');
       } finally {
           setIsUploading(false);
           e.target.value = null;
@@ -5781,6 +5785,7 @@ const AdminDashboard = ({ user }) => {
           mimeType: newContent.mimeType || '',
           fileName: newContent.fileName || '',
           fileSize: newContent.fileSize || 0,
+          htmlContent: newContent.type === 'html' ? (newContent.htmlContent || '') : '',
           createdAt: new Date() 
       };
       
@@ -5791,7 +5796,7 @@ const AdminDashboard = ({ user }) => {
       } 
       
       alert("تم النشر!"); 
-      setNewContent({ title: '', url: '', type: 'video', videoSection: 'explanation', isPublic: false, grade: '3sec', allowedEmails: '', isPremium: false, linkedExamId: '', estimatedDurationMinutes: '', branch: '', storageProvider: '', firebaseStoragePath: '', mimeType: '', fileName: '', fileSize: 0 });
+      setNewContent({ title: '', url: '', type: 'video', videoSection: 'explanation', isPublic: false, grade: '3sec', allowedEmails: '', isPremium: false, linkedExamId: '', estimatedDurationMinutes: '', branch: '', storageProvider: '', firebaseStoragePath: '', mimeType: '', fileName: '', fileSize: 0, htmlContent: '' });
   }; 
   
   const handleDeleteContent = async (id) => { 
@@ -6990,7 +6995,7 @@ const AdminDashboard = ({ user }) => {
                           </div>
                           {isUploading && (
                               <div className="absolute inset-0 bg-white/90 flex flex-col items-center justify-center rounded-xl z-10">
-                                  <span className="text-sm font-bold text-amber-600 mb-1">جاري القراءة... {uploadProgress}%</span>
+                                  <span className="text-sm font-bold text-amber-600 mb-1">جاري تجهيز/رفع الملف... {uploadProgress}%</span>
                                   <div className="w-3/4 h-2 bg-slate-200 rounded-full overflow-hidden"><div className="h-full bg-amber-500 transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div></div>
                               </div>
                           )}

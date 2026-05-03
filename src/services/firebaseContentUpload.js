@@ -71,3 +71,26 @@ export function uploadToFirebaseContent(file, { folder = 'general-content', onPr
     );
   });
 }
+
+
+export function readHtmlFileAsInlineContent(file, { maxInlineSize = 900 * 1024 } = {}) {
+  if (!file) return Promise.reject(new Error('لم يتم اختيار ملف HTML.'));
+  if (file.size > maxInlineSize) {
+    return Promise.reject(new Error('ملف HTML كبير جدًا للحفظ المباشر داخل Firestore. ارفعه كرابط خارجي أو استخدم Firebase Storage بعد ضبط القواعد.'));
+  }
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('فشل قراءة ملف HTML من الجهاز.'));
+    reader.onload = () => resolve({
+      url: 'inline-html',
+      htmlContent: String(reader.result || ''),
+      path: '',
+      name: file.name,
+      size: file.size,
+      mimeType: file.type || 'text/html',
+      contentType: 'html',
+      storageProvider: 'firestore-inline'
+    });
+    reader.readAsText(file, 'UTF-8');
+  });
+}

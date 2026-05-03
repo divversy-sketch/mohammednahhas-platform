@@ -6,11 +6,15 @@ const InteractiveViewer = ({ content, user, onClose }) => {
     const [iframeSrc, setIframeSrc] = useState('');
     useEffect(() => {
         let activeBlobUrl = null;
-        if (content.url && content.url.startsWith('data:')) {
+        if (content.htmlContent) {
+            const blob = new Blob([content.htmlContent], { type: 'text/html;charset=utf-8' });
+            activeBlobUrl = URL.createObjectURL(blob);
+            setIframeSrc(activeBlobUrl);
+        } else if (content.url && content.url.startsWith('data:')) {
             fetch(content.url).then(res => res.blob()).then(blob => { activeBlobUrl = URL.createObjectURL(blob); setIframeSrc(activeBlobUrl); }).catch(err => { console.error("Error creating blob:", err); setIframeSrc(content.url); });
         } else { setIframeSrc(content.url); }
         return () => { if (activeBlobUrl) { URL.revokeObjectURL(activeBlobUrl); } };
-    }, [content.url]);
+    }, [content.url, content.htmlContent]);
     useEffect(() => {
         const handleKeyDown = (e) => { if (e.key === 'PrintScreen') { alert('غير مسموح بأخذ لقطات شاشة! المحتوى محمي.'); if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText('Screenshots are disabled'); } } };
         const handleCopy = (e) => { e.preventDefault(); alert("النسخ غير مسموح!"); };
