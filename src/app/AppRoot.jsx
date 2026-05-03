@@ -33,6 +33,7 @@ import InteractiveViewer from '../features/content/InteractiveViewer';
 import SmartHomeworkScanner from '../features/homework/SmartHomeworkScanner';
 import { AdminCoursesManager, StudentCoursesHub } from '../features/courses/CourseSystem';
 import { uploadToCloudinary } from '../services/cloudinaryUpload';
+import { uploadToFirebaseContent, detectContentType } from '../services/firebaseContentUpload';
 
 const getAdminAIHeaders = async () => {
   const token = await auth?.currentUser?.getIdToken?.();
@@ -5725,15 +5726,29 @@ const AdminDashboard = ({ user }) => {
       const file = e.target.files[0];
       if (!file) return;
       setIsUploading(true);
-      setUploadProgress(15);
+      setUploadProgress(1);
       try {
-          const kind = file.type === 'application/pdf' ? 'pdf' : file.type?.startsWith('image/') ? 'image' : 'auto';
-          const uploaded = await uploadToCloudinary(file, { kind, folder: kind === 'pdf' ? 'nahhas-platform/content-pdfs' : 'nahhas-platform/content-media' });
-          setNewContent({...newContent, url: uploaded.url, cloudinaryPublicId: uploaded.publicId});
+          // صفحة المحتوى العام منفصلة عن الكورسات:
+          // أي ملف هنا يترفع على Firebase Storage، حتى HTML، عشان يفتح داخل المنصة داخل iframe.
+          const uploaded = await uploadToFirebaseContent(file, {
+              folder: newContent.type || 'general',
+              onProgress: (percent) => setUploadProgress(percent)
+          });
+          const autoType = detectContentType(file);
+          setNewContent({
+              ...newContent,
+              url: uploaded.url,
+              fileName: uploaded.name,
+              fileSize: uploaded.size,
+              mimeType: uploaded.mimeType,
+              firebaseStoragePath: uploaded.path,
+              storageProvider: 'firebase',
+              type: newContent.type === 'video' && autoType !== 'video' ? autoType : (newContent.type || autoType)
+          });
           setUploadProgress(100);
           setTimeout(() => setUploadProgress(0), 2000);
       } catch (err) {
-          alert(err?.message || 'فشل رفع الملف على Cloudinary.');
+          alert(err?.message || 'فشل رفع الملف على Firebase Storage.');
       } finally {
           setIsUploading(false);
           e.target.value = null;
@@ -5761,6 +5776,11 @@ const AdminDashboard = ({ user }) => {
           linkedExamId: newContent.type === 'video' ? (newContent.linkedExamId || '') : '',
           estimatedDurationMinutes: newContent.type === 'video' ? safeNumber(newContent.estimatedDurationMinutes, 0) : 0,
           videoExamUnlockPercent: newContent.type === 'video' && newContent.linkedExamId ? VIDEO_EXAM_UNLOCK_PERCENT : 0,
+          storageProvider: newContent.storageProvider || (newContent.firebaseStoragePath ? 'firebase' : ''),
+          firebaseStoragePath: newContent.firebaseStoragePath || '',
+          mimeType: newContent.mimeType || '',
+          fileName: newContent.fileName || '',
+          fileSize: newContent.fileSize || 0,
           createdAt: new Date() 
       };
       
@@ -5771,7 +5791,7 @@ const AdminDashboard = ({ user }) => {
       } 
       
       alert("تم النشر!"); 
-      setNewContent({ title: '', url: '', type: 'video', videoSection: 'explanation', isPublic: false, grade: '3sec', allowedEmails: '', isPremium: false, linkedExamId: '', estimatedDurationMinutes: '', branch: '' });
+      setNewContent({ title: '', url: '', type: 'video', videoSection: 'explanation', isPublic: false, grade: '3sec', allowedEmails: '', isPremium: false, linkedExamId: '', estimatedDurationMinutes: '', branch: '', storageProvider: '', firebaseStoragePath: '', mimeType: '', fileName: '', fileSize: 0 });
   }; 
   
   const handleDeleteContent = async (id) => { 
@@ -6966,7 +6986,7 @@ const AdminDashboard = ({ user }) => {
                           <input type="file" onChange={handleFileSelect} className="absolute inset-0 opacity-0 cursor-pointer" />
                           <div className="flex flex-col items-center gap-2 text-slate-500">
                               <Upload size={32} />
-                              <span className="text-sm font-bold">اضغط هنا لرفع ملف (الحد الأقصى 1 ميجا)</span><span className="text-xs text-red-400">للملفات الأكبر، استخدم رابط خارجي</span>
+                              <span className="text-sm font-bold">اضغط هنا لرفع ملف عام على Firebase</span><span className="text-xs text-emerald-600">يدعم HTML وPDF وأي ملف عام حتى 100MB — والكورسات تظل على Cloudinary</span>
                           </div>
                           {isUploading && (
                               <div className="absolute inset-0 bg-white/90 flex flex-col items-center justify-center rounded-xl z-10">
