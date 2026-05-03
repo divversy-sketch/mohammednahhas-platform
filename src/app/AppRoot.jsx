@@ -4946,6 +4946,7 @@ const AdminDashboard = ({ user }) => {
   const [adminReviewExamData, setAdminReviewExamData] = useState(null);
   const [adminReviewResult, setAdminReviewResult] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard'); 
+  const [adminExamView, setAdminExamView] = useState('manage');
   const [adminGradeFilter, setAdminGradeFilter] = useState('all'); 
   const [pendingUsers, setPendingUsers] = useState([]);
   const [activeUsersList, setActiveUsersList] = useState([]);
@@ -5547,15 +5548,54 @@ const AdminDashboard = ({ user }) => {
     alert('تم السماح للطالب بإعادة الامتحان من البداية. عندما يدخل نفس الامتحان سيبدأ بمحاولة جديدة.');
   };
 
-  const handleDeleteAllResults = async () => {
-    if(window.confirm("تحذير خطير: سيتم حذف جميع نتائج الامتحانات لكل الطلاب. هل أنت متأكد؟")) {
+  const deleteDocsByCollection = async (collectionName, confirmMessage, successMessage) => {
+    if (!window.confirm(confirmMessage)) return;
+    const snap = await getDocs(collection(db, collectionName));
+    const refs = snap.docs.map((d) => doc(db, collectionName, d.id));
+    for (let i = 0; i < refs.length; i += 400) {
       const batch = writeBatch(db);
-      examResults.forEach(res => {
-        batch.delete(doc(db, 'exam_results', res.id));
-      });
+      refs.slice(i, i + 400).forEach((r) => batch.delete(r));
       await batch.commit();
-      alert("تم حذف جميع النتائج بنجاح.");
     }
+    alert(successMessage);
+  };
+
+  const handleDeleteAllResults = async () => {
+    await deleteDocsByCollection('exam_results', 'تحذير خطير: سيتم حذف جميع نتائج الامتحانات لكل الطلاب. هل أنت متأكد؟', 'تم حذف جميع النتائج بنجاح.');
+  };
+  const handleDeleteAllContent = async () => {
+    await deleteDocsByCollection('content', 'سيتم حذف كل محتوى صفحة المحتوى. هل أنت متأكد؟', 'تم حذف كل المحتوى.');
+  };
+  const handleDeleteAllExams = async () => {
+    if (!window.confirm('سيتم حذف كل الامتحانات وكل نتائجها. هل أنت متأكد؟')) return;
+    const refs = [];
+    for (const name of ['exams', 'exam_results']) {
+      const snap = await getDocs(collection(db, name));
+      snap.docs.forEach((d) => refs.push(doc(db, name, d.id)));
+    }
+    for (let i = 0; i < refs.length; i += 400) {
+      const batch = writeBatch(db);
+      refs.slice(i, i + 400).forEach((r) => batch.delete(r));
+      await batch.commit();
+    }
+    alert('تم حذف كل الامتحانات ونتائجها.');
+  };
+  const handleDeleteAllHomework = async () => {
+    if (!window.confirm('سيتم حذف كل الواجبات وتسليماتها والواجبات الذكية ونتائجها. هل أنت متأكد؟')) return;
+    const refs = [];
+    for (const name of ['assignments', 'assignment_submissions', 'smart_homeworks', 'homework_results']) {
+      const snap = await getDocs(collection(db, name));
+      snap.docs.forEach((d) => refs.push(doc(db, name, d.id)));
+    }
+    for (let i = 0; i < refs.length; i += 400) {
+      const batch = writeBatch(db);
+      refs.slice(i, i + 400).forEach((r) => batch.delete(r));
+      await batch.commit();
+    }
+    alert('تم حذف كل الواجبات وسجلاتها.');
+  };
+  const handleDeleteAllMistakes = async () => {
+    await deleteDocsByCollection('student_mistakes', 'سيتم حذف بنك الأخطاء لكل الطلاب. هل أنت متأكد؟', 'تم حذف بنك الأخطاء بالكامل.');
   };
 
   const getEssayDraftKey = (resultId, questionId) => `${resultId}__${questionId}`;
@@ -6387,7 +6427,8 @@ const AdminDashboard = ({ user }) => {
             ['exams', 'الامتحانات والنتائج'],
             ['smart_hw', 'الواجب الذكي QR'],
             ['content', 'المحتوى'],
-            ['courses', 'الكورسات التعليمية']
+            ['courses', 'الكورسات التعليمية'],
+            ['mistakes_admin', 'بنك الأخطاء']
           ].map(([tab, label]) => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 transition-all ${activeTab===tab?'bg-amber-100 text-amber-700 shadow-sm border-b-4 md:border-b-0 md:border-r-4 border-amber-500':'hover:bg-slate-50 text-slate-600'}`}>
               {label}
@@ -6598,7 +6639,10 @@ const AdminDashboard = ({ user }) => {
           {activeTab === 'smart_hw' && (
               <div className="space-y-6">
                   <div className="glass-panel p-4 md:p-6 rounded-xl">
-                      <h2 className="text-xl font-bold mb-4 font-arabic text-blue-700 flex items-center gap-2"><QrCode/> إضافة واجب (للكتاب)</h2>
+                      <div className="flex flex-col md:flex-row justify-between md:items-center gap-3 mb-4">
+                        <h2 className="text-xl font-bold font-arabic text-blue-700 flex items-center gap-2"><QrCode/> إضافة واجب (للكتاب)</h2>
+                        <button onClick={handleDeleteAllHomework} className="bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 justify-center"><Trash2 size={16}/> حذف كل الواجبات الذكية وسجلاتها</button>
+                      </div>
                       <form onSubmit={handleCreateSmartHw} className="grid gap-4">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div><label className="block text-xs font-bold mb-1 text-slate-500">المرحلة الدراسية</label><select className="border p-3 rounded w-full bg-white" value={newSmartHw.grade} onChange={e=>setNewSmartHw({...newSmartHw, grade:e.target.value})}><GradeOptions/></select></div>
@@ -6668,9 +6712,21 @@ const AdminDashboard = ({ user }) => {
 
           {activeTab === 'question_bank' && <InlineTabs tabs={[{ key: 'bank', label: 'إدارة بنك الأسئلة', content: <QuestionBankManager adminGradeFilter={adminGradeFilter} /> }]} />}
 
-          {activeTab === 'assignments' && <InlineTabs tabs={[{ key: 'assignments_admin', label: 'إدارة الواجبات', content: <AssignmentsManager adminGradeFilter={adminGradeFilter} /> }]} />}
+          {activeTab === 'assignments' && (
+            <div className="space-y-4">
+              <div className="flex justify-end"><button onClick={handleDeleteAllHomework} className="bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2"><Trash2 size={16}/> حذف كل الواجبات وسجلاتها</button></div>
+              <InlineTabs tabs={[{ key: 'assignments_admin', label: 'إدارة الواجبات', content: <AssignmentsManager adminGradeFilter={adminGradeFilter} /> }]} />
+            </div>
+          )}
 
           {activeTab === 'exams' && (
+            <div className="flex flex-wrap gap-2 mb-4">
+              <button onClick={() => setAdminExamView('manage')} className={`px-5 py-3 rounded-2xl font-black ${adminExamView === 'manage' ? 'bg-amber-600 text-white' : 'bg-amber-50 text-amber-700'}`}>إدارة الامتحانات</button>
+              <button onClick={() => setAdminExamView('results')} className={`px-5 py-3 rounded-2xl font-black ${adminExamView === 'results' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700'}`}>النتائج</button>
+            </div>
+          )}
+
+          {activeTab === 'exams' && adminExamView === 'manage' && (
               <div className="space-y-8">
                   <div className="glass-panel p-4 md:p-6 rounded-xl">
                       <h2 className="text-xl font-bold mb-6 border-b pb-2 font-arabic text-amber-700">إنشاء امتحان</h2>
@@ -6702,7 +6758,10 @@ const AdminDashboard = ({ user }) => {
                       </div>
                   </div>
                   <div className="glass-panel p-4 md:p-6 rounded-xl">
-                      <h3 className="font-bold mb-4 font-arabic">الامتحانات الحالية</h3>
+                      <div className="flex flex-col md:flex-row justify-between md:items-center gap-3 mb-4">
+                        <h3 className="font-bold font-arabic">الامتحانات الحالية</h3>
+                        {examsList.length > 0 && <button onClick={handleDeleteAllExams} className="bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 justify-center"><Trash2 size={16}/> حذف كل الامتحانات</button>}
+                      </div>
                       <div className="overflow-x-auto">
                           <div className="min-w-[600px]">
                               {filteredExamsList.map(exam=>(
@@ -6730,7 +6789,7 @@ const AdminDashboard = ({ user }) => {
 
           
 
-          {activeTab === 'exams' && (
+          {activeTab === 'exams' && adminExamView === 'results' && (
              <div className="glass-panel p-4 md:p-6 rounded-xl">
                <div className="flex flex-col md:flex-row justify-between md:items-center mb-4 gap-4">
                  <h2 className="font-bold flex items-center gap-2 font-arabic text-xl"><Layout/> نتائج الامتحانات</h2>
@@ -6981,9 +7040,24 @@ const AdminDashboard = ({ user }) => {
 
 {activeTab === 'courses' && <AdminCoursesManager users={activeUsersList} exams={examsList} adminUser={userData} />}
 
+{activeTab === 'mistakes_admin' && (
+  <div className="glass-panel p-4 md:p-6 rounded-xl space-y-4">
+    <div className="flex flex-col md:flex-row justify-between md:items-center gap-3">
+      <div>
+        <h2 className="font-bold font-arabic text-xl">بنك الأخطاء</h2>
+        <p className="text-sm text-slate-500 font-bold mt-1">حذف كل أخطاء الطلاب المسجلة مرة واحدة.</p>
+      </div>
+      <button onClick={handleDeleteAllMistakes} className="bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 justify-center"><Trash2 size={16}/> حذف بنك الأخطاء بالكامل</button>
+    </div>
+  </div>
+)}
+
 {activeTab === 'content' && (
               <div className="glass-panel p-4 md:p-6 rounded-xl">
-                  <h2 className="font-bold mb-4 font-arabic text-xl">إضافة محتوى</h2>
+                  <div className="flex flex-col md:flex-row justify-between md:items-center gap-3 mb-4">
+                    <h2 className="font-bold font-arabic text-xl">إضافة محتوى</h2>
+                    {contentList.length > 0 && <button type="button" onClick={handleDeleteAllContent} className="bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 justify-center"><Trash2 size={16}/> حذف كل المحتوى</button>}
+                  </div>
                   <form onSubmit={handleAddContent} className="grid gap-4 mb-6">
                       <input className="border p-3 rounded w-full" placeholder="العنوان" value={newContent.title} onChange={e=>setNewContent({...newContent, title:e.target.value})}/>
                       <input className="border p-3 rounded w-full" placeholder="الرابط (يفضل Google Drive للملفات الكبيرة)" value={newContent.url} onChange={e=>setNewContent({...newContent, url:e.target.value})}/>

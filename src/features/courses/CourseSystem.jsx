@@ -210,12 +210,14 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
   const [enrollments, setEnrollments] = useState([]);
   const [course, setCourse] = useState('');
   const [mod, setMod] = useState('');
-  const [cf, setCf] = useState({ title: '', description: '', price: '', teacher: 'مستر النحاس', coverImage: '', grade: '3sec', isPublished: false, unlockMode: 'sequential' });
+  const emptyCourseForm = { title: '', description: '', price: '', teacher: 'مستر النحاس', coverImage: '', grade: '3sec', isPublished: false, unlockMode: 'sequential', visibleFrom: '', visibleUntil: '', defaultAccessDays: '', permanentAccess: true };
+  const [cf, setCf] = useState(emptyCourseForm);
   const [mf, setMf] = useState({ title: '', order: 1 });
   const [lf, setLf] = useState({ title: '', videoUrl: '', pdfUrl: '', examUrl: '', examId: '', lessonImage: '', icon: '📘', order: 1, isFree: false, unlockAt: '', requiredPreviousLessonId: '', examRequiresWatchPercent: 75, nextLessonRequiresExamScore: 60 });
   const [of, setOf] = useState({ userId: '', lessonId: '', reason: '' });
-  const [manual, setManual] = useState({ userId: '', courseId: '' });
-  const [codeForm, setCodeForm] = useState({ courseId: '', count: 1 });
+  const [manual, setManual] = useState({ userId: '', courseId: '', expiresInDays: '', permanent: true });
+  const [codeForm, setCodeForm] = useState({ courseId: '', count: 1, expiresInDays: '', permanent: true });
+  const [editingCourseId, setEditingCourseId] = useState('');
 
   useEffect(() => onSnapshot(query(collection(db, 'courses'), orderBy('title')), (s) => setCourses(s.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setCourses([])), []);
   useEffect(() => (course ? onSnapshot(query(collection(db, 'courses', course, 'modules'), orderBy('order')), (s) => setMods(s.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setMods([])) : setMods([])), [course]);
@@ -224,10 +226,50 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
   useEffect(() => onSnapshot(query(collection(db, 'courseAccessCodes'), orderBy('createdAt')), (s) => setCodes(s.docs.map((d) => ({ id: d.id, ...d.data() })).reverse()), () => setCodes([])), []);
   useEffect(() => onSnapshot(collection(db, 'enrollments'), (s) => setEnrollments(s.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setEnrollments([])), []);
 
+  const resetCourseForm = () => { setEditingCourseId(''); setCf(emptyCourseForm); };
+  const editCourse = (c) => {
+    setEditingCourseId(c.id);
+    setCf({ title: c.title || '', description: c.description || '', price: c.price ?? '', teacher: c.teacher || 'مستر النحاس', coverImage: c.coverImage || '', grade: c.grade || '3sec', isPublished: !!c.isPublished, unlockMode: c.unlockMode || 'sequential', visibleFrom: c.visibleFrom || '', visibleUntil: c.visibleUntil || '', defaultAccessDays: c.defaultAccessDays ?? '', permanentAccess: c.permanentAccess !== false });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  const deleteManyRefs = async (refs) => {
+    for (let i = 0; i < refs.length; i += 350) {
+      const { writeBatch } = await import('firebase/firestore');
+      const b = writeBatch(db);
+      refs.slice(i, i + 350).forEach((r) => b.delete(r));
+      await b.commit();
+    }
+  };
+  const deleteCourseDeep = async (courseId, silent = false) => {
+    if (!courseId) return;
+    if (!silent && !window.confirm('سيتم حذف الكورس بكل وحداته ودروسه وأكواد فتحه واشتراكاته. هل أنت متأكد؟')) return;
+    const refs = [];
+    const modSnap = await getDocs(collection(db, 'courses', courseId, 'modules'));
+    for (const m of modSnap.docs) {
+      const lessonSnap = await getDocs(collection(db, 'courses', courseId, 'modules', m.id, 'lessons'));
+      lessonSnap.docs.forEach((l) => refs.push(doc(db, 'courses', courseId, 'modules', m.id, 'lessons', l.id)));
+      refs.push(doc(db, 'courses', courseId, 'modules', m.id));
+    }
+    for (const name of ['enrollments', 'courseAccessCodes', 'lessonUnlockOverrides', 'lessonProgress']) {
+      const snap = await getDocs(query(collection(db, name), where('courseId', '==', courseId)));
+      snap.docs.forEach((d) => refs.push(doc(db, name, d.id)));
+    }
+    refs.push(doc(db, 'courses', courseId));
+    await deleteManyRefs(refs);
+    if (editingCourseId === courseId) resetCourseForm();
+    if (!silent) alert('تم حذف الكورس بالكامل.');
+  };
+  const deleteAllCourses = async () => {
+    if (!window.confirm('تحذير: سيتم حذف كل الكورسات والوحدات والدروس والأكواد والاشتراكات الخاصة بها. هل أنت متأكد؟')) return;
+    for (const c of courses) await deleteCourseDeep(c.id, true);
+    alert('تم حذف كل الكورسات.');
+  };
   const saveCourse = async () => {
     if (!cf.title.trim()) return alert('اكتب اسم الكورس');
-    await addDoc(collection(db, 'courses'), { ...cf, price: Number(cf.price || 0), createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-    setCf({ title: '', description: '', price: '', teacher: 'مستر النحاس', coverImage: '', grade: '3sec', isPublished: false, unlockMode: 'sequential' });
+    const payload = { ...cf, price: Number(cf.price || 0), defaultAccessDays: cf.defaultAccessDays === '' ? '' : Number(cf.defaultAccessDays || 0), updatedAt: serverTimestamp() };
+    if (editingCourseId) { await updateDoc(doc(db, 'courses', editingCourseId), payload); alert('تم تعديل الكورس.'); }
+    else { await addDoc(collection(db, 'courses'), { ...payload, createdAt: serverTimestamp() }); alert('تم حفظ الكورس.'); }
+    resetCourseForm();
   };
   const saveMod = async () => {
     if (!course || !mf.title.trim()) return alert('اختار كورس واكتب الوحدة');
@@ -262,6 +304,8 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
   const enrollStudent = async () => {
     const targetCourseId = manual.courseId || course;
     if (!manual.userId || !targetCourseId) return alert('اختار الطالب والكورس');
+    const days = manual.permanent ? 0 : Number(manual.expiresInDays || 0);
+    const expiresAt = days > 0 ? new Date(Date.now() + days * 86400000).toISOString() : null;
     await setDoc(doc(db, 'enrollments', `${manual.userId}_${targetCourseId}`), {
       userId: manual.userId,
       courseId: targetCourseId,
@@ -271,6 +315,8 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
       progress: 0,
       openedBy: adminUser?.email || 'admin',
       method: 'manual',
+      permanentAccess: !expiresAt,
+      expiresAt,
     }, { merge: true });
     alert('تم فتح الكورس للطالب');
   };
@@ -280,7 +326,10 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
     const count = Math.max(1, Math.min(50, Number(codeForm.count || 1)));
     for (let i = 0; i < count; i += 1) {
       const code = randomCode();
-      await setDoc(doc(db, 'courseAccessCodes', code), { code, courseId: targetCourseId, isUsed: false, usedBy: null, usedAt: null, createdBy: adminUser?.email || 'admin', createdAt: serverTimestamp() });
+      const selectedCourse = courses.find((c) => c.id === targetCourseId);
+      const days = codeForm.permanent ? 0 : Number(codeForm.expiresInDays || selectedCourse?.defaultAccessDays || 0);
+      const expiresAt = days > 0 ? new Date(Date.now() + days * 86400000).toISOString() : null;
+      await setDoc(doc(db, 'courseAccessCodes', code), { code, courseId: targetCourseId, isUsed: false, usedBy: null, usedAt: null, permanentAccess: !expiresAt, expiresAt, validityDays: days || null, createdBy: adminUser?.email || 'admin', createdAt: serverTimestamp() });
     }
     alert(`تم توليد ${count} كود`);
   };
@@ -295,7 +344,7 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
 
       <div className="grid md:grid-cols-2 gap-6">
         <section className="bg-white rounded-3xl p-5 border space-y-3">
-          <h3 className="font-black flex gap-2"><PlusCircle /> إنشاء كورس</h3>
+          <h3 className="font-black flex gap-2"><PlusCircle /> {editingCourseId ? 'تعديل كورس' : 'إنشاء كورس'}</h3>
           <input className="w-full p-3 rounded-xl border" placeholder="اسم الكورس" value={cf.title} onChange={(e) => setCf({ ...cf, title: e.target.value })} />
           <textarea className="w-full p-3 rounded-xl border" placeholder="وصف وتفاصيل الكورس" value={cf.description} onChange={(e) => setCf({ ...cf, description: e.target.value })} />
           <div className="grid grid-cols-2 gap-3">
@@ -303,6 +352,12 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
             <input className="p-3 rounded-xl border" placeholder="المدرس" value={cf.teacher} onChange={(e) => setCf({ ...cf, teacher: e.target.value })} />
           </div>
           <select className="w-full p-3 rounded-xl border" value={cf.grade} onChange={(e) => setCf({ ...cf, grade: e.target.value })}><GradeOptions /></select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-50 border rounded-2xl p-3">
+            <label className="text-xs font-black text-slate-600">يظهر من<input type="datetime-local" className="mt-1 w-full p-3 rounded-xl border" value={cf.visibleFrom || ''} onChange={(e) => setCf({ ...cf, visibleFrom: e.target.value })} /></label>
+            <label className="text-xs font-black text-slate-600">يختفي بعد<input type="datetime-local" className="mt-1 w-full p-3 rounded-xl border" value={cf.visibleUntil || ''} onChange={(e) => setCf({ ...cf, visibleUntil: e.target.value })} /></label>
+            <label className="md:col-span-2 font-bold flex gap-2 items-center"><input type="checkbox" checked={cf.permanentAccess !== false} onChange={(e) => setCf({ ...cf, permanentAccess: e.target.checked })} /> فتح الكورس دائم عند التفعيل</label>
+            {cf.permanentAccess === false && <input className="md:col-span-2 p-3 rounded-xl border" placeholder="مدة فتح الكورس الافتراضية بالأيام" value={cf.defaultAccessDays || ''} onChange={(e) => setCf({ ...cf, defaultAccessDays: e.target.value })} />}
+          </div>
           <ImgInput label="صورة الكورس الكبيرة" value={cf.coverImage} onChange={(v) => setCf({ ...cf, coverImage: v })} />
           <div className="grid grid-cols-2 gap-3">
             <select className="p-3 rounded-xl border" value={cf.unlockMode} onChange={(e) => setCf({ ...cf, unlockMode: e.target.value })}>
@@ -312,7 +367,11 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
             </select>
             <label className="font-bold flex gap-2 items-center"><input type="checkbox" checked={cf.isPublished} onChange={(e) => setCf({ ...cf, isPublished: e.target.checked })} /> منشور في الرئيسية</label>
           </div>
-          <button onClick={saveCourse} className="bg-amber-600 text-white px-5 py-3 rounded-xl font-black flex gap-2"><Save /> حفظ الكورس</button>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={saveCourse} className="bg-amber-600 text-white px-5 py-3 rounded-xl font-black flex gap-2"><Save /> {editingCourseId ? 'حفظ التعديلات' : 'حفظ الكورس'}</button>
+            {editingCourseId && <button onClick={resetCourseForm} className="bg-slate-100 text-slate-700 px-5 py-3 rounded-xl font-black">إلغاء التعديل</button>}
+            {courses.length > 0 && <button onClick={deleteAllCourses} className="bg-red-600 text-white px-5 py-3 rounded-xl font-black flex gap-2"><Trash2 /> حذف كل الكورسات</button>}
+          </div>
         </section>
 
         <section className="bg-white rounded-3xl p-5 border space-y-3">
@@ -369,6 +428,10 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
             <option value="">اختار طالب</option>
             {users.map((u) => <option key={userIdOf(u)} value={userIdOf(u)}>{userLabel(u)}</option>)}
           </select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-emerald-50 border border-emerald-100 rounded-2xl p-3">
+            <label className="font-bold flex gap-2 items-center"><input type="checkbox" checked={manual.permanent !== false} onChange={(e) => setManual({ ...manual, permanent: e.target.checked })} /> فتح دائم للطالب</label>
+            {manual.permanent === false && <input className="p-3 rounded-xl border" placeholder="الصلاحية بالأيام" value={manual.expiresInDays || ''} onChange={(e) => setManual({ ...manual, expiresInDays: e.target.value })} />}
+          </div>
           <button onClick={enrollStudent} className="bg-emerald-600 text-white px-5 py-3 rounded-xl font-black flex gap-2"><Unlock /> فتح الكورس للطالب</button>
           <div className="space-y-2 max-h-48 overflow-auto">
             {enrollments.slice(0, 8).map((e) => <div key={e.id} className="bg-emerald-50 rounded-2xl p-3 text-sm font-bold">{userLabel(users.find((u) => userIdOf(u) === e.userId))} — {courses.find((c) => c.id === e.courseId)?.title || e.courseId}</div>)}
@@ -382,6 +445,10 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
             {courses.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
           </select>
           <input className="w-full p-3 rounded-xl border" type="number" min="1" max="50" placeholder="عدد الأكواد" value={codeForm.count} onChange={(e) => setCodeForm({ ...codeForm, count: e.target.value })} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-amber-50 border border-amber-100 rounded-2xl p-3">
+            <label className="font-bold flex gap-2 items-center"><input type="checkbox" checked={codeForm.permanent !== false} onChange={(e) => setCodeForm({ ...codeForm, permanent: e.target.checked })} /> الكود يفتح دائم</label>
+            {codeForm.permanent === false && <input className="p-3 rounded-xl border" placeholder="صلاحية فتح الكورس بالأيام" value={codeForm.expiresInDays || ''} onChange={(e) => setCodeForm({ ...codeForm, expiresInDays: e.target.value })} />}
+          </div>
           <button onClick={generateCodes} className="bg-amber-600 text-white px-5 py-3 rounded-xl font-black flex gap-2"><Key /> توليد الأكواد</button>
           <div className="space-y-2 max-h-56 overflow-auto">
             {codes.slice(0, 12).map((c) => <div key={c.id} className="bg-slate-50 rounded-2xl p-3 flex justify-between items-center gap-2"><span className="font-black text-sm tracking-wider">{c.code}</span><span className={`text-xs px-2 py-1 rounded-full font-black ${c.isUsed ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>{c.isUsed ? 'مستخدم' : 'متاح'}</span></div>)}
@@ -409,7 +476,7 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
       <section className="bg-white rounded-3xl p-5 border">
         <h3 className="font-black mb-3">الكورسات الحالية</h3>
         <div className="grid md:grid-cols-3 gap-4">
-          {courses.map((c) => <div key={c.id} className="border rounded-2xl p-3"><img src={c.coverImage || 'https://placehold.co/900x420?text=Course'} className="h-36 w-full rounded-xl object-cover" /><p className="font-black mt-2">{c.title}</p><p className="text-xs text-slate-500">{c.isPublished ? 'منشور' : 'غير منشور'} • {getGradeLabel(c.grade || 'كل المراحل')} • {c.unlockMode}</p><button onClick={() => updateDoc(doc(db, 'courses', c.id), { isPublished: !c.isPublished })} className="mt-2 text-xs bg-slate-100 px-3 py-1 rounded-lg font-bold">{c.isPublished ? 'إخفاء' : 'نشر'}</button></div>)}
+          {courses.map((c) => <div key={c.id} className="border rounded-2xl p-3"><img src={c.coverImage || 'https://placehold.co/900x420?text=Course'} className="h-36 w-full rounded-xl object-cover" /><p className="font-black mt-2">{c.title}</p><p className="text-xs text-slate-500">{c.isPublished ? 'منشور' : 'غير منشور'} • {getGradeLabel(c.grade || 'كل المراحل')} • {c.unlockMode}</p><p className="text-[11px] text-slate-400 mt-1">{c.visibleFrom ? `من ${new Date(c.visibleFrom).toLocaleString('ar-EG')}` : 'بدون بداية'} — {c.visibleUntil ? `حتى ${new Date(c.visibleUntil).toLocaleString('ar-EG')}` : 'بدون اختفاء'}</p><div className="flex flex-wrap gap-2 mt-2"><button onClick={() => updateDoc(doc(db, 'courses', c.id), { isPublished: !c.isPublished })} className="text-xs bg-slate-100 px-3 py-1 rounded-lg font-bold">{c.isPublished ? 'إخفاء' : 'نشر'}</button><button onClick={() => editCourse(c)} className="text-xs bg-emerald-50 text-emerald-700 px-3 py-1 rounded-lg font-bold">تعديل</button><button onClick={() => deleteCourseDeep(c.id)} className="text-xs bg-red-50 text-red-700 px-3 py-1 rounded-lg font-bold">حذف</button></div></div>)}
         </div>
       </section>
     </div>
@@ -431,7 +498,13 @@ export function StudentCoursesHub({ user, userData, exams = [], onStartExam }) {
 
   useEffect(() => onSnapshot(query(collection(db, 'courses'), where('isPublished', '==', true)), (s) => {
     const g = userData?.grade || '';
-    setCourses(s.docs.map((d) => ({ id: d.id, ...d.data() })).filter((c) => !c.grade || c.grade === g));
+    const now = new Date();
+    setCourses(s.docs.map((d) => ({ id: d.id, ...d.data() })).filter((c) => {
+      const gradeOk = !c.grade || c.grade === g;
+      const startOk = !c.visibleFrom || new Date(c.visibleFrom) <= now;
+      const endOk = !c.visibleUntil || new Date(c.visibleUntil) >= now;
+      return gradeOk && startOk && endOk;
+    }));
   }, () => setCourses([])), [userData?.grade]);
 
   useEffect(() => {
@@ -458,7 +531,7 @@ export function StudentCoursesHub({ user, userData, exams = [], onStartExam }) {
     }, () => { setMods([]); setLbm({}); });
   }, [course?.id]);
 
-  const isEnrolled = (c) => Number(c.price || 0) === 0 || enroll.some((e) => e.courseId === c.id && e.status !== 'blocked' && (e.paid || e.status === 'active'));
+  const isEnrolled = (c) => Number(c.price || 0) === 0 || enroll.some((e) => e.courseId === c.id && e.status !== 'blocked' && (e.paid || e.status === 'active') && (!e.expiresAt || new Date(e.expiresAt) >= new Date()));
   const courseProgress = (c) => enroll.find((e) => e.courseId === c.id)?.progress || 0;
   const pr = (id) => prog.find((p) => p.courseId === course?.id && p.lessonId === id) || {};
   const er = (id) => exr.find((r) => r.courseId === course?.id && r.lessonId === id) || {};
@@ -493,8 +566,10 @@ export function StudentCoursesHub({ user, userData, exams = [], onStartExam }) {
     const d = snap.docs[0];
     const data = d.data();
     if (data.isUsed) return alert('الكود مستخدم بالفعل');
+    if (data.expiresAt && new Date(data.expiresAt) < new Date()) return alert('انتهت صلاحية هذا الكود');
     if (data.courseId !== course.id) return alert('الكود لا يخص هذا الكورس');
-    await setDoc(doc(db, 'enrollments', `${user.uid}_${course.id}`), { userId: user.uid, courseId: course.id, status: 'active', paid: true, joinedAt: serverTimestamp(), progress: 0, openedBy: 'access-code', accessCode: code }, { merge: true });
+    const enrollmentExpiresAt = data.permanentAccess === false && data.validityDays ? new Date(Date.now() + Number(data.validityDays) * 86400000).toISOString() : null;
+    await setDoc(doc(db, 'enrollments', `${user.uid}_${course.id}`), { userId: user.uid, courseId: course.id, status: 'active', paid: true, joinedAt: serverTimestamp(), progress: 0, openedBy: 'access-code', accessCode: code, permanentAccess: !enrollmentExpiresAt, expiresAt: enrollmentExpiresAt }, { merge: true });
     await updateDoc(doc(db, 'courseAccessCodes', d.id), { isUsed: true, usedBy: user.uid, usedAt: serverTimestamp() });
     setAccessCode('');
     alert('تم فتح الكورس بنجاح');
@@ -566,7 +641,7 @@ export function StudentCoursesHub({ user, userData, exams = [], onStartExam }) {
 
       <div className="bg-white rounded-3xl p-4 border">
         <h3 className="font-black mb-4 flex gap-2"><Layers /> دروس الكورس</h3>
-        {mods.map((m) => <div key={m.id} className="mb-6"><h4 className="font-black text-amber-800 mb-3">{m.order}. {m.title}</h4><div className="grid md:grid-cols-3 gap-4">{(lbm[m.id] || []).map((l) => { const a = can(l); const p = pr(l.id); return <button key={l.id} onClick={() => { if (!a.ok) return alert(a.reason); setLesson(l); setTab('video'); }} className={`text-right rounded-3xl overflow-hidden border bg-white ${a.ok ? 'hover:-translate-y-1' : 'opacity-70'}`}><div className="relative"><img src={l.lessonImage || course.coverImage || 'https://placehold.co/600x340?text=Lesson'} className="h-36 w-full object-cover" /><span className="absolute top-3 right-3 bg-white/90 rounded-full px-3 py-1 font-black">{l.icon || '📘'}</span><span className="absolute top-3 left-3 bg-white/90 rounded-full p-2">{a.ok ? <Unlock size={18} className="text-emerald-600" /> : <Lock size={18} className="text-red-600" />}</span></div><div className="p-4"><h5 className="font-black">{l.title}</h5><p className="text-xs text-slate-500 font-bold">مشاهدة: {pct(p.watchPercent)}%</p>{a.admin && <p className="text-xs text-emerald-700 font-black">متاح باستثناء من الإدارة</p>}{!a.ok && <p className="text-xs text-red-600 font-black">{a.reason}</p>}</div></button>; })}</div></div>)}
+        {mods.map((m) => <div key={m.id} className="mb-6"><h4 className="font-black text-amber-800 mb-3">{m.order}. {m.title}</h4><div className="grid lg:grid-cols-2 gap-6">{(lbm[m.id] || []).map((l) => { const a = can(l); const p = pr(l.id); return <button key={l.id} onClick={() => { if (!a.ok) return alert(a.reason); setLesson(l); setTab('video'); }} className={`text-right rounded-3xl overflow-hidden border bg-white ${a.ok ? 'hover:-translate-y-1' : 'opacity-70'}`}><div className="relative"><img src={l.lessonImage || course.coverImage || 'https://placehold.co/600x340?text=Lesson'} className="h-72 lg:h-80 w-full object-cover" /><span className="absolute top-3 right-3 bg-white/90 rounded-full px-3 py-1 font-black">{l.icon || '📘'}</span><span className="absolute top-3 left-3 bg-white/90 rounded-full p-2">{a.ok ? <Unlock size={18} className="text-emerald-600" /> : <Lock size={18} className="text-red-600" />}</span></div><div className="p-4"><h5 className="font-black">{l.title}</h5><p className="text-xs text-slate-500 font-bold">مشاهدة: {pct(p.watchPercent)}%</p>{a.admin && <p className="text-xs text-emerald-700 font-black">متاح باستثناء من الإدارة</p>}{!a.ok && <p className="text-xs text-red-600 font-black">{a.reason}</p>}</div></button>; })}</div></div>)}
       </div>
 
       {lesson && <div className="bg-white rounded-3xl p-5 border"><h3 className="text-2xl font-black mb-4">{lesson.icon || '📘'} {lesson.title}</h3><div className="grid md:grid-cols-3 gap-2 mb-5"><button onClick={() => setTab('video')} className={`p-3 rounded-2xl font-black ${tab === 'video' ? 'bg-amber-600 text-white' : 'bg-slate-100'}`}><PlayCircle className="inline ml-1" /> شرح الدرس</button><button onClick={() => setTab('pdf')} className={`p-3 rounded-2xl font-black ${tab === 'pdf' ? 'bg-blue-600 text-white' : 'bg-slate-100'}`}><FileText className="inline ml-1" /> PDF</button><button onClick={() => setTab('exam')} className={`p-3 rounded-2xl font-black ${tab === 'exam' ? 'bg-emerald-600 text-white' : 'bg-slate-100'}`}><ClipboardList className="inline ml-1" /> الامتحان</button></div>{tab === 'video' && <YouTubeLessonPlayer videoUrl={lesson.videoUrl} savedProgress={pr(lesson.id)} onProgress={(d) => saveP(lesson, d)} />} {tab === 'pdf' && <div className="bg-blue-50 rounded-3xl p-6 text-center">{lesson.pdfUrl ? <a href={lesson.pdfUrl} target="_blank" rel="noreferrer" className="bg-blue-600 text-white px-6 py-3 rounded-2xl font-black inline-flex gap-2"><FileText /> فتح PDF</a> : <p className="font-bold text-slate-500">لا يوجد PDF لهذا الدرس.</p>}</div>} {tab === 'exam' && <div className="bg-emerald-50 rounded-3xl p-6 text-center space-y-3"><p className="font-black">نسبة مشاهدتك: {pct(pr(lesson.id).watchPercent)}%</p><button onClick={() => openExam(lesson)} className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-black inline-flex gap-2"><ClipboardList /> بدء الامتحان</button><p className="text-xs text-slate-500 font-bold">لا يفتح إلا بعد مشاهدة {lesson.unlockRules?.examRequiresWatchPercent || 75}% إلا باستثناء من الأدمن.</p></div>}</div>}
