@@ -31,6 +31,8 @@ import { PWAInstallBox, ModernLogo, FloatingArabicBackground, WisdomBox, Announc
 import PomodoroFocusMode from '../features/study/PomodoroFocusMode';
 import InteractiveViewer from '../features/content/InteractiveViewer';
 import SmartHomeworkScanner from '../features/homework/SmartHomeworkScanner';
+import { AdminCoursesManager, StudentCoursesHub } from '../features/courses/CourseSystem';
+import { uploadToCloudinary } from '../services/cloudinaryUpload';
 
 const getAdminAIHeaders = async () => {
   const token = await auth?.currentUser?.getIdToken?.();
@@ -995,26 +997,23 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     }
   };
 
-  const handleEssayImageUpload = (qId, file) => {
+  const handleEssayImageUpload = async (qId, file) => {
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      alert("حجم الصورة كبير. الحد الأقصى 2 ميجا.");
-      fileDialogBypassRef.current = false;
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
+    try {
+      const uploaded = await uploadToCloudinary(file, { kind: 'image', folder: 'nahhas-platform/essay-answers' });
       const previousAnswer = answers[qId];
       const currentText = typeof previousAnswer === 'object' ? previousAnswer?.text || '' : '';
-      handleAnswer(qId, { text: currentText, image: reader.result, fileName: file.name });
+      handleAnswer(qId, {
+        text: currentText,
+        image: uploaded.url,
+        fileName: file.name,
+        cloudinaryPublicId: uploaded.publicId,
+      });
+    } catch (err) {
+      alert(err?.message || 'فشل رفع الصورة على Cloudinary.');
+    } finally {
       fileDialogBypassRef.current = false;
-    };
-    reader.onerror = () => {
-      alert("حدث خطأ أثناء قراءة الصورة.");
-      fileDialogBypassRef.current = false;
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
   const calculateScore = () => {
@@ -4473,7 +4472,14 @@ const StudentAssignmentsPanel = ({ assignments = [], submissions = [], user, use
   const [answerImage, setAnswerImage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const uploadImage = (file) => { const reader = new FileReader(); reader.onloadend = () => setAnswerImage(reader.result); reader.readAsDataURL(file); };
+  const uploadImage = async (file) => {
+    try {
+      const uploaded = await uploadToCloudinary(file, { kind: 'image', folder: 'nahhas-platform/assignment-answers' });
+      setAnswerImage(uploaded.url);
+    } catch (err) {
+      alert(err?.message || 'فشل رفع الصورة على Cloudinary.');
+    }
+  };
 
   const submitAssignment = async () => {
     if (!selectedAssignment) return;
@@ -5715,29 +5721,23 @@ const AdminDashboard = ({ user }) => {
       alert(`تم رفض طلب تغيير المرحلة للطالب ${user.name}.`);
   };
 
-  const handleFileSelect = (e) => {
+  const handleFileSelect = async (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      if (file.size > 1048576) { 
-          alert("⚠️ تنبيه: حجم الملف أكبر من 1 ميجا.\n\nقواعد البيانات لا تقبل ملفات ضخمة مباشرة. لرفع ملفات كبيرة (كتب كاملة أو فيديوهات)، يرجى رفعها على Google Drive ونسخ الرابط هنا في خانة 'الرابط'.");
-          e.target.value = null; 
-          return;
-      }
       setIsUploading(true);
-      const reader = new FileReader();
-      reader.onprogress = (event) => {
-          if (event.lengthComputable) {
-              const percent = Math.round((event.loaded / event.total) * 100);
-              setUploadProgress(percent);
-          }
-      };
-      reader.onloadend = () => {
-          setNewContent({...newContent, url: reader.result});
-          setIsUploading(false);
+      setUploadProgress(15);
+      try {
+          const kind = file.type === 'application/pdf' ? 'pdf' : file.type?.startsWith('image/') ? 'image' : 'auto';
+          const uploaded = await uploadToCloudinary(file, { kind, folder: kind === 'pdf' ? 'nahhas-platform/content-pdfs' : 'nahhas-platform/content-media' });
+          setNewContent({...newContent, url: uploaded.url, cloudinaryPublicId: uploaded.publicId});
           setUploadProgress(100);
           setTimeout(() => setUploadProgress(0), 2000);
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+          alert(err?.message || 'فشل رفع الملف على Cloudinary.');
+      } finally {
+          setIsUploading(false);
+          e.target.value = null;
+      }
   };
 
   const handleAddContent = async (e) => { 
@@ -6361,7 +6361,8 @@ const AdminDashboard = ({ user }) => {
             ['assignments', 'الواجبات'],
             ['exams', 'الامتحانات والنتائج'],
             ['smart_hw', 'الواجب الذكي QR'],
-            ['content', 'المحتوى']
+            ['content', 'المحتوى'],
+            ['courses', 'الكورسات التعليمية']
           ].map(([tab, label]) => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 transition-all ${activeTab===tab?'bg-amber-100 text-amber-700 shadow-sm border-b-4 md:border-b-0 md:border-r-4 border-amber-500':'hover:bg-slate-50 text-slate-600'}`}>
               {label}
@@ -6952,6 +6953,8 @@ const AdminDashboard = ({ user }) => {
                 </div>
               </div>
           )}
+
+{activeTab === 'courses' && <AdminCoursesManager users={activeUsersList} exams={examsList} adminUser={userData} />}
 
 {activeTab === 'content' && (
               <div className="glass-panel p-4 md:p-6 rounded-xl">
@@ -7774,6 +7777,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
           {!isBannedContent && (
               <>
+                <div onClick={() => {setActiveTab('courses'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='courses'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><BookOpen/> الكورسات التعليمية</div>
                 <div onClick={() => {setActiveTab('videos'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='videos'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><PlayCircle/> المحاضرات</div>
                 <div onClick={() => {setActiveTab('files'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='files'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><FileText/> الملفات و الروابط</div>
                 <div onClick={() => {setActiveTab('htmls'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='htmls'?'bg-purple-100 text-purple-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-purple-600'}`}><Code/> محتوى تفاعلي</div>
@@ -7981,6 +7985,8 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                 </div>
             </div>
           )}
+
+          {activeTab === 'courses' && !isBannedContent && <StudentCoursesHub user={user} userData={userData} exams={exams} onStartExam={startExamWithCode} />}
 
           {activeTab === 'videos' && !isBannedContent && (
             <div className="space-y-6">
