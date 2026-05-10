@@ -1,0 +1,20 @@
+export const COLLECTIONS = Object.freeze({
+  ADMINS: 'admins',
+  USERS: 'users',
+  CONTENT: 'content',
+  MESSAGES: 'messages',
+  EXAMS: 'exams',
+  EXAM_RESULTS: 'exam_results',
+  ANNOUNCEMENTS: 'announcements',
+  QUOTES: 'quotes',
+  SMART_HOMEWORKS: 'smart_homeworks',
+  HOMEWORK_RESULTS: 'homework_results',
+  SUBSCRIPTION_CODES: 'subscription_codes',
+  STUDENT_MISTAKES: 'student_mistakes',
+  NOTIFICATIONS: 'notifications',
+  ASSIGNMENTS: 'assignments',
+  ASSIGNMENT_SUBMISSIONS: 'assignment_submissions',
+  VIDEO_VIEWS: 'video_views',
+  PAYMENT_REQUESTS: 'payment_requests',
+  QUESTION_BANK: 'question_bank'
+});
