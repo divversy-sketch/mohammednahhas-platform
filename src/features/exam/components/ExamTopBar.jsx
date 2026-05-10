@@ -59,12 +59,6 @@ export default function ExamTopBar({
           ))}
         </div>
       )}
-
-      {!isSubmitted && (
-        <button onClick={onDashboard} className="bg-slate-700 hover:bg-slate-600 px-6 py-2.5 rounded-xl font-bold transition whitespace-nowrap flex items-center gap-2">
-          <Layout size={18} /> لوحة التحكم
-        </button>
-      )}
     </div>
   );
 }

@@ -72,6 +72,7 @@ import PerformanceOverview from './PerformanceOverview.jsx';
 import { useStudentDashboardData } from '../hooks/useStudentDashboardData.js';
 import { StudentContinueCard, StudentSmartDashboard, StudentCompactHome } from '../components/home/StudentHomeCards.jsx';
 import { StudentTopGreeting, LearningHubTabs } from '../components/layout/StudentLayoutParts.jsx';
+import StudentAssignmentsPanel from '../../admin/parts/StudentAssignmentsPanel.jsx';
 
 export const StudentDashboard = ({ user, userData, installPrompt }) => {
   userData = userData || {
@@ -369,7 +370,10 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
   const startExamWithCode = async (exam, options = {}) => {
     if (isBannedExam) return platformNotify("أنت محظور من دخول الامتحانات.");
 
-    const previousResult = examResults.find(r => r.examId === exam.id);
+    const previousAttempts = examResults.filter(r => r.examId === exam.id);
+    const previousResult = previousAttempts.find(r => ['continue', 'restart'].includes(r.adminDecision))
+      || previousAttempts.find(r => ['security_hold', 'in_progress', 'cheated'].includes(r.status))
+      || previousAttempts[0];
     const openExamFromSavedResult = (result, resumeData = null) => {
       setActiveExam({
         ...exam,

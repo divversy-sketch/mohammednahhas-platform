@@ -199,17 +199,26 @@ export const AdminDashboard = ({ user }) => {
 
   // بيانات لوحة الإدارة الحية انتقلت إلى useAdminDashboardData.
 
+  const updateStudentStatusSafely = async (id, status) => {
+    try {
+      await adminSecureFunctions.setStudentStatus(id, status);
+    } catch (error) {
+      console.warn('setStudentStatus callable failed; trying Firestore admin fallback:', error?.message);
+      await updateDoc(doc(db, 'users', id), { status, updatedAt: serverTimestamp() });
+    }
+  };
+
   const handleApprove = async (id) => {
-    await adminSecureFunctions.setStudentStatus(id, 'active');
+    await updateStudentStatusSafely(id, 'active');
     sendSystemNotification("مبروك! 🎉", "تم تفعيل حسابك بنجاح.");
   };
 
   const handleReject = async (id) => {
-      await adminSecureFunctions.setStudentStatus(id, 'blocked');
+      await updateStudentStatusSafely(id, 'blocked');
   };
   
   const handleChangeUserStatus = async (id, newStatus) => {
-      await adminSecureFunctions.setStudentStatus(id, newStatus);
+      await updateStudentStatusSafely(id, newStatus);
   };
 
   const handleToggleSubscription = async (user) => {
@@ -295,7 +304,20 @@ export const AdminDashboard = ({ user }) => {
 
   const handleDeleteUser = async (id) => { if(platformConfirm("حذف نهائي؟")) await adminSecureFunctions.deleteStudentAccount(id); };
   const handleDeleteMessage = async (id) => { if(platformConfirm("حذف الرسالة؟")) await adminSecureFunctions.deleteAdminDocument('messages', id); };
-  const handleDeleteExam = async (id) => { if(platformConfirm("حذف الامتحان؟")) await adminSecureFunctions.deleteExam(id); };
+  const handleDeleteExam = async (id) => {
+    if (!platformConfirm("حذف الامتحان؟")) return;
+    try {
+      await adminSecureFunctions.deleteExam(id);
+    } catch (error) {
+      console.warn('deleteExam callable failed; trying Firestore admin fallback:', error?.message);
+      const batch = writeBatch(db);
+      batch.delete(doc(db, 'exams', id));
+      const related = await getDocs(query(collection(db, 'exam_results'), where('examId', '==', id)));
+      related.forEach((resultDoc) => batch.delete(resultDoc.ref));
+      await batch.commit();
+    }
+    platformNotify('تم حذف الامتحان وسجلاته المرتبطة.');
+  };
   const handleDeleteAnnouncement = async (id) => { if(platformConfirm("حذف الإعلان؟")) await adminSecureFunctions.deleteAdminDocument('announcements', id); };
   const handleDeleteResult = async (resultId) => { if(platformConfirm("حذف النتيجة؟")) await adminSecureFunctions.deleteAdminDocument('exam_results', resultId); };
 

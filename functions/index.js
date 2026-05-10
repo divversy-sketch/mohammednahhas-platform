@@ -241,7 +241,7 @@ exports.setStudentStatus = functions
     const adminUser = await assertAdmin(context);
     const studentId = requireString(data && data.studentId, "studentId");
     const status = requireString(data && data.status, "status");
-    const allowed = ["pending", "active", "blocked", "banned", "suspended"];
+    const allowed = ["pending", "active", "blocked", "banned", "suspended", "rejected", "banned_all", "banned_exam", "banned_content", "banned_cheating"];
 
     if (!allowed.includes(status)) {
       throw new functions.https.HttpsError("invalid-argument", "حالة الطالب غير مسموحة.");
@@ -355,7 +355,17 @@ exports.deleteExam = functions
     const adminUser = await assertAdmin(context);
     const examId = requireString(data && data.examId, "examId");
 
-    await db.collection("exams").doc(examId).delete();
+    const batch = db.batch();
+    batch.delete(db.collection("exams").doc(examId));
+
+    // نظافة إضافية: حذف نتائج ومحاولات هذا الامتحان حتى لا يظهر للطلاب كأنه ما زال له محاولة قديمة.
+    const relatedCollections = ["exam_results", "examResults", "attempts"];
+    for (const collectionName of relatedCollections) {
+      const snap = await db.collection(collectionName).where("examId", "==", examId).limit(450).get();
+      snap.forEach((docSnap) => batch.delete(docSnap.ref));
+    }
+
+    await batch.commit();
     await db.collection("admin_audit_logs").add({
       action: "deleteExam",
       adminUid: adminUser.uid,
