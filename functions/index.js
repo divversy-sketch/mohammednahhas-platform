@@ -365,3 +365,119 @@ exports.deleteExam = functions
 
     return { ok: true };
   });
+
+exports.setExamPublishedState = functions
+  .region("us-central1")
+  .https
+  .onCall(async (data, context) => {
+    const adminUser = await assertAdmin(context);
+    const examId = requireString(data && data.examId, "examId");
+    const isPublished = Boolean(data && data.isPublished);
+
+    await db.collection("exams").doc(examId).set({
+      isPublished,
+      status: isPublished ? "published" : "draft",
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedBy: adminUser.uid
+    }, { merge: true });
+
+    await db.collection("admin_audit_logs").add({
+      action: "setExamPublishedState",
+      adminUid: adminUser.uid,
+      examId,
+      isPublished,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return { ok: true, examId, isPublished };
+  });
+
+exports.updateResultScore = functions
+  .region("us-central1")
+  .https
+  .onCall(async (data, context) => {
+    const adminUser = await assertAdmin(context);
+    const resultId = requireString(data && data.resultId, "resultId");
+    const allowed = [
+      "score", "totalScore", "percentage", "status", "teacherNote", "feedback",
+      "essayScore", "manualScore", "reviewed", "reviewedAt", "reviewedBy"
+    ];
+    const payload = cleanObject((data && data.payload) || {}, allowed);
+
+    if (Object.keys(payload).length === 0) {
+      throw new functions.https.HttpsError("invalid-argument", "لا توجد بيانات صالحة للتحديث.");
+    }
+
+    payload.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+    payload.updatedBy = adminUser.uid;
+    if (payload.reviewed === true) {
+      payload.reviewedAt = admin.firestore.FieldValue.serverTimestamp();
+      payload.reviewedBy = adminUser.uid;
+    }
+
+    await db.collection("exam_results").doc(resultId).set(payload, { merge: true });
+
+    await db.collection("admin_audit_logs").add({
+      action: "updateResultScore",
+      adminUid: adminUser.uid,
+      resultId,
+      changedKeys: Object.keys(payload).filter((key) => !["updatedAt", "updatedBy"].includes(key)),
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return { ok: true, resultId };
+  });
+
+exports.deleteAdminDocument = functions
+  .region("us-central1")
+  .https
+  .onCall(async (data, context) => {
+    const adminUser = await assertAdmin(context);
+    const collectionName = requireString(data && data.collectionName, "collectionName");
+    const docId = requireString(data && data.docId, "docId");
+    const allowedCollections = [
+      "messages", "announcements", "quotes", "content", "exam_results",
+      "smart_homeworks", "student_mistakes", "subscription_codes"
+    ];
+
+    if (!allowedCollections.includes(collectionName)) {
+      throw new functions.https.HttpsError("permission-denied", "لا يمكن حذف مستند من هذه المجموعة عبر هذه الدالة.");
+    }
+
+    await db.collection(collectionName).doc(docId).delete();
+    await db.collection("admin_audit_logs").add({
+      action: "deleteAdminDocument",
+      adminUid: adminUser.uid,
+      collectionName,
+      docId,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return { ok: true, collectionName, docId };
+  });
+
+exports.rejectPaymentRequest = functions
+  .region("us-central1")
+  .https
+  .onCall(async (data, context) => {
+    const adminUser = await assertAdmin(context);
+    const requestId = requireString(data && data.requestId, "requestId");
+    const reason = typeof (data && data.reason) === "string" ? data.reason.trim() : "";
+
+    await db.collection("payment_requests").doc(requestId).set({
+      status: "rejected",
+      rejectReason: reason || "rejected_by_admin",
+      reviewedBy: adminUser.uid,
+      reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    await db.collection("admin_audit_logs").add({
+      action: "rejectPaymentRequest",
+      adminUid: adminUser.uid,
+      requestId,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return { ok: true, requestId };
+  });

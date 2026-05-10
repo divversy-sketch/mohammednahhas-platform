@@ -87,6 +87,7 @@ import AdminFullContentEditorModal from '../modals/AdminFullContentEditorModal.j
 import AdminStudentProfileModal from '../modals/AdminStudentProfileModal.jsx';
 import AdminPendingUsersPage from '../pages/AdminPendingUsersPage.jsx';
 import { AdminAssignmentsPage, AdminExamViewTabs, AdminQuestionBankPage } from '../pages/AdminUtilityPages.jsx';
+import { adminSecureFunctions } from '../services/adminSecureFunctions.js';
 
 export const AdminDashboard = ({ user }) => {
   const userData = user || {};
@@ -199,16 +200,16 @@ export const AdminDashboard = ({ user }) => {
   // بيانات لوحة الإدارة الحية انتقلت إلى useAdminDashboardData.
 
   const handleApprove = async (id) => {
-    await updateDoc(doc(db,'users',id), {status:'active'});
+    await adminSecureFunctions.setStudentStatus(id, 'active');
     sendSystemNotification("مبروك! 🎉", "تم تفعيل حسابك بنجاح.");
   };
 
   const handleReject = async (id) => {
-      await updateDoc(doc(db,'users',id), {status:'rejected'});
+      await adminSecureFunctions.setStudentStatus(id, 'blocked');
   };
   
   const handleChangeUserStatus = async (id, newStatus) => {
-      await updateDoc(doc(db,'users',id), {status: newStatus});
+      await adminSecureFunctions.setStudentStatus(id, newStatus);
   };
 
   const handleToggleSubscription = async (user) => {
@@ -231,25 +232,21 @@ export const AdminDashboard = ({ user }) => {
   const generateSubscriptionCodes = async () => {
       if(!codeGenCount || !codeGenDays) return;
       if(platformConfirm(`هل أنت متأكد من توليد ${codeGenCount} كود جديد لمدة ${codeGenDays} يوم؟`)) {
-          const batch = writeBatch(db);
-          for(let i=0; i<codeGenCount; i++) {
+          for(let i=0; i<Number(codeGenCount); i++) {
               const codeString = 'NAHAS-' + Math.random().toString(36).substring(2,8).toUpperCase();
-              const newDocRef = doc(collection(db, 'subscription_codes'));
-              batch.set(newDocRef, {
+              await adminSecureFunctions.createSubscriptionCode({
                   code: codeString,
                   days: parseInt(codeGenDays),
-                  used: false,
-                  usedBy: null,
-                  createdAt: serverTimestamp()
+                  durationDays: parseInt(codeGenDays),
+                  type: 'subscription'
               });
           }
-          await batch.commit();
           platformNotify("تم توليد الأكواد بنجاح!");
       }
   };
 
   const handleDeleteCode = async (id) => {
-      if(platformConfirm("حذف هذا الكود؟")) await deleteDoc(doc(db, 'subscription_codes', id));
+      if(platformConfirm("حذف هذا الكود؟")) await adminSecureFunctions.deleteAdminDocument('subscription_codes', id);
   };
 
   const copyUnusedSubscriptionCodes = async () => {
@@ -296,11 +293,11 @@ export const AdminDashboard = ({ user }) => {
   };
 
 
-  const handleDeleteUser = async (id) => { if(platformConfirm("حذف نهائي؟")) await deleteDoc(doc(db,'users',id)); };
-  const handleDeleteMessage = async (id) => { if(platformConfirm("حذف الرسالة؟")) await deleteDoc(doc(db,'messages',id)); };
-  const handleDeleteExam = async (id) => { if(platformConfirm("حذف الامتحان؟")) await deleteDoc(doc(db, 'exams', id)); };
-  const handleDeleteAnnouncement = async (id) => { if(platformConfirm("حذف الإعلان؟")) await deleteDoc(doc(db, 'announcements', id)); };
-  const handleDeleteResult = async (resultId) => { if(platformConfirm("حذف النتيجة؟")) await deleteDoc(doc(db, 'exam_results', resultId)); };
+  const handleDeleteUser = async (id) => { if(platformConfirm("حذف نهائي؟")) await adminSecureFunctions.deleteStudentAccount(id); };
+  const handleDeleteMessage = async (id) => { if(platformConfirm("حذف الرسالة؟")) await adminSecureFunctions.deleteAdminDocument('messages', id); };
+  const handleDeleteExam = async (id) => { if(platformConfirm("حذف الامتحان؟")) await adminSecureFunctions.deleteExam(id); };
+  const handleDeleteAnnouncement = async (id) => { if(platformConfirm("حذف الإعلان؟")) await adminSecureFunctions.deleteAdminDocument('announcements', id); };
+  const handleDeleteResult = async (resultId) => { if(platformConfirm("حذف النتيجة؟")) await adminSecureFunctions.deleteAdminDocument('exam_results', resultId); };
 
   const openAdminResultReview = async (result) => {
     try {

@@ -72,6 +72,7 @@ import ExamSubmitConfirmDialog from '../../features/exam/components/ExamSubmitCo
 import ExamTopBar from '../../features/exam/components/ExamTopBar.jsx';
 import ExamQuestionNavigator from '../../features/exam/components/ExamQuestionNavigator.jsx';
 import ExamQuestionPanel from '../../features/exam/components/ExamQuestionPanel.jsx';
+import { ConnectionStatusBanner, useOnlineStatus } from '../ui/ConnectionStatusBanner.jsx';
 
 
 
@@ -96,6 +97,8 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
 
   const [showAntiCheatChoice, setShowAntiCheatChoice] = useState(false);
   const [securityLockReason, setSecurityLockReason] = useState('');
+  const [lastLocalSaveAt, setLastLocalSaveAt] = useState('');
+  const isOnline = useOnlineStatus();
 
   const fileDialogBypassRef = useRef(false);
   const antiCheatWarningsRef = useRef(existingResult?.antiCheatWarnings || exam.resumeData?.antiCheatWarnings || 0);
@@ -153,7 +156,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
 
   const writeLocalExamBackup = (nextAnswers = answers, extra = {}) => {
     if (isReviewMode || isSubmitted || exam.id === 'custom_mistakes_exam') return;
-    writeLocalExamBackupToStorage({
+    const didSaveLocally = writeLocalExamBackupToStorage({
       autosaveKey,
       exam,
       user,
@@ -163,6 +166,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
       antiCheatWarnings: antiCheatWarningsRef.current,
       antiCheatLog
     });
+    if (didSaveLocally) setLastLocalSaveAt(new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
   };
 
   const saveExamProgress = async (extra = {}) => {
@@ -370,6 +374,20 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
     const interval = setInterval(() => writeLocalExamBackup(), 5000);
     return () => clearInterval(interval);
   }, [answers, timeLeft, currentQIndex, isSubmitted, isReviewMode, autosaveKey]);
+
+  useEffect(() => {
+    if (!isOnline || isReviewMode || isSubmitted || !exam.attemptId || exam.id === 'custom_mistakes_exam') return;
+    const backup = readLocalExamBackup(autosaveKey);
+    if (!backup?.answers) return;
+    setDoc(doc(db, 'exam_results', exam.attemptId), {
+      answers: backup.answers,
+      remainingTime: backup.remainingTime,
+      currentQIndex: backup.currentQIndex,
+      localDraftSyncedAt: serverTimestamp(),
+      lastSavedAt: serverTimestamp(),
+      status: 'in_progress'
+    }, { merge: true }).catch((e) => console.warn('local backup sync failed:', e?.message));
+  }, [isOnline, isReviewMode, isSubmitted, autosaveKey, exam.attemptId, exam.id]);
 
   const handleEssayImageUpload = async (qId, file) => {
     if (!file) return;
@@ -581,6 +599,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
   return (
     <div className="fixed inset-0 z-50 bg-slate-100 flex flex-col font-['Cairo'] no-select" dir="rtl">
       {!isSubmitted && <ExamWatermarkLayer positions={wmPositions} user={user} />}
+      {!isSubmitted && <ConnectionStatusBanner isOnline={isOnline} lastLocalSaveAt={lastLocalSaveAt} />}
 
       {showAntiCheatChoice && <ExamSecurityHoldOverlay onClose={onClose} />}
 

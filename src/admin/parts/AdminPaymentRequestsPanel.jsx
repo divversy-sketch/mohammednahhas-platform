@@ -64,6 +64,7 @@ import {
   LocalEssayReviewBox
 } from '../../shared/core/platformShared.jsx';
 import { isActiveAdminSnapshot, getInitialRouteMode, navigatePlatform, DebugCollector, DebugPanel } from '../../shared/core/debugTools.jsx';
+import { adminSecureFunctions } from '../services/adminSecureFunctions.js';
 
 
 
@@ -88,45 +89,19 @@ export const AdminPaymentRequestsPanel = ({ users = [] }) => {
     if (!platformConfirm(`تفعيل اشتراك ${req.studentName} لمدة ${req.durationDays || 30} يوم؟`)) return;
 
     try {
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + safeNumber(req.durationDays, 30));
-
-      const batch = writeBatch(db);
-      batch.update(doc(db, 'payment_requests', req.id), {
-        status: 'approved',
-        reviewedAt: serverTimestamp(),
-        approvedAt: serverTimestamp()
-      });
-      batch.set(doc(db, 'users', req.userId), {
-        subscription: {
-          active: true,
-          plan: req.plan || 'manual',
-          source: 'payment_request',
-          expiresAt,
-          activatedAt: serverTimestamp(),
-          lastPaymentRequestId: req.id
-        },
-        isVIP: true,
-        vipUntil: expiresAt,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-
-      await batch.commit();
+      await adminSecureFunctions.approvePaymentRequest(req.id, safeNumber(req.durationDays, 30));
       platformNotify('تم تفعيل الاشتراك بنجاح.');
     } catch (error) {
       console.error('approve payment request error:', error);
-      platformNotify('تعذر تفعيل الاشتراك. راجع الصلاحيات.');
+      platformNotify(error?.message || 'تعذر تفعيل الاشتراك. راجع الصلاحيات.');
     }
   };
 
   const rejectRequest = async (req) => {
     const reason = platformPrompt('سبب الرفض؟', 'بيانات الدفع غير واضحة');
     if (reason === null) return;
-    await updateDoc(doc(db, 'payment_requests', req.id), {
-      status: 'rejected',
-      rejectReason: reason,
-      reviewedAt: serverTimestamp()
-    });
+    await adminSecureFunctions.rejectPaymentRequest(req.id, reason);
+    platformNotify('تم رفض الطلب.');
   };
 
   const filtered = requests.filter(r => filter === 'all' || r.status === filter);

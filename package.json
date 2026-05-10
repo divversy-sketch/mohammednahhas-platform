@@ -11,7 +11,12 @@
     "quality:check": "npm run build && npm audit --audit-level=moderate",
     "deploy:rules": "firebase deploy --only firestore:rules,storage",
     "deploy:hosting": "firebase deploy --only hosting",
-    "deploy:functions": "firebase deploy --only functions"
+    "deploy:functions": "firebase deploy --only functions",
+    "security:smoke": "node scripts/security-smoke-check.mjs",
+    "app:qa": "npm run build && npm run security:smoke && npm audit --audit-level=moderate",
+    "release:tag": "git tag v1.0.0-stable && git push origin v1.0.0-stable",
+    "bundle:report": "node scripts/bundle-report.mjs",
+    "production:check": "npm run app:qa && npm run bundle:report"
   },
   "dependencies": {
     "@capacitor/cli": "^8.3.1",
