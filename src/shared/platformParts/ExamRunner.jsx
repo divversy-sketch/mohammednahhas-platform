@@ -221,8 +221,6 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
           answers: {},
           remainingTime: exam.duration * 60,
           currentQIndex: 0,
-          score: 0,
-          total: 0,
           status: 'in_progress',
           antiCheatWarnings: 0,
           antiCheatLog: nextLog,
