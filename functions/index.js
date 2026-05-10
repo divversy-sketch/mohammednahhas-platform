@@ -141,3 +141,227 @@ exports.pingPushFunctions = functions
   .onCall(async () => {
     return { ok: true, message: "Push functions are working" };
   });
+
+// -----------------------------------------------------------------------------
+// Secure admin-only operations
+// -----------------------------------------------------------------------------
+
+async function assertAdmin(context) {
+  const uid = context.auth && context.auth.uid;
+  if (!uid) {
+    throw new functions.https.HttpsError("unauthenticated", "يجب تسجيل الدخول أولاً.");
+  }
+
+  const adminSnap = await db.collection("admins").doc(uid).get();
+  const adminData = adminSnap.exists ? adminSnap.data() : null;
+
+  if (!adminData || adminData.active !== true || adminData.role !== "admin") {
+    throw new functions.https.HttpsError("permission-denied", "هذا الحساب لا يملك صلاحية الإدارة.");
+  }
+
+  return { uid, email: adminData.email || (context.auth.token && context.auth.token.email) || "" };
+}
+
+function requireString(value, fieldName) {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new functions.https.HttpsError("invalid-argument", `الحقل ${fieldName} مطلوب.`);
+  }
+  return value.trim();
+}
+
+function cleanObject(input, allowedKeys) {
+  const out = {};
+  allowedKeys.forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(input || {}, key)) {
+      out[key] = input[key];
+    }
+  });
+  return out;
+}
+
+exports.deleteStudentAccount = functions
+  .region("us-central1")
+  .https
+  .onCall(async (data, context) => {
+    const adminUser = await assertAdmin(context);
+    const studentId = requireString(data && data.studentId, "studentId");
+
+    if (studentId === adminUser.uid) {
+      throw new functions.https.HttpsError("failed-precondition", "لا يمكن حذف حساب الأدمن الحالي.");
+    }
+
+    const batch = db.batch();
+    batch.delete(db.collection("users").doc(studentId));
+
+    const ownedCollections = [
+      "notification_tokens",
+      "payment_requests",
+      "lessonProgress",
+      "enrollments",
+      "examResults",
+      "attempts",
+      "exam_results",
+      "homework_results",
+      "assignment_submissions",
+      "video_views",
+      "video_notes",
+      "student_mistakes"
+    ];
+
+    for (const collectionName of ownedCollections) {
+      const snap = await db.collection(collectionName).where("userId", "==", studentId).limit(300).get();
+      snap.forEach((docSnap) => batch.delete(docSnap.ref));
+
+      const studentSnap = await db.collection(collectionName).where("studentId", "==", studentId).limit(300).get();
+      studentSnap.forEach((docSnap) => batch.delete(docSnap.ref));
+    }
+
+    await batch.commit();
+
+    try {
+      await admin.auth().deleteUser(studentId);
+    } catch (error) {
+      console.warn("Auth user delete skipped/failed:", studentId, error && error.message);
+    }
+
+    await db.collection("admin_audit_logs").add({
+      action: "deleteStudentAccount",
+      adminUid: adminUser.uid,
+      studentId,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return { ok: true };
+  });
+
+exports.setStudentStatus = functions
+  .region("us-central1")
+  .https
+  .onCall(async (data, context) => {
+    const adminUser = await assertAdmin(context);
+    const studentId = requireString(data && data.studentId, "studentId");
+    const status = requireString(data && data.status, "status");
+    const allowed = ["pending", "active", "blocked", "banned", "suspended"];
+
+    if (!allowed.includes(status)) {
+      throw new functions.https.HttpsError("invalid-argument", "حالة الطالب غير مسموحة.");
+    }
+
+    await db.collection("users").doc(studentId).set({
+      status,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedBy: adminUser.uid
+    }, { merge: true });
+
+    await db.collection("admin_audit_logs").add({
+      action: "setStudentStatus",
+      adminUid: adminUser.uid,
+      studentId,
+      status,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return { ok: true, status };
+  });
+
+exports.createSubscriptionCode = functions
+  .region("us-central1")
+  .https
+  .onCall(async (data, context) => {
+    const adminUser = await assertAdmin(context);
+    const code = requireString(data && data.code, "code").toUpperCase();
+    const payload = cleanObject(data || {}, ["grade", "durationDays", "type", "note", "value"]);
+
+    await db.collection("subscription_codes").doc(code).set({
+      ...payload,
+      code,
+      isUsed: false,
+      usedBy: null,
+      usedAt: null,
+      createdBy: adminUser.uid,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: false });
+
+    await db.collection("admin_audit_logs").add({
+      action: "createSubscriptionCode",
+      adminUid: adminUser.uid,
+      code,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return { ok: true, code };
+  });
+
+exports.approvePaymentRequest = functions
+  .region("us-central1")
+  .https
+  .onCall(async (data, context) => {
+    const adminUser = await assertAdmin(context);
+    const requestId = requireString(data && data.requestId, "requestId");
+    const durationDays = Number(data && data.durationDays ? data.durationDays : 30);
+
+    if (!Number.isFinite(durationDays) || durationDays <= 0 || durationDays > 730) {
+      throw new functions.https.HttpsError("invalid-argument", "مدة الاشتراك غير صحيحة.");
+    }
+
+    const requestRef = db.collection("payment_requests").doc(requestId);
+    const requestSnap = await requestRef.get();
+    if (!requestSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "طلب الدفع غير موجود.");
+    }
+
+    const requestData = requestSnap.data() || {};
+    const userId = requestData.userId;
+    if (!userId) {
+      throw new functions.https.HttpsError("failed-precondition", "طلب الدفع لا يحتوي على userId.");
+    }
+
+    const expiry = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
+
+    await db.runTransaction(async (tx) => {
+      tx.set(requestRef, {
+        status: "approved",
+        approvedBy: adminUser.uid,
+        approvedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+
+      tx.set(db.collection("users").doc(userId), {
+        subscriptionStatus: "premium",
+        subscriptionExpiry: admin.firestore.Timestamp.fromDate(expiry),
+        status: "active",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedBy: adminUser.uid
+      }, { merge: true });
+    });
+
+    await db.collection("admin_audit_logs").add({
+      action: "approvePaymentRequest",
+      adminUid: adminUser.uid,
+      requestId,
+      userId,
+      durationDays,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return { ok: true, userId, durationDays };
+  });
+
+exports.deleteExam = functions
+  .region("us-central1")
+  .https
+  .onCall(async (data, context) => {
+    const adminUser = await assertAdmin(context);
+    const examId = requireString(data && data.examId, "examId");
+
+    await db.collection("exams").doc(examId).delete();
+    await db.collection("admin_audit_logs").add({
+      action: "deleteExam",
+      adminUid: adminUser.uid,
+      examId,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return { ok: true };
+  });
