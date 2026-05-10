@@ -64,6 +64,7 @@ import {
   LocalEssayReviewBox
 } from '../core/platformShared.jsx';
 import { isActiveAdminSnapshot, getInitialRouteMode, navigatePlatform, DebugCollector, DebugPanel } from '../core/debugTools.jsx';
+import { makeExamAutosaveKey, readLocalExamBackup, writeLocalExamBackupToStorage, flattenExamQuestions } from '../exam/examState.js';
 
 
 
@@ -71,14 +72,8 @@ import { isActiveAdminSnapshot, getInitialRouteMode, navigatePlatform, DebugColl
 export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult = null }) => {
   const [activeView, setActiveView] = useState(isReviewMode || existingResult ? 'dashboard' : 'questions');
   const [currentQIndex, setCurrentQIndex] = useState(0);
-  const autosaveKey = `nahhas_exam_backup_${user?.uid || 'guest'}_${exam?.attemptId || exam?.id || 'exam'}`;
-  const readLocalExamBackup = () => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(autosaveKey) || 'null');
-      return saved && typeof saved === 'object' ? saved : null;
-    } catch { return null; }
-  };
-  const localExamBackup = readLocalExamBackup();
+  const autosaveKey = makeExamAutosaveKey(user, exam);
+  const localExamBackup = readLocalExamBackup(autosaveKey);
   const [answers, setAnswers] = useState(existingResult?.answers || exam.resumeData?.answers || localExamBackup?.answers || {});
   const [flagged, setFlagged] = useState({});
   const [timeLeft, setTimeLeft] = useState(safeNumber(existingResult?.remainingTime ?? exam.resumeData?.remainingTime ?? localExamBackup?.remainingTime, exam.duration * 60));
@@ -99,38 +94,9 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
   const antiCheatWarningsRef = useRef(existingResult?.antiCheatWarnings || exam.resumeData?.antiCheatWarnings || 0);
   const stateRefs = useRef({ isSubmitted, showSubmitConfirm, isCheating, showAntiCheatChoice });
 
-  const shuffleArray = (array) => {
-    const arr = [...array];
-    for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
-    return arr;
-  };
-
-  const flatQuestions = useMemo(() => {
-    const flat = [];
-    if (exam.questions) {
-      let processedBlocks = [...exam.questions];
-      if (!isReviewMode && !existingResult) processedBlocks = shuffleArray(processedBlocks);
-
-      processedBlocks.forEach((block) => {
-        let subQs = [...(block.subQuestions || [])];
-        const hasEssay = subQs.some((q) => q.type === 'essay');
-        if (!isReviewMode && !existingResult && !hasEssay) subQs = shuffleArray(subQs);
-
-        subQs.forEach((q) => {
-          flat.push({
-            ...q,
-            type: q.type || 'mcq',
-            blockText: block.text || '',
-            branch: q.branch || 'عام'
-          });
-        });
-      });
-    }
-    return flat;
-  }, [exam.questions, isReviewMode, existingResult]);
+  const flatQuestions = useMemo(() => (
+    flattenExamQuestions({ exam, isReviewMode, existingResult })
+  ), [exam, isReviewMode, existingResult]);
 
   const uniqueBranches = useMemo(() => ['الكل', ...new Set(flatQuestions.map(q => q.branch))], [flatQuestions]);
 
@@ -180,21 +146,16 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
 
   const writeLocalExamBackup = (nextAnswers = answers, extra = {}) => {
     if (isReviewMode || isSubmitted || exam.id === 'custom_mistakes_exam') return;
-    try {
-      localStorage.setItem(autosaveKey, JSON.stringify({
-        examId: exam.id,
-        attemptId: exam.attemptId,
-        studentId: user.uid,
-        answers: nextAnswers,
-        remainingTime: extra.remainingTime ?? timeLeft,
-        currentQIndex: extra.currentQIndex ?? currentQIndex,
-        antiCheatWarnings: antiCheatWarningsRef.current,
-        antiCheatLog,
-        savedAt: new Date().toISOString()
-      }));
-    } catch (e) {
-      console.warn('local exam backup failed:', e?.message);
-    }
+    writeLocalExamBackupToStorage({
+      autosaveKey,
+      exam,
+      user,
+      answers: nextAnswers,
+      timeLeft: extra.remainingTime ?? timeLeft,
+      currentQIndex: extra.currentQIndex ?? currentQIndex,
+      antiCheatWarnings: antiCheatWarningsRef.current,
+      antiCheatLog
+    });
   };
 
   const saveExamProgress = async (extra = {}) => {

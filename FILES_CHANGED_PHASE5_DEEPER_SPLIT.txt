@@ -1,0 +1,10 @@
+src/admin/parts/AdminDashboard.jsx
+src/admin/modals/AdminExamTimeModal.jsx
+src/admin/modals/AdminReviewExamOverlay.jsx
+src/admin/modals/AdminFullExamEditorModal.jsx
+src/admin/modals/AdminFullContentEditorModal.jsx
+src/admin/modals/AdminStudentProfileModal.jsx
+src/shared/platformParts/ExamRunner.jsx
+src/shared/exam/examState.js
+DEEP_SPLIT_PHASE5_AR.md
+FILES_CHANGED_PHASE5_DEEPER_SPLIT.txt

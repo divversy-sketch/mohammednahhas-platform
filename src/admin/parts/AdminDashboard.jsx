@@ -80,6 +80,11 @@ import SmartSubscriptionManager from './SmartSubscriptionManager.jsx';
 import { useAdminDashboardData } from '../hooks/useAdminDashboardData.js';
 import AdminHeader from '../components/AdminHeader.jsx';
 import AdminSidebar from '../components/AdminSidebar.jsx';
+import AdminExamTimeModal from '../modals/AdminExamTimeModal.jsx';
+import AdminReviewExamOverlay from '../modals/AdminReviewExamOverlay.jsx';
+import AdminFullExamEditorModal from '../modals/AdminFullExamEditorModal.jsx';
+import AdminFullContentEditorModal from '../modals/AdminFullContentEditorModal.jsx';
+import AdminStudentProfileModal from '../modals/AdminStudentProfileModal.jsx';
 
 export const AdminDashboard = ({ user }) => {
   const userData = user || {};
@@ -1086,329 +1091,57 @@ export const AdminDashboard = ({ user }) => {
       <DebugPanel user={user} />
       <FloatingArabicBackground />
 
-      {editingExamTime && (
-          <div className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl relative">
-                  <button onClick={() => setEditingExamTime(null)} className="absolute top-4 left-4 text-slate-400 hover:text-red-500"><X size={24}/></button>
-                  <h3 className="text-xl font-bold mb-4 text-blue-800 flex items-center gap-2"><Calendar size={24}/> تمديد وقت الامتحان</h3>
-                  <p className="text-sm text-slate-600 mb-6 font-bold">{editingExamTime.title}</p>
-                  <form onSubmit={handleUpdateExamTime}>
-                      <label className="block text-sm font-bold mb-2 text-slate-800">تاريخ ووقت الانتهاء الجديد:</label>
-                      <input type="datetime-local" className="w-full border-2 border-blue-200 p-3 rounded-xl mb-6 bg-blue-50 focus:border-blue-500 outline-none transition" value={newEndTime} onChange={(e) => setNewEndTime(e.target.value)} required />
-                      <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg hover:shadow-blue-500/50">حفظ التعديل</button>
-                  </form>
-              </div>
-          </div>
-      )}
+      <AdminExamTimeModal
+        editingExamTime={editingExamTime}
+        setEditingExamTime={setEditingExamTime}
+        newEndTime={newEndTime}
+        setNewEndTime={setNewEndTime}
+        handleUpdateExamTime={handleUpdateExamTime}
+      />
 
 
-      {adminReviewExamData && adminReviewResult && (
-        <ExamRunner
-          exam={adminReviewExamData.exam}
-          user={adminReviewExamData.user}
-          existingResult={adminReviewResult}
-          isReviewMode={true}
-          onClose={() => {
-            setAdminReviewExamData(null);
-            setAdminReviewResult(null);
-          }}
-        />
-      )}
+      <AdminReviewExamOverlay
+        adminReviewExamData={adminReviewExamData}
+        adminReviewResult={adminReviewResult}
+        onClose={() => {
+          setAdminReviewExamData(null);
+          setAdminReviewResult(null);
+        }}
+      />
 
-      {editingFullExam && (
-        <div className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-5xl max-h-[92vh] overflow-y-auto p-6 shadow-2xl">
-            <div className="flex justify-between items-center mb-5 border-b pb-3">
-              <h3 className="text-2xl font-black text-slate-800 flex items-center gap-2"><Edit size={22}/> تعديل الامتحان بالكامل</h3>
-              <button onClick={() => setEditingFullExam(null)} className="text-slate-400 hover:text-red-600"><X size={26}/></button>
-            </div>
+      <AdminFullExamEditorModal
+        editingFullExam={editingFullExam}
+        setEditingFullExam={setEditingFullExam}
+        examEditMode={examEditMode}
+        setExamEditMode={setExamEditMode}
+        recalculateAfterExamEdit={recalculateAfterExamEdit}
+        setRecalculateAfterExamEdit={setRecalculateAfterExamEdit}
+        examEditDraft={examEditDraft}
+        setExamEditDraft={setExamEditDraft}
+        examEditQuestionsPreview={examEditQuestionsPreview}
+        updateQuestionInExamDraft={updateQuestionInExamDraft}
+        saveFullExamEdit={saveFullExamEdit}
+      />
 
-            {editingFullExam.hasResults && (
-              <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-2xl text-sm font-bold leading-relaxed">
-                هذا الامتحان له نتائج طلاب سابقة. عند تعديل الإجابات الصحيحة يمكنك إعادة تصحيح نتائج الطلاب تلقائيًا بناءً على الإجابات الجديدة.
-              </div>
-            )}
+      <AdminFullContentEditorModal
+        editingFullContent={editingFullContent}
+        setEditingFullContent={setEditingFullContent}
+        contentEditMode={contentEditMode}
+        setContentEditMode={setContentEditMode}
+        contentEditDraft={contentEditDraft}
+        setContentEditDraft={setContentEditDraft}
+        examsList={examsList}
+        saveFullContentEdit={saveFullContentEdit}
+      />
 
-            {editingFullExam.hasResults && examEditMode === 'direct' && (
-              <label className="mb-4 flex items-start gap-3 bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-2xl font-bold cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="mt-1"
-                  checked={recalculateAfterExamEdit}
-                  onChange={e => setRecalculateAfterExamEdit(e.target.checked)}
-                />
-                <span>
-                  إعادة تصحيح نتائج الطلاب القديمة تلقائيًا بعد حفظ التعديل
-                  <span className="block text-xs font-normal mt-1 text-emerald-700">
-                    استخدم هذا الخيار عند تعديل الإجابة الصحيحة أو درجة السؤال. سيعاد حساب الدرجة والفروع والتحليل لكل طالب حل الامتحان.
-                  </span>
-                </span>
-              </label>
-            )}
-
-            <form onSubmit={saveFullExamEdit} className="grid gap-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <label className="bg-slate-50 border rounded-xl p-3 flex items-center gap-2 font-bold">
-                  <input type="radio" checked={examEditMode === 'direct'} onChange={() => setExamEditMode('direct')} />
-                  تعديل مباشر
-                </label>
-                <label className="bg-slate-50 border rounded-xl p-3 flex items-center gap-2 font-bold">
-                  <input type="radio" checked={examEditMode === 'clone'} onChange={() => setExamEditMode('clone')} />
-                  إنشاء نسخة جديدة آمنة
-                </label>
-                <label className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-2 font-bold text-amber-800">
-                  <input type="checkbox" checked={examEditDraft.isPremium} onChange={e => setExamEditDraft({...examEditDraft, isPremium: e.target.checked})} />
-                  VIP فقط
-                </label>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <input className="border p-3 rounded-xl" placeholder="عنوان الامتحان" value={examEditDraft.title} onChange={e => setExamEditDraft({...examEditDraft, title: e.target.value})} />
-                <select className="border p-3 rounded-xl" value={examEditDraft.grade} onChange={e => setExamEditDraft({...examEditDraft, grade: e.target.value})}><GradeOptions/></select>
-                <input type="number" className="border p-3 rounded-xl" placeholder="المدة بالدقائق" value={examEditDraft.duration} onChange={e => setExamEditDraft({...examEditDraft, duration: e.target.value})} />
-                <input className="border p-3 rounded-xl" placeholder="كود الامتحان" value={examEditDraft.accessCode} onChange={e => setExamEditDraft({...examEditDraft, accessCode: e.target.value})} />
-                <input type="datetime-local" className="border p-3 rounded-xl" value={examEditDraft.startTime} onChange={e => setExamEditDraft({...examEditDraft, startTime: e.target.value})} />
-                <input type="datetime-local" className="border p-3 rounded-xl" value={examEditDraft.endTime} onChange={e => setExamEditDraft({...examEditDraft, endTime: e.target.value})} />
-              </div>
-
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
-                <div className="flex items-center justify-between gap-3 mb-3">
-                  <div>
-                    <label className="block font-black text-slate-800 mb-1">تصحيح الإجابات من داخل المنصة</label>
-                    <p className="text-xs text-slate-500">غيّر الإجابة الصحيحة أو درجة السؤال من هنا بدون كتابة كود. المادة/النص والامتحان يظلوا كما هم إلا لو عدلتهم بنفسك.</p>
-                  </div>
-                  <span className="bg-white border px-3 py-1 rounded-full text-xs font-bold text-slate-600">{examEditQuestionsPreview.length} سؤال</span>
-                </div>
-
-                <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
-                  {examEditQuestionsPreview.length === 0 ? (
-                    <div className="bg-white border border-dashed rounded-xl p-5 text-center text-slate-400 font-bold">
-                      لا يمكن عرض محرر الأسئلة لأن صيغة الأسئلة غير مقروءة.
-                    </div>
-                  ) : examEditQuestionsPreview.map((q, idx) => (
-                    <div key={`${q.blockIndex}-${q.questionIndex}-${q.id || idx}`} className="bg-white border rounded-xl p-4">
-                      <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
-                        <div className="flex-1 min-w-[220px]">
-                          <div className="flex flex-wrap gap-2 mb-2">
-                            <span className="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded font-bold">سؤال {idx + 1}</span>
-                            <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded font-bold">{q.branch || 'عام'}</span>
-                            <span className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded font-bold">{q.type === 'essay' ? 'مقالي' : 'اختياري'}</span>
-                          </div>
-                          <p className="font-bold text-slate-800 leading-relaxed">{String(q.text || '').replaceAll('|', ' / ')}</p>
-                        </div>
-                      </div>
-
-                      {q.type === 'essay' ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <label className="block">
-                            <span className="text-xs font-bold text-slate-500">درجة السؤال المقالي من</span>
-                            <input
-                              type="number"
-                              min="0"
-                              className="w-full border rounded-xl p-3 mt-1"
-                              value={q.maxScore ?? q.mark ?? 10}
-                              onChange={e => updateQuestionInExamDraft(q.blockIndex, q.questionIndex, { maxScore: safeNumber(e.target.value, 10), mark: safeNumber(e.target.value, 10) })}
-                            />
-                          </label>
-                          <label className="block">
-                            <span className="text-xs font-bold text-slate-500">نموذج إجابة مختصر</span>
-                            <input
-                              className="w-full border rounded-xl p-3 mt-1"
-                              value={q.modelAnswer || ''}
-                              onChange={e => updateQuestionInExamDraft(q.blockIndex, q.questionIndex, { modelAnswer: e.target.value })}
-                              placeholder="اختياري"
-                            />
-                          </label>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <label className="block">
-                            <span className="text-xs font-bold text-slate-500">الإجابة الصحيحة</span>
-                            <select
-                              className="w-full border rounded-xl p-3 mt-1"
-                              value={q.correctIdx ?? 0}
-                              onChange={e => updateQuestionInExamDraft(q.blockIndex, q.questionIndex, { correctIdx: safeNumber(e.target.value, 0) })}
-                            >
-                              {(Array.isArray(q.options) ? q.options : []).map((opt, optIdx) => (
-                                <option key={optIdx} value={optIdx}>{optIdx + 1} - {opt}</option>
-                              ))}
-                            </select>
-                          </label>
-                          <label className="block">
-                            <span className="text-xs font-bold text-slate-500">درجة السؤال</span>
-                            <input
-                              type="number"
-                              min="0"
-                              className="w-full border rounded-xl p-3 mt-1"
-                              value={q.maxScore ?? q.mark ?? 1}
-                              onChange={e => updateQuestionInExamDraft(q.blockIndex, q.questionIndex, { maxScore: safeNumber(e.target.value, 1), mark: safeNumber(e.target.value, 1) })}
-                            />
-                          </label>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <details className="bg-white border rounded-2xl p-4">
-                  <summary className="cursor-pointer font-bold text-slate-700">تعديل متقدم للأسئلة بصيغة JSON</summary>
-                  <p className="text-xs text-slate-500 my-2">استخدمه فقط لو عايز تعدل نص السؤال أو الاختيارات أو الفروع بشكل متقدم.</p>
-                  <textarea className="w-full border rounded-xl p-3 min-h-[320px] font-mono text-xs text-left direction-ltr" dir="ltr" value={examEditDraft.questionsText} onChange={e => setExamEditDraft({...examEditDraft, questionsText: e.target.value})} />
-                </details>
-              </div>
-
-              <div className="flex flex-col md:flex-row gap-3">
-                <button type="submit" className="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-black hover:bg-emerald-700">حفظ</button>
-                <button type="button" onClick={() => setEditingFullExam(null)} className="flex-1 bg-slate-200 text-slate-700 py-3 rounded-xl font-black hover:bg-slate-300">إلغاء</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {editingFullContent && (
-        <div className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[92vh] overflow-y-auto p-6 shadow-2xl">
-            <div className="flex justify-between items-center mb-5 border-b pb-3">
-              <h3 className="text-2xl font-black text-slate-800 flex items-center gap-2"><Edit size={22}/> تعديل المحتوى بالكامل</h3>
-              <button onClick={() => setEditingFullContent(null)} className="text-slate-400 hover:text-red-600"><X size={26}/></button>
-            </div>
-
-            <form onSubmit={saveFullContentEdit} className="grid gap-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <label className="bg-slate-50 border rounded-xl p-3 flex items-center gap-2 font-bold">
-                  <input type="radio" checked={contentEditMode === 'direct'} onChange={() => setContentEditMode('direct')} />
-                  تعديل مباشر
-                </label>
-                <label className="bg-slate-50 border rounded-xl p-3 flex items-center gap-2 font-bold">
-                  <input type="radio" checked={contentEditMode === 'clone'} onChange={() => setContentEditMode('clone')} />
-                  إنشاء نسخة جديدة
-                </label>
-                <label className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-2 font-bold text-amber-800">
-                  <input type="checkbox" checked={contentEditDraft.isPremium} onChange={e => setContentEditDraft({...contentEditDraft, isPremium: e.target.checked})} />
-                  VIP فقط
-                </label>
-              </div>
-
-              <input className="border p-3 rounded-xl" placeholder="العنوان" value={contentEditDraft.title} onChange={e => setContentEditDraft({...contentEditDraft, title: e.target.value})} />
-              <input className="border p-3 rounded-xl" placeholder="الرابط / رابط الفيديو / رابط الملف" value={contentEditDraft.url} onChange={e => setContentEditDraft({...contentEditDraft, url: e.target.value})} />
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <select className="border p-3 rounded-xl" value={contentEditDraft.type} onChange={e => setContentEditDraft({...contentEditDraft, type: e.target.value})}>
-                  <option value="video">فيديو مدمج</option><option value="file">ملف PDF</option><option value="html">HTML تفاعلي</option><option value="interactive_exam">امتحان تفاعلي</option><option value="link">رابط خارجي</option>
-                </select>
-                <select className="border p-3 rounded-xl" value={contentEditDraft.grade} onChange={e => setContentEditDraft({...contentEditDraft, grade: e.target.value})}><GradeOptions/></select>
-                <input className="border p-3 rounded-xl" placeholder="الفرع" value={contentEditDraft.branch} onChange={e => setContentEditDraft({...contentEditDraft, branch: e.target.value})} />
-              </div>
-
-              {contentEditDraft.type === 'video' && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-blue-50 border border-blue-200 rounded-2xl p-4">
-                  <select className="border p-3 rounded-xl bg-white" value={contentEditDraft.videoSection} onChange={e => setContentEditDraft({...contentEditDraft, videoSection: e.target.value})}>
-                    <option value="explanation">شرح الدرس</option><option value="exercises">حل التدريبات</option><option value="reviews">مراجعة نهائية</option>
-                  </select>
-                  <select className="border p-3 rounded-xl bg-white" value={contentEditDraft.linkedExamId} onChange={e => setContentEditDraft({...contentEditDraft, linkedExamId: e.target.value})}>
-                    <option value="">بدون امتحان مرتبط</option>
-                    {examsList.filter(exam => !contentEditDraft.grade || exam.grade === contentEditDraft.grade).map(exam => <option key={exam.id} value={exam.id}>{exam.title}</option>)}
-                  </select>
-                  <input type="number" min="1" className="border p-3 rounded-xl bg-white" placeholder="مدة الفيديو بالدقائق" value={contentEditDraft.estimatedDurationMinutes} onChange={e => setContentEditDraft({...contentEditDraft, estimatedDurationMinutes: e.target.value})} />
-                </div>
-              )}
-
-              <textarea className="border p-3 rounded-xl min-h-[80px]" placeholder="إيميلات مسموحة مفصولة بفاصلة، أو اتركها فارغة للجميع" value={contentEditDraft.allowedEmailsText} onChange={e => setContentEditDraft({...contentEditDraft, allowedEmailsText: e.target.value})} />
-              <label className="flex items-center gap-2 bg-slate-50 border rounded-xl p-3 font-bold"><input type="checkbox" checked={contentEditDraft.isPublic} onChange={e => setContentEditDraft({...contentEditDraft, isPublic: e.target.checked})}/> يظهر للزوار في الصفحة الرئيسية</label>
-
-              <div className="flex flex-col md:flex-row gap-3">
-                <button type="submit" className="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-black hover:bg-emerald-700">حفظ</button>
-                <button type="button" onClick={() => setEditingFullContent(null)} className="flex-1 bg-slate-200 text-slate-700 py-3 rounded-xl font-black hover:bg-slate-300">إلغاء</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {viewingStudentProfile && (
-          <div className="fixed inset-0 z-[1000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 md:p-8">
-              <div className="bg-slate-50 rounded-3xl w-full max-w-6xl h-full md:h-[90vh] shadow-2xl flex flex-col relative overflow-hidden border border-slate-300">
-                  <button onClick={() => setViewingStudentProfile(null)} className="absolute top-4 left-4 md:top-6 md:left-6 z-50 bg-red-100 p-2 md:p-3 rounded-full text-red-600 hover:bg-red-200 hover:text-red-700 transition shadow-md border border-red-200"><X size={24}/></button>
-                  <div className="bg-white border-b border-slate-200 p-6 pt-16 md:pt-6 flex justify-between items-start flex-shrink-0">
-                      <div className="flex gap-4 items-center">
-                          <div className="w-16 h-16 bg-blue-100 text-blue-700 rounded-2xl flex items-center justify-center font-bold text-2xl shadow-inner">
-                              {viewingStudentProfile.name.charAt(0)}
-                          </div>
-                          <div>
-                              <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                                  {viewingStudentProfile.name} 
-                                  <span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600">{getGradeLabel(viewingStudentProfile.grade)}</span>
-                                  {viewingStudentProfile.subscriptionStatus === 'premium' && <span className="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded-full font-bold flex items-center gap-1"><Crown size={12}/> VIP</span>}
-                              </h2>
-                              <div className="flex flex-col md:flex-row gap-2 md:gap-4 mt-2 text-sm text-slate-500 font-bold">
-                                  <span className="flex items-center gap-1"><Phone size={14}/> {viewingStudentProfile.phone}</span>
-                                  <span className="flex items-center gap-1 text-amber-600"><Users size={14}/> ولي الأمر: {viewingStudentProfile.parentPhone}</span>
-                              </div>
-                          </div>
-                      </div>
-                  </div>
-
-                  <div className="flex-1 overflow-y-auto p-4 md:p-6">
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                          <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col h-[500px]">
-                              <h3 className="font-bold text-lg mb-4 text-blue-800 flex items-center gap-2 border-b pb-2"><PlayCircle/> سجل مشاهدات الفيديوهات</h3>
-                              <div className="flex-1 overflow-y-auto space-y-3 pr-2">
-                                  {studentHistoryData.length === 0 ? <p className="text-slate-400 text-center py-10">لم يفتح أي فيديو.</p> : studentHistoryData.map((v, i) => (
-                                      <div key={i} className="bg-slate-50 p-3 rounded-xl flex justify-between items-center border border-slate-100">
-                                          <div>
-                                              <p className="font-bold text-slate-800">{v.videoTitle}</p>
-                                              <p className="text-xs text-slate-400 mt-1">آخر فتح: {v.viewedAt?.toDate().toLocaleString('ar-EG')}</p>
-                                          </div>
-                                          <div className="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg text-xs font-bold text-center">شاهد لمدة<br/><span className="text-sm">{formatWatchTime(v.watchedSeconds)}</span></div>
-                                      </div>
-                                  ))}
-                              </div>
-                          </div>
-
-                          <div className="flex flex-col gap-6 h-[500px]">
-                              <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-100 flex-1 flex flex-col overflow-hidden">
-                                  <h3 className="font-bold text-lg mb-4 text-emerald-800 flex items-center gap-2 border-b pb-2"><ClipboardList/> نتائج الامتحانات</h3>
-                                  <div className="flex-1 overflow-y-auto space-y-3 pr-2">
-                                      {(() => {
-                                          const sExams = examResults.filter(r => r.studentId === viewingStudentProfile.id);
-                                          if (sExams.length === 0) return <p className="text-slate-400 text-center py-4">لم يقم بحل أي امتحان.</p>;
-                                          return sExams.map(ex => (
-                                              <div key={ex.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
-                                                  <p className="font-bold text-slate-700 text-sm">{examsList.find(e => e.id === ex.examId)?.title || 'امتحان محذوف'}</p>
-                                                  <span className={`px-3 py-1 rounded-lg text-sm font-bold ${ex.status === 'cheated' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-700'}`}>{ex.status === 'cheated' ? 'غش 🚫' : `${ex.score}/${ex.total}`}</span>
-                                              </div>
-                                          ))
-                                      })()}
-                                  </div>
-                              </div>
-
-                              <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-100 flex-1 flex flex-col overflow-hidden">
-                                  <h3 className="font-bold text-lg mb-4 text-amber-800 flex items-center gap-2 border-b pb-2"><QrCode/> سجل الواجبات</h3>
-                                  <div className="flex-1 overflow-y-auto space-y-3 pr-2">
-                                      {(() => {
-                                          const sHw = hwResults.filter(r => r.studentId === viewingStudentProfile.id);
-                                          if (sHw.length === 0) return <p className="text-slate-400 text-center py-4">لم يقم بتسليم أي واجب QR.</p>;
-                                          return sHw.map(hw => (
-                                              <div key={hw.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
-                                                  <div>
-                                                      <p className="font-bold text-slate-700 text-sm">{hw.homeworkTitle}</p>
-                                                      <p className="text-xs text-slate-400">{hw.bookName}</p>
-                                                  </div>
-                                                  <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-lg text-sm font-bold">{hw.score}/${hw.total}</span>
-                                              </div>
-                                          ))
-                                      })()}
-                                  </div>
-                              </div>
-                          </div>
-                      </div>
-                  </div>
-              </div>
-          </div>
-      )}
+      <AdminStudentProfileModal
+        viewingStudentProfile={viewingStudentProfile}
+        setViewingStudentProfile={setViewingStudentProfile}
+        studentHistoryData={studentHistoryData}
+        examResults={examResults}
+        examsList={examsList}
+        hwResults={hwResults}
+      />
 
       <AdminHeader adminGradeFilter={adminGradeFilter} setAdminGradeFilter={setAdminGradeFilter} />
 
