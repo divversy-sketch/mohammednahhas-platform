@@ -2,6 +2,7 @@ import React from 'react';
 
 export const ADMIN_TABS = [
   ['dashboard', 'Dashboard شامل'],
+  ['follow_up', 'المتابعة والتقارير'],
   ['users', 'طلبات الانضمام'],
   ['all_users', 'الطلاب'],
   ['payments', 'الاشتراكات والدفع'],

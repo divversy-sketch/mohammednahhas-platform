@@ -15,6 +15,10 @@ export function subscribeAdminDashboardData(handlers) {
     onSnapshot(collection(db, COLLECTIONS.QUOTES), (snapshot) => handlers.setQuotesList(mapDocs(snapshot))),
     onSnapshot(collection(db, COLLECTIONS.SMART_HOMEWORKS), (snapshot) => handlers.setSmartHomeworks(mapDocs(snapshot))),
     onSnapshot(query(collection(db, COLLECTIONS.HOMEWORK_RESULTS), orderBy('submittedAt', 'desc')), (snapshot) => handlers.setHwResults(mapDocs(snapshot))),
-    onSnapshot(query(collection(db, COLLECTIONS.SUBSCRIPTION_CODES), orderBy('createdAt', 'desc')), (snapshot) => handlers.setSubscriptionCodes(mapDocs(snapshot)))
+    onSnapshot(query(collection(db, COLLECTIONS.SUBSCRIPTION_CODES), orderBy('createdAt', 'desc')), (snapshot) => handlers.setSubscriptionCodes(mapDocs(snapshot))),
+    onSnapshot(query(collection(db, COLLECTIONS.ASSIGNMENTS), orderBy('createdAt', 'desc')), (snapshot) => handlers.setAssignments?.(mapDocs(snapshot))),
+    onSnapshot(query(collection(db, COLLECTIONS.ASSIGNMENT_SUBMISSIONS), orderBy('submittedAt', 'desc')), (snapshot) => handlers.setAssignmentSubmissions?.(mapDocs(snapshot))),
+    onSnapshot(collection(db, COLLECTIONS.STUDENT_MISTAKES), (snapshot) => handlers.setMistakes?.(mapDocs(snapshot))),
+    onSnapshot(collection(db, COLLECTIONS.VIDEO_VIEWS), (snapshot) => handlers.setVideoViews?.(mapDocs(snapshot)))
   ];
 }

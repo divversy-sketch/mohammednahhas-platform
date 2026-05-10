@@ -493,89 +493,34 @@ exports.rejectPaymentRequest = functions
   });
 
 // -----------------------------------------------------------------------------
-// Smart QR homework correction - secure server-side Gemini grading
+// Smart QR Homework: secure grading through Cloud Function
 // -----------------------------------------------------------------------------
-
-function getGeminiApiKey() {
-  return process.env.GEMINI_API_KEY || (functions.config && functions.config().gemini && functions.config().gemini.key) || "";
+function getGeminiKey() {
+  const cfgKey = functions.config && functions.config().gemini && functions.config().gemini.key;
+  return cfgKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY || "";
 }
 
-function extractJsonObject(text) {
-  const raw = String(text || "").replace(/```json/gi, "").replace(/```/g, "").trim();
-  try { return JSON.parse(raw); } catch (_) {}
-  const start = raw.indexOf("{");
-  const end = raw.lastIndexOf("}");
-  if (start >= 0 && end > start) {
-    return JSON.parse(raw.slice(start, end + 1));
-  }
-  throw new Error("Gemini did not return valid JSON");
+function cleanGeminiJson(text) {
+  const raw = String(text || "").trim().replace(/```json/gi, "").replace(/```/g, "").trim();
+  const first = raw.indexOf("{");
+  const last = raw.lastIndexOf("}");
+  const jsonText = first >= 0 && last >= first ? raw.slice(first, last + 1) : raw;
+  return JSON.parse(jsonText);
 }
 
-function toMillis(value) {
-  if (!value) return null;
-  if (value.toMillis) return value.toMillis();
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? null : d.getTime();
-}
-
-function safeQuestionRows(rows) {
-  if (!Array.isArray(rows)) return [];
-  return rows.slice(0, 120).map((q, idx) => ({
-    q: q.q || q.question || idx + 1,
-    studentAnswer: String(q.studentAnswer || q.answer || "").slice(0, 80),
-    correctAnswer: String(q.correctAnswer || "").slice(0, 80),
-    isCorrect: Boolean(q.isCorrect),
-    note: String(q.note || "").slice(0, 250)
+function normalizeQuestionRows(result) {
+  if (!Array.isArray(result.questions)) return [];
+  return result.questions.map((q, index) => ({
+    q: q.q || q.number || index + 1,
+    studentAnswer: String(q.studentAnswer || q.student_answer || "").trim(),
+    correctAnswer: String(q.correctAnswer || q.correct_answer || "").trim(),
+    isCorrect: Boolean(q.isCorrect ?? q.correct ?? false),
+    note: String(q.note || q.feedback || "").trim()
   }));
-}
-
-async function callGeminiForHomework({ answerKey, imageBase64, mimeType, homework }) {
-  const apiKey = getGeminiApiKey();
-  if (!apiKey) {
-    throw new functions.https.HttpsError("failed-precondition", "لم يتم ضبط GEMINI_API_KEY على Cloud Functions.");
-  }
-
-  const promptText = `أنت مصحح واجبات عربي صارم وعادل. صحح صورة واجب الطالب حسب نموذج الإجابة التالي فقط.\n\nنموذج الإجابة:\n${answerKey}\n\nبيانات الواجب:\nالعنوان: ${homework.title || ""}\nالكتاب: ${homework.bookName || ""}\nعدد الأسئلة المتوقع: ${homework.totalQuestions || "غير محدد"}\n\nارجع JSON فقط بدون شرح خارجي وبالصيغة التالية:\n{"score": number, "total": number, "feedback": "تعليق مختصر بالعربية", "questions": [{"q": 1, "studentAnswer": "أ", "correctAnswer": "أ", "isCorrect": true, "note": ""}] }\nلو الصورة غير واضحة ارجع score=0 واكتب في feedback أن الصورة غير واضحة.`;
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{
-        role: "user",
-        parts: [
-          { text: promptText },
-          { inlineData: { mimeType: mimeType || "image/jpeg", data: imageBase64 } }
-        ]
-      }],
-      generationConfig: { temperature: 0.1, responseMimeType: "application/json" }
-    })
-  });
-
-  const data = await response.json();
-  if (!response.ok) {
-    console.error("Gemini API error", data);
-    throw new functions.https.HttpsError("internal", "فشل الاتصال بخدمة التصحيح الذكي.");
-  }
-
-  const textResult = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text;
-  const parsed = extractJsonObject(textResult);
-  const score = Number(parsed.score || 0);
-  const questions = safeQuestionRows(parsed.questions);
-  const inferredTotal = questions.length || Number(homework.totalQuestions || 0) || Number(parsed.total || 0) || 0;
-  const total = Math.max(0, Number(parsed.total || inferredTotal || 0));
-  return {
-    score: Number.isFinite(score) ? Math.max(0, score) : 0,
-    total: Number.isFinite(total) ? total : 0,
-    feedback: String(parsed.feedback || "تم التصحيح.").slice(0, 1200),
-    questions
-  };
 }
 
 exports.correctSmartHomework = functions
   .region("us-central1")
-  .runWith({ timeoutSeconds: 120, memory: "512MB" })
   .https
   .onCall(async (data, context) => {
     const uid = context.auth && context.auth.uid;
@@ -585,131 +530,200 @@ exports.correctSmartHomework = functions
 
     const homeworkId = requireString(data && data.homeworkId, "homeworkId");
     const imageBase64 = requireString(data && data.imageBase64, "imageBase64");
-    const mimeType = String((data && data.mimeType) || "image/jpeg").slice(0, 80);
-    if (!/^image\/(jpeg|jpg|png|webp)$/i.test(mimeType)) {
-      throw new functions.https.HttpsError("invalid-argument", "صيغة الصورة غير مدعومة.");
-    }
-    if (imageBase64.length > 6_500_000) {
-      throw new functions.https.HttpsError("invalid-argument", "الصورة كبيرة جدًا، أعد التصوير بجودة أقل.");
+    const mimeType = typeof data.mimeType === "string" ? data.mimeType : "image/jpeg";
+
+    if (imageBase64.length > 7 * 1024 * 1024) {
+      throw new functions.https.HttpsError("invalid-argument", "حجم الصورة كبير. صوّر الصفحة من بعيد قليلاً أو قلل الجودة.");
     }
 
-    const hwRef = db.collection("smart_homeworks").doc(homeworkId);
-    const hwSnap = await hwRef.get();
-    if (!hwSnap.exists) {
+    const [homeworkSnap, userSnap, oldResultSnap, privateKeySnap] = await Promise.all([
+      db.collection("smart_homeworks").doc(homeworkId).get(),
+      db.collection("users").doc(uid).get(),
+      db.collection("homework_results").doc(`${homeworkId}_${uid}`).get(),
+      db.collection("smart_homeworks").doc(homeworkId).collection("private").doc("answerKey").get()
+    ]);
+
+    if (!homeworkSnap.exists) {
       throw new functions.https.HttpsError("not-found", "الواجب غير موجود.");
     }
-    const homework = hwSnap.data() || {};
-    if (homework.status === "closed" || homework.isActive === false) {
-      throw new functions.https.HttpsError("failed-precondition", "الواجب مغلق الآن.");
+
+    const homework = homeworkSnap.data() || {};
+    const student = userSnap.exists ? userSnap.data() : {};
+    const now = new Date();
+    const startAt = homework.startAt ? new Date(homework.startAt) : null;
+    const endAt = homework.endAt ? new Date(homework.endAt) : null;
+    if (homework.status && homework.status !== "active") {
+      throw new functions.https.HttpsError("failed-precondition", "هذا الواجب غير متاح حالياً.");
     }
-    const nowMs = Date.now();
-    const startMs = toMillis(homework.startAt);
-    const endMs = toMillis(homework.endAt);
-    if (startMs && nowMs < startMs) {
-      throw new functions.https.HttpsError("failed-precondition", "الواجب لم يبدأ بعد.");
+    if (startAt && now < startAt) {
+      throw new functions.https.HttpsError("failed-precondition", "هذا الواجب لم يبدأ بعد.");
     }
-    if (endMs && nowMs > endMs) {
-      throw new functions.https.HttpsError("failed-precondition", "انتهى موعد تسليم الواجب.");
+    if (endAt && now > endAt) {
+      throw new functions.https.HttpsError("failed-precondition", "انتهى وقت تسليم هذا الواجب.");
+    }
+    if (homework.grade && homework.grade !== "all" && student.grade && homework.grade !== student.grade) {
+      throw new functions.https.HttpsError("permission-denied", "هذا الواجب غير مخصص لمرحلتك.");
     }
 
-    const privateSnap = await hwRef.collection("private").doc("answerKey").get();
-    const answerKey = (privateSnap.exists && privateSnap.data().answerKey) || homework.answerKey || "";
+    const oldAttempts = Number(oldResultSnap.exists ? (oldResultSnap.data().attempts || 1) : 0);
+    const maxAttempts = Number(homework.maxAttempts || 1);
+    if (oldResultSnap.exists && homework.allowResubmit !== true && oldAttempts >= 1) {
+      throw new functions.https.HttpsError("failed-precondition", "تم تسليم هذا الواجب من قبل.");
+    }
+    if (oldAttempts >= maxAttempts) {
+      throw new functions.https.HttpsError("failed-precondition", "انتهى عدد المحاولات المسموح بها.");
+    }
+
+    const answerKey = (privateKeySnap.exists && privateKeySnap.data().answerKey) || homework.answerKey || "";
     if (!answerKey) {
-      throw new functions.https.HttpsError("failed-precondition", "نموذج الإجابة غير مضبوط لهذا الواجب.");
+      throw new functions.https.HttpsError("failed-precondition", "نموذج الإجابة غير موجود. تواصل مع الأدمن.");
     }
 
-    const userSnap = await db.collection("users").doc(uid).get();
-    const userData = userSnap.exists ? userSnap.data() : {};
-    const studentGrade = userData.grade || "غير محدد";
-    if (homework.grade && homework.grade !== "all" && studentGrade !== homework.grade) {
-      throw new functions.https.HttpsError("permission-denied", "هذا الواجب ليس مخصصًا لمرحلتك.");
+    const apiKey = getGeminiKey();
+    if (!apiKey) {
+      throw new functions.https.HttpsError("failed-precondition", "لم يتم ضبط مفتاح Gemini في Cloud Functions.");
     }
 
-    const resultDocId = `${homeworkId}_${uid}`;
-    const resultRef = db.collection("homework_results").doc(resultDocId);
-    const existingSnap = await resultRef.get();
-    const existing = existingSnap.exists ? existingSnap.data() : null;
-    const currentAttempts = Number(existing && existing.attemptCount ? existing.attemptCount : 0);
-    const maxAttempts = Math.max(1, Number(homework.maxAttempts || 1));
-    const allowResubmit = homework.allowResubmit === true;
-    if (currentAttempts >= maxAttempts && !allowResubmit) {
-      throw new functions.https.HttpsError("failed-precondition", "تم استهلاك عدد محاولات هذا الواجب.");
+    const promptText = `أنت مصحح واجبات لغة عربية. صحح صورة إجابات الطالب بناءً على نموذج الإجابة التالي فقط: ${answerKey}\n\nالمطلوب: أعد JSON فقط بدون أي شرح خارج JSON بالشكل التالي:\n{\"score\": number, \"total\": number, \"feedback\": \"تعليق مختصر بالعربية\", \"questions\": [{\"q\": 1, \"studentAnswer\": \"أ\", \"correctAnswer\": \"ب\", \"isCorrect\": false, \"note\": \"سبب مختصر\"}]}\nلو الصورة غير واضحة اجعل score=0 واكتب في feedback أن الصورة غير واضحة.`;
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{
+          role: "user",
+          parts: [
+            { text: promptText },
+            { inlineData: { mimeType, data: imageBase64 } }
+          ]
+        }],
+        generationConfig: { temperature: 0.1, responseMimeType: "application/json" }
+      })
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      console.error("Gemini API error", response.status, body.slice(0, 600));
+      throw new functions.https.HttpsError("internal", "فشل الاتصال بخدمة التصحيح.");
     }
 
-    const aiResult = await callGeminiForHomework({ answerKey, imageBase64, mimeType, homework });
-    const attemptCount = currentAttempts + 1;
-    const wrongQuestions = (aiResult.questions || []).filter((q) => !q.isCorrect);
-    const resultPayload = {
+    const modelData = await response.json();
+    const text = modelData.candidates && modelData.candidates[0] && modelData.candidates[0].content && modelData.candidates[0].content.parts && modelData.candidates[0].content.parts[0] && modelData.candidates[0].content.parts[0].text;
+    let parsed;
+    try {
+      parsed = cleanGeminiJson(text);
+    } catch (error) {
+      console.error("Failed to parse Gemini JSON", text);
+      throw new functions.https.HttpsError("internal", "تعذر قراءة نتيجة التصحيح.");
+    }
+
+    const result = {
+      score: Number(parsed.score || 0),
+      total: Number(parsed.total || 0),
+      feedback: String(parsed.feedback || "تم تصحيح الواجب.").slice(0, 1200),
+      questions: normalizeQuestionRows(parsed)
+    };
+    if (!Number.isFinite(result.score) || result.score < 0) result.score = 0;
+    if (!Number.isFinite(result.total) || result.total <= 0) result.total = Math.max(1, result.questions.length || 1);
+    result.score = Math.min(result.score, result.total);
+
+    const resultRef = db.collection("homework_results").doc(`${homeworkId}_${uid}`);
+    const payload = {
       studentId: uid,
       userId: uid,
-      studentName: userData.name || context.auth.token.name || context.auth.token.email || "طالب",
-      studentEmail: context.auth.token.email || userData.email || "",
+      studentName: student.name || (context.auth.token && context.auth.token.name) || "طالب",
       homeworkId,
       homeworkTitle: homework.title || "واجب QR",
       bookName: homework.bookName || "عام",
-      grade: homework.grade || studentGrade || "غير محدد",
-      score: aiResult.score,
-      total: aiResult.total,
-      feedback: aiResult.feedback,
-      questions: aiResult.questions,
-      wrongQuestionsCount: wrongQuestions.length,
-      attemptCount,
-      lastSubmittedAt: admin.firestore.FieldValue.serverTimestamp(),
-      submittedAt: existing && existing.submittedAt ? existing.submittedAt : admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      correctionSource: "cloud_function_gemini",
+      grade: homework.grade || student.grade || "غير محدد",
+      score: result.score,
+      total: result.total,
+      feedback: result.feedback,
+      questions: result.questions,
+      attempts: oldAttempts + 1,
+      lastAttemptAt: admin.firestore.FieldValue.serverTimestamp(),
+      submittedAt: admin.firestore.FieldValue.serverTimestamp(),
+      gradingMode: "cloud_function",
       showResultToStudent: homework.showResultToStudent !== false,
-      showFeedbackToStudent: homework.showFeedbackToStudent !== false,
-      attempts: admin.firestore.FieldValue.arrayUnion({
-        attemptNo: attemptCount,
-        score: aiResult.score,
-        total: aiResult.total,
-        feedback: aiResult.feedback,
-        questions: aiResult.questions,
-        createdAt: new Date().toISOString()
-      })
+      showFeedbackToStudent: homework.showFeedbackToStudent !== false
     };
 
-    await resultRef.set(resultPayload, { merge: true });
+    await resultRef.set(payload, { merge: true });
 
-    const mistakeWrites = wrongQuestions.slice(0, 50).map((q) => {
-      const mistakeId = `${homeworkId}_${uid}_${String(q.q).replace(/[^\w\u0600-\u06FF-]+/g, "_")}`.slice(0, 140);
-      return db.collection("student_mistakes").doc(mistakeId).set({
-        userId: uid,
-        studentId: uid,
-        studentName: resultPayload.studentName,
-        source: "smart_homework_qr",
-        homeworkId,
-        homeworkTitle: resultPayload.homeworkTitle,
-        bookName: resultPayload.bookName,
-        grade: resultPayload.grade,
-        questionNo: q.q,
-        studentAnswer: q.studentAnswer || "",
-        correctAnswer: q.correctAnswer || "",
-        note: q.note || aiResult.feedback || "",
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
-    });
-    await Promise.all(mistakeWrites);
-
-    const showResult = homework.showResultToStudent !== false;
-    const showFeedback = homework.showFeedbackToStudent !== false;
-    const studentResult = showResult ? {
-      score: aiResult.score,
-      total: aiResult.total,
-      feedback: showFeedback ? aiResult.feedback : "تم التصحيح وحفظ النتيجة.",
-      questions: showFeedback ? aiResult.questions : [],
-      hiddenFromStudent: false
-    } : {
-      hiddenFromStudent: true,
-      feedback: "تم تسليم الواجب بنجاح."
-    };
+    const wrongQuestions = result.questions.filter((q) => !q.isCorrect);
+    if (wrongQuestions.length) {
+      const batch = db.batch();
+      wrongQuestions.slice(0, 60).forEach((q) => {
+        const mistakeRef = db.collection("student_mistakes").doc(`${homeworkId}_${uid}_${q.q}`);
+        batch.set(mistakeRef, {
+          userId: uid,
+          studentId: uid,
+          studentName: payload.studentName,
+          source: "smart_homework_qr",
+          homeworkId,
+          homeworkTitle: payload.homeworkTitle,
+          bookName: payload.bookName,
+          branch: homework.bookName || "واجب QR",
+          question: {
+            text: `واجب ${payload.homeworkTitle} - سؤال ${q.q}`,
+            studentAnswerText: q.studentAnswer || "غير واضح",
+            correctAnswerText: q.correctAnswer || "غير محدد"
+          },
+          note: q.note || result.feedback,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+      });
+      await batch.commit();
+    }
 
     return {
       ok: true,
-      result: studentResult,
-      attemptCount,
-      attemptsRemaining: allowResubmit ? null : Math.max(0, maxAttempts - attemptCount)
+      result: homework.showResultToStudent === false
+        ? { score: result.score, total: result.total, feedback: "تم استلام الواجب وإرساله للمراجعة.", hidden: true }
+        : { ...result, feedback: homework.showFeedbackToStudent === false ? "تم حفظ النتيجة." : result.feedback }
     };
+  });
+
+exports.redeemSubscriptionCode = functions
+  .region("us-central1")
+  .https
+  .onCall(async (data, context) => {
+    const uid = context.auth && context.auth.uid;
+    if (!uid) throw new functions.https.HttpsError("unauthenticated", "يجب تسجيل الدخول أولاً.");
+    const code = requireString(data && data.code, "code").toUpperCase();
+    const snap = await db.collection("subscription_codes").where("code", "==", code).limit(1).get();
+    if (snap.empty) throw new functions.https.HttpsError("not-found", "الكود غير صحيح أو غير موجود.");
+    const codeRef = snap.docs[0].ref;
+    const codeData = snap.docs[0].data() || {};
+    const days = Number(codeData.days || codeData.durationDays || 30);
+    if (!Number.isFinite(days) || days <= 0) throw new functions.https.HttpsError("failed-precondition", "مدة الكود غير صالحة.");
+    let expiryDate;
+    await db.runTransaction(async (tx) => {
+      const freshCode = await tx.get(codeRef);
+      const fresh = freshCode.data() || {};
+      if (fresh.used === true || fresh.isUsed === true) throw new functions.https.HttpsError("failed-precondition", "هذا الكود تم استخدامه من قبل.");
+      const userRef = db.collection("users").doc(uid);
+      const userSnap = await tx.get(userRef);
+      const user = userSnap.exists ? userSnap.data() : {};
+      const currentExpiry = user.subscriptionExpiry && user.subscriptionExpiry.toDate ? user.subscriptionExpiry.toDate() : null;
+      expiryDate = currentExpiry && currentExpiry > new Date() ? currentExpiry : new Date();
+      expiryDate.setDate(expiryDate.getDate() + days);
+      tx.set(userRef, {
+        subscriptionStatus: "premium",
+        subscriptionExpiry: admin.firestore.Timestamp.fromDate(expiryDate),
+        status: "active",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+      tx.set(codeRef, {
+        used: true,
+        isUsed: true,
+        usedBy: uid,
+        usedById: uid,
+        usedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    });
+    return { ok: true, days, expiry: expiryDate.toISOString() };
   });

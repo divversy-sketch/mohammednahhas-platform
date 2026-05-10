@@ -13,6 +13,10 @@ export function useAdminDashboardData() {
   const [smartHomeworks, setSmartHomeworks] = useState([]);
   const [hwResults, setHwResults] = useState([]);
   const [subscriptionCodes, setSubscriptionCodes] = useState([]);
+  const [assignments, setAssignments] = useState([]);
+  const [assignmentSubmissions, setAssignmentSubmissions] = useState([]);
+  const [mistakes, setMistakes] = useState([]);
+  const [videoViews, setVideoViews] = useState([]);
 
   useEffect(() => {
     const subscriptions = subscribeAdminDashboardData({
@@ -26,7 +30,11 @@ export function useAdminDashboardData() {
       setQuotesList,
       setSmartHomeworks,
       setHwResults,
-      setSubscriptionCodes
+      setSubscriptionCodes,
+      setAssignments,
+      setAssignmentSubmissions,
+      setMistakes,
+      setVideoViews
     });
 
     return () => subscriptions.forEach((unsubscribe) => unsubscribe?.());
@@ -44,6 +52,10 @@ export function useAdminDashboardData() {
     smartHomeworks,
     hwResults,
     subscriptionCodes,
+    assignments,
+    assignmentSubmissions,
+    mistakes,
+    videoViews,
     setPendingUsers,
     setActiveUsersList,
     setContentList,
@@ -54,6 +66,10 @@ export function useAdminDashboardData() {
     setQuotesList,
     setSmartHomeworks,
     setHwResults,
-    setSubscriptionCodes
+    setSubscriptionCodes,
+    setAssignments,
+    setAssignmentSubmissions,
+    setMistakes,
+    setVideoViews
   };
 }

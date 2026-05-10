@@ -5,6 +5,7 @@ import {  signInWithEmailAndPassword, createUserWithEmailAndPassword,
 import {  doc, setDoc, getDoc, getDocs, collection, addDoc, query, where, 
   onSnapshot, updateDoc, deleteDoc, orderBy, serverTimestamp, writeBatch, limit, increment 
 } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import { 
   PlayCircle, FileText, LogOut, User, GraduationCap, Quote, CheckCircle, 
   Lock, Mail, ChevronRight, Menu, X, Loader2, AlertTriangle, PlusCircle, 
@@ -19,7 +20,7 @@ import {
   Target, AlertCircle, Crown, CreditCard, Key, Wand2, WalletCards, Smartphone
 } from '../../shared/icons/lucide-shim.jsx';
 import { motion, AnimatePresence } from 'framer-motion';
-import { auth, db, savePushTokenForUser, setupForegroundPushListener } from '../../services/firebase';
+import { auth, db, functions, savePushTokenForUser, setupForegroundPushListener } from '../../services/firebase';
 import SecureVideoPlayer from '../../features/lectures/SecureVideoPlayer';
 import MobileStudentBottomNav from '../../features/student/MobileStudentBottomNav';
 import MobileExamHelperStyles from '../../shared/components/MobileExamHelperStyles';
@@ -74,6 +75,7 @@ import { StudentContinueCard, StudentSmartDashboard, StudentCompactHome } from '
 import { StudentTopGreeting, LearningHubTabs } from '../components/layout/StudentLayoutParts.jsx';
 import StudentAssignmentsPanel from '../../admin/parts/StudentAssignmentsPanel.jsx';
 import SmartHomeworkScanner from '../../features/homework/SmartHomeworkScanner.jsx';
+import StudentGrowthPanel from '../../features/insights/StudentGrowthPanel.jsx';
 
 export const StudentDashboard = ({ user, userData, installPrompt }) => {
   userData = userData || {
@@ -152,26 +154,9 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
       if(!subscriptionCodeInput.trim()) return platformNotify("أدخل الكود أولاً");
       setIsCharging(true);
       try {
-          const qStr = query(collection(db, 'subscription_codes'), where('code', '==', subscriptionCodeInput.trim()));
-          const snap = await getDocs(qStr);
-          if(snap.empty) { platformNotify("الكود غير صحيح أو غير موجود."); setIsCharging(false); return; }
-          
-          const codeDoc = snap.docs[0];
-          const codeData = codeDoc.data();
-          if(codeData.used) { platformNotify("عفواً، هذا الكود تم استخدامه من قبل."); setIsCharging(false); return; }
-
-          const days = codeData.days;
-          let newExpiry = new Date();
-          if(isPremium && userData?.subscriptionExpiry) {
-              newExpiry = userData?.subscriptionExpiry.toDate();
-          }
-          newExpiry.setDate(newExpiry.getDate() + days);
-
-          const batch = writeBatch(db);
-          batch.update(doc(db, 'users', user.uid), { subscriptionStatus: 'premium', subscriptionExpiry: newExpiry });
-          batch.update(doc(db, 'subscription_codes', codeDoc.id), { used: true, usedBy: user.displayName, usedById: user.uid, usedAt: serverTimestamp() });
-          
-          await batch.commit();
+          const redeemCode = httpsCallable(functions, 'redeemSubscriptionCode');
+          const res = await redeemCode({ code: subscriptionCodeInput.trim() });
+          const days = res.data?.days || 0;
           platformNotify(`تم شحن الكود بنجاح! تم تفعيل اشتراكك لمدة ${days} يوم.`);
           setSubscriptionCodeInput('');
       } catch (err) { console.error(err); platformNotify("حدث خطأ أثناء الشحن"); }
@@ -559,22 +544,19 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
 
 
         {activeTab === 'performance' && (
-            <div className="space-y-6">
-                <PerformanceOverview examResults={examResults} content={content} />
-                <div className="glass-panel p-6 rounded-2xl">
-                    <h2 className="text-2xl font-bold text-slate-800 mb-4 flex items-center gap-2"><BarChart3/> سجل الامتحانات</h2>
-                    <div className="space-y-3">
-                        {examResults.length === 0 ? <p className="text-slate-500 text-center py-8 bg-white rounded-xl border">لم يتم تسجيل نتائج بعد.</p> : examResults.map(result => {
-                            const pct = getResultPercentage(result);
-                            const badge = getGradeBadge(pct);
-                            return <div key={result.id} className="bg-white border rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                                <div><p className="font-bold text-slate-800">{result.examTitle || 'امتحان'}</p><p className="text-xs text-slate-500">{result.submittedAt?.toDate?.().toLocaleString('ar-EG') || 'بدون تاريخ'}</p></div>
-                                <div className="flex items-center gap-2"><span className={`px-3 py-1 rounded-full border text-xs font-bold ${badge.tone}`}>{badge.text}</span><span className="font-black text-slate-800">{result.score}/{result.total} - {pct}%</span></div>
-                            </div>;
-                        })}
-                    </div>
-                </div>
-            </div>
+            <StudentGrowthPanel
+              user={user}
+              userData={userData}
+              exams={exams}
+              examResults={examResults}
+              assignments={assignments}
+              assignmentSubmissions={assignmentSubmissions}
+              hwResults={hwResults}
+              mistakes={mistakes}
+              videoViews={videoViews}
+              content={content}
+              onStartMistakesExam={startMistakesExam}
+            />
         )}
 
         {activeTab === 'subscription' && (
@@ -625,35 +607,19 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
         {activeTab === 'mistakes_bank' && !isBannedExam && (
             <div className="space-y-5">
               <LearningHubTabs activeTab={activeTab} setActiveTab={setActiveTab} setLearningHubTab={setLearningHubTab} />
-              <div className="glass-panel p-4 md:p-8 rounded-2xl">
-                <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 border-b border-slate-200 pb-6">
-                    <div>
-                        <h2 className="text-2xl md:text-3xl font-bold font-arabic text-red-700 flex items-center gap-3"><BrainCircuit size={32} className="text-red-500" /> بنك أخطاء الطالب 🏦</h2>
-                        <p className="text-slate-500 mt-2 text-sm md:text-lg">كل سؤال أخطأت فيه سيتم تسجيله هنا لتتمكن من مراجعته والتدرب عليه.</p>
-                    </div>
-                    <button onClick={startMistakesExam} className="bg-red-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-bold shadow-xl shadow-red-500/30 hover:bg-red-700 transition flex items-center gap-2 transform hover:scale-105 w-full md:w-auto justify-center"><Target size={20}/> امتحان من أخطائي</button>
-                </div>
-                {mistakes.length === 0 ? (
-                    <div className="text-center py-16 bg-white rounded-2xl border border-slate-100 shadow-sm"><Trophy size={64} className="mx-auto text-amber-400 mb-4 opacity-80" /><h3 className="text-2xl font-bold text-slate-700">ممتاز جداً يا بطل! 👏</h3><p className="text-slate-500 mt-2">بنك الأخطاء الخاص بك فارغ تماماً. استمر على هذا المستوى.</p></div>
-                ) : (
-                    <div className="grid grid-cols-1 gap-6">
-                        <div className="bg-red-50 text-red-700 p-4 rounded-xl border border-red-200 font-bold flex items-center gap-2 text-sm md:text-base">
-                            <AlertOctagon /> لديك {mistakes.length} سؤال في بنك الأخطاء. يجب مراجعتها جيداً قبل الامتحان النهائي!
-                        </div>
-                        {mistakes.map(m => (
-                            <div key={m.id} className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-200 hover:border-red-300 transition relative overflow-hidden">
-                                <div className="absolute top-0 right-0 bg-slate-800 text-white text-xs px-3 py-1 rounded-bl-lg font-bold">من امتحان: {m.examTitle}</div>
-                                {m.question.blockText && <div className="mt-6 mb-4 bg-amber-50 border border-amber-200 rounded-2xl p-4 text-slate-800 leading-relaxed whitespace-pre-wrap"><p className="text-xs font-black text-amber-700 mb-2">القطعة المرتبطة بالسؤال</p>{renderBracketHighlightedText(m.question.blockText)}</div>}
-                                <h3 className="text-lg md:text-xl font-bold text-slate-800 mt-6 md:mt-4 mb-4 leading-relaxed font-sans">{renderBracketHighlightedText(m.question.text)}</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="bg-red-50 p-4 rounded-xl border border-red-100"><p className="text-xs text-red-500 font-bold mb-1">إجابتك الخاطئة كانت:</p><p className="font-bold text-slate-800">{m.question.studentAnswerText || 'غير معروف'}</p></div>
-                                    <div className="bg-green-50 p-4 rounded-xl border border-green-100"><p className="text-xs text-green-600 font-bold mb-1">الإجابة الصحيحة هي:</p><p className="font-bold text-green-800">{m.question.correctAnswerText || 'غير معروف'}</p></div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-              </div>
+              <StudentGrowthPanel
+                user={user}
+                userData={userData}
+                exams={exams}
+                examResults={examResults}
+                assignments={assignments}
+                assignmentSubmissions={assignmentSubmissions}
+                hwResults={hwResults}
+                mistakes={mistakes}
+                videoViews={videoViews}
+                content={content}
+                onStartMistakesExam={startMistakesExam}
+              />
             </div>
         )}
 
@@ -910,13 +876,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
               </div>
         )}
       </main>
-      {scanningHwId && (
-        <SmartHomeworkScanner
-          hwId={scanningHwId}
-          user={user}
-          onClose={() => setScanningHwId(null)}
-        />
-      )}
+      {scanningHwId && <SmartHomeworkScanner hwId={scanningHwId} user={user} onClose={() => setScanningHwId(null)} />}
     </div>
   );
 };

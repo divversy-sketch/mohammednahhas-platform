@@ -95,7 +95,7 @@ service cloud.firestore {
         || (isOwner(userId)
           && request.resource.data.diff(resource.data).changedKeys().hasOnly([
             'name', 'phone', 'parentPhone', 'grade', 'photoURL', 'updatedAt',
-            'lastLoginAt', 'deviceInfo', 'notificationToken'
+            'lastLoginAt', 'deviceInfo', 'notificationToken', 'requestedGrade', 'gradeUpdateStatus'
           ])
           && request.resource.data.role == resource.data.role
           && request.resource.data.status == resource.data.status
@@ -159,20 +159,18 @@ service cloud.firestore {
     }
 
     match /smart_homeworks/{docId} {
-      // الطلاب يقرأون بيانات الواجب العامة فقط. نموذج الإجابة محفوظ في private ولا يقرأه إلا الأدمن/Cloud Function.
       allow read: if signedIn();
-      allow create, update, delete: if isAdmin();
+      allow write: if isAdmin();
 
-      match /private/{privateId} {
+      match /private/{privateDocId} {
         allow read, write: if isAdmin();
       }
     }
 
     match /homework_results/{docId} {
       allow read: if isAdmin() || (signedIn() && resource.data.studentId == request.auth.uid);
-      // التصحيح الذكي يكتب النتائج من Cloud Function باستخدام Admin SDK، وليس من المتصفح.
-      allow create: if false;
-      allow update, delete: if isAdmin();
+      // نتائج واجب QR تكتب من Cloud Function فقط حتى لا يرى الطالب نموذج الإجابة ولا يزوّر الدرجة.
+      allow create, update, delete: if isAdmin();
     }
 
     match /assignments/{docId} {
@@ -214,10 +212,10 @@ service cloud.firestore {
       allow create, delete: if isAdmin();
       allow update: if isAdmin()
         || (signedIn()
-          && resource.data.isUsed == false
-          && request.resource.data.isUsed == true
-          && request.resource.data.usedBy == request.auth.uid
-          && request.resource.data.diff(resource.data).changedKeys().hasOnly(['isUsed', 'usedBy', 'usedAt', 'updatedAt']));
+          && ((resource.data.isUsed == false && request.resource.data.isUsed == true)
+              || (resource.data.used == false && request.resource.data.used == true))
+          && (request.resource.data.usedBy == request.auth.uid || request.resource.data.usedById == request.auth.uid)
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly(['isUsed', 'used', 'usedBy', 'usedById', 'usedAt', 'updatedAt']));
     }
 
     match /courseAccessCodes/{codeId} {

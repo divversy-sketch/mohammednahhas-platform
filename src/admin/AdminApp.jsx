@@ -32,6 +32,8 @@ import InteractiveViewer from '../features/content/InteractiveViewer';
 import { AdminCoursesManager, StudentCoursesHub } from '../features/courses/CourseSystem';
 import { uploadToCloudinary } from '../services/cloudinaryUpload';
 import { uploadToFirebaseContent, detectContentType, readHtmlFileAsInlineContent } from '../services/firebaseContentUpload';
+import AdminFollowUpPanel from '../features/insights/AdminFollowUpPanel.jsx';
+import AdminSmartHomeworkManager from '../features/homework/AdminSmartHomeworkManager.jsx';
 
 
 
@@ -4383,6 +4385,20 @@ const AdminDashboard = ({ user }) => {
             />
           )}
 
+          {activeTab === 'follow_up' && (
+            <AdminFollowUpPanel
+              users={activeUsersList}
+              exams={examsList}
+              examResults={examResults}
+              assignments={[]}
+              assignmentSubmissions={[]}
+              hwResults={hwResults}
+              mistakes={[]}
+              videoViews={[]}
+              adminGradeFilter={adminGradeFilter}
+            />
+          )}
+
           {activeTab === 'users' && <div className="glass-panel p-4 md:p-6 rounded-xl"><h2 className="font-bold mb-4 font-arabic text-xl">طلبات الانضمام</h2>{filteredPendingUsers.map(u=><div key={u.id} className="border p-4 mb-2 rounded-lg flex flex-col md:flex-row gap-3 justify-between bg-white/50 backdrop-blur-sm"><div><p className="font-bold">{u.name}</p><p className="text-sm">{u.grade}</p></div><div className="flex gap-2"><button onClick={()=>handleApprove(u.id)} className="bg-green-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-green-500/50 transition flex-1"><Check className="mx-auto"/></button><button onClick={()=>handleReject(u.id)} className="bg-red-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-red-500/50 transition flex-1"><X className="mx-auto"/></button></div></div>)}</div>}
 
           {activeTab === 'all_users' && (
@@ -4571,77 +4587,13 @@ const AdminDashboard = ({ user }) => {
           )}
 
           {activeTab === 'smart_hw' && (
-              <div className="space-y-6">
-                  <div className="glass-panel p-4 md:p-6 rounded-xl">
-                      <div className="flex flex-col md:flex-row justify-between md:items-center gap-3 mb-4">
-                        <h2 className="text-xl font-bold font-arabic text-blue-700 flex items-center gap-2"><QrCode/> إضافة واجب (للكتاب)</h2>
-                        <button onClick={handleDeleteAllHomework} className="bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 justify-center"><Trash2 size={16}/> حذف كل الواجبات الذكية وسجلاتها</button>
-                      </div>
-                      <form onSubmit={handleCreateSmartHw} className="grid gap-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div><label className="block text-xs font-bold mb-1 text-slate-500">المرحلة الدراسية</label><select className="border p-3 rounded w-full bg-white" value={newSmartHw.grade} onChange={e=>setNewSmartHw({...newSmartHw, grade:e.target.value})}><GradeOptions/></select></div>
-                              <div><label className="block text-xs font-bold mb-1 text-slate-500">اسم الكتاب</label><input className="border p-3 rounded w-full" placeholder="مثال: كتاب النحو الجزء الأول" value={newSmartHw.bookName} onChange={e=>setNewSmartHw({...newSmartHw, bookName:e.target.value})} required/></div>
-                          </div>
-                          <input className="border p-3 rounded" placeholder="اسم الواجب/رقم الصفحة (مثال: تدريبات صفحة 15)" value={newSmartHw.title} onChange={e=>setNewSmartHw({...newSmartHw, title:e.target.value})} required/>
-                          <textarea className="border p-3 rounded h-24" placeholder="نموذج الإجابة (مثال: 1-أ, 2-ج, 3-د...)" value={newSmartHw.answerKey} onChange={e=>setNewSmartHw({...newSmartHw, answerKey:e.target.value})} required/>
-                          <button type="submit" className="bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-blue-500/50">توليد رابط للصفحة</button>
-                      </form>
-                  </div>
-                  
-                  <div className="glass-panel p-4 md:p-6 rounded-xl">
-                      <h3 className="font-bold mb-4">الواجبات المضافة</h3>
-                      <div className="space-y-6">
-                          {(() => {
-                              const filteredHw = smartHomeworks.filter(hw => adminGradeFilter === 'all' || hw.grade === adminGradeFilter);
-                              if (filteredHw.length === 0) return <p className="text-slate-500">لا توجد واجبات في هذه المرحلة.</p>;
-                              const hwByBook = filteredHw.reduce((acc, hw) => { const book = hw.bookName || 'كتب غير مصنفة'; if(!acc[book]) acc[book] = []; acc[book].push(hw); return acc; }, {});
-                              return Object.entries(hwByBook).map(([bookName, hws]) => (
-                                  <div key={bookName} className="mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200 overflow-x-auto">
-                                      <h4 className="font-bold text-lg text-amber-700 bg-amber-100 p-2 rounded-lg mb-4 flex items-center gap-2 w-max"><BookOpen size={20}/> كتاب: {bookName}</h4>
-                                      <div className="space-y-3 pl-4 border-r-4 border-amber-300 pr-4 w-max min-w-full">
-                                          {hws.map(hw => {
-                                              const hwLink = `${window.location.origin}/?hw=${hw.id}`;
-                                              return (
-                                                  <div key={hw.id} className="bg-white border shadow-sm p-4 rounded-xl flex flex-col md:flex-row justify-between gap-4 hover:border-amber-400 transition">
-                                                      <div className="flex-1">
-                                                          <p className="font-bold text-lg text-slate-800">{hw.title} <span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600">{getGradeLabel(hw.grade)}</span></p>
-                                                          <p className="text-sm text-slate-500 mb-2 mt-1 bg-slate-50 p-2 rounded">الإجابات: <span className="font-mono text-blue-600">{hw.answerKey}</span></p>
-                                                          <code className="bg-slate-100 p-2 rounded text-xs break-all border block select-all">{hwLink}</code>
-                                                      </div>
-                                                      <div className="flex gap-2 items-center flex-shrink-0">
-                                                          <button onClick={() => { navigator.clipboard.writeText(hwLink); platformNotify("تم نسخ الرابط!"); }} className="bg-slate-800 text-white px-4 py-2 rounded-lg font-bold hover:bg-slate-700 text-sm h-fit shadow-md">نسخ الرابط</button>
-                                                          <button onClick={async () => { if(platformConfirm('هل أنت متأكد من حذف هذه الصفحة؟')) await deleteDoc(doc(db, 'smart_homeworks', hw.id)); }} className="text-red-500 bg-red-50 hover:bg-red-100 p-2 rounded-lg"><Trash2 size={18}/></button>
-                                                      </div>
-                                                  </div>
-                                              )
-                                          })}
-                                      </div>
-                                  </div>
-                              ));
-                          })()}
-                      </div>
-                  </div>
-
-                  <div className="glass-panel p-4 md:p-6 rounded-xl">
-                      <h3 className="font-bold mb-4 text-green-700">نتائج التصحيح اليدوي</h3>
-                      <div className="space-y-2 overflow-x-auto">
-                          <div className="min-w-max">
-                              {hwResults.filter(res => adminGradeFilter === 'all' || res.grade === adminGradeFilter).map(res => (
-                                  <div key={res.id} className="flex justify-between items-center border p-3 rounded hover:bg-slate-50 transition bg-white/50 mb-2">
-                                      <div className="ml-4">
-                                          <p className="font-bold">{res.studentName} <span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600 mx-1">{getGradeLabel(res.grade)}</span></p>
-                                          <p className="text-slate-500 text-xs font-bold mt-1">الكتاب: {res.bookName} - {res.homeworkTitle}</p>
-                                          <p className="text-sm text-green-600 font-bold mt-1">الدرجة: {res.score}/{res.total}</p>
-                                      </div>
-                                      <div className="text-xs text-slate-500 bg-slate-100 p-2 rounded-lg text-center flex-shrink-0">
-                                          {res.submittedAt?.toDate().toLocaleDateString('ar-EG')}<br/>{res.submittedAt?.toDate().toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}
-                                      </div>
-                                  </div>
-                              ))}
-                          </div>
-                      </div>
-                  </div>
-              </div>
+            <AdminSmartHomeworkManager
+              smartHomeworks={smartHomeworks}
+              hwResults={hwResults}
+              adminGradeFilter={adminGradeFilter}
+              onNotify={platformNotify}
+              onDeleteAll={handleDeleteAllHomework}
+            />
           )}
 
           {activeTab === 'question_bank' && <InlineTabs tabs={[{ key: 'bank', label: 'إدارة بنك الأسئلة', content: <QuestionBankManager adminGradeFilter={adminGradeFilter} /> }]} />}
