@@ -85,6 +85,8 @@ import AdminReviewExamOverlay from '../modals/AdminReviewExamOverlay.jsx';
 import AdminFullExamEditorModal from '../modals/AdminFullExamEditorModal.jsx';
 import AdminFullContentEditorModal from '../modals/AdminFullContentEditorModal.jsx';
 import AdminStudentProfileModal from '../modals/AdminStudentProfileModal.jsx';
+import AdminPendingUsersPage from '../pages/AdminPendingUsersPage.jsx';
+import { AdminAssignmentsPage, AdminExamViewTabs, AdminQuestionBankPage } from '../pages/AdminUtilityPages.jsx';
 
 export const AdminDashboard = ({ user }) => {
   const userData = user || {};
@@ -1161,7 +1163,7 @@ export const AdminDashboard = ({ user }) => {
             />
           )}
 
-          {activeTab === 'users' && <div className="glass-panel p-4 md:p-6 rounded-xl"><h2 className="font-bold mb-4 font-arabic text-xl">طلبات الانضمام</h2>{filteredPendingUsers.map(u=><div key={u.id} className="border p-4 mb-2 rounded-lg flex flex-col md:flex-row gap-3 justify-between bg-white/50 backdrop-blur-sm"><div><p className="font-bold">{u.name}</p><p className="text-sm">{u.grade}</p></div><div className="flex gap-2"><button onClick={()=>handleApprove(u.id)} className="bg-green-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-green-500/50 transition flex-1"><Check className="mx-auto"/></button><button onClick={()=>handleReject(u.id)} className="bg-red-600 text-white px-3 py-1 rounded shadow-lg hover:shadow-red-500/50 transition flex-1"><X className="mx-auto"/></button></div></div>)}</div>}
+          {activeTab === 'users' && <AdminPendingUsersPage filteredPendingUsers={filteredPendingUsers} handleApprove={handleApprove} handleReject={handleReject} />}
 
           {activeTab === 'all_users' && (
               <div className="glass-panel p-4 md:p-6 rounded-xl">
@@ -1422,21 +1424,11 @@ export const AdminDashboard = ({ user }) => {
               </div>
           )}
 
-          {activeTab === 'question_bank' && <InlineTabs tabs={[{ key: 'bank', label: 'إدارة بنك الأسئلة', content: <QuestionBankManager adminGradeFilter={adminGradeFilter} /> }]} />}
+          {activeTab === 'question_bank' && <AdminQuestionBankPage adminGradeFilter={adminGradeFilter} />}
 
-          {activeTab === 'assignments' && (
-            <div className="space-y-4">
-              <div className="flex justify-end"><button onClick={handleDeleteAllHomework} className="bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2"><Trash2 size={16}/> حذف كل الواجبات وسجلاتها</button></div>
-              <InlineTabs tabs={[{ key: 'assignments_admin', label: 'إدارة الواجبات', content: <AssignmentsManager adminGradeFilter={adminGradeFilter} /> }]} />
-            </div>
-          )}
+          {activeTab === 'assignments' && <AdminAssignmentsPage adminGradeFilter={adminGradeFilter} handleDeleteAllHomework={handleDeleteAllHomework} />}
 
-          {activeTab === 'exams' && (
-            <div className="flex flex-wrap gap-2 mb-4">
-              <button onClick={() => setAdminExamView('manage')} className={`px-5 py-3 rounded-2xl font-black ${adminExamView === 'manage' ? 'bg-amber-600 text-white' : 'bg-amber-50 text-amber-700'}`}>إدارة الامتحانات</button>
-              <button onClick={() => setAdminExamView('results')} className={`px-5 py-3 rounded-2xl font-black ${adminExamView === 'results' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700'}`}>النتائج</button>
-            </div>
-          )}
+          {activeTab === 'exams' && <AdminExamViewTabs adminExamView={adminExamView} setAdminExamView={setAdminExamView} />}
 
           {activeTab === 'exams' && adminExamView === 'manage' && (
               <div className="space-y-8">
