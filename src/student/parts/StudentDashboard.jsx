@@ -69,6 +69,7 @@ import { isActiveAdminSnapshot, getInitialRouteMode, navigatePlatform, DebugColl
 
 import ExamRunner from '../../shared/platformParts/ExamRunner.jsx';
 import PerformanceOverview from './PerformanceOverview.jsx';
+import { useStudentDashboardData } from '../hooks/useStudentDashboardData.js';
 
 export const StudentDashboard = ({ user, userData, installPrompt }) => {
   userData = userData || {
