@@ -19,7 +19,7 @@ export default function StudentLocalAdvice({ metrics }) {
   const percentage = Number(metrics?.percentage || 0);
   return (
     <div className="mt-5 bg-slate-900/70 border border-slate-700 rounded-2xl p-4">
-      <h3 className="font-black text-amber-300 mb-3 flex items-center gap-2"><BrainCircuit size={20} /> تحليل ذكي بدون استهلاك AI</h3>
+      <h3 className="font-black text-amber-300 mb-3 flex items-center gap-2"><BrainCircuit size={20} /> تحليل ذكي داخلي</h3>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
         <div className="bg-white/5 rounded-xl p-3 border border-white/10"><p className="text-slate-400 text-xs">النسبة العامة</p><p className="text-2xl font-black text-white">{percentage}%</p></div>
         <div className="bg-white/5 rounded-xl p-3 border border-white/10"><p className="text-slate-400 text-xs">الدرجة</p><p className="text-2xl font-black text-emerald-300">{metrics?.totalScore || 0}/{metrics?.totalPossible || 0}</p></div>

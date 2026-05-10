@@ -1,0 +1,6 @@
+src/app/AppRoot.jsx
+firestore.rules
+database.rules.json
+storage.rules
+firebase.json
+ADMIN_SECURITY_SEPARATION_AR.md

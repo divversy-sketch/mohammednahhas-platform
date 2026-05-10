@@ -20,7 +20,6 @@ import {
 } from '../shared/icons/lucide-shim.jsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { auth, db, savePushTokenForUser, setupForegroundPushListener } from '../services/firebase';
-import { isVisibleLiveSession } from '../utils/liveSessions';
 import SecureVideoPlayer from '../features/lectures/SecureVideoPlayer';
 import MobileStudentBottomNav from '../features/student/MobileStudentBottomNav';
 import MobileExamHelperStyles from '../shared/components/MobileExamHelperStyles';
@@ -30,17 +29,59 @@ import { normalizeEgyptPhone, isValidEgyptPhone, validateEgyptianPhones } from '
 import { PWAInstallBox, ModernLogo, FloatingArabicBackground, WisdomBox, Announcements, Leaderboard } from '../features/home/HomeWidgets';
 import PomodoroFocusMode from '../features/study/PomodoroFocusMode';
 import InteractiveViewer from '../features/content/InteractiveViewer';
-import SmartHomeworkScanner from '../features/homework/SmartHomeworkScanner';
 import { AdminCoursesManager, StudentCoursesHub } from '../features/courses/CourseSystem';
 import { uploadToCloudinary } from '../services/cloudinaryUpload';
 import { uploadToFirebaseContent, detectContentType, readHtmlFileAsInlineContent } from '../services/firebaseContentUpload';
 
-const getAdminAIHeaders = async () => {
-  const token = await auth?.currentUser?.getIdToken?.();
-  return {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {})
-  };
+
+
+const platformNotify = (message, type = 'info') => {
+  const text = typeof message === 'string' ? message : String(message || '');
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('nahhas-toast', { detail: { message: text, type } }));
+  }
+  return undefined;
+};
+
+const platformConfirm = (message) => {
+  // Central wrapper so the remaining destructive actions have one upgrade point.
+  // The student-facing validation messages now use platformNotify instead of blocking alerts.
+  return window.confirm(message);
+};
+
+const platformPrompt = (message, defaultValue = '') => {
+  return window.prompt(message, defaultValue);
+};
+
+const ToastCenter = () => {
+  const [items, setItems] = useState([]);
+  useEffect(() => {
+    const onToast = (event) => {
+      const id = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const payload = { id, type: event.detail?.type || 'info', message: event.detail?.message || '' };
+      setItems(prev => [payload, ...prev].slice(0, 4));
+      window.setTimeout(() => setItems(prev => prev.filter(item => item.id !== id)), 3600);
+    };
+    window.addEventListener('nahhas-toast', onToast);
+    return () => window.removeEventListener('nahhas-toast', onToast);
+  }, []);
+  return (
+    <div className="fixed top-4 left-4 z-[10000] space-y-3 w-[min(92vw,380px)]" dir="rtl">
+      <AnimatePresence>
+        {items.map(item => (
+          <motion.div
+            key={item.id}
+            initial={{ opacity: 0, y: -14, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.96 }}
+            className={`rounded-2xl border p-4 shadow-2xl font-black ${item.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' : item.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-slate-950 border-slate-800 text-white'}`}
+          >
+            {item.message}
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </div>
+  );
 };
 
 const formatWatchTime = (totalSeconds) => {
@@ -142,7 +183,7 @@ const getQuestionsForExam = (examData) => {
 
 
 const generatePDF = (type, data) => {
-    if (!window.html2pdf) return alert("جاري تحميل نظام الطباعة... يرجى الانتظار ثوانٍ والمحاولة مرة أخرى.");
+    if (!window.html2pdf) return platformNotify("جاري تحميل نظام الطباعة... يرجى الانتظار ثوانٍ والمحاولة مرة أخرى.");
     const percentage = data.total > 0 ? Math.round((data.score / data.total) * 100) : 0;
     const date = new Date().toLocaleDateString('ar-EG');
     const element = document.createElement('div');
@@ -369,325 +410,15 @@ const getReviewRecommendations = (branchStats = {}, content = []) => {
 
 
 
-const isZoomLink = (url = '') => /(^|\/\/|\.)(zoom\.us|zoomgov\.com)\//i.test(url || '');
-const isMeetLink = (url = '') => /(^|\/\/|\.)(meet\.google\.com)\//i.test(url || '');
-const isJitsiLink = (url = '') => /(^|\/\/|\.)(meet\.jit\.si|8x8\.vc)\//i.test(url || '');
-const isYouTubeLink = (url = '') => /(youtube\.com|youtu\.be)/i.test(url || '');
-
-const normalizeExternalUrl = (url = '') => {
-    const clean = String(url || '').trim();
-    if (!clean) return '';
-    return /^https?:\/\//i.test(clean) ? clean : `https://${clean}`;
-};
-
-const normalizeJitsiUrl = (url = '') => {
-    const clean = normalizeExternalUrl(url);
-    if (!clean) return '';
-    try {
-        const u = new URL(clean);
-        if (!isJitsiLink(clean)) return clean;
-
-        const room = (u.pathname || '').replace(/^\/+/, '').split(/[?#]/)[0];
-        const safeRoom = room || `nahhas-live-${Date.now()}`;
-
-        // مهم للموبايل:
-        // disableDeepLinking يمنع Jitsi من تحويل الطالب لتحميل التطبيق
-        // ويجبر المحاضرة تفتح داخل iframe في المنصة قدر الإمكان.
-        const jitsiHashParams = [
-            'config.disableDeepLinking=true',
-            'config.prejoinPageEnabled=false',
-            'config.startWithAudioMuted=true',
-            'config.startWithVideoMuted=false',
-            'config.enableWelcomePage=false',
-            'interfaceConfig.MOBILE_APP_PROMO=false',
-            'interfaceConfig.SHOW_JITSI_WATERMARK=false',
-            'interfaceConfig.SHOW_WATERMARK_FOR_GUESTS=false'
-        ].join('&');
-
-        return `${u.origin}/${safeRoom}#${jitsiHashParams}`;
-    } catch {
-        return clean;
-    }
-};
-
-const getYouTubeEmbedUrl = (url = '') => {
-    const clean = normalizeExternalUrl(url);
-    const id = getYouTubeID(clean);
-    if (!id) return '';
-    return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&controls=1&rel=0&modestbranding=1&playsinline=1`;
-};
-
-const getLiveEmbedInfo = (session = {}) => {
-    const liveUrl = normalizeExternalUrl(session.liveUrl || session.url || session.streamUrl || '');
-    const embedUrl = normalizeExternalUrl(session.embedUrl || session.optionalEmbedUrl || '');
-    const detectedType = isJitsiLink(liveUrl) ? 'jitsi'
-        : isYouTubeLink(liveUrl) ? 'youtube'
-        : isZoomLink(liveUrl) ? 'zoom'
-        : isMeetLink(liveUrl) ? 'meet'
-        : 'external';
-
-    const sessionType = session.sessionType && session.sessionType !== 'external' ? session.sessionType : detectedType;
-
-    if (embedUrl) {
-        return {
-            type: sessionType || 'embed',
-            canEmbed: true,
-            embedSrc: embedUrl,
-            externalUrl: liveUrl || embedUrl,
-            note: 'سيتم تشغيل رابط التضمين داخل المنصة.'
-        };
-    }
-
-    if (sessionType === 'youtube') {
-        const embedSrc = getYouTubeEmbedUrl(liveUrl);
-        return {
-            type: 'youtube',
-            canEmbed: !!embedSrc,
-            embedSrc,
-            externalUrl: liveUrl,
-            note: embedSrc ? 'YouTube يعمل داخل المنصة، وتم تحويل الرابط تلقائيًا إلى Embed.' : 'رابط YouTube غير واضح.'
-        };
-    }
-
-    if (sessionType === 'jitsi') {
-        const embedSrc = normalizeJitsiUrl(liveUrl);
-        return {
-            type: 'jitsi',
-            canEmbed: !!embedSrc,
-            embedSrc,
-            externalUrl: embedSrc,
-            note: 'Jitsi يعمل داخل المنصة. استخدم رابط غرفة مباشر مثل https://meet.jit.si/nahhas-live-room'
-        };
-    }
-
-    if (sessionType === 'zoom') {
-        return {
-            type: 'zoom',
-            canEmbed: false,
-            embedSrc: '',
-            externalUrl: liveUrl,
-            note: 'Zoom العادي لا يعمل داخل iframe. سيظهر للطالب زر فتح خارجي. للتشغيل داخل المنصة نحتاج Zoom SDK لاحقًا.'
-        };
-    }
-
-    if (sessionType === 'meet') {
-        return {
-            type: 'meet',
-            canEmbed: false,
-            embedSrc: '',
-            externalUrl: liveUrl,
-            note: 'Google Meet العادي لا يعمل داخل iframe غالبًا. استخدم Jitsi للتشغيل داخل المنصة أو افتحه خارجيًا.'
-        };
-    }
-
-    return {
-        type: 'external',
-        canEmbed: false,
-        embedSrc: '',
-        externalUrl: liveUrl,
-        note: 'هذا الرابط لا يدعم التضمين داخل المنصة. استخدم Jitsi أو YouTube.'
-    };
-};
-
-const getLiveStatus = (session = {}) => {
-    if (session.status === 'ended') return { label: 'انتهت', tone: 'bg-slate-100 text-slate-600' };
-    const startMs = session.scheduledAt ? new Date(session.scheduledAt).getTime() : null;
-    if (startMs && Date.now() + 10 * 60 * 1000 < startMs) return { label: 'قادمة', tone: 'bg-blue-100 text-blue-700' };
-    return { label: 'مباشرة الآن', tone: 'bg-red-100 text-red-700' };
-};
 
 
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-const callPlatformAIWithRetry = async (payload, attempts = 3) => {
-    let lastError = null;
-    for (let i = 0; i < attempts; i++) {
-        try {
-            const res = await fetch('/api/ai-coach', {
-                method: 'POST',
-                headers: await getAdminAIHeaders(),
-                body: JSON.stringify(payload)
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok || data?.ok === false) {
-                throw new Error(data?.error || data?.message || 'تعذر تشغيل الذكاء الاصطناعي الآن.');
-            }
-            return data;
-        } catch (error) {
-            lastError = error;
-            await sleep(900 * (i + 1));
-        }
-    }
-    throw lastError;
-};
 
 
-const LiveSessionView = ({ session, user, onClose }) => {
-  const [messages, setMessages] = useState([]);
-  const [msgInput, setMsgInput] = useState("");
-  const [aiQuestion, setAiQuestion] = useState("");
-  const [aiAnswer, setAiAnswer] = useState("");
-  const [aiLoading, setAiLoading] = useState(false);
-  const [liveExam, setLiveExam] = useState(null);
-  const chatRef = useRef(null);
-  const embedInfo = useMemo(() => getLiveEmbedInfo(session), [session]);
 
-  useEffect(() => {
-    if (!session?.id) return;
-    const q = query(collection(db, 'live_sessions', session.id, 'chat'), orderBy('createdAt', 'asc'));
-    const unsub = onSnapshot(q, (snap) => {
-      setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      chatRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, (error) => {
-      console.warn('live chat listener blocked:', error?.message);
-      setMessages([]);
-    });
-    return () => unsub();
-  }, [session?.id]);
 
-  useEffect(() => {
-    if (!user || !session?.id) return;
-    const attendanceId = `${session.id}_${user.uid}`;
-    setDoc(doc(db, 'live_attendance', attendanceId), {
-      sessionId: session.id,
-      sessionTitle: session.title || '',
-      userId: user.uid,
-      userEmail: user.email || '',
-      userName: user.displayName || user.email || 'طالب',
-      joinedAt: serverTimestamp(),
-      lastSeenAt: serverTimestamp(),
-      platformView: embedInfo.canEmbed,
-      sessionType: embedInfo.type
-    }, { merge: true }).catch((e) => console.warn('attendance write blocked:', e?.message));
-    const interval = setInterval(() => {
-      setDoc(doc(db, 'live_attendance', attendanceId), { lastSeenAt: serverTimestamp() }, { merge: true }).catch(() => {});
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [user?.uid, session?.id, session?.title, embedInfo.canEmbed, embedInfo.type]);
 
-  const askLiveAI = async () => {
-    if (!aiQuestion.trim()) return alert('اكتب سؤالك الأول.');
-    setAiLoading(true);
-    setAiAnswer('');
-    try {
-      const data = await callPlatformAIWithRetry({
-        mode: 'live_question',
-        question: aiQuestion,
-        grade: session?.grade || '',
-        context: `محاضرة مباشرة بعنوان: ${session?.title || ''}`
-      });
-      const answer = data.analysis?.answer || data.data?.answer || data.analysis?.summary || data.data?.summary || 'تم التحليل بنجاح.';
-      setAiAnswer(answer);
-    } catch (error) {
-      setAiAnswer('مزود الذكاء الاصطناعي عليه ضغط مؤقت. جرّب بعد دقيقة أو اكتب السؤال بصيغة أقصر.');
-    } finally {
-      setAiLoading(false);
-    }
-  };
 
-  const generateLiveExam = async () => {
-    setAiLoading(true);
-    setLiveExam(null);
-    try {
-      const data = await callPlatformAIWithRetry({
-        mode: 'generate_exam',
-        topic: session?.title || 'المحاضرة المباشرة',
-        branches: session?.branch || session?.title || 'المحاضرة',
-        grade: session?.grade || '',
-        mcqCount: 15,
-        difficultyMix: ['easy','medium','hard','very_hard'],
-        instructions: 'ولد امتحان اختيار من متعدد من 15 إلى 20 سؤال من محتوى المحاضرة المباشرة، مناسب للمرحلة الدراسية فقط.'
-      });
-      const exam = data.analysis?.exam || data.data?.exam || data.analysis;
-      const questions = Array.isArray(exam?.questions) ? exam.questions : [];
-      setLiveExam({ title: exam?.title || `امتحان المحاضرة - ${session?.title || ''}`, questions });
-    } catch (error) {
-      setAiAnswer('تعذر توليد امتحان الآن بسبب ضغط مؤقت على الموديل. جرّب مرة أخرى بعد قليل.');
-    } finally {
-      setAiLoading(false);
-    }
-  };
 
-  const sendChat = async (e) => {
-    e.preventDefault();
-    if(!session?.id) return alert('بيانات المحاضرة غير مكتملة.');
-    if(!msgInput.trim()) return;
-    try {
-      await addDoc(collection(db, 'live_sessions', session.id, 'chat'), {
-        text: msgInput,
-        user: user?.displayName || user?.email || 'طالب',
-        createdAt: serverTimestamp()
-      });
-      setMsgInput("");
-    } catch (error) {
-      alert('تعذر إرسال الرسالة. تحقق من صلاحيات المحادثة.');
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col md:flex-row font-['Cairo']" dir="rtl">
-      <div className="flex-1 flex flex-col min-h-0">
-        <div className="bg-gradient-to-r from-red-600 to-red-800 p-3 text-white flex justify-between items-center shadow-lg">
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 bg-white rounded-full animate-pulse shadow-[0_0_10px_white]"></span>
-            <h2 className="font-bold">محاضرة مباشرة: {session?.title}</h2>
-          </div>
-          <button onClick={onClose} className="text-sm bg-black/30 hover:bg-black/50 px-3 py-1 rounded transition">العودة للمنصة</button>
-        </div>
-
-        <div className="flex-1 bg-black relative flex items-center justify-center overflow-hidden min-h-[260px]">
-          <div className="watermark-video z-50">{user?.displayName || user?.email || 'طالب'} — منصة النحاس</div>
-          {embedInfo.canEmbed ? (
-            <iframe
-              width="100%"
-              height="100%"
-              src={embedInfo.embedSrc}
-              title="Live Meeting"
-              frameBorder="0"
-              allow="camera; microphone; display-capture; autoplay; clipboard-write; fullscreen; encrypted-media"
-              allowFullScreen
-              className="relative z-10 bg-black w-full h-full min-h-[260px]"
-            ></iframe>
-          ) : (
-            <div className="relative z-20 max-w-xl mx-auto p-8 text-center text-white">
-              <Radio size={72} className="mx-auto mb-5 text-red-400" />
-              <h3 className="text-2xl font-black mb-3">الرابط لا يعمل داخل المنصة</h3>
-              <p className="text-slate-300 leading-relaxed mb-6">{embedInfo.note}</p>
-              <div className="bg-white/10 border border-white/10 rounded-2xl p-4 text-sm text-slate-200 mb-6">
-                استخدم Jitsi للتشغيل داخل المنصة. Zoom وGoogle Meet العاديين غالبًا يفتحوا خارجيًا بسبب قيود الأمان.
-              </div>
-              {embedInfo.externalUrl && (
-                <a href={embedInfo.externalUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-white text-red-700 px-6 py-3 rounded-full font-bold shadow-lg hover:bg-red-50 transition">
-                  فتح المحاضرة خارجيًا <ExternalLink size={18}/>
-                </a>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="w-full md:w-[420px] bg-white border-r flex flex-col h-[48vh] md:h-full">
-        <div className="p-3 border-b bg-slate-50 font-bold text-slate-700">المحادثة المباشرة</div>
-        <div className="flex-1 overflow-y-auto p-3 space-y-3">
-          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-3 text-sm text-amber-800 font-bold leading-relaxed">تم إيقاف AI للطلاب داخل المحاضرات مؤقتًا لتوفير Gemini. استخدم الشات المباشر لكتابة سؤالك للمستر.</div>
-
-          <div className="border-t pt-3">
-            <p className="font-bold text-slate-700 mb-2">الشات المباشر</p>
-            {messages.map((m, i) => (
-              <div key={m.id || i} className="text-sm bg-slate-50 p-2 rounded mb-2"><span className="font-bold text-amber-700">{m.user}: </span><span className="text-slate-800">{m.text}</span></div>
-            ))}
-            {messages.length === 0 && <p className="text-xs text-slate-400 text-center mt-6">لا توجد رسائل حتى الآن.</p>}
-            <div ref={chatRef} />
-          </div>
-        </div>
-        <form onSubmit={sendChat} className="p-2 border-t flex gap-2">
-          <input className="flex-1 border rounded px-2 py-1 text-sm" placeholder="اكتب تعليق..." value={msgInput} onChange={e=>setMsgInput(e.target.value)} />
-          <button className="bg-blue-600 text-white p-2 rounded"><Send size={16}/></button>
-        </form>
-      </div>
-    </div>
-  );
-};
 
 
 
@@ -695,18 +426,26 @@ const StudentLocalAdvice = ({ metrics = {}, content = [] }) => {
   const branches = Object.entries(metrics?.branchStats || {}).map(([branch, data]) => ({ branch, pct: data.possible > 0 ? Math.round((safeNumber(data.earned, 0) / safeNumber(data.possible, 0)) * 100) : 0, wrong: safeNumber(data.wrong, 0) })).sort((a,b)=>a.pct-b.pct);
   const weakBranches = branches.filter(b => b.pct < 70).slice(0, 3);
   const recommendations = getReviewRecommendations(metrics?.branchStats || {}, content || []);
-  return <div className="mt-5 bg-slate-900/70 border border-slate-700 rounded-3xl p-5 text-slate-100"><div className="flex items-center gap-2 mb-4"><BrainCircuit className="text-amber-400"/><h3 className="font-black text-xl">تحليل ذكي بدون استهلاك AI</h3></div><p className="text-sm text-slate-300 mb-4">التحليل مبني على إجابات الطالب ونسب الفروع داخل المنصة فقط، بدون Gemini.</p>{weakBranches.length===0?<div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 text-emerald-200 font-bold">ممتاز يا بطل. لا توجد فروع أقل من 70%. راجع الأخطاء الفردية وحافظ على مستواك.</div>:<div className="space-y-3">{weakBranches.map((b,idx)=>{const rec=recommendations.find(r=>r.branch===b.branch);return <div key={idx} className="bg-white/5 border border-white/10 rounded-2xl p-4"><div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-2"><p className="font-black text-red-300">راجع فرع: {b.branch}</p><span className="text-xs bg-red-500/20 text-red-200 px-3 py-1 rounded-full font-bold">{b.pct}%</span></div><p className="text-sm text-slate-200 leading-relaxed">عندك {b.wrong} أخطاء في هذا الفرع. ابدأ بمراجعة القاعدة، ثم حل أسئلة قصيرة، وبعدها ارجع لبنك الأخطاء.</p>{rec?.title && <p className="text-xs text-amber-200 mt-2">اقتراح مراجعة: {rec.title}</p>}</div>})}</div>}</div>;
+  return <div className="mt-5 bg-slate-900/70 border border-slate-700 rounded-3xl p-5 text-slate-100"><div className="flex items-center gap-2 mb-4"><BrainCircuit className="text-amber-400"/><h3 className="font-black text-xl">تحليل ذكي داخلي</h3></div><p className="text-sm text-slate-300 mb-4">التحليل مبني على إجابات الطالب ونسب الفروع داخل المنصة فقط، داخليًا.</p>{weakBranches.length===0?<div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 text-emerald-200 font-bold">ممتاز يا بطل. لا توجد فروع أقل من 70%. راجع الأخطاء الفردية وحافظ على مستواك.</div>:<div className="space-y-3">{weakBranches.map((b,idx)=>{const rec=recommendations.find(r=>r.branch===b.branch);return <div key={idx} className="bg-white/5 border border-white/10 rounded-2xl p-4"><div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-2"><p className="font-black text-red-300">راجع فرع: {b.branch}</p><span className="text-xs bg-red-500/20 text-red-200 px-3 py-1 rounded-full font-bold">{b.pct}%</span></div><p className="text-sm text-slate-200 leading-relaxed">عندك {b.wrong} أخطاء في هذا الفرع. ابدأ بمراجعة القاعدة، ثم حل أسئلة قصيرة، وبعدها ارجع لبنك الأخطاء.</p>{rec?.title && <p className="text-xs text-amber-200 mt-2">اقتراح مراجعة: {rec.title}</p>}</div>})}</div>}</div>;
 };
 const StudentLocalHomeCoach = ({ userResults = [], content = [] }) => { const branchStats={}; (userResults||[]).slice(0,10).forEach(r=>{const stats=r?.branchStats||r?.performanceAnalysis?.branchStats||r?.branchAnalysis||{}; Object.entries(stats).forEach(([branch,d])=>{branchStats[branch]=branchStats[branch]||{earned:0,possible:0,wrong:0}; branchStats[branch].earned+=safeNumber(d.earned,0); branchStats[branch].possible+=safeNumber(d.possible,d.total||0); branchStats[branch].wrong+=safeNumber(d.wrong,0);});}); return <StudentLocalAdvice metrics={{branchStats}} content={content}/>; };
-const LocalQuestionExplanation = ({ question, answers }) => { if(!question||question.type==='essay') return null; const selectedIdx=answers?.[question.id]; const correctIdx=safeNumber(question.correctIdx,0); const selectedText=selectedIdx!==undefined?question.options?.[selectedIdx]:'لم يتم اختيار إجابة'; const correctText=question.options?.[correctIdx]||'غير محدد'; const isCorrect=selectedIdx===correctIdx; return <div className={`mb-6 rounded-2xl p-4 border ${isCorrect?'bg-emerald-50 border-emerald-200 text-emerald-800':'bg-amber-50 border-amber-200 text-amber-900'}`}><h4 className="font-black mb-2">شرح المنصة بدون AI</h4><p className="text-sm font-bold">إجابتك: {selectedText}</p><p className="text-sm font-bold">الإجابة الصحيحة: {correctText}</p>{question.explanation?<p className="text-sm mt-2 leading-relaxed">الشرح: {question.explanation}</p>:<p className="text-xs mt-2 opacity-80">راجع قاعدة هذا السؤال من فرع {question.branch || 'الدرس'} ثم أعد حل أسئلة مشابهة.</p>}</div>; };
-const LocalEssayReviewBox = ({ question, answer }) => { const answerText=typeof answer==='object'?answer?.text:answer; const hasAnswer=!!String(answerText||'').trim()||!!answer?.image; return <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4"><h4 className="font-black text-purple-800 flex items-center gap-2"><PenTool size={18}/> مراجعة مقالي بدون AI</h4><p className="text-sm text-purple-700 mt-2">{hasAnswer?'تم حفظ إجابتك المقالية. التصحيح النهائي يتم من الأدمن حاليًا لحين تفعيل خطة AI المدفوعة.':'لا توجد إجابة مقالية محفوظة لهذا السؤال.'}</p>{question?.modelAnswer&&<p className="text-xs text-slate-600 mt-2"><b>نموذج إجابة:</b> {question.modelAnswer}</p>}</div>; };
+const LocalQuestionExplanation = ({ question, answers }) => { if(!question||question.type==='essay') return null; const selectedIdx=answers?.[question.id]; const correctIdx=safeNumber(question.correctIdx,0); const selectedText=selectedIdx!==undefined?question.options?.[selectedIdx]:'لم يتم اختيار إجابة'; const correctText=question.options?.[correctIdx]||'غير محدد'; const isCorrect=selectedIdx===correctIdx; return <div className={`mb-6 rounded-2xl p-4 border ${isCorrect?'bg-emerald-50 border-emerald-200 text-emerald-800':'bg-amber-50 border-amber-200 text-amber-900'}`}><h4 className="font-black mb-2">شرح المنصة بدون النظام</h4><p className="text-sm font-bold">إجابتك: {selectedText}</p><p className="text-sm font-bold">الإجابة الصحيحة: {correctText}</p>{question.explanation?<p className="text-sm mt-2 leading-relaxed">الشرح: {question.explanation}</p>:<p className="text-xs mt-2 opacity-80">راجع قاعدة هذا السؤال من فرع {question.branch || 'الدرس'} ثم أعد حل أسئلة مشابهة.</p>}</div>; };
+const LocalEssayReviewBox = ({ question, answer }) => { const answerText=typeof answer==='object'?answer?.text:answer; const hasAnswer=!!String(answerText||'').trim()||!!answer?.image; return <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4"><h4 className="font-black text-purple-800 flex items-center gap-2"><PenTool size={18}/> مراجعة مقالي بدون النظام</h4><p className="text-sm text-purple-700 mt-2">{hasAnswer?'تم حفظ إجابتك المقالية. التصحيح النهائي يتم من الأدمن حاليًا لحين تفعيل خطة النظام المدفوعة.':'لا توجد إجابة مقالية محفوظة لهذا السؤال.'}</p>{question?.modelAnswer&&<p className="text-xs text-slate-600 mt-2"><b>نموذج إجابة:</b> {question.modelAnswer}</p>}</div>; };
 
 const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult = null }) => {
   const [activeView, setActiveView] = useState(isReviewMode || existingResult ? 'dashboard' : 'questions');
   const [currentQIndex, setCurrentQIndex] = useState(0);
-  const [answers, setAnswers] = useState(existingResult?.answers || exam.resumeData?.answers || {});
+  const autosaveKey = `nahhas_exam_backup_${user?.uid || 'guest'}_${exam?.attemptId || exam?.id || 'exam'}`;
+  const readLocalExamBackup = () => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(autosaveKey) || 'null');
+      return saved && typeof saved === 'object' ? saved : null;
+    } catch { return null; }
+  };
+  const localExamBackup = readLocalExamBackup();
+  const [answers, setAnswers] = useState(existingResult?.answers || exam.resumeData?.answers || localExamBackup?.answers || {});
   const [flagged, setFlagged] = useState({});
-  const [timeLeft, setTimeLeft] = useState(safeNumber(existingResult?.remainingTime ?? exam.resumeData?.remainingTime, exam.duration * 60));
+  const [timeLeft, setTimeLeft] = useState(safeNumber(existingResult?.remainingTime ?? exam.resumeData?.remainingTime ?? localExamBackup?.remainingTime, exam.duration * 60));
   const [isCheating, setIsCheating] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(isReviewMode || existingResult !== null);
   const [score, setScore] = useState(existingResult?.score || 0);
@@ -802,7 +541,28 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     return () => window.removeEventListener('focus', restoreBypass);
   }, []);
 
+
+  const writeLocalExamBackup = (nextAnswers = answers, extra = {}) => {
+    if (isReviewMode || isSubmitted || exam.id === 'custom_mistakes_exam') return;
+    try {
+      localStorage.setItem(autosaveKey, JSON.stringify({
+        examId: exam.id,
+        attemptId: exam.attemptId,
+        studentId: user.uid,
+        answers: nextAnswers,
+        remainingTime: extra.remainingTime ?? timeLeft,
+        currentQIndex: extra.currentQIndex ?? currentQIndex,
+        antiCheatWarnings: antiCheatWarningsRef.current,
+        antiCheatLog,
+        savedAt: new Date().toISOString()
+      }));
+    } catch (e) {
+      console.warn('local exam backup failed:', e?.message);
+    }
+  };
+
   const saveExamProgress = async (extra = {}) => {
+    writeLocalExamBackup(answers, extra);
     if (!exam.attemptId || exam.id === 'custom_mistakes_exam') return;
     try {
       await setDoc(doc(db, 'exam_results', exam.attemptId), {
@@ -881,7 +641,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     setAntiCheatLog(nextLog);
 
     if (nextWarning < 3) {
-      alert(`تنبيه رقم ${nextWarning}: تم رصد حركة غير آمنة داخل الامتحان. عند التكرار للمرة الثالثة سيتم إيقاف المحاولة مؤقتًا لحين مراجعة الأدمن، والأدمن وحده يقرر السماح بالاستكمال أو إعادة الامتحان.`);
+      platformNotify(`تنبيه رقم ${nextWarning}: تم رصد حركة غير آمنة داخل الامتحان. عند التكرار للمرة الثالثة سيتم إيقاف المحاولة مؤقتًا لحين مراجعة الأدمن، والأدمن وحده يقرر السماح بالاستكمال أو إعادة الامتحان.`);
       await saveExamProgress({ antiCheatWarnings: nextWarning, antiCheatLog: nextLog });
       return;
     }
@@ -984,6 +744,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     if (!isReviewMode && !isSubmitted && !showAntiCheatChoice) {
       setAnswers((prev) => {
         const nextAnswers = { ...prev, [qId]: value };
+        writeLocalExamBackup(nextAnswers);
         if (exam.attemptId && exam.id !== 'custom_mistakes_exam') {
           setDoc(doc(db, 'exam_results', exam.attemptId), {
             answers: nextAnswers,
@@ -998,6 +759,14 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
     }
   };
 
+
+  useEffect(() => {
+    if (isReviewMode || isSubmitted) return;
+    writeLocalExamBackup();
+    const interval = setInterval(() => writeLocalExamBackup(), 5000);
+    return () => clearInterval(interval);
+  }, [answers, timeLeft, currentQIndex, isSubmitted, isReviewMode, autosaveKey]);
+
   const handleEssayImageUpload = async (qId, file) => {
     if (!file) return;
     try {
@@ -1011,7 +780,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
         cloudinaryPublicId: uploaded.publicId,
       });
     } catch (err) {
-      alert(err?.message || 'فشل رفع الصورة على Cloudinary.');
+      platformNotify(err?.message || 'فشل رفع الصورة على Cloudinary.');
     } finally {
       fileDialogBypassRef.current = false;
     }
@@ -1308,7 +1077,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                           setActiveBranchTab(branch);
                           setActiveView('questions');
                         } else {
-                          alert("نموذج الإجابة سيتاح بعد انتهاء وقت الامتحان للجميع.");
+                          platformNotify("نموذج الإجابة سيتاح بعد انتهاء وقت الامتحان للجميع.");
                         }
                       }}
                       className={`bg-[#1e293b] p-6 rounded-2xl border border-[#334155] shadow-lg transition group ${(!isSubmitted || canReview) ? 'cursor-pointer hover:border-teal-400 hover:-translate-y-1' : ''}`}
@@ -1418,7 +1187,7 @@ const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult 
                 <Timer size={18} /> {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
               </div>
               <button
-                onClick={() => document.documentElement.requestFullscreen?.().catch(() => alert('لو ملء الشاشة لم يعمل، افتح المنصة من المتصفح مباشرة وليس داخل تطبيق خارجي.'))}
+                onClick={() => document.documentElement.requestFullscreen?.().catch(() => platformNotify('لو ملء الشاشة لم يعمل، افتح المنصة من المتصفح مباشرة وليس داخل تطبيق خارجي.'))}
                 className="bg-amber-500 hover:bg-amber-600 text-slate-900 px-3 md:px-4 py-2 rounded-xl font-black transition whitespace-nowrap flex items-center gap-2 shadow-lg"
                 title="تفعيل ملء الشاشة"
               >
@@ -1664,881 +1433,17 @@ const PlatformPerformanceBooster = () => {
 
 
 
-const AIQuickHealthCheck = () => {
-  const [status, setStatus] = useState(null);
-  const checkAI = async () => {
-    setStatus('checking');
-    try {
-      const res = await fetch('/api/ai-coach', {
-        method: 'POST',
-        headers: await getAdminAIHeaders(),
-        body: JSON.stringify({ mode: 'generate_questions', question: 'اختبار تشغيل سريع', topic: 'النحو', count: 1, adminOnly: true })
-      });
-      const data = await res.json().catch(() => ({}));
-      setStatus(res.ok && data.ok ? 'ok' : 'bad');
-    } catch {
-      setStatus('bad');
-    }
-  };
-  return (
-    <button onClick={checkAI} className={`text-xs px-3 py-2 rounded-xl font-bold ${status === 'ok' ? 'bg-emerald-100 text-emerald-700' : status === 'bad' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'}`}>
-      {status === 'checking' ? 'فحص AI...' : status === 'ok' ? 'AI يعمل ✅' : status === 'bad' ? 'AI لا يعمل - راجع API' : 'فحص AI'}
-    </button>
-  );
-};
 
 
 
-const getTodayKey = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-};
 
 
-const LiveAICoachPanel = ({ session, user, userData }) => {
-  const [question, setQuestion] = useState('');
-  const [answer, setAnswer] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [summary, setSummary] = useState('');
-  const [examDraft, setExamDraft] = useState(null);
 
-  const lessonContext = {
-    title: session?.title || '',
-    branch: session?.branch || '',
-    grade: session?.grade || userData?.grade || '',
-    description: session?.description || session?.notes || '',
-    streamUrl: session?.streamUrl || session?.url || ''
-  };
 
-  const askAI = async () => {
-    if (!question.trim()) return alert('اكتب سؤالك الأول.');
-    setLoading(true);
-    setAnswer('');
-    try {
-      const res = await fetch('/api/ai-coach', {
-        method: 'POST',
-        headers: await getAdminAIHeaders(),
-        body: JSON.stringify({
-          mode: 'student_chat',
-          studentName: userData?.name || user?.displayName || user?.email || '',
-          grade: lessonContext.grade,
-          question: `سؤال الطالب أثناء المحاضرة: ${question}\n\nسياق المحاضرة: ${JSON.stringify(lessonContext)}`,
-          recentResults: []
-        })
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error || 'AI لم يرد الآن.');
-      const a = data.analysis || data.data || {};
-      setAnswer(a.answer || a.explanation || a.summary || 'تم.');
-    } catch (e) {
-      setAnswer(e.message || 'تعذر تشغيل AI الآن.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const summarizeLesson = async () => {
-    setLoading(true);
-    setSummary('');
-    try {
-      const res = await fetch('/api/ai-coach', {
-        method: 'POST',
-        headers: await getAdminAIHeaders(),
-        body: JSON.stringify({
-          mode: 'student_chat',
-          grade: lessonContext.grade,
-          question: `لخص هذه المحاضرة للطلاب بنقاط منظمة، ثم اكتب أهم الأفكار، ثم أسئلة مراجعة قصيرة. بيانات المحاضرة: ${JSON.stringify(lessonContext)}`
-        })
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error || 'تعذر تلخيص المحاضرة.');
-      const a = data.analysis || data.data || {};
-      setSummary(a.answer || a.explanation || a.summary || JSON.stringify(a));
-    } catch (e) {
-      setSummary(e.message || 'تعذر التلخيص الآن.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const generateLessonExam = async () => {
-    setLoading(true);
-    setExamDraft(null);
-    try {
-      const res = await fetch('/api/ai-coach', {
-        method: 'POST',
-        headers: await getAdminAIHeaders(),
-        body: JSON.stringify({
-          mode: 'generate_exam',
-          topic: `${lessonContext.title} ${lessonContext.description}`,
-          branches: lessonContext.branch || lessonContext.title,
-          grade: lessonContext.grade,
-          mcqCount: 15,
-          essayCount: 0,
-          duration: 20,
-          instructions: 'امتحان سريع من محتوى المحاضرة فقط. لا تخرج عن عنوان ووصف المحاضرة.'
-        })
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error || 'تعذر توليد امتحان المحاضرة.');
-      setExamDraft((data.analysis || data.data || {}).exam || data.analysis || data.data);
-    } catch (e) {
-      alert(e.message || 'تعذر توليد الامتحان.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  return (
-    <div className="bg-white/95 border border-fuchsia-100 rounded-2xl p-4 space-y-4 shadow-sm">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div>
-          <h3 className="font-black text-xl text-slate-800 flex items-center gap-2">
-            <Sparkles className="text-fuchsia-600"/> Live AI Coach
-          </h3>
-          <p className="text-xs text-slate-500">AI يعتمد على عنوان ووصف المحاضرة وشات الطلبة، وليس على صوت الفيديو مباشرة.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button disabled={loading} onClick={summarizeLesson} className="bg-blue-100 text-blue-700 px-4 py-2 rounded-xl font-bold">تلخيص المحاضرة</button>
-          <button disabled={loading} onClick={generateLessonExam} className="bg-fuchsia-600 text-white px-4 py-2 rounded-xl font-black">توليد امتحان</button>
-        </div>
-      </div>
-      <div className="flex flex-col md:flex-row gap-2">
-        <input value={question} onChange={(e)=>setQuestion(e.target.value)} onKeyDown={(e)=>{ if(e.key === 'Enter') askAI(); }} className="flex-1 border rounded-xl p-3" placeholder="اسأل AI أثناء المحاضرة..." />
-        <button disabled={loading} onClick={askAI} className="bg-slate-900 text-white px-5 py-3 rounded-xl font-black">{loading ? 'جاري...' : 'اسأل AI'}</button>
-      </div>
-      {answer && <div className="bg-sky-50 border border-sky-100 text-slate-800 rounded-xl p-3 font-bold leading-relaxed whitespace-pre-wrap">{answer}</div>}
-      {summary && <div className="bg-emerald-50 border border-emerald-100 text-slate-800 rounded-xl p-3 font-bold leading-relaxed whitespace-pre-wrap">{summary}</div>}
-      {examDraft && (
-        <details className="bg-fuchsia-50 border border-fuchsia-100 rounded-xl p-3">
-          <summary className="cursor-pointer font-black text-fuchsia-700">امتحان المحاضرة الناتج من AI</summary>
-          <pre dir="ltr" className="mt-3 bg-slate-900 text-slate-100 rounded-xl p-3 text-xs overflow-auto max-h-[360px]">{JSON.stringify(examDraft, null, 2)}</pre>
-        </details>
-      )}
-    </div>
-  );
-};
 
-const LiveSessionCreator = ({ adminGradeFilter = 'all' }) => {
-  const [title, setTitle] = useState('');
-  const [streamUrl, setStreamUrl] = useState('');
-  const [platform, setPlatform] = useState('jitsi');
-  const [grade, setGrade] = useState(adminGradeFilter === 'all' ? '3sec' : adminGradeFilter);
-  const [branch, setBranch] = useState('');
-  const [description, setDescription] = useState('');
-
-  const createSession = async () => {
-    if (!title.trim()) return alert('اكتب عنوان المحاضرة.');
-    let finalUrl = streamUrl.trim();
-    if (platform === 'jitsi' && !finalUrl) {
-      const room = `Nahhas-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-      finalUrl = `https://meet.jit.si/${room}`;
-    }
-    if (!finalUrl) return alert('ضع رابط البث أو اختر Jitsi لإنشاء غرفة تلقائيًا.');
-
-    await addDoc(collection(db, 'live_sessions'), {
-      title: title.trim(),
-      streamUrl: finalUrl,
-      url: finalUrl,
-      platform,
-      grade,
-      branch: branch.trim(),
-      description: description.trim(),
-      notes: description.trim(),
-      isLive: true,
-      createdAt: serverTimestamp()
-    });
-
-    setTitle('');
-    setStreamUrl('');
-    setBranch('');
-    setDescription('');
-    alert('تم إنشاء المحاضرة المباشرة.');
-  };
-
-  return (
-    <div className="glass-panel rounded-2xl p-5 border-t-4 border-sky-600 mb-6">
-      <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2 mb-4"><Radio className="text-sky-600"/> إنشاء محاضرة Live + AI</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-        <input className="border rounded-xl p-3" placeholder="عنوان المحاضرة" value={title} onChange={e=>setTitle(e.target.value)} />
-        <select className="border rounded-xl p-3" value={platform} onChange={e=>setPlatform(e.target.value)}>
-          <option value="jitsi">Jitsi Meet - مجاني داخل المنصة</option>
-          <option value="youtube">YouTube Live</option>
-          <option value="zoom">Zoom / رابط خارجي</option>
-          <option value="custom">رابط مخصص iframe</option>
-        </select>
-        <select className="border rounded-xl p-3" value={grade} onChange={e=>setGrade(e.target.value)}><GradeOptions/></select>
-        <input className="border rounded-xl p-3" placeholder="الفرع: نحو / قراءة / بلاغة..." value={branch} onChange={e=>setBranch(e.target.value)} />
-      </div>
-      <input className="border rounded-xl p-3 w-full mb-3" placeholder="رابط البث - اتركه فارغًا مع Jitsi لإنشاء غرفة تلقائيًا" value={streamUrl} onChange={e=>setStreamUrl(e.target.value)} />
-      <textarea className="border rounded-xl p-3 w-full mb-3 min-h-[100px]" placeholder="اكتب وصف المحاضرة أو نقاط الدرس حتى يفهم AI المحتوى..." value={description} onChange={e=>setDescription(e.target.value)} />
-      <button onClick={createSession} className="bg-sky-600 text-white px-6 py-3 rounded-xl font-black hover:bg-sky-700">إنشاء المحاضرة</button>
-    </div>
-  );
-};
-
-
-const LiveAttendanceModal = ({ session, onClose }) => {
-  const [attendance, setAttendance] = useState([]);
-
-  useEffect(() => {
-    if (!session?.id) return;
-
-    const unsub = onSnapshot(collection(db, 'live_attendance'), (snap) => {
-      const rows = snap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .filter(r => r.sessionId === session.id)
-        .sort((a, b) => (b.joinedAt?.seconds || 0) - (a.joinedAt?.seconds || 0));
-
-      setAttendance(rows);
-    }, (error) => {
-      pushDebugLog?.('live-attendance-error', error.message, {});
-      setAttendance([]);
-    });
-
-    return () => unsub();
-  }, [session?.id]);
-
-  const exportCSV = () => {
-    const header = ['studentName', 'grade', 'userEmail', 'joinedAt'];
-    const rows = attendance.map(r => {
-      const joined = r.joinedAt?.toDate?.()?.toLocaleString('ar-EG') || '';
-      return [
-        r.studentName || '',
-        getGradeLabel(r.grade || ''),
-        r.userEmail || r.email || '',
-        joined
-      ].map(v => `"${String(v).replaceAll('"', '""')}"`).join(',');
-    });
-
-    const csv = [header.join(','), ...rows].join('\\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `live_attendance_${session?.title || session?.id}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const copyNames = async () => {
-    await navigator.clipboard?.writeText(attendance.map(a => a.studentName || a.userId).join('\\n'));
-    alert('تم نسخ أسماء الحضور.');
-  };
-
-  return (
-    <div className="fixed inset-0 z-[100000] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3" dir="rtl">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-y-auto border-t-8 border-sky-600">
-        <div className="bg-slate-900 text-white p-4 flex items-center justify-between sticky top-0 z-10">
-          <div>
-            <h2 className="font-black text-2xl">حضور المحاضرة</h2>
-            <p className="text-xs text-slate-300 mt-1">{session?.title} • عدد الحضور: {attendance.length}</p>
-          </div>
-          <button onClick={onClose} className="bg-white/10 hover:bg-white/20 rounded-full p-2"><X/></button>
-        </div>
-
-        <div className="p-5">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
-            <div className="bg-sky-50 border border-sky-100 rounded-2xl p-4">
-              <p className="text-xs font-bold text-sky-600">إجمالي الحضور</p>
-              <p className="text-4xl font-black text-sky-800">{attendance.length}</p>
-            </div>
-            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4">
-              <p className="text-xs font-bold text-emerald-600">الصف</p>
-              <p className="text-xl font-black text-emerald-800">{getGradeLabel(session?.grade)}</p>
-            </div>
-            <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4">
-              <p className="text-xs font-bold text-purple-600">الفرع</p>
-              <p className="text-xl font-black text-purple-800">{session?.branch || 'عام'}</p>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-2 mb-4">
-            <button onClick={exportCSV} className="bg-slate-900 text-white px-4 py-2 rounded-xl font-black">تصدير CSV</button>
-            <button onClick={copyNames} className="bg-sky-100 text-sky-700 px-4 py-2 rounded-xl font-bold">نسخ الأسماء</button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-sm border rounded-2xl overflow-hidden">
-              <thead>
-                <tr className="bg-slate-100 text-slate-700">
-                  <th className="p-3 text-right">الطالب</th>
-                  <th className="p-3">الصف</th>
-                  <th className="p-3">الإيميل / ID</th>
-                  <th className="p-3">وقت الدخول</th>
-                </tr>
-              </thead>
-              <tbody>
-                {attendance.map(row => (
-                  <tr key={row.id} className="border-b hover:bg-slate-50">
-                    <td className="p-3 font-black text-slate-800">{row.studentName || 'طالب'}</td>
-                    <td className="p-3 text-center font-bold">{getGradeLabel(row.grade)}</td>
-                    <td className="p-3 text-center text-xs text-slate-500">{row.userEmail || row.email || row.userId}</td>
-                    <td className="p-3 text-center font-bold">{row.joinedAt?.toDate?.()?.toLocaleString('ar-EG') || 'غير محدد'}</td>
-                  </tr>
-                ))}
-
-                {attendance.length === 0 && (
-                  <tr>
-                    <td colSpan="4" className="p-10 text-center text-slate-400 font-bold">
-                      لا يوجد حضور مسجل لهذه المحاضرة حتى الآن.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 mt-5 text-sm font-bold text-amber-800 leading-relaxed">
-            ملاحظة: الطالب يتسجل حضوره عندما يدخل المحاضرة من داخل المنصة. لو دخل مباشرة من رابط Jitsi خارج المنصة، لن يظهر في الحضور.
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const LiveSessionsAdminPanel = ({ adminGradeFilter = 'all' }) => {
-  const [sessions, setSessions] = useState([]);
-  const [selectedAttendanceSession, setSelectedAttendanceSession] = useState(null);
-
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'live_sessions'), (snap) => {
-      const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      rows.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
-      setSessions(rows);
-    }, () => setSessions([]));
-
-    return () => unsub();
-  }, []);
-
-  const toggleLive = async (s) => {
-    await updateDoc(doc(db, 'live_sessions', s.id), { isLive: !s.isLive });
-  };
-
-  const remove = async (s) => {
-    if (!window.confirm('حذف المحاضرة؟')) return;
-    await deleteDoc(doc(db, 'live_sessions', s.id));
-  };
-
-  return (
-    <>
-      <div className="space-y-6">
-        <LiveSessionCreator adminGradeFilter={adminGradeFilter} />
-
-        <div className="glass-panel rounded-2xl p-5 border-t-4 border-slate-700">
-          <h2 className="text-2xl font-black text-slate-800 mb-4">إدارة المحاضرات المباشرة</h2>
-
-          <div className="space-y-3">
-            {sessions.map(s => (
-              <div key={s.id} className="bg-white border rounded-2xl p-4 flex flex-col md:flex-row justify-between gap-3">
-                <div>
-                  <h3 className="font-black text-slate-800">{s.title}</h3>
-                  <p className="text-xs text-slate-500">{getGradeLabel(s.grade)} • {s.branch || 'عام'} • {s.platform || 'custom'}</p>
-                  <p className="text-xs text-slate-400 break-all mt-1">{s.streamUrl || s.url}</p>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <button onClick={() => toggleLive(s)} className={`${s.isLive ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'} px-4 py-2 rounded-xl font-bold`}>
-                    {s.isLive ? 'إيقاف' : 'تشغيل'}
-                  </button>
-
-                  <button onClick={() => setSelectedAttendanceSession(s)} className="bg-sky-100 text-sky-700 px-4 py-2 rounded-xl font-bold">
-                    عرض الحضور
-                  </button>
-
-                  <button onClick={() => remove(s)} className="bg-red-100 text-red-700 px-4 py-2 rounded-xl font-bold">
-                    حذف
-                  </button>
-                </div>
-              </div>
-            ))}
-
-            {!sessions.length && (
-              <p className="text-center text-slate-400 py-8 font-bold">لا توجد محاضرات بعد.</p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {selectedAttendanceSession && (
-        <LiveAttendanceModal
-          session={selectedAttendanceSession}
-          onClose={() => setSelectedAttendanceSession(null)}
-        />
-      )}
-    </>
-  );
-};
-
-
-const LiveSessionStudentViewer = ({ session, user, userData, onClose }) => {
-  const [messages, setMessages] = useState([]);
-  const [msg, setMsg] = useState('');
-
-  useEffect(() => {
-    if (!session?.id || !user?.uid) return;
-    setDoc(doc(db, 'live_attendance', `${session.id}_${user.uid}`), {
-      sessionId: session.id,
-      userId: user.uid,
-      userEmail: user?.email || '',
-      studentName: userData?.name || user?.displayName || user?.email || 'طالب',
-      grade: userData?.grade || '',
-      joinedAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    }, { merge: true }).catch(() => {});
-  }, [session?.id, user?.uid]);
-
-  useEffect(() => {
-    if (!session?.id) return;
-    const unsub = onSnapshot(collection(db, 'live_sessions', session.id, 'chat'), (snap) => {
-      const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      rows.sort((a,b)=>(a.createdAt?.seconds||0)-(b.createdAt?.seconds||0));
-      setMessages(rows.slice(-80));
-    }, () => setMessages([]));
-    return () => unsub();
-  }, [session?.id]);
-
-  const sendMsg = async () => {
-    if (!msg.trim()) return;
-    await addDoc(collection(db, 'live_sessions', session.id, 'chat'), {
-      userId: user.uid,
-      studentName: userData?.name || user?.displayName || user?.email || 'طالب',
-      message: msg.trim(),
-      createdAt: serverTimestamp()
-    });
-    setMsg('');
-  };
-
-  const embedUrl = session?.streamUrl || session?.url || '';
-  const isYouTube = embedUrl.includes('youtube.com') || embedUrl.includes('youtu.be');
-  const normalizedUrl = isYouTube ? embedUrl.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/') : embedUrl;
-
-  return (
-    <div className="fixed inset-0 z-[99999] bg-slate-950/95 p-3 md:p-6 overflow-y-auto" dir="rtl">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between text-white mb-4">
-          <div>
-            <h2 className="font-black text-2xl">{session?.title}</h2>
-            <p className="text-sm text-slate-300">{getGradeLabel(session?.grade)} • {session?.branch || 'محاضرة مباشرة'}</p>
-          </div>
-          <button onClick={onClose} className="bg-white/10 hover:bg-white/20 rounded-full p-3"><X/></button>
-        </div>
-
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          <div className="xl:col-span-2 space-y-4">
-            <div className="bg-black rounded-2xl overflow-hidden border border-white/10">
-              <iframe title={session?.title || 'live'} src={normalizedUrl} allow="camera; microphone; fullscreen; display-capture; autoplay" allowFullScreen className="w-full h-[62vh] min-h-[360px]" />
-            </div>
-            <LiveAICoachPanel session={session} user={user} userData={userData} />
-          </div>
-
-          <div className="bg-white rounded-2xl p-4 h-fit max-h-[82vh] flex flex-col">
-            <h3 className="font-black text-slate-800 mb-3">شات المحاضرة</h3>
-            <div className="flex-1 overflow-y-auto space-y-2 bg-slate-50 rounded-xl p-3 min-h-[320px]">
-              {messages.map(m => (
-                <div key={m.id} className="bg-white border rounded-xl p-2">
-                  <p className="text-xs font-black text-sky-700">{m.studentName || 'طالب'}</p>
-                  <p className="text-sm font-bold text-slate-700">{m.message}</p>
-                </div>
-              ))}
-              {!messages.length && <p className="text-center text-slate-400 font-bold mt-10">لا توجد رسائل بعد.</p>}
-            </div>
-            <div className="flex gap-2 mt-3">
-              <input value={msg} onChange={e=>setMsg(e.target.value)} onKeyDown={e=>{ if(e.key === 'Enter') sendMsg(); }} className="flex-1 border rounded-xl p-3" placeholder="اكتب رسالة..." />
-              <button onClick={sendMsg} className="bg-sky-600 text-white px-4 rounded-xl font-black">إرسال</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const LiveSessionsStudentPanel = ({ user, userData }) => {
-  const [sessions, setSessions] = useState([]);
-  const [selected, setSelected] = useState(null);
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'live_sessions'), (snap) => {
-      const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      const grade = userData?.grade || '';
-      const filtered = rows.filter(s => s.isLive !== false && (!s.grade || !grade || s.grade === grade || s.grade === 'all'));
-      filtered.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
-      setSessions(filtered);
-    }, () => setSessions([]));
-    return () => unsub();
-  }, [userData?.grade]);
-
-  return (
-    <div className="glass-panel rounded-2xl p-5 border-t-4 border-sky-600">
-      <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2 mb-4"><Radio className="text-sky-600"/> محاضرات أونلاين Live</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {sessions.map(s => (
-          <div key={s.id} className="bg-white border rounded-2xl p-4">
-            <div className="flex justify-between gap-3 mb-2">
-              <h3 className="font-black text-slate-800">{s.title}</h3>
-              <span className="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full font-black">LIVE</span>
-            </div>
-            <p className="text-xs text-slate-500 mb-3">{getGradeLabel(s.grade)} • {s.branch || 'عام'}</p>
-            <p className="text-sm text-slate-600 mb-3 line-clamp-2">{s.description || s.notes || 'محاضرة مباشرة'}</p>
-            <button onClick={() => setSelected(s)} className="bg-sky-600 text-white w-full py-3 rounded-xl font-black">دخول المحاضرة</button>
-          </div>
-        ))}
-        {!sessions.length && <p className="text-center text-slate-400 font-bold py-10 md:col-span-2">لا توجد محاضرات مباشرة الآن.</p>}
-      </div>
-      {selected && <LiveSessionStudentViewer session={selected} user={user} userData={userData} onClose={() => setSelected(null)} />}
-    </div>
-  );
-};
-
-const AIUsageBadge = ({ user }) => {
-  return (
-    <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-100 text-emerald-700 px-3 py-2 rounded-xl text-xs font-black">
-      <Sparkles size={14}/> استخدام AI: غير محدود
-    </div>
-  );
-};
-
-const AIExamHistoryPanel = ({ user, userData }) => {
-  const [rows, setRows] = useState([]);
-  useEffect(() => {
-    if (!user?.uid) return;
-    const qRef = query(collection(db, 'ai_exam_results'), where('userId', '==', user.uid));
-    const unsub = onSnapshot(qRef, (snap) => {
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      list.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-      setRows(list);
-    }, () => setRows([]));
-    return () => unsub();
-  }, [user?.uid]);
-
-  if (!rows.length) return null;
-
-  return (
-    <div className="glass-panel rounded-2xl p-5 border-t-4 border-fuchsia-600">
-      <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2 mb-4"><History className="text-fuchsia-600"/> سجل امتحانات AI</h2>
-      <div className="space-y-3">
-        {rows.slice(0, 8).map(r => (
-          <div key={r.id} className="bg-white border rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <div>
-              <h3 className="font-black text-slate-800">{r.title || 'امتحان AI'}</h3>
-              <p className="text-xs text-slate-500">{r.topic || r.branch || 'عام'} • {getGradeLabel(r.grade || userData?.grade)}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs text-slate-500 font-bold">النتيجة</p>
-              <p className="text-2xl font-black text-fuchsia-700">{safeNumber(r.score, 0)}/{safeNumber(r.total, 0)} - {safeNumber(r.percentage, 0)}%</p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-const AdminAIUsageAnalytics = ({ users = [] }) => {
-  const [results, setResults] = useState([]);
-  const [usage, setUsage] = useState([]);
-
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'ai_exam_results'), (snap) => {
-      const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      rows.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-      setResults(rows);
-    }, () => setResults([]));
-    return () => unsub();
-  }, []);
-
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'ai_usage'), (snap) => {
-      const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      rows.sort((a,b) => (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0));
-      setUsage(rows);
-    }, () => setUsage([]));
-    return () => unsub();
-  }, []);
-
-  const stats = useMemo(() => {
-    const totalAttempts = results.length;
-    const avg = totalAttempts ? Math.round(results.reduce((s,r)=>s+safeNumber(r.percentage,0),0) / totalAttempts) : 0;
-    const branchMap = {};
-    results.forEach(r => {
-      const key = r.branch || r.topic || 'عام';
-      branchMap[key] = (branchMap[key] || 0) + 1;
-    });
-    const branches = Object.entries(branchMap).sort((a,b)=>b[1]-a[1]).slice(0, 8);
-    const todayUsage = usage.filter(u => String(u.dateKey || '').includes(getTodayKey())).reduce((s,u)=>s+safeNumber(u.count,0),0);
-    return { totalAttempts, avg, branches, todayUsage };
-  }, [results, usage]);
-
-  return (
-    <div className="glass-panel rounded-2xl p-5 border-t-4 border-fuchsia-600">
-      <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2 mb-4"><BarChart3 className="text-fuchsia-600"/> تحليلات AI للأدمن</h2>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        <div className="bg-fuchsia-50 border border-fuchsia-100 rounded-2xl p-4"><p className="text-xs font-bold text-fuchsia-600">امتحانات AI</p><p className="text-3xl font-black text-fuchsia-800">{stats.totalAttempts}</p></div>
-        <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4"><p className="text-xs font-bold text-blue-600">متوسط النتائج</p><p className="text-3xl font-black text-blue-800">{stats.avg}%</p></div>
-        <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4"><p className="text-xs font-bold text-amber-600">استخدام اليوم</p><p className="text-3xl font-black text-amber-800">{stats.todayUsage}</p></div>
-        <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4"><p className="text-xs font-bold text-emerald-600">أكثر فرع مطلوب</p><p className="text-lg font-black text-emerald-800">{stats.branches[0]?.[0] || 'لا يوجد'}</p></div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-white border rounded-2xl p-4">
-          <h3 className="font-black text-slate-800 mb-3">أكثر الفروع طلبًا في AI</h3>
-          <div className="space-y-2">
-            {stats.branches.map(([branch, count]) => (
-              <div key={branch} className="flex justify-between bg-slate-50 rounded-xl p-3 font-bold"><span>{branch}</span><span className="text-fuchsia-700">{count}</span></div>
-            ))}
-            {!stats.branches.length && <p className="text-center text-slate-400 py-5 font-bold">لا توجد بيانات بعد.</p>}
-          </div>
-        </div>
-
-        <div className="bg-white border rounded-2xl p-4">
-          <h3 className="font-black text-slate-800 mb-3">آخر امتحانات AI</h3>
-          <div className="space-y-2 max-h-[360px] overflow-auto">
-            {results.slice(0, 10).map(r => (
-              <div key={r.id} className="bg-slate-50 rounded-xl p-3">
-                <p className="font-black text-slate-800">{r.studentName || 'طالب'} - {r.title || 'امتحان AI'}</p>
-                <p className="text-xs text-slate-500">{r.topic || r.branch || 'عام'} • {safeNumber(r.percentage,0)}%</p>
-              </div>
-            ))}
-            {!results.length && <p className="text-center text-slate-400 py-5 font-bold">لا توجد محاولات بعد.</p>}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-
-const AIInteractiveExamModal = ({ user, userData, onClose }) => {
-  const [topic, setTopic] = useState('');
-  const [branch, setBranch] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [exam, setExam] = useState(null);
-  const [answers, setAnswers] = useState({});
-  const [finished, setFinished] = useState(false);
-
-  const generateExam = async () => {
-    if (!topic.trim() && !branch.trim()) return alert('اكتب أي درس عايز تمتحن فيه، مثل: اسم الفاعل، اسم التفضيل، التشبيه، القراءة المتحررة...');
-    setLoading(true);
-    setFinished(false);
-    setAnswers({});
-    try {
-      const res = await fetch('/api/ai-coach', {
-        method: 'POST',
-        headers: await getAdminAIHeaders(),
-        body: JSON.stringify({
-          mode: 'generate_exam',
-          language: 'ar-EG',
-          lesson: topic.trim() || branch.trim(),
-          topic: topic.trim() || branch.trim(),
-          grade: userData?.grade || '1prep',
-          branches: branch.trim() || topic.trim(),
-          mcqCount: 18,
-          essayCount: 0,
-          duration: 25,
-          difficultyMix: ['easy', 'medium', 'hard', 'very_hard'],
-          instructions: 'استخدم Gemini فقط. أنشئ أسئلة حقيقية عن الدرس الذي كتبه الطالب تحديدًا، ولا تستخدم fallback أو أسئلة عامة.'
-        })
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) throw new Error(data.error || 'تعذر توليد الامتحان الآن.');
-
-      const generatedExam = data.analysis?.exam || data.data?.exam || data.analysis || data.data || {};
-      const rawQuestions = Array.isArray(generatedExam?.questions)
-        ? generatedExam.questions
-        : Array.isArray(data.analysis?.questions)
-          ? data.analysis.questions
-          : Array.isArray(data.data?.questions)
-            ? data.data.questions
-            : [];
-
-      // إصلاح جذري:
-      // الـ AI ممكن يرجع الأسئلة بطريقتين:
-      // 1) blocks فيها subQuestions
-      // 2) questions مباشرة كقائمة أسئلة
-      // الكود القديم كان يتعامل مع الطريقة الأولى فقط، فكان يعرض 0 سؤال رغم إن الـ API رجع أسئلة.
-      let flat = rawQuestions.flatMap((item, bi) => {
-        if (Array.isArray(item?.subQuestions)) {
-          return item.subQuestions.map((q, qi) => ({
-            ...q,
-            id: q.id || `ai_${bi}_${qi}_${Date.now()}`,
-            blockText: item.text || '',
-            branch: q.branch || branch || item.branch || 'عام',
-            type: q.type || 'mcq',
-            options: Array.isArray(q.options) ? q.options.slice(0, 4) : [],
-            correctIdx: safeNumber(q.correctIdx, 0),
-            difficulty: q.difficulty || ['سهل','متوسط','صعب','صعب جدًا'][qi % 4],
-            explanation: q.explanation || 'راجع فكرة السؤال جيدًا.'
-          }));
-        }
-
-        return [{
-          ...item,
-          id: item.id || `ai_${bi}_${Date.now()}`,
-          blockText: item.blockText || '',
-          branch: item.branch || branch || 'عام',
-          type: item.type || 'mcq',
-          options: Array.isArray(item.options) ? item.options.slice(0, 4) : [],
-          correctIdx: safeNumber(item.correctIdx, 0),
-          difficulty: item.difficulty || ['سهل','متوسط','صعب','صعب جدًا'][bi % 4],
-          explanation: item.explanation || 'راجع فكرة السؤال جيدًا.'
-        }];
-      }).filter(q => {
-        const questionText = String(q?.text || '').trim();
-        const options = Array.isArray(q?.options) ? q.options.map(o => String(o || '').trim()) : [];
-        const badOption = options.some(o => /^اختيار\s*(أ|ب|ج|د|1|2|3|4)?$/i.test(o) || /^اختبار\s*(أ|ب|ج|د|1|2|3|4)?$/i.test(o));
-        const uniqueOptions = new Set(options.filter(Boolean)).size;
-        const isPlaceholderQuestion = /^سؤال\s+تدريبي\s+\d+/i.test(questionText);
-        return questionText && options.length >= 4 && uniqueOptions >= 4 && !badOption && !isPlaceholderQuestion;
-      });
-
-      if (flat.length === 0) {
-        throw new Error('AI رجّع الامتحان بدون أسئلة صالحة. جرّب فرع أو موضوع أوضح.');
-      }
-
-      setExam({
-        id: `ai_exam_${Date.now()}`,
-        title: generatedExam?.title || `امتحان AI - ${topic || branch}`,
-        topic: topic || branch,
-        branch: branch || topic,
-        grade: userData?.grade || '',
-        questions: flat.slice(0, 20)
-      });
-    } catch (error) {
-      console.error('AI interactive exam error:', error);
-      alert(error.message || 'تعذر توليد الامتحان.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const chooseAnswer = (q, idx) => {
-    if (finished) return;
-    setAnswers(prev => ({ ...prev, [q.id]: idx }));
-  };
-
-  const score = useMemo(() => {
-    if (!exam?.questions?.length) return { correct: 0, total: 0, pct: 0 };
-    const correct = exam.questions.reduce((sum, q) => sum + (answers[q.id] === q.correctIdx ? 1 : 0), 0);
-    const total = exam.questions.length;
-    return { correct, total, pct: total ? Math.round((correct / total) * 100) : 0 };
-  }, [exam, answers]);
-
-  return (
-    <div className="fixed inset-0 z-[100000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3" dir="rtl">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-6xl max-h-[94vh] overflow-y-auto border-t-8 border-fuchsia-600">
-        <div className="bg-slate-900 text-white p-4 flex items-center justify-between sticky top-0 z-20">
-          <div>
-            <h2 className="font-black text-xl md:text-2xl flex items-center gap-2"><Sparkles className="text-fuchsia-400"/> امتحان AI تفاعلي</h2>
-            <p className="text-xs text-slate-300 mt-1">امتحان مخصص حسب مرحلتك: {getGradeLabel(userData?.grade)}</p>
-            <div className="mt-2"><AIUsageBadge user={user} /></div>
-          </div>
-          <button onClick={onClose} className="bg-white/10 hover:bg-white/20 rounded-full p-2"><X size={22}/></button>
-        </div>
-
-        <div className="p-4 md:p-6">
-          {!exam && (
-            <div className="bg-fuchsia-50 border border-fuchsia-100 rounded-3xl p-5 mb-5">
-              <h3 className="font-black text-slate-800 mb-3">اكتب عايز تمتحن في إيه</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <input className="border rounded-xl p-3 md:col-span-2" placeholder="مثال: النحو - البلاغة - القراءة - الاستعارة..." value={topic} onChange={e=>setTopic(e.target.value)} />
-                <input className="border rounded-xl p-3" placeholder="فرع معين اختياري" value={branch} onChange={e=>setBranch(e.target.value)} />
-              </div>
-              <div className="mt-3"><AIQuickHealthCheck /></div>
-              <button disabled={loading} onClick={generateExam} className="mt-4 bg-fuchsia-600 text-white px-6 py-3 rounded-xl font-black hover:bg-fuchsia-700 disabled:opacity-50">
-                {loading ? 'AI بيجهز الامتحان...' : 'توليد امتحان 15 - 20 سؤال'}
-              </button>
-            </div>
-          )}
-
-          {exam && (
-            <div>
-              <div className="flex flex-col md:flex-row justify-between md:items-center gap-3 mb-5 bg-slate-50 border rounded-2xl p-4">
-                <div>
-                  <h3 className="font-black text-slate-800 text-xl">{exam.title}</h3>
-                  <p className="text-sm text-slate-500">{exam.questions.length} سؤال • مستويات متعددة</p>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => { setExam(null); setAnswers({}); setFinished(false); }} className="bg-slate-200 text-slate-700 px-4 py-2 rounded-xl font-bold">امتحان جديد</button>
-                  <button onClick={async () => {
-                    setFinished(true);
-                    try {
-                      if (exam?.questions?.length) {
-                        await addDoc(collection(db, 'ai_exam_results'), {
-                          userId: user.uid,
-                          studentName: userData?.name || user?.displayName || user?.email || 'طالب',
-                          grade: userData?.grade || '',
-                          title: exam.title,
-                          topic: exam.topic || '',
-                          branch: exam.branch || '',
-                          score: score.correct,
-                          total: score.total,
-                          percentage: score.pct,
-                          answers,
-                          createdAt: serverTimestamp()
-                        });
-                      }
-                    } catch (e) {
-                      console.warn('save ai exam result failed:', e?.message);
-                    }
-                  }} className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-black">إنهاء وحفظ النتيجة</button>
-                </div>
-              </div>
-
-              {finished && (
-                <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 mb-5 text-center">
-                  <p className="text-sm font-bold text-emerald-700">نتيجتك</p>
-                  <p className="text-4xl font-black text-emerald-800">{score.correct}/{score.total} - {score.pct}%</p>
-                </div>
-              )}
-
-              <div className="space-y-4">
-                {exam.questions.map((q, i) => {
-                  const chosen = answers[q.id];
-                  const answered = chosen !== undefined;
-                  const isCorrect = answered && chosen === q.correctIdx;
-                  return (
-                    <div key={q.id} className="border rounded-2xl p-4 bg-white">
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        <span className="bg-slate-100 text-slate-700 px-2 py-1 rounded-full text-xs font-bold">سؤال {i+1}</span>
-                        <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-bold">{q.branch}</span>
-                        <span className="bg-fuchsia-100 text-fuchsia-700 px-2 py-1 rounded-full text-xs font-bold">{q.difficulty}</span>
-                      </div>
-                      {q.blockText && <div className="bg-slate-50 border rounded-xl p-3 mb-3 font-bold leading-loose">{renderBracketHighlightedText(q.blockText)}</div>}
-                      <h4 className="font-black text-slate-900 text-lg mb-3 leading-relaxed">{renderBracketHighlightedText(q.text)}</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {q.options.map((opt, idx) => {
-                          const selected = chosen === idx;
-                          const correct = q.correctIdx === idx;
-                          const show = answered || finished;
-                          return (
-                            <button key={idx} onClick={() => chooseAnswer(q, idx)} className={`text-right border rounded-xl p-3 font-bold transition ${
-                              show && correct ? 'bg-emerald-50 border-emerald-300 text-emerald-800' :
-                              show && selected && !correct ? 'bg-red-50 border-red-300 text-red-800' :
-                              selected ? 'bg-fuchsia-50 border-fuchsia-300 text-fuchsia-800' : 'bg-white hover:bg-slate-50'
-                            }`}>
-                              {idx+1}. {opt}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      {answered && (
-                        <div className={`mt-3 rounded-xl p-3 text-sm font-bold ${isCorrect ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'}`}>
-                          {isCorrect ? 'إجابة صحيحة ✅' : `إجابة غير صحيحة ❌ — التصويب: ${q.options[q.correctIdx]}`}
-                          <p className="mt-2 text-slate-700">شرح الفكرة: {q.explanation}</p>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const PaymentRequestStudentPanel = ({ user, userData }) => {
   const [method, setMethod] = useState('vodafone_cash');
@@ -2566,8 +1471,8 @@ const PaymentRequestStudentPanel = ({ user, userData }) => {
   }, [user?.uid]);
 
   const submitRequest = async () => {
-    if (!transactionRef.trim()) return alert('اكتب رقم العملية أو آخر 4 أرقام.');
-    if (!amount || safeNumber(amount, 0) <= 0) return alert('اكتب المبلغ المدفوع.');
+    if (!transactionRef.trim()) return platformNotify('اكتب رقم العملية أو آخر 4 أرقام.');
+    if (!amount || safeNumber(amount, 0) <= 0) return platformNotify('اكتب المبلغ المدفوع.');
 
     setLoading(true);
     try {
@@ -2590,10 +1495,10 @@ const PaymentRequestStudentPanel = ({ user, userData }) => {
       setAmount('');
       setTransactionRef('');
       setNote('');
-      alert('تم إرسال طلب التفعيل للإدارة. سيتم المراجعة قريبًا.');
+      platformNotify('تم إرسال طلب التفعيل للإدارة. سيتم المراجعة قريبًا.');
     } catch (error) {
       console.error('payment request error:', error);
-      alert('تعذر إرسال طلب الدفع. راجع الاتصال أو الصلاحيات.');
+      platformNotify('تعذر إرسال طلب الدفع. راجع الاتصال أو الصلاحيات.');
     } finally {
       setLoading(false);
     }
@@ -2670,7 +1575,7 @@ const AdminPaymentRequestsPanel = ({ users = [] }) => {
   }, []);
 
   const approveRequest = async (req) => {
-    if (!window.confirm(`تفعيل اشتراك ${req.studentName} لمدة ${req.durationDays || 30} يوم؟`)) return;
+    if (!platformConfirm(`تفعيل اشتراك ${req.studentName} لمدة ${req.durationDays || 30} يوم؟`)) return;
 
     try {
       const expiresAt = new Date();
@@ -2697,15 +1602,15 @@ const AdminPaymentRequestsPanel = ({ users = [] }) => {
       }, { merge: true });
 
       await batch.commit();
-      alert('تم تفعيل الاشتراك بنجاح.');
+      platformNotify('تم تفعيل الاشتراك بنجاح.');
     } catch (error) {
       console.error('approve payment request error:', error);
-      alert('تعذر تفعيل الاشتراك. راجع الصلاحيات.');
+      platformNotify('تعذر تفعيل الاشتراك. راجع الصلاحيات.');
     }
   };
 
   const rejectRequest = async (req) => {
-    const reason = window.prompt('سبب الرفض؟', 'بيانات الدفع غير واضحة');
+    const reason = platformPrompt('سبب الرفض؟', 'بيانات الدفع غير واضحة');
     if (reason === null) return;
     await updateDoc(doc(db, 'payment_requests', req.id), {
       status: 'rejected',
@@ -2830,862 +1735,14 @@ const AppConversionGuidePanel = () => (
 );
 
 
-const AIQuestionGeneratorPanel = ({ userData = null, onAddQuestions = null }) => {
-  const [topic, setTopic] = useState('');
-  const [branch, setBranch] = useState('نحو');
-  const [grade, setGrade] = useState(userData?.grade || '3sec');
-  const [count, setCount] = useState(5);
-  const [difficulty, setDifficulty] = useState('medium');
-  const [loading, setLoading] = useState(false);
-  const [generated, setGenerated] = useState([]);
 
-  const generateQuestions = async () => {
-    if (!topic.trim()) return alert('اكتب موضوع أو درس الأسئلة.');
-    setLoading(true);
-    try {
-      const res = await fetch('/api/ai-coach', {
-        method: 'POST',
-        headers: await getAdminAIHeaders(),
-        body: JSON.stringify({
-          mode: 'generate_questions',
-          language: 'ar-EG',
-          topic,
-          branch,
-          grade,
-          count: safeNumber(count, 5),
-          difficulty
-        })
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error || 'تعذر توليد الأسئلة.');
-      const questions = Array.isArray(data.analysis?.questions)
-        ? data.analysis.questions
-        : Array.isArray(data.data?.questions)
-          ? data.data.questions
-          : Array.isArray(data.analysis?.exam?.questions)
-            ? data.analysis.exam.questions
-            : Array.isArray(data.data?.exam?.questions)
-              ? data.data.exam.questions
-              : [];
-      setGenerated(questions.map((q, idx) => ({
-        id: `ai_${Date.now()}_${idx}`,
-        text: q.text || '',
-        type: q.type || 'mcq',
-        branch: q.branch || branch,
-        options: q.options || ['أ', 'ب', 'ج', 'د'],
-        correctIdx: safeNumber(q.correctIdx, 0),
-        explanation: q.explanation || '',
-        maxScore: safeNumber(q.maxScore, 1),
-        tags: q.tags || []
-      })));
-    } catch (error) {
-      console.error('AI generate questions error:', error);
-      alert(error.message || 'تعذر توليد الأسئلة.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const copyJSON = async () => {
-    await navigator.clipboard?.writeText(JSON.stringify(generated, null, 2));
-    alert('تم نسخ الأسئلة بصيغة JSON.');
-  };
 
-  return (
-    <div className="glass-panel rounded-2xl p-5 border-t-4 border-cyan-600">
-      <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2 mb-4"><Wand2 className="text-cyan-600"/> AI مولد الأسئلة</h2>
-      <div className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-4">
-        <input className="border rounded-xl p-3 md:col-span-2" placeholder="اكتب الدرس أو الموضوع..." value={topic} onChange={e=>setTopic(e.target.value)} />
-        <input className="border rounded-xl p-3" placeholder="الفرع" value={branch} onChange={e=>setBranch(e.target.value)} />
-        <select className="border rounded-xl p-3" value={grade} onChange={e=>setGrade(e.target.value)}><GradeOptions/></select>
-        <select className="border rounded-xl p-3" value={difficulty} onChange={e=>setDifficulty(e.target.value)}>
-          <option value="easy">سهل</option>
-          <option value="medium">متوسط</option>
-          <option value="hard">صعب</option>
-        </select>
-        <input type="number" min="1" max="20" className="border rounded-xl p-3" value={count} onChange={e=>setCount(e.target.value)} />
-      </div>
-      <button disabled={loading} onClick={generateQuestions} className="bg-cyan-600 text-white px-6 py-3 rounded-xl font-black hover:bg-cyan-700 disabled:opacity-50">
-        {loading ? 'جاري التوليد...' : 'توليد الأسئلة'}
-      </button>
 
-      {generated.length > 0 && (
-        <div className="mt-5 space-y-3">
-          <div className="flex flex-wrap gap-2">
-            <button onClick={copyJSON} className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl font-bold">نسخ JSON</button>
-            {onAddQuestions && <button onClick={() => onAddQuestions(generated)} className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold">إضافة للامتحان الحالي</button>}
-          </div>
-          {generated.map((q, idx) => (
-            <div key={q.id} className="bg-white border rounded-2xl p-4">
-              <div className="flex gap-2 mb-2">
-                <span className="bg-cyan-100 text-cyan-700 text-xs px-2 py-1 rounded-full font-bold">سؤال {idx+1}</span>
-                <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full font-bold">{q.branch}</span>
-              </div>
-              <p className="font-black text-slate-800 mb-3">{q.text}</p>
-              {q.type !== 'essay' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {q.options.map((opt, i) => (
-                    <div key={i} className={`border rounded-xl p-2 text-sm font-bold ${i === q.correctIdx ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50'}`}>
-                      {i+1}. {opt}
-                    </div>
-                  ))}
-                </div>
-              )}
-              {q.explanation && <p className="text-xs text-slate-500 mt-3">الشرح: {q.explanation}</p>}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
 
-const AIEssayCorrectorBox = ({ exam, question, answer, studentName = '' }) => {
-  const [loading, setLoading] = useState(false);
-  const [correction, setCorrection] = useState(null);
 
-  const runCorrection = async () => {
-    const answerText = typeof answer === 'object' ? answer?.text : answer;
-    if (!answerText || !String(answerText).trim()) return alert('لا توجد إجابة نصية لتصحيحها.');
-    setLoading(true);
-    try {
-      const res = await fetch('/api/ai-coach', {
-        method: 'POST',
-        headers: await getAdminAIHeaders(),
-        body: JSON.stringify({
-          mode: 'essay_correct',
-          language: 'ar-EG',
-          examTitle: exam?.title || '',
-          studentName,
-          question: {
-            text: question?.text || '',
-            branch: question?.branch || '',
-            modelAnswer: question?.modelAnswer || question?.answer || question?.explanation || '',
-            maxScore: getQuestionMaxScore(question)
-          },
-          studentAnswer: answerText
-        })
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error || 'تعذر تصحيح المقالي.');
-      setCorrection(data.analysis || data.data || null);
-    } catch (error) {
-      console.error('AI essay correction error:', error);
-      alert(error.message || 'تعذر تصحيح المقالي.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  return (
-    <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div>
-          <h4 className="font-black text-purple-800 flex items-center gap-2"><PenTool size={18}/> تصحيح AI للمقالي</h4>
-          <p className="text-xs text-purple-600">اقتراح درجة وملاحظات، والقرار النهائي يظل للأدمن.</p>
-        </div>
-        <button disabled={loading} onClick={runCorrection} className="bg-purple-600 text-white px-4 py-2 rounded-xl font-bold disabled:opacity-50">
-          {loading ? 'جاري التصحيح...' : 'تصحيح AI'}
-        </button>
-      </div>
 
-      {correction && (
-        <div className="mt-3 bg-white border rounded-xl p-3 space-y-2">
-          <p className="font-black text-slate-800">الدرجة المقترحة: <span className="text-purple-700">{correction.suggestedScore ?? '-'}</span> / {getQuestionMaxScore(question)}</p>
-          {correction.feedback && <p className="text-sm text-slate-700"><b>ملاحظات:</b> {correction.feedback}</p>}
-          {Array.isArray(correction.strengths) && correction.strengths.length > 0 && <p className="text-sm text-emerald-700"><b>نقاط قوة:</b> {correction.strengths.join('، ')}</p>}
-          {Array.isArray(correction.improvements) && correction.improvements.length > 0 && <p className="text-sm text-amber-700"><b>يحتاج تحسين:</b> {correction.improvements.join('، ')}</p>}
-        </div>
-      )}
-    </div>
-  );
-};
-
-const AIExamBuilderPanel = ({ userData = null }) => {
-  const [topic, setTopic] = useState('');
-  const [grade, setGrade] = useState(userData?.grade || '3sec');
-  const [branches, setBranches] = useState('نحو، قراءة، بلاغة');
-  const [mcqCount, setMcqCount] = useState(10);
-  const [essayCount, setEssayCount] = useState(2);
-  const [duration, setDuration] = useState(30);
-  const [loading, setLoading] = useState(false);
-  const [examDraft, setExamDraft] = useState(null);
-
-  const buildExam = async () => {
-    if (!topic.trim()) return alert('اكتب موضوع الامتحان.');
-    setLoading(true);
-    try {
-      const res = await fetch('/api/ai-coach', {
-        method: 'POST',
-        headers: await getAdminAIHeaders(),
-        body: JSON.stringify({
-          mode: 'generate_exam',
-          language: 'ar-EG',
-          topic,
-          grade,
-          branches,
-          mcqCount: safeNumber(mcqCount, 10),
-          essayCount: safeNumber(essayCount, 2),
-          duration: safeNumber(duration, 30)
-        })
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error || 'تعذر بناء الامتحان.');
-      setExamDraft(data.analysis?.exam || data.analysis);
-    } catch (error) {
-      console.error('AI exam builder error:', error);
-      alert(error.message || 'تعذر بناء الامتحان.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const copyExamJSON = async () => {
-    await navigator.clipboard?.writeText(JSON.stringify(examDraft, null, 2));
-    alert('تم نسخ الامتحان.');
-  };
-
-  return (
-    <div className="glass-panel rounded-2xl p-5 border-t-4 border-rose-600">
-      <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2 mb-4"><ClipboardList className="text-rose-600"/> AI بناء امتحان كامل</h2>
-      <div className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-4">
-        <input className="border rounded-xl p-3 md:col-span-2" placeholder="موضوع الامتحان..." value={topic} onChange={e=>setTopic(e.target.value)} />
-        <select className="border rounded-xl p-3" value={grade} onChange={e=>setGrade(e.target.value)}><GradeOptions/></select>
-        <input className="border rounded-xl p-3" placeholder="الفروع" value={branches} onChange={e=>setBranches(e.target.value)} />
-        <input type="number" className="border rounded-xl p-3" placeholder="اختياري" value={mcqCount} onChange={e=>setMcqCount(e.target.value)} />
-        <input type="number" className="border rounded-xl p-3" placeholder="مقالي" value={essayCount} onChange={e=>setEssayCount(e.target.value)} />
-      </div>
-      <div className="flex flex-wrap gap-3">
-        <input type="number" className="border rounded-xl p-3 w-40" placeholder="المدة" value={duration} onChange={e=>setDuration(e.target.value)} />
-        <button disabled={loading} onClick={buildExam} className="bg-rose-600 text-white px-6 py-3 rounded-xl font-black hover:bg-rose-700 disabled:opacity-50">{loading ? 'جاري البناء...' : 'بناء الامتحان'}</button>
-      </div>
-
-      {examDraft && (
-        <div className="mt-5 bg-white border rounded-2xl p-4">
-          <div className="flex justify-between items-center gap-3 mb-3">
-            <h3 className="font-black text-slate-800">{examDraft.title || 'امتحان AI'}</h3>
-            <button onClick={copyExamJSON} className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl font-bold">نسخ JSON</button>
-          </div>
-          <pre className="bg-slate-900 text-slate-100 rounded-xl p-4 text-xs overflow-auto max-h-[420px]" dir="ltr">{JSON.stringify(examDraft, null, 2)}</pre>
-        </div>
-      )}
-    </div>
-  );
-};
-
-const AIStudentChatCoach = ({ user, userData, examResults = [] }) => {
-  const [messages, setMessages] = useState([
-    { role: 'assistant', text: 'أهلًا 👋 أنا المدرب الذكي. اسألني عن أي سؤال أو خطة مذاكرة أو سبب ضعفك في فرع معين.' }
-  ]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const send = async () => {
-    if (!input.trim()) return;
-    const nextMessages = [...messages, { role: 'user', text: input.trim() }];
-    setMessages(nextMessages);
-    setInput('');
-    setLoading(true);
-    try {
-      const res = await fetch('/api/ai-coach', {
-        method: 'POST',
-        headers: await getAdminAIHeaders(),
-        body: JSON.stringify({
-          mode: 'student_chat',
-          language: 'ar-EG',
-          studentName: userData?.name || user?.displayName || '',
-          grade: userData?.grade || '',
-          question: input.trim(),
-          chatHistory: nextMessages.slice(-8),
-          recentResults: (examResults || []).slice(0, 5).map(r => ({
-            examTitle: r.examTitle,
-            percentage: getResultPercentage(r),
-            branchAnalysis: r.branchAnalysis || r.branchStats || {}
-          }))
-        })
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error || 'تعذر رد AI.');
-      const answer = data.analysis?.answer || data.analysis?.summary || data.analysis?.explanation || 'تم.';
-      setMessages(prev => [...prev, { role: 'assistant', text: answer }]);
-    } catch (error) {
-      setMessages(prev => [...prev, { role: 'assistant', text: 'تعذر تشغيل المدرب الذكي الآن. جرّب بعد قليل.' }]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="glass-panel rounded-2xl p-5 border-t-4 border-sky-600">
-      <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2 mb-4"><Bot className="text-sky-600"/> شات المدرب الذكي</h2>
-      <div className="bg-slate-50 border rounded-2xl p-4 max-h-[460px] overflow-y-auto space-y-3 mb-3">
-        {messages.map((m, idx) => (
-          <div key={idx} className={`flex ${m.role === 'user' ? 'justify-start' : 'justify-end'}`}>
-            <div className={`max-w-[85%] rounded-2xl p-3 text-sm font-bold ${m.role === 'user' ? 'bg-white border text-slate-800' : 'bg-sky-600 text-white'}`}>
-              {m.text}
-            </div>
-          </div>
-        ))}
-        {loading && <p className="text-center text-slate-400 font-bold">AI يكتب الآن...</p>}
-      </div>
-      <div className="flex flex-col md:flex-row gap-2">
-        <input className="flex-1 border rounded-xl p-3" placeholder="اسأل المدرب الذكي..." value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{ if(e.key === 'Enter') send(); }} />
-        <button onClick={send} className="bg-sky-600 text-white px-6 py-3 rounded-xl font-black">إرسال</button>
-      </div>
-    </div>
-  );
-};
-
-
-const RealAIBox = ({ title = 'AI الحقيقي', payload = {}, compact = false }) => {
-  const [loadingAI, setLoadingAI] = useState(false);
-  const [aiResult, setAiResult] = useState(null);
-  const [aiError, setAiError] = useState('');
-
-  const askAI = async () => {
-    setLoadingAI(true);
-    setAiError('');
-    try {
-      const res = await fetch('/api/ai-coach', {
-        method: 'POST',
-        headers: await getAdminAIHeaders(),
-        body: JSON.stringify(payload)
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || 'AI غير متصل حاليًا. تأكد من وجود فولدر api في جذر المشروع ومن مفاتيح OPENAI_API_KEY أو GEMINI_API_KEY في Vercel ثم اعمل Redeploy.');
-      }
-
-      setAiResult(data.analysis || data.data || null);
-    } catch (error) {
-      console.error('Real AI error:', error);
-      setAiError(error.message || 'حدث خطأ أثناء تشغيل AI.');
-      pushDebugLog('ai-error', error.message || 'AI Error', { stack: error.stack });
-    } finally {
-      setLoadingAI(false);
-    }
-  };
-
-  return (
-    <div className={`${compact ? 'bg-white border' : 'glass-panel border'} rounded-2xl p-4 md:p-5 border-fuchsia-200`}>
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
-        <div>
-          <h3 className="font-black text-xl text-slate-800 flex items-center gap-2">
-            <Sparkles className="text-fuchsia-600"/> {title}
-          </h3>
-          <p className="text-xs text-slate-500 mt-1">شرح ذكي، سبب الخطأ، وخطة مذاكرة مخصصة من AI</p>
-          <div className="mt-2"><AIQuickHealthCheck /></div>
-        </div>
-        <button
-          onClick={askAI}
-          disabled={loadingAI}
-          className="bg-fuchsia-600 text-white px-5 py-3 rounded-xl font-black hover:bg-fuchsia-700 disabled:opacity-50"
-        >
-          {loadingAI ? 'جاري التحليل...' : 'تشغيل AI'}
-        </button>
-      </div>
-
-      {aiError && (
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm font-bold mb-3">
-          {aiError}
-        </div>
-      )}
-
-      {aiResult && (
-        <div className="space-y-3">
-          {aiResult.summary && (
-            <div className="bg-fuchsia-50 border border-fuchsia-100 rounded-xl p-3">
-              <p className="text-xs font-bold text-fuchsia-600 mb-1">ملخص ذكي</p>
-              <p className="font-bold text-slate-800 leading-relaxed">{aiResult.summary}</p>
-            </div>
-          )}
-
-          {aiResult.answer && (
-            <div className="bg-sky-50 border border-sky-100 rounded-xl p-3">
-              <p className="text-xs font-bold text-sky-600 mb-1">إجابة AI</p>
-              <p className="font-bold text-slate-800 leading-relaxed whitespace-pre-wrap">{aiResult.answer}</p>
-            </div>
-          )}
-
-          {aiResult.explanation && (
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
-              <p className="text-xs font-bold text-blue-600 mb-1">شرح السؤال / الفكرة</p>
-              <p className="font-bold text-slate-800 leading-relaxed whitespace-pre-wrap">{aiResult.explanation}</p>
-            </div>
-          )}
-
-          {aiResult.mistakeReason && (
-            <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
-              <p className="text-xs font-bold text-amber-600 mb-1">سبب الخطأ المحتمل</p>
-              <p className="font-bold text-slate-800 leading-relaxed whitespace-pre-wrap">{aiResult.mistakeReason}</p>
-            </div>
-          )}
-
-          {Array.isArray(aiResult.studyPlan) && aiResult.studyPlan.length > 0 && (
-            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
-              <p className="text-xs font-bold text-emerald-600 mb-2">خطة مذاكرة</p>
-              <ol className="list-decimal list-inside space-y-1 text-sm font-bold text-slate-800">
-                {aiResult.studyPlan.map((step, idx) => <li key={idx}>{step}</li>)}
-              </ol>
-            </div>
-          )}
-
-          {Array.isArray(aiResult.quickExercises) && aiResult.quickExercises.length > 0 && (
-            <div className="bg-slate-50 border rounded-xl p-3">
-              <p className="text-xs font-bold text-slate-600 mb-2">تدريبات سريعة مقترحة</p>
-              <ul className="list-disc list-inside space-y-1 text-sm font-bold text-slate-700">
-                {aiResult.quickExercises.map((item, idx) => <li key={idx}>{item}</li>)}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
-const buildQuestionAIPayload = ({ exam, question, answers, user, result = null }) => {
-  const studentAnswer = answers?.[question?.id];
-  const isEssay = question?.type === 'essay';
-  const correctAnswer = !isEssay && Array.isArray(question?.options) ? question.options[question.correctIdx] : (question?.modelAnswer || question?.answer || '');
-  const chosenAnswer = !isEssay && Array.isArray(question?.options) ? question.options[studentAnswer] : (typeof studentAnswer === 'object' ? studentAnswer?.text : studentAnswer);
-
-  return {
-    mode: 'question_explain',
-    language: 'ar-EG',
-    examTitle: exam?.title || '',
-    studentName: user?.displayName || '',
-    grade: exam?.grade || '',
-    questionText: question?.text || '',
-    branch: question?.branch || '',
-    studentAnswer: chosenAnswer || 'لم يجب',
-    correctAnswer: correctAnswer || '',
-    isCorrect: !isEssay ? studentAnswer === question?.correctIdx : null,
-    question: {
-      text: question?.text || '',
-      branch: question?.branch || '',
-      type: question?.type || 'mcq',
-      options: question?.options || [],
-      correctAnswer,
-      chosenAnswer,
-      explanation: question?.explanation || '',
-      blockText: question?.blockText || ''
-    },
-    resultSummary: result ? {
-      score: result.score,
-      total: result.total,
-      percentage: getResultPercentage(result)
-    } : null
-  };
-};
-
-const buildExamAIPayload = ({ exam, answers, metrics, user }) => {
-  const questions = extractAllQuestions(exam).slice(0, 80).map(q => {
-    const ans = answers?.[q.id];
-    return {
-      text: q.text,
-      branch: q.branch,
-      type: q.type || 'mcq',
-      options: q.options || [],
-      correctAnswer: q.type !== 'essay' && Array.isArray(q.options) ? q.options[q.correctIdx] : (q.modelAnswer || ''),
-      chosenAnswer: q.type !== 'essay' && Array.isArray(q.options) ? q.options[ans] : (typeof ans === 'object' ? ans?.text : ans),
-      isCorrect: q.type !== 'essay' ? ans === q.correctIdx : null
-    };
-  });
-
-  const wrongQuestions = questions.filter(q => q.isCorrect === false).slice(0, 25);
-  const weakBranches = Object.entries(metrics?.branchStats || {})
-    .map(([branch, data]) => ({
-      branch,
-      percentage: data?.possible > 0 ? Math.round((safeNumber(data?.earned, 0) / safeNumber(data?.possible, 1)) * 100) : 0,
-      wrong: safeNumber(data?.wrong, 0),
-      correct: safeNumber(data?.correct, 0)
-    }))
-    .sort((a, b) => a.percentage - b.percentage);
-
-  return {
-    mode: 'exam_review',
-    language: 'ar-EG',
-    examTitle: exam?.title || '',
-    studentName: user?.displayName || '',
-    grade: exam?.grade || '',
-    question: `حلل نتيجة الطالب بعد امتحان ${exam?.title || ''}. ركز على الأسئلة الخطأ، سبب الخطأ، وخطة مذاكرة مخصصة.`,
-    metrics: {
-      percentage: metrics?.percentage,
-      totalScore: metrics?.totalScore,
-      totalPossible: metrics?.totalPossible,
-      branchStats: metrics?.branchStats || {}
-    },
-    questions,
-    wrongQuestions,
-    weakBranches
-  };
-};
-
-
-const AdvancedAIStudentCoach = ({ userResults = [], exams = [], content = [], userData = null }) => {
-  userResults = Array.isArray(userResults) ? userResults : [];
-  exams = Array.isArray(exams) ? exams : [];
-  content = Array.isArray(content) ? content : [];
-
-  const analysis = useMemo(() => {
-    const completed = userResults
-      .filter(r => r.status === 'completed')
-      .sort((a, b) => (b.submittedAt?.seconds || 0) - (a.submittedAt?.seconds || 0));
-
-    const branchMap = {};
-    const tagMap = {};
-    const questionMistakes = [];
-    const timeline = completed.slice(0, 8).reverse().map(r => ({
-      title: r.examTitle || 'امتحان',
-      pct: getResultPercentage(r)
-    }));
-
-    completed.forEach(result => {
-      const exam = exams.find(e => e.id === result.examId);
-      const questions = exam ? extractAllQuestions(exam) : [];
-
-      const branchRows = Array.isArray(result.branchAnalysis)
-        ? result.branchAnalysis
-        : Object.entries(result.branchStats || {}).map(([branch, data]) => ({
-            branch,
-            percentage: data.possible > 0 ? Math.round((safeNumber(data.earned, 0) / safeNumber(data.possible, 1)) * 100) : 0,
-            wrong: safeNumber(data.wrong, 0),
-            correct: safeNumber(data.correct, 0)
-          }));
-
-      branchRows.forEach(row => {
-        const branch = row.branch || 'عام';
-        branchMap[branch] = branchMap[branch] || { branch, totalPct: 0, count: 0, wrong: 0, correct: 0 };
-        branchMap[branch].totalPct += safeNumber(row.percentage, 0);
-        branchMap[branch].count += 1;
-        branchMap[branch].wrong += safeNumber(row.wrong, 0);
-        branchMap[branch].correct += safeNumber(row.correct, 0);
-      });
-
-      questions.forEach(q => {
-        if (q.type === 'essay') return;
-        const ans = result.answers?.[q.id];
-        if (ans === undefined || ans === null || ans === '') return;
-        if (ans !== q.correctIdx) {
-          const tags = Array.isArray(q.tags) && q.tags.length
-            ? q.tags
-            : [q.skill, q.lesson, q.topic, q.branch].filter(Boolean);
-
-          tags.forEach(tag => {
-            const key = String(tag || '').trim();
-            if (!key) return;
-            tagMap[key] = tagMap[key] || { tag: key, wrong: 0, branch: q.branch || 'عام', examples: [] };
-            tagMap[key].wrong += 1;
-            if (tagMap[key].examples.length < 3) {
-              tagMap[key].examples.push(q.text || 'سؤال');
-            }
-          });
-
-          questionMistakes.push({
-            examTitle: result.examTitle || exam?.title || 'امتحان',
-            branch: q.branch || 'عام',
-            text: q.text || '',
-            correct: Array.isArray(q.options) ? q.options[q.correctIdx] : '',
-            chosen: Array.isArray(q.options) ? q.options[ans] : '',
-            tags
-          });
-        }
-      });
-    });
-
-    const branches = Object.values(branchMap)
-      .map(b => ({ ...b, avg: b.count ? Math.round(b.totalPct / b.count) : 0 }))
-      .sort((a, b) => a.avg - b.avg);
-
-    const tags = Object.values(tagMap).sort((a, b) => b.wrong - a.wrong);
-
-    const latest = completed[0];
-    const latestPct = latest ? getResultPercentage(latest) : 0;
-    const previous = completed[1] ? getResultPercentage(completed[1]) : null;
-    const trendDirection = previous === null ? 'unknown' : latestPct > previous ? 'up' : latestPct < previous ? 'down' : 'same';
-
-    const recommendations = [];
-
-    branches.slice(0, 3).forEach(b => {
-      const relatedVideo = content.find(c =>
-        (c.type === 'video' || c.videoSection) &&
-        ((c.branch || '').includes(b.branch) || (c.title || '').includes(b.branch))
-      );
-
-      const relatedExam = exams.find(e =>
-        e.grade === userData?.grade &&
-        ((e.title || '').includes(b.branch))
-      );
-
-      recommendations.push({
-        level: b.avg < 50 ? 'عاجل' : b.avg < 70 ? 'مهم' : 'متابعة',
-        title: `خطة علاج فرع ${b.branch}`,
-        reason: `متوسطك في هذا الفرع ${b.avg}% مع ${b.wrong} أخطاء تقريبًا.`,
-        steps: [
-          'راجع القاعدة الأساسية للفرع لمدة 15 دقيقة.',
-          relatedVideo ? `شاهد فيديو: ${relatedVideo.title}` : 'شاهد شرحًا قصيرًا لهذا الفرع.',
-          relatedExam ? `حل امتحان تدريبي: ${relatedExam.title}` : 'حل 10 أسئلة تدريبية على نفس الفرع.',
-          'راجع الأخطاء فقط بعد الحل ولا تعيد الامتحان كاملًا.'
-        ]
-      });
-    });
-
-    tags.slice(0, 3).forEach(t => {
-      recommendations.push({
-        level: t.wrong >= 3 ? 'دقيق' : 'ملاحظة',
-        title: `أنت تحتاج تركيزًا في: ${t.tag}`,
-        reason: `تكرر الخطأ في هذا الجزء ${t.wrong} مرة.`,
-        steps: [
-          `راجع أمثلة على ${t.tag}.`,
-          'اكتب سبب الخطأ في ورقة صغيرة.',
-          'حل 5 أسئلة قصيرة على نفس النقطة.'
-        ]
-      });
-    });
-
-    if (!recommendations.length) {
-      recommendations.push({
-        level: 'ابدأ',
-        title: 'ابدأ بتكوين بيانات أداء',
-        reason: 'لم يتم العثور على نتائج كافية لتحليل دقيق.',
-        steps: ['حل امتحان قصير.', 'راجع النتيجة.', 'سيتم بناء خطة ذكية بعد ظهور نتائجك.']
-      });
-    }
-
-    return {
-      completed,
-      latestPct,
-      previous,
-      trendDirection,
-      branches,
-      tags,
-      questionMistakes: questionMistakes.slice(0, 8),
-      timeline,
-      recommendations: recommendations.slice(0, 8)
-    };
-  }, [userResults, exams, content, userData]);
-
-  const trendText = analysis.trendDirection === 'up'
-    ? 'مستواك يتحسن'
-    : analysis.trendDirection === 'down'
-      ? 'فيه انخفاض بسيط محتاج متابعة'
-      : analysis.trendDirection === 'same'
-        ? 'مستواك ثابت'
-        : 'ابدأ بحل امتحان لتكوين تحليل';
-
-  return (
-    <div className="glass-panel rounded-2xl p-5 border-t-4 border-fuchsia-600">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
-        <div>
-          <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2">
-            <Sparkles className="text-fuchsia-600"/> المدرب الذكي AI
-          </h2>
-          <p className="text-sm text-slate-500 mt-1">تحليل ذكي لأخطاء الطالب حسب الفروع والنقاط المتكررة بدون تكلفة إضافية.</p>
-        </div>
-        <div className="bg-fuchsia-50 border border-fuchsia-100 rounded-2xl px-4 py-3">
-          <p className="text-xs font-bold text-fuchsia-600">حالة الطالب</p>
-          <p className="font-black text-fuchsia-800">{trendText}</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-5">
-        <div className="bg-white border rounded-2xl p-4">
-          <p className="text-xs font-bold text-slate-500">آخر نتيجة</p>
-          <p className="text-3xl font-black text-fuchsia-700">{analysis.latestPct || 0}%</p>
-        </div>
-        <div className="bg-white border rounded-2xl p-4">
-          <p className="text-xs font-bold text-slate-500">عدد الامتحانات</p>
-          <p className="text-3xl font-black text-blue-700">{analysis.completed.length}</p>
-        </div>
-        <div className="bg-white border rounded-2xl p-4">
-          <p className="text-xs font-bold text-slate-500">أضعف فرع</p>
-          <p className="text-lg font-black text-red-700">{analysis.branches[0]?.branch || 'لا يوجد'}</p>
-        </div>
-        <div className="bg-white border rounded-2xl p-4">
-          <p className="text-xs font-bold text-slate-500">أكثر نقطة تكرارًا</p>
-          <p className="text-lg font-black text-amber-700">{analysis.tags[0]?.tag || 'لا يوجد'}</p>
-        </div>
-      </div>
-
-      {analysis.timeline.length > 0 && (
-        <div className="bg-slate-50 border rounded-2xl p-4 mb-5">
-          <h3 className="font-black text-slate-800 mb-3">منحنى الأداء</h3>
-          <div className="flex items-end gap-2 h-32">
-            {analysis.timeline.map((item, idx) => (
-              <div key={idx} className="flex-1 flex flex-col items-center justify-end gap-1">
-                <div className="w-full bg-fuchsia-500 rounded-t-xl" style={{ height: `${Math.max(8, item.pct)}%` }} title={item.title}></div>
-                <span className="text-[10px] font-bold text-slate-500">{item.pct}%</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <h3 className="font-black text-slate-800 mb-3">خطة علاج ذكية</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
-        {analysis.recommendations.map((rec, idx) => (
-          <div key={idx} className="bg-white border rounded-2xl p-4">
-            <div className="flex justify-between gap-3 mb-2">
-              <h4 className="font-black text-slate-800">{rec.title}</h4>
-              <span className={`text-xs px-3 py-1 rounded-full font-black ${rec.level === 'عاجل' ? 'bg-red-100 text-red-700' : rec.level === 'مهم' ? 'bg-amber-100 text-amber-700' : 'bg-fuchsia-100 text-fuchsia-700'}`}>{rec.level}</span>
-            </div>
-            <p className="text-sm text-slate-600 mb-3">{rec.reason}</p>
-            <ol className="space-y-1 text-sm text-slate-700 list-decimal list-inside">
-              {rec.steps.map((s, i) => <li key={i}>{s}</li>)}
-            </ol>
-          </div>
-        ))}
-      </div>
-
-      {analysis.questionMistakes.length > 0 && (
-        <details className="bg-red-50 border border-red-100 rounded-2xl p-4">
-          <summary className="cursor-pointer font-black text-red-700">أمثلة من أخطائك المتكررة</summary>
-          <div className="mt-3 space-y-2">
-            {analysis.questionMistakes.map((m, idx) => (
-              <div key={idx} className="bg-white border rounded-xl p-3 text-sm">
-                <p className="font-bold text-slate-800">{String(m.text).replaceAll('|', ' / ')}</p>
-                <p className="text-xs text-slate-500 mt-1">الفرع: {m.branch} • الامتحان: {m.examTitle}</p>
-                {m.correct && <p className="text-xs text-emerald-700 mt-1">الصحيح: {m.correct}</p>}
-                {m.chosen && <p className="text-xs text-red-700 mt-1">اختيارك: {m.chosen}</p>}
-              </div>
-            ))}
-          </div>
-        </details>
-      )}
-    </div>
-  );
-};
-
-const AdminAIInsightsPanel = ({ examResults = [], examsList = [], content = [] }) => {
-  const safeResults = Array.isArray(examResults) ? examResults : [];
-  const safeExams = Array.isArray(examsList) ? examsList : [];
-  const safeContent = Array.isArray(content) ? content : [];
-
-  const insights = useMemo(() => {
-    const completed = safeResults.filter(r => r && r.status === 'completed');
-    const branchMap = {};
-    const examMap = {};
-    const gradeMap = {};
-
-    completed.forEach(r => {
-      const pct = getResultPercentage(r);
-      const examTitle = r.examTitle || safeExams.find(e => e.id === r.examId)?.title || 'امتحان';
-      examMap[r.examId || examTitle] = examMap[r.examId || examTitle] || { examId: r.examId || examTitle, title: examTitle, attempts: 0, avg: 0 };
-      examMap[r.examId || examTitle].attempts += 1;
-      examMap[r.examId || examTitle].avg += pct;
-
-      const grade = r.grade || 'غير محدد';
-      gradeMap[grade] = gradeMap[grade] || { grade, attempts: 0, avg: 0 };
-      gradeMap[grade].attempts += 1;
-      gradeMap[grade].avg += pct;
-
-      const rows = Array.isArray(r.branchAnalysis)
-        ? r.branchAnalysis
-        : Object.entries(r.branchStats || {}).map(([branch, data]) => ({
-            branch,
-            percentage: data?.possible > 0 ? Math.round((safeNumber(data?.earned, 0) / safeNumber(data?.possible, 1)) * 100) : safeNumber(data?.percentage, 0),
-            wrong: safeNumber(data?.wrong, 0)
-          }));
-
-      rows.forEach(b => {
-        const branch = b?.branch || 'عام';
-        branchMap[branch] = branchMap[branch] || { branch, total: 0, count: 0, wrong: 0 };
-        branchMap[branch].total += safeNumber(b?.percentage, 0);
-        branchMap[branch].count += 1;
-        branchMap[branch].wrong += safeNumber(b?.wrong, 0);
-      });
-    });
-
-    const branches = Object.values(branchMap).map(b => ({
-      ...b,
-      avg: b.count ? Math.round(b.total / b.count) : 0
-    })).sort((a,b) => a.avg - b.avg);
-
-    const exams = Object.values(examMap).map(e => ({
-      ...e,
-      avg: e.attempts ? Math.round(e.avg / e.attempts) : 0
-    })).sort((a,b) => a.avg - b.avg);
-
-    const grades = Object.values(gradeMap).map(g => ({
-      ...g,
-      avg: g.attempts ? Math.round(g.avg / g.attempts) : 0
-    })).sort((a,b) => a.avg - b.avg);
-
-    return { branches, exams, grades, totalAttempts: completed.length };
-  }, [safeResults, safeExams]);
-
-  const aiRecommendations = useMemo(() => {
-    const weak = insights.branches.slice(0, 5);
-    if (!weak.length) return [];
-    return weak.map(item => {
-      const related = safeContent.find(c => (c?.branch || '').trim() === item.branch || (c?.title || '').includes(item.branch));
-      return {
-        branch: item.branch,
-        avg: item.avg,
-        action: related?.title ? `راجع أو أعد شرح: ${related.title}` : `أضف مراجعة مركزة على فرع ${item.branch}`
-      };
-    });
-  }, [insights.branches, safeContent]);
-
-  return (
-    <div className="glass-panel rounded-2xl p-5 border-t-4 border-fuchsia-600">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
-        <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2"><BrainCircuit className="text-fuchsia-600"/> AI Insights للأدمن</h2>
-        <span className="text-xs bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-100 rounded-full px-3 py-1 font-bold">تحليل آمن بدون كراش</span>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
-        <div className="bg-fuchsia-50 border border-fuchsia-100 rounded-2xl p-4"><p className="text-xs font-bold text-fuchsia-600">محاولات مكتملة</p><p className="text-3xl font-black text-fuchsia-800">{insights.totalAttempts}</p></div>
-        <div className="bg-red-50 border border-red-100 rounded-2xl p-4"><p className="text-xs font-bold text-red-600">أضعف فرع عام</p><p className="text-xl font-black text-red-800">{insights.branches[0]?.branch || 'لا يوجد'}</p></div>
-        <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4"><p className="text-xs font-bold text-amber-600">أصعب امتحان</p><p className="text-lg font-black text-amber-800">{insights.exams[0]?.title || 'لا يوجد'}</p></div>
-      </div>
-
-      {insights.totalAttempts === 0 ? (
-        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-8 text-center text-slate-500 font-bold">
-          لا توجد نتائج مكتملة كافية للتحليل حتى الآن. بعد أول امتحانات مكتملة ستظهر التحليلات هنا تلقائيًا.
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="bg-white border rounded-2xl p-4">
-            <h3 className="font-black text-slate-800 mb-3">الفروع التي تحتاج إعادة شرح</h3>
-            <div className="space-y-2">
-              {insights.branches.slice(0, 8).map(b => (
-                <div key={b.branch} className="flex justify-between items-center bg-slate-50 rounded-xl p-3">
-                  <span className="font-bold">{b.branch}</span>
-                  <span className="font-black text-red-600">{b.avg}%</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="bg-white border rounded-2xl p-4">
-            <h3 className="font-black text-slate-800 mb-3">امتحانات تحتاج مراجعة</h3>
-            <div className="space-y-2">
-              {insights.exams.slice(0, 8).map(e => (
-                <div key={e.examId} className="flex justify-between items-center bg-slate-50 rounded-xl p-3">
-                  <span className="font-bold">{e.title}</span>
-                  <span className="font-black text-amber-600">{e.avg}%</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="bg-white border rounded-2xl p-4 lg:col-span-2">
-            <h3 className="font-black text-slate-800 mb-3">اقتراحات عملية من البيانات</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {aiRecommendations.map((r, i) => (
-                <div key={i} className="bg-fuchsia-50 border border-fuchsia-100 rounded-xl p-3">
-                  <p className="font-black text-fuchsia-800">{r.branch} - متوسط {r.avg}%</p>
-                  <p className="text-sm text-slate-700 mt-1">{r.action}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
 
 const SmartSubscriptionManager = ({ users = [], adminGradeFilter = 'all' }) => {
   const [codes, setCodes] = useState([]);
@@ -3722,8 +1779,8 @@ const SmartSubscriptionManager = ({ users = [], adminGradeFilter = 'all' }) => {
 
   const createCodes = async () => {
     const safeCount = Math.min(Math.max(safeNumber(count, 1), 1), 100);
-    if (!grade) return alert('اختار الصف.');
-    if (safeNumber(durationDays, 0) <= 0) return alert('حدد مدة الاشتراك بالأيام.');
+    if (!grade) return platformNotify('اختار الصف.');
+    if (safeNumber(durationDays, 0) <= 0) return platformNotify('حدد مدة الاشتراك بالأيام.');
 
     setLoading(true);
     try {
@@ -3751,25 +1808,25 @@ const SmartSubscriptionManager = ({ users = [], adminGradeFilter = 'all' }) => {
       }
       await batch.commit();
       await navigator.clipboard?.writeText(created.join('\n')).catch(() => {});
-      alert(`تم إنشاء ${safeCount} كود ونسخهم للحافظة.`);
+      platformNotify(`تم إنشاء ${safeCount} كود ونسخهم للحافظة.`);
     } catch (error) {
       console.error('create subscription codes error:', error);
-      alert('تعذر إنشاء الأكواد. راجع الصلاحيات.');
+      platformNotify('تعذر إنشاء الأكواد. راجع الصلاحيات.');
     } finally {
       setLoading(false);
     }
   };
 
   const deleteCode = async (id) => {
-    if (!window.confirm('حذف الكود؟')) return;
+    if (!platformConfirm('حذف الكود؟')) return;
     await deleteDoc(doc(db, 'subscription_codes', id));
   };
 
   const copyAvailableCodes = async () => {
     const available = codes.filter(c => !c.used && c.active !== false).map(c => c.code);
-    if (!available.length) return alert('لا توجد أكواد متاحة للنسخ.');
+    if (!available.length) return platformNotify('لا توجد أكواد متاحة للنسخ.');
     await navigator.clipboard?.writeText(available.join('\n'));
-    alert(`تم نسخ ${available.length} كود متاح.`);
+    platformNotify(`تم نسخ ${available.length} كود متاح.`);
   };
 
   const exportCSV = () => {
@@ -3917,62 +1974,6 @@ const LeaderboardPanel = ({ examResults = [], users = [], currentUserId = null, 
   );
 };
 
-const AISmartRecommendations = ({ userResults = [], content = [], exams = [], userData = null }) => {
-  userResults = Array.isArray(userResults) ? userResults : [];
-  content = Array.isArray(content) ? content : [];
-  exams = Array.isArray(exams) ? exams : [];
-
-  const recommendations = useMemo(() => {
-    const completed = userResults.filter(r => r.status === 'completed');
-    const branches = {};
-    completed.forEach(r => {
-      const branchRows = Array.isArray(r.branchAnalysis) ? r.branchAnalysis : Object.entries(r.branchStats || {}).map(([branch, data]) => ({
-        branch,
-        percentage: data.possible > 0 ? Math.round((safeNumber(data.earned, 0) / safeNumber(data.possible, 1)) * 100) : 0,
-        wrong: safeNumber(data.wrong, 0)
-      }));
-      branchRows.forEach(b => {
-        branches[b.branch] = branches[b.branch] || { branch: b.branch, total: 0, count: 0, wrong: 0 };
-        branches[b.branch].total += safeNumber(b.percentage, 0);
-        branches[b.branch].count += 1;
-        branches[b.branch].wrong += safeNumber(b.wrong, 0);
-      });
-    });
-
-    const weak = Object.values(branches).map(b => ({...b, avg: b.count ? Math.round(b.total / b.count) : 0})).sort((a,b)=>a.avg-b.avg).slice(0,4);
-    const out = weak.map(b => {
-      const relatedVideo = content.find(c => (c.type === 'video' || c.videoSection) && ((c.branch || '').includes(b.branch) || (c.title || '').includes(b.branch)));
-      const relatedExam = exams.find(e => e.grade === userData?.grade && (e.title || '').includes(b.branch));
-      return {
-        priority: b.avg < 50 ? 'عاجل' : b.avg < 70 ? 'مهم' : 'مراجعة',
-        title: `راجع فرع ${b.branch}`,
-        reason: `متوسطك في هذا الفرع ${b.avg}% وعدد الأخطاء ${b.wrong}.`,
-        action: relatedVideo ? `شاهد: ${relatedVideo.title}` : relatedExam ? `حل امتحان: ${relatedExam.title}` : 'راجع الدرس ثم حل تدريب قصير.'
-      };
-    });
-
-    if (!out.length) out.push({ priority: 'ابدأ', title: 'ابدأ أول اختبار', reason: 'لسه مفيش بيانات كافية.', action: 'حل امتحان قصير حتى تظهر توصيات دقيقة.' });
-    return out;
-  }, [userResults, content, exams, userData]);
-
-  return (
-    <div className="glass-panel rounded-2xl p-5 border-t-4 border-purple-600">
-      <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2 mb-4"><Sparkles className="text-purple-600"/> توصيات ذكية AI</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {recommendations.map((r, i) => (
-          <div key={i} className="bg-white border rounded-2xl p-4">
-            <div className="flex justify-between gap-3 mb-2">
-              <h3 className="font-black text-slate-800">{r.title}</h3>
-              <span className={`text-xs px-3 py-1 rounded-full font-black ${r.priority === 'عاجل' ? 'bg-red-100 text-red-700' : 'bg-purple-100 text-purple-700'}`}>{r.priority}</span>
-            </div>
-            <p className="text-sm text-slate-600 mb-3">{r.reason}</p>
-            <div className="bg-purple-50 text-purple-800 rounded-xl p-3 text-sm font-bold">{r.action}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
 
 const AdminQuestionDeepAnalytics = ({ examsList = [], examResults = [] }) => {
   const [selectedExamId, setSelectedExamId] = useState('');
@@ -4234,8 +2235,8 @@ const QuestionBankManager = ({ adminGradeFilter }) => {
   const handleAddQuestion = async (e) => {
     e.preventDefault();
     const options = form.type === 'mcq' ? form.optionsText.split('\n').map(o => o.trim()).filter(Boolean) : [];
-    if (!form.text.trim()) return alert('اكتب نص السؤال أولاً');
-    if (form.type === 'mcq' && options.length < 2) return alert('أضف اختيارين على الأقل');
+    if (!form.text.trim()) return platformNotify('اكتب نص السؤال أولاً');
+    if (form.type === 'mcq' && options.length < 2) return platformNotify('أضف اختيارين على الأقل');
     await addDoc(collection(db, 'question_bank'), {
       text: form.text.trim(),
       grade: form.grade,
@@ -4254,7 +2255,7 @@ const QuestionBankManager = ({ adminGradeFilter }) => {
 
   const createExamFromBank = async () => {
     const pool = questions.filter(q => (!filters.grade || q.grade === filters.grade) && (!filters.branch || q.branch === filters.branch) && (!filters.type || q.type === filters.type));
-    if (pool.length === 0) return alert('لا توجد أسئلة مطابقة للفلاتر الحالية');
+    if (pool.length === 0) return platformNotify('لا توجد أسئلة مطابقة للفلاتر الحالية');
     const selected = pool.slice(0, Math.min(pool.length, 20));
     const grouped = {};
     selected.forEach(q => {
@@ -4283,7 +2284,7 @@ const QuestionBankManager = ({ adminGradeFilter }) => {
       createdAt: serverTimestamp(),
       source: 'question_bank'
     });
-    alert('تم إنشاء امتحان جديد من بنك الأسئلة بنجاح');
+    platformNotify('تم إنشاء امتحان جديد من بنك الأسئلة بنجاح');
   };
 
   const visible = questions.filter(q => (!filters.grade || q.grade === filters.grade) && (!filters.branch || q.branch === filters.branch) && (!filters.type || q.type === filters.type));
@@ -4367,17 +2368,17 @@ const AssignmentsManager = ({ adminGradeFilter }) => {
 
   const createAssignment = async (e) => {
     e.preventDefault();
-    if (!form.title.trim()) return alert('اكتب عنوان الواجب');
+    if (!form.title.trim()) return platformNotify('اكتب عنوان الواجب');
     await addDoc(collection(db, 'assignments'), { ...form, totalMarks: safeNumber(form.totalMarks, 20), createdAt: serverTimestamp(), status: 'active' });
     setForm(prev => ({ ...prev, title: '', description: '' }));
   };
 
   const reviewSubmission = async (submission) => {
-    const scoreValue = prompt('أدخل الدرجة التي حصل عليها الطالب', submission.score ?? 0);
+    const scoreValue = platformPrompt('أدخل الدرجة التي حصل عليها الطالب', submission.score ?? 0);
     if (scoreValue === null) return;
-    const maxValue = prompt('ومن كام؟', submission.maxScore ?? submission.totalMarks ?? 20);
+    const maxValue = platformPrompt('ومن كام؟', submission.maxScore ?? submission.totalMarks ?? 20);
     if (maxValue === null) return;
-    const feedback = prompt('تعليقك على الواجب', submission.feedback || '');
+    const feedback = platformPrompt('تعليقك على الواجب', submission.feedback || '');
     await updateDoc(doc(db, 'assignment_submissions', submission.id), {
       score: safeNumber(scoreValue, 0),
       maxScore: safeNumber(maxValue, submission.totalMarks ?? 20),
@@ -4385,7 +2386,7 @@ const AssignmentsManager = ({ adminGradeFilter }) => {
       reviewStatus: 'graded',
       gradedAt: serverTimestamp()
     });
-    alert('تم حفظ تصحيح الواجب');
+    platformNotify('تم حفظ تصحيح الواجب');
   };
 
   const visibleSubmissions = submissions.filter(item => {
@@ -4478,13 +2479,13 @@ const StudentAssignmentsPanel = ({ assignments = [], submissions = [], user, use
       const uploaded = await uploadToCloudinary(file, { kind: 'image', folder: 'nahhas-platform/assignment-answers' });
       setAnswerImage(uploaded.url);
     } catch (err) {
-      alert(err?.message || 'فشل رفع الصورة على Cloudinary.');
+      platformNotify(err?.message || 'فشل رفع الصورة على Cloudinary.');
     }
   };
 
   const submitAssignment = async () => {
     if (!selectedAssignment) return;
-    if (!answerText.trim() && !answerImage) return alert('أضف نص الإجابة أو صورة واحدة على الأقل');
+    if (!answerText.trim() && !answerImage) return platformNotify('أضف نص الإجابة أو صورة واحدة على الأقل');
     setIsSubmitting(true);
     const existing = submissions.find(s => s.assignmentId === selectedAssignment.id);
     const payload = {
@@ -4506,7 +2507,7 @@ const StudentAssignmentsPanel = ({ assignments = [], submissions = [], user, use
     setSelectedAssignment(null);
     setAnswerText('');
     setAnswerImage('');
-    alert('تم تسليم الواجب بنجاح');
+    platformNotify('تم تسليم الواجب بنجاح');
   };
 
   const visibleAssignments = assignments.filter(item => {
@@ -4556,7 +2557,7 @@ const StudentAssignmentsPanel = ({ assignments = [], submissions = [], user, use
 
 
 
-const AdminProDashboard = ({ users = [], exams = [], results = [], content = [], subscriptionCodes = [], liveSessions = [], hwResults = [], adminGradeFilter = 'all' }) => {
+const AdminProDashboard = ({ users = [], exams = [], results = [], content = [], subscriptionCodes = [], hwResults = [], adminGradeFilter = 'all' }) => {
   const filteredUsers = useMemo(() => users.filter(u => adminGradeFilter === 'all' || u.grade === adminGradeFilter), [users, adminGradeFilter]);
   const filteredResults = useMemo(() => results.filter(r => {
     if (adminGradeFilter === 'all') return true;
@@ -4953,8 +2954,6 @@ const AdminDashboard = ({ user }) => {
   const [contentList, setContentList] = useState([]);
   const [messagesList, setMessagesList] = useState([]); 
   const [newContent, setNewContent] = useState({ title: '', url: '', type: 'video', videoSection: 'explanation', isPublic: false, grade: '3sec', allowedEmails: '', isPremium: false, linkedExamId: '', estimatedDurationMinutes: '', branch: '' });
-  const [liveData, setLiveData] = useState({ title: '', liveUrl: '', grade: '3sec', passcode: '', allowedEmails: '', sessionType: 'jitsi', embedUrl: '', scheduledAt: '', isOptional: true });
-  const [activeLiveSessions, setActiveLiveSessions] = useState([]);
   const [editingUser, setEditingUser] = useState(null);
   const [replyTexts, setReplyTexts] = useState({});
   const [examBuilder, setExamBuilder] = useState({ title: '', grade: '3sec', duration: 60, startTime: '', endTime: '', questions: [], accessCode: '', isPremium: false });
@@ -5022,7 +3021,7 @@ const AdminDashboard = ({ user }) => {
         questionsText: JSON.stringify(blocks, null, 2)
       }));
     } catch (error) {
-      alert('لا يمكن تعديل الأسئلة الآن لأن صيغة الأسئلة غير سليمة.');
+      platformNotify('لا يمكن تعديل الأسئلة الآن لأن صيغة الأسئلة غير سليمة.');
     }
   };
 
@@ -5075,12 +3074,6 @@ const AdminDashboard = ({ user }) => {
   useEffect(() => {
       const q = query(collection(db, 'messages'), orderBy('createdAt','desc'));
       const u = onSnapshot(q, s => setMessagesList(s.docs.map(d=>({id:d.id,...d.data()}))));
-      return u;
-  }, []);
-
-  useEffect(() => {
-      const q = query(collection(db, 'live_sessions'), where('status', '==', 'active'));
-      const u = onSnapshot(q, s => setActiveLiveSessions(s.docs.map(d=>({id:d.id,...d.data()}))));
       return u;
   }, []);
 
@@ -5142,23 +3135,23 @@ const AdminDashboard = ({ user }) => {
   const handleToggleSubscription = async (user) => {
       const isCurrentlyPremium = user.subscriptionStatus === 'premium';
       if (isCurrentlyPremium) {
-          if(window.confirm("تحويل الطالب لباقة مجانية؟")) {
+          if(platformConfirm("تحويل الطالب لباقة مجانية؟")) {
               await updateDoc(doc(db, 'users', user.id), { subscriptionStatus: 'free', subscriptionExpiry: null });
           }
       } else {
-          const days = prompt("كم يوم تريد تفعيل الباقة لهذا الطالب؟", "30");
+          const days = platformPrompt("كم يوم تريد تفعيل الباقة لهذا الطالب؟", "30");
           if (days && !isNaN(days)) {
               const expiryDate = new Date();
               expiryDate.setDate(expiryDate.getDate() + parseInt(days));
               await updateDoc(doc(db, 'users', user.id), { subscriptionStatus: 'premium', subscriptionExpiry: expiryDate });
-              alert(`تم تفعيل الطالب لمدة ${days} يوم.`);
+              platformNotify(`تم تفعيل الطالب لمدة ${days} يوم.`);
           }
       }
   };
 
   const generateSubscriptionCodes = async () => {
       if(!codeGenCount || !codeGenDays) return;
-      if(window.confirm(`هل أنت متأكد من توليد ${codeGenCount} كود جديد لمدة ${codeGenDays} يوم؟`)) {
+      if(platformConfirm(`هل أنت متأكد من توليد ${codeGenCount} كود جديد لمدة ${codeGenDays} يوم؟`)) {
           const batch = writeBatch(db);
           for(let i=0; i<codeGenCount; i++) {
               const codeString = 'NAHAS-' + Math.random().toString(36).substring(2,8).toUpperCase();
@@ -5172,19 +3165,19 @@ const AdminDashboard = ({ user }) => {
               });
           }
           await batch.commit();
-          alert("تم توليد الأكواد بنجاح!");
+          platformNotify("تم توليد الأكواد بنجاح!");
       }
   };
 
   const handleDeleteCode = async (id) => {
-      if(window.confirm("حذف هذا الكود؟")) await deleteDoc(doc(db, 'subscription_codes', id));
+      if(platformConfirm("حذف هذا الكود؟")) await deleteDoc(doc(db, 'subscription_codes', id));
   };
 
   const copyUnusedSubscriptionCodes = async () => {
       const unused = subscriptionCodes.filter(c => !c.used).map(c => `${c.code} - ${c.days} يوم`).join('\n');
-      if (!unused) return alert('لا توجد أكواد غير مستخدمة للنسخ.');
+      if (!unused) return platformNotify('لا توجد أكواد غير مستخدمة للنسخ.');
       await navigator.clipboard.writeText(unused);
-      alert('تم نسخ الأكواد غير المستخدمة.');
+      platformNotify('تم نسخ الأكواد غير المستخدمة.');
   };
 
   const exportSubscriptionCodesCSV = () => {
@@ -5209,9 +3202,9 @@ const AdminDashboard = ({ user }) => {
   };
 
   const extendPremiumForAll = async () => {
-      const days = prompt('كم يوم تريد إضافتها لكل طلاب VIP الحاليين؟', '7');
+      const days = platformPrompt('كم يوم تريد إضافتها لكل طلاب VIP الحاليين؟', '7');
       if (!days || Number.isNaN(Number(days))) return;
-      if (!window.confirm(`سيتم إضافة ${days} يوم لكل طلاب VIP الحاليين. هل أنت متأكد؟`)) return;
+      if (!platformConfirm(`سيتم إضافة ${days} يوم لكل طلاب VIP الحاليين. هل أنت متأكد؟`)) return;
       const batch = writeBatch(db);
       activeUsersList.filter(u => u.subscriptionStatus === 'premium').forEach(u => {
           let expiry = u.subscriptionExpiry?.toDate ? u.subscriptionExpiry.toDate() : new Date();
@@ -5220,15 +3213,15 @@ const AdminDashboard = ({ user }) => {
           batch.update(doc(db, 'users', u.id), { subscriptionExpiry: expiry, subscriptionStatus: 'premium' });
       });
       await batch.commit();
-      alert('تم تمديد اشتراكات VIP الحالية.');
+      platformNotify('تم تمديد اشتراكات VIP الحالية.');
   };
 
 
-  const handleDeleteUser = async (id) => { if(window.confirm("حذف نهائي؟")) await deleteDoc(doc(db,'users',id)); };
-  const handleDeleteMessage = async (id) => { if(window.confirm("حذف الرسالة؟")) await deleteDoc(doc(db,'messages',id)); };
-  const handleDeleteExam = async (id) => { if(window.confirm("حذف الامتحان؟")) await deleteDoc(doc(db, 'exams', id)); };
-  const handleDeleteAnnouncement = async (id) => { if(window.confirm("حذف الإعلان؟")) await deleteDoc(doc(db, 'announcements', id)); };
-  const handleDeleteResult = async (resultId) => { if(window.confirm("حذف النتيجة؟")) await deleteDoc(doc(db, 'exam_results', resultId)); };
+  const handleDeleteUser = async (id) => { if(platformConfirm("حذف نهائي؟")) await deleteDoc(doc(db,'users',id)); };
+  const handleDeleteMessage = async (id) => { if(platformConfirm("حذف الرسالة؟")) await deleteDoc(doc(db,'messages',id)); };
+  const handleDeleteExam = async (id) => { if(platformConfirm("حذف الامتحان؟")) await deleteDoc(doc(db, 'exams', id)); };
+  const handleDeleteAnnouncement = async (id) => { if(platformConfirm("حذف الإعلان؟")) await deleteDoc(doc(db, 'announcements', id)); };
+  const handleDeleteResult = async (resultId) => { if(platformConfirm("حذف النتيجة؟")) await deleteDoc(doc(db, 'exam_results', resultId)); };
 
   const openAdminResultReview = async (result) => {
     try {
@@ -5245,7 +3238,7 @@ const AdminDashboard = ({ user }) => {
       }
 
       if (!examData) {
-        return alert('لم يتم العثور على الامتحان الأصلي لهذه النتيجة. قد يكون الامتحان محذوفًا.');
+        return platformNotify('لم يتم العثور على الامتحان الأصلي لهذه النتيجة. قد يكون الامتحان محذوفًا.');
       }
 
       const reviewExam = {
@@ -5265,7 +3258,7 @@ const AdminDashboard = ({ user }) => {
       setAdminReviewResult(result);
     } catch (error) {
       console.error('open admin result review error:', error);
-      alert('تعذر فتح مراجعة الامتحان.');
+      platformNotify('تعذر فتح مراجعة الامتحان.');
     }
   };
 
@@ -5292,7 +3285,7 @@ const AdminDashboard = ({ user }) => {
     const snap = await getDocs(resultsQuery);
 
     if (snap.empty) {
-      alert('تم تعديل الامتحان، ولا توجد نتائج قديمة لإعادة تصحيحها.');
+      platformNotify('تم تعديل الامتحان، ولا توجد نتائج قديمة لإعادة تصحيحها.');
       return { updated: 0 };
     }
 
@@ -5366,16 +3359,16 @@ const AdminDashboard = ({ user }) => {
   const saveFullExamEdit = async (e) => {
     e?.preventDefault?.();
     if (!editingFullExam) return;
-    if (!examEditDraft.title.trim()) return alert('اكتب عنوان الامتحان.');
-    if (!examEditDraft.accessCode.trim()) return alert('اكتب كود الامتحان.');
-    if (!examEditDraft.startTime || !examEditDraft.endTime) return alert('حدد وقت البداية والنهاية.');
+    if (!examEditDraft.title.trim()) return platformNotify('اكتب عنوان الامتحان.');
+    if (!examEditDraft.accessCode.trim()) return platformNotify('اكتب كود الامتحان.');
+    if (!examEditDraft.startTime || !examEditDraft.endTime) return platformNotify('حدد وقت البداية والنهاية.');
 
     let parsedQuestions = [];
     try {
       parsedQuestions = JSON.parse(examEditDraft.questionsText || '[]');
       if (!Array.isArray(parsedQuestions)) throw new Error('questions must be array');
     } catch (err) {
-      return alert('صيغة الأسئلة غير صحيحة. يجب أن تكون JSON Array. لو مش متأكد، لا تعدل جزء الأسئلة.');
+      return platformNotify('صيغة الأسئلة غير صحيحة. يجب أن تكون JSON Array. لو مش متأكد، لا تعدل جزء الأسئلة.');
     }
 
     const payload = {
@@ -5391,7 +3384,7 @@ const AdminDashboard = ({ user }) => {
     };
 
     if (examEditMode === 'direct') {
-      if (editingFullExam.hasResults && !window.confirm('هذا الامتحان له نتائج سابقة. التعديل المباشر قد يغير شكل المراجعة والتحليل للنتائج القديمة. هل تريد التعديل المباشر فعلاً؟')) return;
+      if (editingFullExam.hasResults && !platformConfirm('هذا الامتحان له نتائج سابقة. التعديل المباشر قد يغير شكل المراجعة والتحليل للنتائج القديمة. هل تريد التعديل المباشر فعلاً؟')) return;
       await updateDoc(doc(db, 'exams', editingFullExam.id), {
         ...payload,
         version: increment(1),
@@ -5401,9 +3394,9 @@ const AdminDashboard = ({ user }) => {
 
       if (editingFullExam.hasResults && recalculateAfterExamEdit) {
         const recalc = await recalculateExamResultsAfterAnswerEdit(editingFullExam.id, { ...editingFullExam, ...payload });
-        alert(`تم تعديل الامتحان مباشرة وإعادة تصحيح ${recalc.updated} نتيجة قديمة تلقائيًا.`);
+        platformNotify(`تم تعديل الامتحان مباشرة وإعادة تصحيح ${recalc.updated} نتيجة قديمة تلقائيًا.`);
       } else {
-        alert('تم تعديل الامتحان مباشرة.');
+        platformNotify('تم تعديل الامتحان مباشرة.');
       }
     } else {
       await addDoc(collection(db, 'exams'), {
@@ -5415,7 +3408,7 @@ const AdminDashboard = ({ user }) => {
         createdAt: serverTimestamp(),
         source: 'clone_edit'
       });
-      alert('تم إنشاء نسخة جديدة من الامتحان بنجاح. النتائج القديمة محفوظة كما هي.');
+      platformNotify('تم إنشاء نسخة جديدة من الامتحان بنجاح. النتائج القديمة محفوظة كما هي.');
     }
 
     setEditingFullExam(null);
@@ -5443,10 +3436,10 @@ const AdminDashboard = ({ user }) => {
   const saveFullContentEdit = async (e) => {
     e?.preventDefault?.();
     if (!editingFullContent) return;
-    if (!contentEditDraft.title.trim()) return alert('اكتب عنوان المحتوى.');
-    if (!contentEditDraft.url.trim()) return alert('أدخل رابط المحتوى.');
+    if (!contentEditDraft.title.trim()) return platformNotify('اكتب عنوان المحتوى.');
+    if (!contentEditDraft.url.trim()) return platformNotify('أدخل رابط المحتوى.');
     if (contentEditDraft.type === 'video' && contentEditDraft.linkedExamId && safeNumber(contentEditDraft.estimatedDurationMinutes, 0) <= 0) {
-      return alert('لو الفيديو مربوط بامتحان لازم تكتب مدة الفيديو بالدقائق.');
+      return platformNotify('لو الفيديو مربوط بامتحان لازم تكتب مدة الفيديو بالدقائق.');
     }
 
     const allowedEmails = contentEditDraft.allowedEmailsText
@@ -5472,7 +3465,7 @@ const AdminDashboard = ({ user }) => {
 
     if (contentEditMode === 'direct') {
       await updateDoc(doc(db, 'content', editingFullContent.id), { ...payload, version: increment(1), lastEditMode: 'direct' });
-      alert('تم تعديل المحتوى مباشرة.');
+      platformNotify('تم تعديل المحتوى مباشرة.');
     } else {
       await addDoc(collection(db, 'content'), {
         ...payload,
@@ -5483,7 +3476,7 @@ const AdminDashboard = ({ user }) => {
         createdAt: serverTimestamp(),
         source: 'clone_edit'
       });
-      alert('تم إنشاء نسخة جديدة من المحتوى.');
+      platformNotify('تم إنشاء نسخة جديدة من المحتوى.');
     }
 
     setEditingFullContent(null);
@@ -5491,7 +3484,7 @@ const AdminDashboard = ({ user }) => {
 
   const handleApproveSecurityContinue = async (result) => {
     if (!result?.id) return;
-    if (!window.confirm(`السماح للطالب ${result.studentName || ''} باستكمال الامتحان بنفس الإجابات والوقت المتبقي؟`)) return;
+    if (!platformConfirm(`السماح للطالب ${result.studentName || ''} باستكمال الامتحان بنفس الإجابات والوقت المتبقي؟`)) return;
 
     const safeRemainingTime = safeNumber(result.remainingTime, safeNumber(result.totalTime, 60) * 60);
     const payload = {
@@ -5515,12 +3508,12 @@ const AdminDashboard = ({ user }) => {
     const updated = { ...result, ...payload, remainingTime: safeRemainingTime, currentQIndex: safeNumber(result.currentQIndex, 0), answers: result.answers || {} };
     setExamResults(prev => prev.map(r => r.id === result.id ? updated : r));
     if (viewingResult?.id === result.id) setViewingResult(updated);
-    alert('تم السماح للطالب باستكمال الامتحان. عندما يدخل نفس الامتحان سيظهر له زر الاستكمال ويكمل من نفس الإجابات والوقت المتبقي.');
+    platformNotify('تم السماح للطالب باستكمال الامتحان. عندما يدخل نفس الامتحان سيظهر له زر الاستكمال ويكمل من نفس الإجابات والوقت المتبقي.');
   };
 
   const handleApproveSecurityRestart = async (result) => {
     if (!result?.id) return;
-    if (!window.confirm(`السماح للطالب ${result.studentName || ''} بإعادة الامتحان من البداية؟ سيتم مسح الإجابات الحالية وإرجاع الوقت كاملًا.`)) return;
+    if (!platformConfirm(`السماح للطالب ${result.studentName || ''} بإعادة الامتحان من البداية؟ سيتم مسح الإجابات الحالية وإرجاع الوقت كاملًا.`)) return;
     const fullSeconds = safeNumber(result.totalTime, 60) * 60;
     const payload = {
       status: 'in_progress',
@@ -5545,11 +3538,11 @@ const AdminDashboard = ({ user }) => {
     const updated = { ...result, ...payload, restartCount: safeNumber(result.restartCount, 0) + 1 };
     setExamResults(prev => prev.map(r => r.id === result.id ? updated : r));
     if (viewingResult?.id === result.id) setViewingResult(updated);
-    alert('تم السماح للطالب بإعادة الامتحان من البداية. عندما يدخل نفس الامتحان سيبدأ بمحاولة جديدة.');
+    platformNotify('تم السماح للطالب بإعادة الامتحان من البداية. عندما يدخل نفس الامتحان سيبدأ بمحاولة جديدة.');
   };
 
   const deleteDocsByCollection = async (collectionName, confirmMessage, successMessage) => {
-    if (!window.confirm(confirmMessage)) return;
+    if (!platformConfirm(confirmMessage)) return;
     const snap = await getDocs(collection(db, collectionName));
     const refs = snap.docs.map((d) => doc(db, collectionName, d.id));
     for (let i = 0; i < refs.length; i += 400) {
@@ -5557,7 +3550,7 @@ const AdminDashboard = ({ user }) => {
       refs.slice(i, i + 400).forEach((r) => batch.delete(r));
       await batch.commit();
     }
-    alert(successMessage);
+    platformNotify(successMessage);
   };
 
   const handleDeleteAllResults = async () => {
@@ -5567,7 +3560,7 @@ const AdminDashboard = ({ user }) => {
     await deleteDocsByCollection('content', 'سيتم حذف كل محتوى صفحة المحتوى. هل أنت متأكد؟', 'تم حذف كل المحتوى.');
   };
   const handleDeleteAllExams = async () => {
-    if (!window.confirm('سيتم حذف كل الامتحانات وكل نتائجها. هل أنت متأكد؟')) return;
+    if (!platformConfirm('سيتم حذف كل الامتحانات وكل نتائجها. هل أنت متأكد؟')) return;
     const refs = [];
     for (const name of ['exams', 'exam_results']) {
       const snap = await getDocs(collection(db, name));
@@ -5578,10 +3571,10 @@ const AdminDashboard = ({ user }) => {
       refs.slice(i, i + 400).forEach((r) => batch.delete(r));
       await batch.commit();
     }
-    alert('تم حذف كل الامتحانات ونتائجها.');
+    platformNotify('تم حذف كل الامتحانات ونتائجها.');
   };
   const handleDeleteAllHomework = async () => {
-    if (!window.confirm('سيتم حذف كل الواجبات وتسليماتها والواجبات الذكية ونتائجها. هل أنت متأكد؟')) return;
+    if (!platformConfirm('سيتم حذف كل الواجبات وتسليماتها والواجبات الذكية ونتائجها. هل أنت متأكد؟')) return;
     const refs = [];
     for (const name of ['assignments', 'assignment_submissions', 'smart_homeworks', 'homework_results']) {
       const snap = await getDocs(collection(db, name));
@@ -5592,7 +3585,7 @@ const AdminDashboard = ({ user }) => {
       refs.slice(i, i + 400).forEach((r) => batch.delete(r));
       await batch.commit();
     }
-    alert('تم حذف كل الواجبات وسجلاتها.');
+    platformNotify('تم حذف كل الواجبات وسجلاتها.');
   };
   const handleDeleteAllMistakes = async () => {
     await deleteDocsByCollection('student_mistakes', 'سيتم حذف بنك الأخطاء لكل الطلاب. هل أنت متأكد؟', 'تم حذف بنك الأخطاء بالكامل.');
@@ -5609,13 +3602,13 @@ const AdminDashboard = ({ user }) => {
       const maxValue = Number(rawMaxValue);
 
       if (rawScoreValue === '' || rawMaxValue === '' || Number.isNaN(scoreValue) || Number.isNaN(maxValue)) {
-          return alert("من فضلك أدخل الدرجة والدرجة النهائية لهذا السؤال.");
+          return platformNotify("من فضلك أدخل الدرجة والدرجة النهائية لهذا السؤال.");
       }
       if (maxValue <= 0) {
-          return alert("الدرجة النهائية يجب أن تكون أكبر من صفر.");
+          return platformNotify("الدرجة النهائية يجب أن تكون أكبر من صفر.");
       }
       if (scoreValue < 0 || scoreValue > maxValue) {
-          return alert("درجة الطالب يجب أن تكون بين صفر والدرجة النهائية.");
+          return platformNotify("درجة الطالب يجب أن تكون بين صفر والدرجة النهائية.");
       }
 
       const nextEssayScores = { ...(resultDoc.essayScores || {}), [question.id]: scoreValue };
@@ -5651,17 +3644,17 @@ const AdminDashboard = ({ user }) => {
           const nextViewingResult = { ...resultDoc, ...payload };
           setViewingResult(nextViewingResult);
           setExamResults((prev) => prev.map((res) => res.id === resultDoc.id ? nextViewingResult : res));
-          alert("تم حفظ تصحيح السؤال المقالي بنجاح.");
+          platformNotify("تم حفظ تصحيح السؤال المقالي بنجاح.");
       } catch (error) {
           console.error("Error saving essay grade:", error);
-          alert("حدث خطأ أثناء حفظ التصحيح.");
+          platformNotify("حدث خطأ أثناء حفظ التصحيح.");
       }
   };
 
 
   const sendWhatsAppToParent = (result) => {
       const student = activeUsersList.find(u => u.id === result.studentId);
-      if (!student || !student.parentPhone) return alert("لا يوجد رقم ولي أمر مسجل لهذا الطالب!");
+      if (!student || !student.parentPhone) return platformNotify("لا يوجد رقم ولي أمر مسجل لهذا الطالب!");
       let phone = student.parentPhone.trim();
       if (phone.startsWith('0')) phone = '20' + phone.substring(1);
       const examName = examsList.find(e => e.id === result.examId)?.title || 'اختبار';
@@ -5686,18 +3679,18 @@ const AdminDashboard = ({ user }) => {
       if (!newEndTime) return;
       try {
           await updateDoc(doc(db, 'exams', editingExamTime.id), { endTime: newEndTime });
-          alert("تم تمديد وقت الامتحان بنجاح!");
+          platformNotify("تم تمديد وقت الامتحان بنجاح!");
           setEditingExamTime(null);
           setNewEndTime('');
-      } catch (error) { console.error("Error updating exam time:", error); alert("حدث خطأ أثناء تعديل الوقت."); }
+      } catch (error) { console.error("Error updating exam time:", error); platformNotify("حدث خطأ أثناء تعديل الوقت."); }
   };
 
   const handleCreateSmartHw = async (e) => {
       e.preventDefault();
-      if (!newSmartHw.title || !newSmartHw.answerKey || !newSmartHw.bookName) return alert("أكمل البيانات (الاسم، الإجابة، والكتاب)");
+      if (!newSmartHw.title || !newSmartHw.answerKey || !newSmartHw.bookName) return platformNotify("أكمل البيانات (الاسم، الإجابة، والكتاب)");
       await addDoc(collection(db, 'smart_homeworks'), { ...newSmartHw, createdAt: serverTimestamp() });
       setNewSmartHw(prev => ({ ...prev, title: '', answerKey: '' }));
-      alert("تم إنشاء الواجب! يمكنك نسخ الرابط الآن.");
+      platformNotify("تم إنشاء الواجب! يمكنك نسخ الرابط الآن.");
   };
 
   const handleReplyMessage = async (msgId) => {
@@ -5705,7 +3698,7 @@ const AdminDashboard = ({ user }) => {
     if (!text?.trim()) return;
     await updateDoc(doc(db, 'messages', msgId), { adminReply: text });
     setReplyTexts(prev => ({ ...prev, [msgId]: '' }));
-    alert("تم إرسال الرد!");
+    platformNotify("تم إرسال الرد!");
   };
   
   const handleAddAnnouncement = async () => {
@@ -5713,12 +3706,12 @@ const AdminDashboard = ({ user }) => {
       await addDoc(collection(db, 'announcements'), { text: newAnnouncement, createdAt: serverTimestamp() });
       await addDoc(collection(db, 'notifications'), { text: `تنبيه هام: ${newAnnouncement}`, grade: 'all', createdAt: serverTimestamp() });
       setNewAnnouncement("");
-      alert("تم نشر الإعلان");
+      platformNotify("تم نشر الإعلان");
   };
 
   const handleSendStudentNotification = async (e) => {
       e?.preventDefault?.();
-      if(!newStudentNotification.text.trim()) return alert('اكتب نص الإشعار أولاً');
+      if(!newStudentNotification.text.trim()) return platformNotify('اكتب نص الإشعار أولاً');
       const title = newStudentNotification.title?.trim() || 'تنبيه من منصة النحاس';
       await addDoc(collection(db, 'notifications'), {
         title,
@@ -5731,7 +3724,7 @@ const AdminDashboard = ({ user }) => {
         source: 'admin_manual'
       });
       setNewStudentNotification({ title: '', text: '', grade: newStudentNotification.grade || 'all', clickUrl: '/' });
-      alert('تم حفظ الإشعار وسيتم إرساله كتطبيق/موبايل للطلاب المفعّلين للإشعارات بعد تفعيل Cloud Function');
+      platformNotify('تم حفظ الإشعار وسيتم إرساله كتطبيق/موبايل للطلاب المفعّلين للإشعارات بعد تفعيل Cloud Function');
   };
 
   const handleUpdateUser = async (e) => { 
@@ -5739,7 +3732,7 @@ const AdminDashboard = ({ user }) => {
       if(!editingUser) return; 
 
       const validation = validateEgyptianPhones(editingUser.phone, editingUser.parentPhone);
-      if (!validation.ok) return alert(validation.message);
+      if (!validation.ok) return platformNotify(validation.message);
 
       await updateDoc(doc(db, 'users', editingUser.id), { 
           name: editingUser.name?.trim(), phone: validation.normalizedStudentPhone, parentPhone: validation.normalizedParentPhone, grade: editingUser.grade 
@@ -5748,18 +3741,18 @@ const AdminDashboard = ({ user }) => {
   };
   
   const handleSendResetPassword = async (email) => { 
-      if(window.confirm(`إرسال رابط تغيير كلمة السر لـ ${email}؟`)) await sendPasswordResetEmail(auth, email); 
+      if(platformConfirm(`إرسال رابط تغيير كلمة السر لـ ${email}؟`)) await sendPasswordResetEmail(auth, email); 
   };
   
   const approveGrade = async (user) => {
       if (!user.requestedGrade) return;
       await updateDoc(doc(db, 'users', user.id), { grade: user.requestedGrade, requestedGrade: null, gradeUpdateStatus: null });
-      alert(`تم تغيير مرحلة الطالب ${user.name} بنجاح.`);
+      platformNotify(`تم تغيير مرحلة الطالب ${user.name} بنجاح.`);
   };
 
   const rejectGrade = async (user) => {
       await updateDoc(doc(db, 'users', user.id), { requestedGrade: null, gradeUpdateStatus: null });
-      alert(`تم رفض طلب تغيير المرحلة للطالب ${user.name}.`);
+      platformNotify(`تم رفض طلب تغيير المرحلة للطالب ${user.name}.`);
   };
 
   const handleFileSelect = async (e) => {
@@ -5792,7 +3785,7 @@ const AdminDashboard = ({ user }) => {
           setUploadProgress(100);
           setTimeout(() => setUploadProgress(0), 2000);
       } catch (err) {
-          alert(err?.message || 'فشل تجهيز/رفع الملف.');
+          platformNotify(err?.message || 'فشل تجهيز/رفع الملف.');
       } finally {
           setIsUploading(false);
           e.target.value = null;
@@ -5805,10 +3798,10 @@ const AdminDashboard = ({ user }) => {
         ? newContent.allowedEmails.split(',').map(email => email.trim()) 
         : [];
 
-      if (!newContent.title.trim()) return alert('اكتب عنوان المحتوى أولاً.');
-      if (!newContent.url.trim()) return alert('أضف رابط المحتوى أو ارفع ملفاً.');
+      if (!newContent.title.trim()) return platformNotify('اكتب عنوان المحتوى أولاً.');
+      if (!newContent.url.trim()) return platformNotify('أضف رابط المحتوى أو ارفع ملفاً.');
       if (newContent.type === 'video' && newContent.linkedExamId && safeNumber(newContent.estimatedDurationMinutes, 0) <= 0) {
-          return alert('مهم: أدخل مدة الفيديو بالدقائق حتى يتم فتح امتحان الفيديو بعد مشاهدة 75% بدقة، خصوصًا مع YouTube.');
+          return platformNotify('مهم: أدخل مدة الفيديو بالدقائق حتى يتم فتح امتحان الفيديو بعد مشاهدة 75% بدقة، خصوصًا مع YouTube.');
       }
 
       const contentData = { 
@@ -5835,73 +3828,18 @@ const AdminDashboard = ({ user }) => {
           await addDoc(collection(db, 'notifications'), { text: `تم إضافة درس جديد: ${newContent.title}`, grade: newContent.grade, createdAt: serverTimestamp() });
       } 
       
-      alert("تم النشر!"); 
+      platformNotify("تم النشر!"); 
       setNewContent({ title: '', url: '', type: 'video', videoSection: 'explanation', isPublic: false, grade: '3sec', allowedEmails: '', isPremium: false, linkedExamId: '', estimatedDurationMinutes: '', branch: '', storageProvider: '', firebaseStoragePath: '', mimeType: '', fileName: '', fileSize: 0, htmlContent: '' });
   }; 
   
   const handleDeleteContent = async (id) => { 
-      if(window.confirm("حذف هذا المحتوى؟")) await deleteDoc(doc(db, 'content', id)); 
-  };
-
-  const startLiveStream = async () => {
-      if(!liveData.title?.trim()) return alert("اكتب عنوان المحاضرة.");
-      if(!liveData.liveUrl?.trim()) return alert("الرابط مطلوب!");
-
-      const allowedEmailsArray = liveData.allowedEmails
-        ? liveData.allowedEmails.split(',').map(email => email.trim()).filter(Boolean)
-        : [];
-
-      const rawUrl = normalizeExternalUrl(liveData.liveUrl);
-      const autoType = isJitsiLink(rawUrl) ? 'jitsi'
-        : isYouTubeLink(rawUrl) ? 'youtube'
-        : isZoomLink(rawUrl) ? 'zoom'
-        : isMeetLink(rawUrl) ? 'meet'
-        : liveData.sessionType || 'external';
-
-      const finalLiveUrl = autoType === 'jitsi' ? normalizeJitsiUrl(rawUrl) : rawUrl;
-      const livePayload = {
-          ...liveData,
-          title: liveData.title.trim(),
-          liveUrl: finalLiveUrl,
-          embedUrl: normalizeExternalUrl(liveData.embedUrl),
-          sessionType: autoType,
-          allowedEmails: allowedEmailsArray,
-          status: 'active',
-          isOptional: true,
-          aiEnabled: true,
-          liveAiMerged: true,
-          createdAt: serverTimestamp()
-      };
-
-      const info = getLiveEmbedInfo(livePayload);
-      if (!info.canEmbed && (autoType === 'zoom' || autoType === 'meet')) {
-        const ok = window.confirm('هذا الرابط Zoom/Meet غالبًا لن يعمل داخل المنصة وسيظهر للطالب زر فتح خارجي. هل تريد نشره؟\n\nللتشغيل داخل المنصة استخدم Jitsi.');
-        if (!ok) return;
-      }
-
-      await addDoc(collection(db, 'live_sessions'), livePayload);
-      if (allowedEmailsArray.length === 0) {
-          await addDoc(collection(db, 'notifications'), {
-            text: `🔴 محاضرة مباشرة الآن: ${liveData.title}`,
-            grade: liveData.grade,
-            createdAt: serverTimestamp()
-          });
-      }
-      alert("تم نشر المحاضرة في Live + AI!");
-      setLiveData({ title: '', liveUrl: '', grade: '3sec', passcode: '', allowedEmails: '', sessionType: 'jitsi', embedUrl: '', scheduledAt: '', isOptional: true });
-  };
-
-  const stopLiveStream = async (id) => { 
-      if(window.confirm("إنهاء البث؟")) { 
-          await updateDoc(doc(db, 'live_sessions', id), { status: 'ended' }); 
-          alert("تم الإنهاء"); 
-      } 
+      if(platformConfirm("حذف هذا المحتوى؟")) await deleteDoc(doc(db, 'content', id)); 
   };
 
   const parseExam = async () => {
-    if (!bulkText.trim()) return alert("أدخل نص الامتحان");
-    if (!examBuilder.accessCode) return alert("أدخل كود للامتحان");
-    if (!examBuilder.startTime || !examBuilder.endTime) return alert("يرجى تحديد وقت البدء والانتهاء");
+    if (!bulkText.trim()) return platformNotify("أدخل نص الامتحان");
+    if (!examBuilder.accessCode) return platformNotify("أدخل كود للامتحان");
+    if (!examBuilder.startTime || !examBuilder.endTime) return platformNotify("يرجى تحديد وقت البدء والانتهاء");
 
     const lines = bulkText.split('\n').map(l => l.trim());
     const blocks = [];
@@ -6030,7 +3968,7 @@ const AdminDashboard = ({ user }) => {
     pushCurrentBlock();
 
     const finalBlocks = blocks.filter(b => b.subQuestions.length > 0);
-    if (finalBlocks.length === 0) return alert("لم يتم التعرف على الأسئلة بشكل صحيح. افصل بين كل سؤال بسطر فارغ، واستخدم #فرع: للفروع و #مقالي: للسؤال المقالي.");
+    if (finalBlocks.length === 0) return platformNotify("لم يتم التعرف على الأسئلة بشكل صحيح. افصل بين كل سؤال بسطر فارغ، واستخدم #فرع: للفروع و #مقالي: للسؤال المقالي.");
 
     await addDoc(collection(db, 'exams'), { 
         title: examBuilder.title, grade: examBuilder.grade, duration: examBuilder.duration, 
@@ -6041,7 +3979,7 @@ const AdminDashboard = ({ user }) => {
 
     await addDoc(collection(db, 'notifications'), { text: `امتحان جديد: ${examBuilder.title}`, grade: examBuilder.grade, createdAt: serverTimestamp() });
     setBulkText(""); 
-    alert(`تم نشر الامتحان بنجاح!`);
+    platformNotify(`تم نشر الامتحان بنجاح!`);
   };
 
   const toggleLeaderboard = async () => {
@@ -6049,22 +3987,21 @@ const AdminDashboard = ({ user }) => {
       setShowLeaderboard(!showLeaderboard);
   };
 
-  const handleAddAutoReply = async () => { alert('تم حذف نظام الرد الآلي نهائيًا.'); };
+  const handleAddAutoReply = async () => { platformNotify('تم حذف نظام الرد الآلي نهائيًا.'); };
   const toggleAutoReply = async () => {};
   const deleteAutoReply = async () => {};
   const handleAddQuote = async () => {
-      if(!newQuote.text || !newQuote.source) return alert("أكمل البيانات");
+      if(!newQuote.text || !newQuote.source) return platformNotify("أكمل البيانات");
       await addDoc(collection(db, 'quotes'), { ...newQuote, createdAt: serverTimestamp() });
       setNewQuote({ text: '', source: '' });
   };
-  const deleteQuote = async (id) => { if(window.confirm("حذف هذه الحكمة؟")) await deleteDoc(doc(db, 'quotes', id)); };
+  const deleteQuote = async (id) => { if(platformConfirm("حذف هذه الحكمة؟")) await deleteDoc(doc(db, 'quotes', id)); };
 
   const filteredPendingUsers = pendingUsers.filter(u => adminGradeFilter === 'all' || u.grade === adminGradeFilter);
   const filteredActiveUsers = activeUsersList.filter(u => adminGradeFilter === 'all' || u.grade === adminGradeFilter);
   const filteredContentList = contentList.filter(c => adminGradeFilter === 'all' || c.grade === adminGradeFilter);
   const filteredExamsList = examsList.filter(e => adminGradeFilter === 'all' || e.grade === adminGradeFilter);
-  const filteredLiveSessions = activeLiveSessions.filter(ls => adminGradeFilter === 'all' || ls.grade === adminGradeFilter);
-  const filteredExamResultsForAdmin = examResults.filter(result => {
+    const filteredExamResultsForAdmin = examResults.filter(result => {
       const exam = examsList.find(e => e.id === result.examId);
       if (adminGradeFilter !== 'all' && exam?.grade && exam.grade !== adminGradeFilter) return false;
       if (resultsFilter === 'essay_pending') return !!result.hasEssay && getUnreviewedEssayCount(result, exam) > 0;
@@ -6420,7 +4357,6 @@ const AdminDashboard = ({ user }) => {
             ['all_users', 'الطلاب'],
             ['payments', 'الاشتراكات والدفع'],
             ['security_center', 'مركز الحماية'],
-            ['live_ai', 'البث المباشر'],
             ['app_convert', 'تحويل App'],
             ['question_bank', 'بنك الأسئلة'],
             ['assignments', 'الواجبات'],
@@ -6441,7 +4377,7 @@ const AdminDashboard = ({ user }) => {
             <InlineTabs
               defaultTab="overview"
               tabs={[
-                { key: 'overview', label: 'نظرة عامة', content: <AdminProDashboard users={activeUsersList} exams={examsList} results={examResults} content={contentList} subscriptionCodes={subscriptionCodes} liveSessions={activeLiveSessions} hwResults={hwResults} adminGradeFilter={adminGradeFilter} /> },
+                { key: 'overview', label: 'نظرة عامة', content: <AdminProDashboard users={activeUsersList} exams={examsList} results={examResults} content={contentList} subscriptionCodes={subscriptionCodes} hwResults={hwResults} adminGradeFilter={adminGradeFilter} /> },
                 { key: 'performance', label: 'تحليل الأداء', content: <AdminPerformanceAnalytics examResults={examResults} examsList={examsList} users={activeUsersList} adminGradeFilter={adminGradeFilter} /> },
                 { key: 'questions', label: 'تحليل الأسئلة', content: <AdminQuestionDeepAnalytics examsList={examsList} examResults={examResults} /> },
                 { key: 'leaderboard', label: 'لوحة الشرف', content: <LeaderboardPanel examResults={examResults} users={activeUsersList} gradeFilter={adminGradeFilter} /> }
@@ -6675,8 +4611,8 @@ const AdminDashboard = ({ user }) => {
                                                           <code className="bg-slate-100 p-2 rounded text-xs break-all border block select-all">{hwLink}</code>
                                                       </div>
                                                       <div className="flex gap-2 items-center flex-shrink-0">
-                                                          <button onClick={() => { navigator.clipboard.writeText(hwLink); alert("تم نسخ الرابط!"); }} className="bg-slate-800 text-white px-4 py-2 rounded-lg font-bold hover:bg-slate-700 text-sm h-fit shadow-md">نسخ الرابط</button>
-                                                          <button onClick={async () => { if(window.confirm('هل أنت متأكد من حذف هذه الصفحة؟')) await deleteDoc(doc(db, 'smart_homeworks', hw.id)); }} className="text-red-500 bg-red-50 hover:bg-red-100 p-2 rounded-lg"><Trash2 size={18}/></button>
+                                                          <button onClick={() => { navigator.clipboard.writeText(hwLink); platformNotify("تم نسخ الرابط!"); }} className="bg-slate-800 text-white px-4 py-2 rounded-lg font-bold hover:bg-slate-700 text-sm h-fit shadow-md">نسخ الرابط</button>
+                                                          <button onClick={async () => { if(platformConfirm('هل أنت متأكد من حذف هذه الصفحة؟')) await deleteDoc(doc(db, 'smart_homeworks', hw.id)); }} className="text-red-500 bg-red-50 hover:bg-red-100 p-2 rounded-lg"><Trash2 size={18}/></button>
                                                       </div>
                                                   </div>
                                               )
@@ -6689,7 +4625,7 @@ const AdminDashboard = ({ user }) => {
                   </div>
 
                   <div className="glass-panel p-4 md:p-6 rounded-xl">
-                      <h3 className="font-bold mb-4 text-green-700">نتائج تصحيح الذكاء الاصطناعي</h3>
+                      <h3 className="font-bold mb-4 text-green-700">نتائج التصحيح اليدوي</h3>
                       <div className="space-y-2 overflow-x-auto">
                           <div className="min-w-max">
                               {hwResults.filter(res => adminGradeFilter === 'all' || res.grade === adminGradeFilter).map(res => (
@@ -6964,80 +4900,6 @@ const AdminDashboard = ({ user }) => {
             <InlineTabs tabs={[{ key: 'anti_cheat', label: 'تنبيهات الحماية', content: <AdvancedAntiCheatInsights examResults={examResults} /> }]} />
           )}
 
-          {activeTab === 'live_ai' && (
-              <div className="space-y-6">
-                <div className="glass-panel p-4 md:p-8 rounded-xl border-t-4 border-red-600">
-                    <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6">
-                      <div>
-                        <h2 className="text-2xl font-black flex items-center gap-2 text-red-600 font-arabic"><Radio size={32}/> المحاضرات المباشرة + Live AI</h2>
-                        <p className="text-sm text-slate-500 mt-1">تم دمج صفحة البث المباشر مع Live AI في مكان واحد. الطالب يدخل اختياريًا، ويسأل AI من نفس نافذة المحاضرة.</p>
-                      </div>
-                      <span className="bg-fuchsia-50 text-fuchsia-700 px-4 py-2 rounded-full font-bold text-sm">Live + AI مدمج</span>
-                    </div>
-
-                    <div className="grid gap-4 mb-8 bg-white/70 border border-red-100 rounded-2xl p-4">
-                        <input className="border p-3 rounded-xl w-full" placeholder="عنوان المحاضرة، مثال: بث مباشر نحو - تالتة ثانوي" value={liveData.title} onChange={e=>setLiveData({...liveData, title:e.target.value})}/>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <select className="border p-3 rounded-xl w-full" value={liveData.sessionType} onChange={e=>setLiveData({...liveData, sessionType:e.target.value})}>
-                              <option value="jitsi">Jitsi داخل المنصة - الأفضل</option>
-                              <option value="youtube">YouTube Live داخل المنصة</option>
-                              <option value="zoom">Zoom رابط خارجي</option>
-                              <option value="meet">Google Meet رابط خارجي</option>
-                              <option value="external">رابط خارجي / عام</option>
-                          </select>
-                          <select className="border p-3 rounded-xl w-full" value={liveData.grade} onChange={e=>setLiveData({...liveData, grade:e.target.value})}><GradeOptions/></select>
-                        </div>
-
-                        <input className="border p-3 rounded-xl w-full" placeholder="رابط المحاضرة الأساسي: Jitsi / YouTube / Zoom / Meet" value={liveData.liveUrl} onChange={e=>setLiveData({...liveData, liveUrl:e.target.value})}/>
-                        <input className="border p-3 rounded-xl w-full" placeholder="رابط Embed اختياري داخل المنصة - اتركه فارغًا غالبًا" value={liveData.embedUrl} onChange={e=>setLiveData({...liveData, embedUrl:e.target.value})}/>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                          <input type="datetime-local" className="border p-3 rounded-xl w-full" value={liveData.scheduledAt} onChange={e=>setLiveData({...liveData, scheduledAt:e.target.value})}/>
-                          <input className="border p-3 rounded-xl w-full" placeholder="كود دخول اختياري" value={liveData.passcode} onChange={e=>setLiveData({...liveData, passcode:e.target.value})}/>
-                          <input className="border p-3 rounded-xl w-full" placeholder="إيميلات مخصصة اختياري" value={liveData.allowedEmails} onChange={e=>setLiveData({...liveData, allowedEmails:e.target.value})}/>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-xl text-sm font-bold">
-                            ✅ Jitsi يفتح داخل المنصة: https://meet.jit.si/nahhas-live-room — وتم تعطيل تحويل الطالب للتطبيق
-                          </div>
-                          <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-xl text-sm font-bold">
-                            ✅ YouTube: ضع رابط الفيديو العادي أو embed وسيتم تحويله تلقائيًا.
-                          </div>
-                          <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-xl text-sm font-bold">
-                            ⚠️ Zoom/Meet العادي لا يظهر داخل المنصة، وسيظهر زر فتح خارجي للطالب.
-                          </div>
-                        </div>
-
-                        <button onClick={startLiveStream} className="bg-red-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-red-500/30 w-full md:w-auto">نشر محاضرة Live + AI</button>
-                    </div>
-
-                    {filteredLiveSessions.length > 0 && (
-                        <div className="mt-8 border-t pt-6">
-                            <h3 className="font-bold mb-4">المحاضرات المباشرة الحالية</h3>
-                            <div className="space-y-3">
-                                {filteredLiveSessions.map(session => {
-                                  const info = getLiveEmbedInfo(session);
-                                  return (
-                                    <div key={session.id} className="p-4 bg-red-50 border border-red-200 rounded-xl flex flex-col md:flex-row gap-4 justify-between md:items-center">
-                                        <div>
-                                          <p className="font-bold text-red-800">{session.title} <span className="text-xs bg-red-200 px-2 py-1 rounded-full text-red-700">{getGradeLabel(session.grade)}</span></p>
-                                          <p className="text-xs text-red-600 mt-1">النوع: {session.sessionType || info.type} {session.scheduledAt ? `• الموعد: ${new Date(session.scheduledAt).toLocaleString('ar-EG')}` : ''}</p>
-                                          <p className="text-xs mt-1 font-bold">{info.canEmbed ? '✅ يعمل داخل المنصة' : '⚠️ يفتح خارجيًا'}</p>
-                                          {session.passcode && <p className="text-xs text-red-600 mt-1">كود الدخول: {session.passcode}</p>}
-                                        </div>
-                                        <button onClick={() => stopLiveStream(session.id)} className="bg-slate-800 text-white px-4 py-2 rounded-lg font-bold hover:bg-slate-900 transition">إنهاء المحاضرة</button>
-                                    </div>
-                                  )
-                                })}
-                            </div>
-                        </div>
-                    )}
-                </div>
-              </div>
-          )}
-
 {activeTab === 'courses' && <AdminCoursesManager users={activeUsersList} exams={examsList} adminUser={userData} />}
 
 {activeTab === 'mistakes_admin' && (
@@ -7222,9 +5084,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   const [lectureInnerTab, setLectureInnerTab] = useState('explanation');
   const [learningHubTab, setLearningHubTab] = useState('assignments');
   const [mobileMenu, setMobileMenu] = useState(false);
-  const [content, setContent] = useState([]);
-  const [liveSessions, setLiveSessions] = useState([]); 
-  const [activeLiveView, setActiveLiveView] = useState(null); 
+  const [content, setContent] = useState([]);  
   const [exams, setExams] = useState([]);
   const [activeExam, setActiveExam] = useState(null);
   const [playingVideo, setPlayingVideo] = useState(null);
@@ -7274,17 +5134,6 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
         setContent(visibleContent);
     }, error => { console.warn('content listener blocked:', error?.message); setContent([]); });
 
-    const unsubLive = onSnapshot(query(collection(db, 'live_sessions'), where('status', '==', 'active'), where('grade', '==', userData?.grade)), s => {
-        const activeSessions = s.docs.map(d=>({id:d.id, ...d.data()}));
-        const visibleSessions = activeSessions.filter(ls => {
-            const allowedByEmail = !ls.allowedEmails || ls.allowedEmails.length === 0 || ls.allowedEmails.includes(user.email);
-            const notDeleted = ls.deleted !== true && ls.isDeleted !== true;
-            const isOpen = ls.status === 'active' && ls.isLive !== false && ls.ended !== true && ls.closed !== true;
-            return allowedByEmail && notDeleted && isOpen;
-        });
-        setLiveSessions(visibleSessions);
-    }, error => { console.warn('live_sessions listener blocked:', error?.message); setLiveSessions([]); });
-
     const unsubExams = onSnapshot(query(collection(db, 'exams'), where('grade', '==', userData?.grade)), s => setExams(s.docs.map(d=>({id:d.id,...d.data()}))), error => { console.warn('exams listener blocked:', error?.message); setExams([]); });
     const unsubResults = onSnapshot(query(collection(db, 'exam_results'), where('studentId', '==', user.uid)), s => {
         const rows = s.docs.map(d=>({id:d.id,...d.data()}));
@@ -7325,19 +5174,19 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
     setEditFormData({ name: userData?.name, phone: userData.phone, parentPhone: userData.parentPhone, grade: userData?.grade });
 
-    return () => { unsubContent(); unsubLive(); unsubExams(); unsubResults(); unsubHwResults(); unsubMistakes(); unsubNotif(); unsubAssignments(); unsubAssignmentSubs(); unsubVideoViews(); };
+    return () => { unsubContent(); unsubExams(); unsubResults(); unsubHwResults(); unsubMistakes(); unsubNotif(); unsubAssignments(); unsubAssignmentSubs(); unsubVideoViews(); };
   }, [userData, user]);
 
 
   const enableMobilePushNotifications = async () => {
     setPushStatus('disabled');
-    alert('إشعارات المتصفح متوقفة مؤقتًا. ستظهر تنبيهات المنصة داخل حساب الطالب فقط.');
+    platformNotify('إشعارات المتصفح متوقفة مؤقتًا. ستظهر تنبيهات المنصة داخل حساب الطالب فقط.');
   };
 
   const isPremium = userData.subscriptionStatus === 'premium' && (!userData?.subscriptionExpiry || userData?.subscriptionExpiry.toDate() > new Date());
   
   const startMistakesExam = () => {
-      if (mistakes.length === 0) return alert("ليس لديك أي أخطاء مسجلة بعد! استمر في التميز 👏");
+      if (mistakes.length === 0) return platformNotify("ليس لديك أي أخطاء مسجلة بعد! استمر في التميز 👏");
       const shuffledMistakes = [...mistakes].sort(() => 0.5 - Math.random()).slice(0, 20);
       const generatedExam = {
           id: 'custom_mistakes_exam', title: 'امتحان نقاط الضعف (بنك الأخطاء) 🏦', duration: shuffledMistakes.length * 2, 
@@ -7348,16 +5197,16 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
   const handleChargeSubscriptionCode = async (e) => {
       e.preventDefault();
-      if(!subscriptionCodeInput.trim()) return alert("أدخل الكود أولاً");
+      if(!subscriptionCodeInput.trim()) return platformNotify("أدخل الكود أولاً");
       setIsCharging(true);
       try {
           const qStr = query(collection(db, 'subscription_codes'), where('code', '==', subscriptionCodeInput.trim()));
           const snap = await getDocs(qStr);
-          if(snap.empty) { alert("الكود غير صحيح أو غير موجود."); setIsCharging(false); return; }
+          if(snap.empty) { platformNotify("الكود غير صحيح أو غير موجود."); setIsCharging(false); return; }
           
           const codeDoc = snap.docs[0];
           const codeData = codeDoc.data();
-          if(codeData.used) { alert("عفواً، هذا الكود تم استخدامه من قبل."); setIsCharging(false); return; }
+          if(codeData.used) { platformNotify("عفواً، هذا الكود تم استخدامه من قبل."); setIsCharging(false); return; }
 
           const days = codeData.days;
           let newExpiry = new Date();
@@ -7371,9 +5220,9 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
           batch.update(doc(db, 'subscription_codes', codeDoc.id), { used: true, usedBy: user.displayName, usedById: user.uid, usedAt: serverTimestamp() });
           
           await batch.commit();
-          alert(`تم شحن الكود بنجاح! تم تفعيل اشتراكك لمدة ${days} يوم.`);
+          platformNotify(`تم شحن الكود بنجاح! تم تفعيل اشتراكك لمدة ${days} يوم.`);
           setSubscriptionCodeInput('');
-      } catch (err) { console.error(err); alert("حدث خطأ أثناء الشحن"); }
+      } catch (err) { console.error(err); platformNotify("حدث خطأ أثناء الشحن"); }
       setIsCharging(false);
   };
 
@@ -7384,7 +5233,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
   const handlePremiumClick = (callback) => {
       if(!isPremium) {
-          alert("عفواً يا بطل، هذا المحتوى مخصص للطلاب المشتركين في الباقة المدفوعة (VIP). يرجى شحن حسابك أو التواصل مع المستر لترقية حسابك!");
+          platformNotify("عفواً يا بطل، هذا المحتوى مخصص للطلاب المشتركين في الباقة المدفوعة (VIP). يرجى شحن حسابك أو التواصل مع المستر لترقية حسابك!");
           setActiveTab('subscription');
       } else {
           callback();
@@ -7408,10 +5257,10 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
       if (!videoItem?.linkedExamId) return;
       const watchPercent = getVideoWatchPercent(videoItem);
       if (watchPercent < VIDEO_EXAM_UNLOCK_PERCENT) {
-          return alert(`امتحان الفيديو سيفتح بعد مشاهدة ${VIDEO_EXAM_UNLOCK_PERCENT}% من الفيديو. شاهدت الآن ${watchPercent}%.`);
+          return platformNotify(`امتحان الفيديو سيفتح بعد مشاهدة ${VIDEO_EXAM_UNLOCK_PERCENT}% من الفيديو. شاهدت الآن ${watchPercent}%.`);
       }
       const linkedExam = exams.find(e => e.id === videoItem.linkedExamId);
-      if (!linkedExam) return alert('الامتحان المرتبط بهذا الفيديو غير موجود حالياً أو لم يتم نشره.');
+      if (!linkedExam) return platformNotify('الامتحان المرتبط بهذا الفيديو غير موجود حالياً أو لم يتم نشره.');
       startExamWithCode(linkedExam, { skipCode: true, sourceVideoId: videoItem.id });
   };
 
@@ -7654,24 +5503,16 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
     </div>
   );
 
-  const handleJoinLive = (session) => {
-      if (session.passcode) {
-          const code = prompt('أدخل كود البث المباشر');
-          if (code !== session.passcode) return alert('الكود غير صحيح');
-      }
-      setActiveLiveView(session);
-  };
-
   const handleUpdateMyProfile = async (e) => {
       e.preventDefault();
 
       const normalizedPhone = normalizeEgyptPhone(editFormData.phone);
       if (!isValidEgyptPhone(normalizedPhone)) {
-          return alert("رقم الهاتف غير صحيح! يجب أن يكون 11 رقم ويبدأ بـ 010 أو 011 أو 012 أو 015");
+          return platformNotify("رقم الهاتف غير صحيح! يجب أن يكون 11 رقم ويبدأ بـ 010 أو 011 أو 012 أو 015");
       }
 
       if (normalizedPhone === normalizeEgyptPhone(editFormData.parentPhone)) {
-          return alert("لا يمكن أن يكون رقم الطالب هو نفسه رقم ولي الأمر.");
+          return platformNotify("لا يمكن أن يكون رقم الطالب هو نفسه رقم ولي الأمر.");
       }
 
       const payload = { phone: normalizedPhone };
@@ -7682,11 +5523,8 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
       }
 
       await updateDoc(doc(db, 'users', user.uid), payload);
-      alert(editFormData.grade !== userData?.grade ? "تم حفظ رقم الهاتف وإرسال طلب تغيير المرحلة إلى الأدمن." : "تم تحديث رقم الهاتف بنجاح.");
+      platformNotify(editFormData.grade !== userData?.grade ? "تم حفظ رقم الهاتف وإرسال طلب تغيير المرحلة إلى الأدمن." : "تم تحديث رقم الهاتف بنجاح.");
   };
-
-  if (scanningHwId) return <SmartHomeworkScanner hwId={scanningHwId} user={user} onClose={() => setScanningHwId(null)} />;
-  if (activeLiveView) return <LiveSessionView session={activeLiveView} user={user} onClose={() => setActiveLiveView(null)} />;
   if (activeExam) return <ExamRunner exam={activeExam} user={user} onClose={() => setActiveExam(null)} />;
   if (showFocusMode) return <PomodoroFocusMode onClose={() => setShowFocusMode(false)} />;
   if (reviewingExam) {
@@ -7705,7 +5543,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
   );
 
   const startExamWithCode = async (exam, options = {}) => {
-    if (isBannedExam) return alert("أنت محظور من دخول الامتحانات.");
+    if (isBannedExam) return platformNotify("أنت محظور من دخول الامتحانات.");
 
     const previousResult = examResults.find(r => r.examId === exam.id);
     const openExamFromSavedResult = (result, resumeData = null) => {
@@ -7722,7 +5560,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
         const hasAdminRestartApproval = previousResult.adminDecision === 'restart';
 
         if (previousResult.status === 'completed') {
-          alert(`أنت امتحنت الامتحان ده قبل كده وجبت ${previousResult.score}.`);
+          platformNotify(`أنت امتحنت الامتحان ده قبل كده وجبت ${previousResult.score}.`);
           return;
         }
 
@@ -7779,25 +5617,25 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
         }
 
         if (previousResult.status === 'security_hold') {
-          alert('تم إيقاف محاولتك مؤقتًا بسبب تنبيهات الأمان. انتظر موافقة الأدمن على الاستكمال أو الإعادة.');
+          platformNotify('تم إيقاف محاولتك مؤقتًا بسبب تنبيهات الأمان. انتظر موافقة الأدمن على الاستكمال أو الإعادة.');
           return;
         }
 
         if (previousResult.status === 'in_progress') {
-          alert('لديك محاولة غير مكتملة. لا يمكن الاستكمال إلا بعد موافقة الأدمن من لوحة النتائج.');
+          platformNotify('لديك محاولة غير مكتملة. لا يمكن الاستكمال إلا بعد موافقة الأدمن من لوحة النتائج.');
           return;
         }
 
         if (previousResult.status === 'cheated') {
-          alert('هذه المحاولة مسجلة كمخالفة أمان. لا يمكن إعادة الامتحان أو استكماله إلا إذا سمح الأدمن من لوحة النتائج.');
+          platformNotify('هذه المحاولة مسجلة كمخالفة أمان. لا يمكن إعادة الامتحان أو استكماله إلا إذا سمح الأدمن من لوحة النتائج.');
           return;
         }
     }
 
     const now = new Date(); const start = new Date(exam.startTime); const end = new Date(exam.endTime);
-    if (now < start) return alert(`الامتحان لم يبدأ بعد. موعد البدء: ${start.toLocaleString('ar-EG')}`);
-    if (now > end) return alert("عفواً، انتهى وقت الامتحان.");
-    const code = options.skipCode ? exam.accessCode : prompt("أدخل كود الامتحان:");
+    if (now < start) return platformNotify(`الامتحان لم يبدأ بعد. موعد البدء: ${start.toLocaleString('ar-EG')}`);
+    if (now > end) return platformNotify("عفواً، انتهى وقت الامتحان.");
+    const code = options.skipCode ? exam.accessCode : platformPrompt("أدخل كود الامتحان:");
     if (options.skipCode || code === exam.accessCode) {
         try {
             const attemptRef = await addDoc(collection(db, 'exam_results'), {
@@ -7814,8 +5652,8 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
               submittedAt: serverTimestamp()
             });
             setActiveExam({ ...exam, attemptId: attemptRef.id, sourceVideoId: options.sourceVideoId || null });
-        } catch (error) { console.error("Error creating attempt record:", error); alert("حدث خطأ أثناء بدء الامتحان. حاول مرة أخرى."); }
-    } else { alert("كود خاطئ!"); }
+        } catch (error) { console.error("Error creating attempt record:", error); platformNotify("حدث خطأ أثناء بدء الامتحان. حاول مرة أخرى."); }
+    } else { platformNotify("كود خاطئ!"); }
   };
 
   const studentFirstName = String(userData?.name || user?.displayName || 'طالب').split(' ')[0];
@@ -7858,7 +5696,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
       <MobileStudentBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
       {playingVideo && <SecureVideoPlayer video={playingVideo} user={user} userName={userData?.name} onClose={() => setPlayingVideo(null)} onProgress={handleVideoProgress} />}
       {playingHtml && <InteractiveViewer content={playingHtml} user={userData} onClose={() => setPlayingHtml(null)} />}
-      {/* AI امتحانات الطلاب متوقفة مؤقتًا لتوفير Gemini quota */}
+      {/* النظام امتحانات الطلاب متوقفة مؤقتًا  */}
       <FloatingArabicBackground />
       
       <aside className={`fixed top-0 bottom-0 right-0 z-40 bg-white/95 backdrop-blur-xl w-72 p-6 shadow-xl transition-transform duration-300 ${mobileMenu ? 'translate-x-0' : 'translate-x-full md:translate-x-0'} border-l border-slate-200 flex flex-col`}>
@@ -7913,20 +5751,11 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                 <StudentContinueCard />
                 <StudentSmartDashboard />
                 <StudentCompactHome />
-                {liveSessions.length > 0 && (
-                    <div className="bg-white border border-red-100 text-slate-800 p-4 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm">
-                        <div>
-                           <h3 className="font-bold font-arabic text-xl flex items-center gap-2 text-red-700"><Radio/> يوجد {liveSessions.length} محاضرة أون لاين متاحة</h3>
-                           <p className="text-sm text-slate-500 mt-1">الدخول اختياري تمامًا. افتح قسم محاضرة أون لاين وقت ما تحب.</p>
-                        </div>
-                        <button onClick={() => { setVideoSectionTab('live'); setActiveTab('videos'); }} className="bg-red-600 text-white px-6 py-2 rounded-full font-bold shadow-md hover:bg-red-700 transition w-full md:w-auto">عرض المحاضرات</button>
-                    </div>
-                )}
-                <Announcements />
+                                <Announcements />
                 <PWAInstallBox installPrompt={installPrompt} />
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <motion.div whileHover={{ scale: 1.01 }} onClick={()=> !isBannedContent && setActiveTab('videos')} className={`bg-gradient-to-br from-blue-950 via-blue-800 to-sky-700 text-white p-7 rounded-[2rem] relative overflow-hidden cursor-pointer shadow-xl group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}>
-                        <div className="relative z-10"><p className="text-sky-200 font-black text-sm mb-2">مركز المحاضرات</p><h3 className="text-3xl font-black mb-3">المحاضرات والمساحات الأونلاين</h3><p className="text-blue-100 leading-relaxed text-sm">كل الشرح، التدريبات، المراجعات، والمحاضرات المباشرة داخل تبويبات منظمة.</p><div className="flex gap-3 mt-5"><span className="bg-white/15 px-4 py-2 rounded-2xl font-bold">{videos.length} فيديو</span><span className="bg-white/15 px-4 py-2 rounded-2xl font-bold">{liveSessions.length} أونلاين</span></div></div><PlayCircle className="absolute -bottom-8 -left-8 text-white/10 w-52 h-52 group-hover:scale-110 transition"/>
+                        <div className="relative z-10"><p className="text-sky-200 font-black text-sm mb-2">مركز المحاضرات</p><h3 className="text-3xl font-black mb-3">المحاضرات والمساحات الأونلاين</h3><p className="text-blue-100 leading-relaxed text-sm">كل الشرح، التدريبات، المراجعات، والمحاضرات المباشرة داخل تبويبات منظمة.</p><div className="flex gap-3 mt-5"><span className="bg-white/15 px-4 py-2 rounded-2xl font-bold">{videos.length} فيديو</span></div></div><PlayCircle className="absolute -bottom-8 -left-8 text-white/10 w-52 h-52 group-hover:scale-110 transition"/>
                     </motion.div>
                     <motion.div whileHover={{ scale: 1.01 }} onClick={()=> setActiveTab('settings')} className="bg-gradient-to-br from-emerald-950 via-emerald-800 to-teal-700 text-white p-7 rounded-[2rem] relative overflow-hidden cursor-pointer shadow-xl group">
                         <div className="relative z-10"><p className="text-emerald-200 font-black text-sm mb-2">النتائج والتطور</p><h3 className="text-3xl font-black mb-3">نتائجك وتحليل أدائك</h3><p className="text-emerald-100 leading-relaxed text-sm">تابع متوسطك، سجل امتحاناتك، ونقاط الضعف من مكان واحد داخل ملفك.</p><div className="flex gap-3 mt-5"><span className="bg-white/15 px-4 py-2 rounded-2xl font-bold">{examResults.length} نتيجة</span><span className="bg-white/15 px-4 py-2 rounded-2xl font-bold">{completedExamResults.length ? averageScore + '%' : '—'} متوسط</span></div></div><BarChart3 className="absolute -bottom-8 -left-8 text-white/10 w-52 h-52 group-hover:scale-110 transition"/>
@@ -8036,54 +5865,6 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
               </div>
             </div>
         )}
-        
-        {activeTab === 'online_live' && !isBannedContent && (
-            <div className="space-y-6">
-                <div className="glass-panel p-6 rounded-3xl border-t-4 border-red-500">
-                    <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6">
-                        <div>
-                            <h2 className="text-3xl font-black text-slate-800 flex items-center gap-2"><Radio className="text-red-600"/> محاضرة أون لاين</h2>
-                            <p className="text-slate-500 mt-1">هذا القسم اختياري. الطالب يدخل المحاضرة بنفسه فقط عند الضغط على زر الدخول.</p>
-                        </div>
-                        <span className="bg-red-50 text-red-700 px-4 py-2 rounded-full font-bold text-sm">{liveSessions.length} متاحة</span>
-                    </div>
-                    {liveSessions.length === 0 ? (
-                        <div className="bg-white border border-slate-100 rounded-2xl p-10 text-center">
-                            <Radio className="mx-auto text-slate-300 w-16 h-16 mb-4"/>
-                            <p className="text-slate-500 font-bold">لا توجد محاضرات أون لاين متاحة الآن.</p>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            {liveSessions.map(session => {
-                                const embedInfo = getLiveEmbedInfo(session);
-                                const status = getLiveStatus(session);
-                                return (
-                                    <div key={session.id} className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition">
-                                        <div className="flex justify-between items-start gap-3 mb-3">
-                                            <div>
-                                                <h3 className="font-black text-xl text-slate-800">{session.title}</h3>
-                                                <p className="text-xs text-slate-500 mt-1">{session.scheduledAt ? new Date(session.scheduledAt).toLocaleString('ar-EG') : 'متاحة الآن'}</p>
-                                            </div>
-                                            <span className={`text-xs px-3 py-1 rounded-full font-bold ${status.tone}`}>{status.label}</span>
-                                        </div>
-                                        <div className="flex flex-wrap gap-2 mb-4">
-                                            <span className="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded">{getGradeLabel(session.grade)}</span>
-                                            <span className="bg-blue-50 text-blue-700 text-xs px-2 py-1 rounded">{session.sessionType || embedInfo.type}</span>
-                                            {session.passcode && <span className="bg-amber-50 text-amber-700 text-xs px-2 py-1 rounded">محمي بكود</span>}
-                                            {embedInfo.canEmbed ? <span className="bg-emerald-50 text-emerald-700 text-xs px-2 py-1 rounded">يعمل داخل المنصة</span> : <span className="bg-orange-50 text-orange-700 text-xs px-2 py-1 rounded">قد يفتح خارجيًا</span>}
-                                        </div>
-                                        <p className="text-sm text-slate-500 mb-5 leading-relaxed">{embedInfo.note}</p>
-                                        <button onClick={() => handleJoinLive(session)} className="w-full bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 transition flex items-center justify-center gap-2">
-                                            دخول المحاضرة <ExternalLink size={16}/>
-                                        </button>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-            </div>
-          )}
 
           {activeTab === 'courses' && !isBannedContent && <StudentCoursesHub user={user} userData={userData} exams={exams} onStartExam={startExamWithCode} />}
 
@@ -8092,7 +5873,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                 <div className="bg-white rounded-3xl p-3 border border-slate-100 shadow-sm space-y-3">
                     <div className="grid grid-cols-2 gap-2">
                         <button onClick={() => setVideoSectionTab('recorded')} className={`px-6 py-3 rounded-2xl font-black whitespace-nowrap transition ${videoSectionTab === 'recorded' ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-50 text-slate-600'}`}>المحاضرات المسجلة</button>
-                        <button onClick={() => setVideoSectionTab('live')} className={`px-6 py-3 rounded-2xl font-black whitespace-nowrap transition ${videoSectionTab === 'live' ? 'bg-red-600 text-white shadow-md' : 'bg-red-50 text-red-700'}`}>المحاضرات الأونلاين</button>
+                        
                     </div>
                     {videoSectionTab === 'recorded' && <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                         <button onClick={() => setLectureInnerTab('explanation')} className={`px-5 py-2 rounded-full font-bold whitespace-nowrap transition ${lectureInnerTab === 'explanation' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 border'}`}>شرح الدروس</button>
@@ -8100,11 +5881,6 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                         <button onClick={() => setLectureInnerTab('reviews')} className={`px-5 py-2 rounded-full font-bold whitespace-nowrap transition ${lectureInnerTab === 'reviews' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 border'}`}>المراجعات النهائية</button>
                     </div>}
                 </div>
-                {videoSectionTab === 'live' ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                      {liveSessions.length === 0 ? <div className="md:col-span-2 bg-white border border-slate-100 rounded-2xl p-10 text-center"><Radio className="mx-auto text-slate-300 w-16 h-16 mb-4"/><p className="text-slate-500 font-bold">لا توجد محاضرات أون لاين متاحة الآن.</p></div> : liveSessions.map(session => { const embedInfo = getLiveEmbedInfo(session); const status = getLiveStatus(session); return <div key={session.id} className="bg-white border border-red-100 rounded-3xl p-5 shadow-sm hover:shadow-lg transition"><div className="flex justify-between items-start gap-3 mb-3"><div><h3 className="font-black text-xl text-slate-800">{session.title}</h3><p className="text-xs text-slate-500 mt-1">{session.scheduledAt ? new Date(session.scheduledAt).toLocaleString('ar-EG') : 'متاحة الآن'}</p></div><span className={`text-xs px-3 py-1 rounded-full font-bold ${status.tone}`}>{status.label}</span></div><p className="text-sm text-slate-500 mb-5 leading-relaxed">{embedInfo.note}</p><button onClick={() => handleJoinLive(session)} className="w-full bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 transition flex items-center justify-center gap-2">دخول المحاضرة <ExternalLink size={16}/></button></div>})}
-                    </div>
-                ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                     {videos.filter(v => videoSectionTab === 'recorded' && (v.videoSection || 'explanation') === lectureInnerTab).length === 0 ? (
                          <div className="col-span-full text-center py-12 bg-white rounded-xl border border-slate-100 shadow-sm">
@@ -8152,7 +5928,6 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
                         </div>
                     )})}
                 </div>
-                )}
             </div>
         )}
 
@@ -8197,7 +5972,7 @@ const StudentDashboard = ({ user, userData, installPrompt }) => {
 
         {activeTab === 'interactive_exams' && !isBannedExam && (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 md:col-span-3 text-amber-800 font-bold">امتحان AI المخصص متوقف مؤقتًا للطلاب. ستظل الامتحانات التفاعلية المنشورة من الأدمن متاحة هنا.</div>
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 md:col-span-3 text-amber-800 font-bold">امتحان النظام المخصص متوقف مؤقتًا للطلاب. ستظل الامتحانات التفاعلية المنشورة من الأدمن متاحة هنا.</div>
                 
                 {interactiveExams.map(h => (
                     <motion.div whileHover={{y:-5}} key={h.id} className="glass-card rounded-xl overflow-hidden cursor-pointer relative" onClick={() => handlePremiumClick(() => setPlayingHtml(h))}>
@@ -8418,13 +6193,13 @@ const AuthPage = ({ onBack }) => {
 
     if (isRegister) {
         if (!formData.name.trim()) {
-            alert("من فضلك اكتب اسم الطالب.");
+            platformNotify("من فضلك اكتب اسم الطالب.");
             setLoading(false);
             return;
         }
         const validation = validateEgyptianPhones(formData.phone, formData.parentPhone);
         if (!validation.ok) {
-            alert(validation.message);
+            platformNotify(validation.message);
             setLoading(false);
             return;
         }
@@ -8440,15 +6215,15 @@ const AuthPage = ({ onBack }) => {
             parentPhone: validation.normalizedParentPhone, role: 'student', status: 'pending', 
             subscriptionStatus: 'free', subscriptionExpiry: null, createdAt: new Date() 
         });
-        alert("تم إنشاء الحساب! انتظر تفعيل الأدمن.");
+        platformNotify("تم إنشاء الحساب! انتظر تفعيل الأدمن.");
       } else { await signInWithEmailAndPassword(auth, formData.email, formData.password); }
-    } catch (error) { alert("حدث خطأ: " + error.message); } 
+    } catch (error) { platformNotify("حدث خطأ: " + error.message); } 
     finally { setLoading(false); }
   };
 
   const handleForgotPassword = async () => {
-    if(!formData.email) { alert("من فضلك اكتب الإيميل الأول."); return; }
-    try { await sendPasswordResetEmail(auth, formData.email); alert("تم إرسال رابط استعادة كلمة السر."); } catch (error) { alert("حدث خطأ: " + error.message); }
+    if(!formData.email) { platformNotify("من فضلك اكتب الإيميل الأول."); return; }
+    try { await sendPasswordResetEmail(auth, formData.email); platformNotify("تم إرسال رابط استعادة كلمة السر."); } catch (error) { platformNotify("حدث خطأ: " + error.message); }
   };
 
   return (
@@ -8478,6 +6253,22 @@ const AuthPage = ({ onBack }) => {
     </div>
   );
 };
+
+
+const AdminAccessDenied = ({ user }) => (
+  <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-5 font-['Cairo']" dir="rtl">
+    <div className="bg-white text-slate-900 max-w-lg w-full rounded-3xl shadow-2xl p-7 text-center border-t-8 border-red-500">
+      <ShieldAlert className="mx-auto text-red-500 mb-4" size={64} />
+      <h1 className="text-2xl font-black mb-2">لوحة الإدارة محمية</h1>
+      <p className="text-slate-600 font-bold mb-5">هذا الحساب ليس له صلاحية دخول لوحة الإدارة. الطلاب هنا يذاكروا بس، مش يفتحوا غرفة الكنترول.</p>
+      <p className="bg-slate-100 rounded-xl p-3 text-xs text-slate-500 break-all mb-5" dir="ltr">{user?.email || 'unknown user'}</p>
+      <div className="flex flex-col sm:flex-row gap-3 justify-center">
+        <button onClick={() => navigatePlatform('/student')} className="bg-amber-600 text-white px-5 py-3 rounded-xl font-black hover:bg-amber-700">الذهاب لواجهة الطالب</button>
+        <button onClick={() => signOut(auth)} className="bg-slate-900 text-white px-5 py-3 rounded-xl font-black hover:bg-slate-800">تسجيل الخروج</button>
+      </div>
+    </div>
+  </div>
+);
 
 class AppErrorBoundary extends React.Component {
   constructor(props) {
@@ -8512,11 +6303,28 @@ class AppErrorBoundary extends React.Component {
 }
 
 const DEBUG_EVENT_NAME = 'nahhas-platform-debug-log';
+const PLATFORM_ADMIN_EMAIL = 'mido16280@gmail.com';
 
-const isDebugAdmin = (user) => {
-  const email = (user?.email || '').toLowerCase();
-  return email === 'mido16280@gmail.com';
+const isAdminIdentity = (user, userData) => {
+  const email = (user?.email || userData?.email || '').toLowerCase();
+  return email === PLATFORM_ADMIN_EMAIL || userData?.role === 'admin' || userData?.isAdmin === true;
 };
+
+const getInitialRouteMode = () => {
+  const path = window.location.pathname || '/';
+  if (path.startsWith('/admin')) return 'admin';
+  if (path.startsWith('/student')) return 'student';
+  return 'public';
+};
+
+const navigatePlatform = (path) => {
+  if (window.location.pathname !== path) {
+    window.history.pushState({}, '', path);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }
+};
+
+const isDebugAdmin = (user, userData) => isAdminIdentity(user, userData);
 
 const pushRemoteDebugLog = async (entry) => {
   try {
@@ -8553,7 +6361,6 @@ const pushDebugLog = (type, title, details = {}) => {
 const explainDebugError = (errorText = '') => {
   const t = String(errorText || '').toLowerCase();
   if (t.includes('userdata') && t.includes('not defined')) return 'متغير userData مستخدم في مكان غير متاح. الحل استخدام userData?. أو تمرير بيانات المستخدم للكومبوننت.';
-  if (t.includes('/api/ai-coach') || t.includes('gemini') || t.includes('ai')) return 'مشكلة في اتصال AI. راجع api/ai-coach.js ومفتاح GEMINI_API_KEY واضغط فحص AI.';
   if (t.includes('permission') || t.includes('insufficient permissions')) return 'مشكلة Firebase Rules. راجع صلاحيات الـ collection المستخدمة.';
   if (t.includes('failed to fetch') || t.includes('network')) return 'مشكلة اتصال أو API غير متاح حاليًا.';
   if (t.includes('undefined')) return 'يوجد متغير غير متعرف في هذا الجزء من الصفحة.';
@@ -8643,7 +6450,6 @@ const DebugPanel = ({ user }) => {
   const [open, setOpen] = useState(false);
   const [remoteLogs, setRemoteLogs] = useState([]);
   const [logs, setLogs] = useState([]);
-  const [aiStatus, setAiStatus] = useState(null);
   const [checking, setChecking] = useState(false);
 
   const loadLogs = () => {
@@ -8704,43 +6510,20 @@ const DebugPanel = ({ user }) => {
       console.error = originalError;
     };
   }, []);
-
-  const checkAI = async () => {
-    setChecking(true);
-    setAiStatus(null);
-    try {
-      const res = await fetch('/api/ai-coach', {
-        method: 'POST',
-        headers: await getAdminAIHeaders(),
-        body: JSON.stringify({ mode: 'generate_questions', question: 'اختبار سريع للذكاء الاصطناعي', topic: 'النحو', count: 1, adminOnly: true })
-      });
-      const data = await res.json().catch(() => ({}));
-      const status = { ok: res.ok && data.ok, status: res.status, data };
-      setAiStatus(status);
-      pushDebugLog(status.ok ? 'ai-ok' : 'ai-error', status.ok ? 'AI يعمل' : 'AI لا يعمل', status);
-    } catch (e) {
-      const status = { ok: false, error: e.message };
-      setAiStatus(status);
-      pushDebugLog('ai-error', e.message, { stack: e.stack });
-    } finally {
-      setChecking(false);
-    }
-  };
-
   const checkFirebase = async () => {
     try {
       await getDoc(doc(db, 'settings', 'public'));
       pushDebugLog('firebase-ok', 'Firebase متصل', {});
-      alert('Firebase متصل ✅');
+      platformNotify('Firebase متصل ✅');
     } catch (e) {
       pushDebugLog('firebase-error', e.message, { stack: e.stack });
-      alert(`Firebase Error: ${e.message}`);
+      platformNotify(`Firebase Error: ${e.message}`);
     }
   };
 
   const copyLogs = async () => {
     await navigator.clipboard?.writeText(JSON.stringify({ localLogs: logs, platformLogs: remoteLogs }, null, 2));
-    alert('تم نسخ سجل التشخيص.');
+    platformNotify('تم نسخ سجل التشخيص.');
   };
 
   const clearLogs = () => {
@@ -8767,18 +6550,10 @@ const DebugPanel = ({ user }) => {
 
             <div className="p-5 space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <button onClick={checkAI} disabled={checking} className="bg-fuchsia-600 text-white rounded-xl p-3 font-black disabled:opacity-50">{checking ? 'فحص AI...' : 'فحص AI'}</button>
                 <button onClick={checkFirebase} className="bg-blue-600 text-white rounded-xl p-3 font-black">فحص Firebase</button>
                 <button onClick={copyLogs} className="bg-emerald-600 text-white rounded-xl p-3 font-black">نسخ السجل</button>
                 <button onClick={clearLogs} className="bg-red-100 text-red-700 rounded-xl p-3 font-black">مسح السجل</button>
               </div>
-
-              {aiStatus && (
-                <div className={`rounded-2xl p-4 border ${aiStatus.ok ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
-                  <p className={`font-black ${aiStatus.ok ? 'text-emerald-700' : 'text-red-700'}`}>{aiStatus.ok ? 'AI يعمل ✅' : 'AI لا يعمل ❌'}</p>
-                  <pre dir="ltr" className="mt-2 bg-slate-900 text-slate-100 rounded-xl p-3 text-xs overflow-auto max-h-[260px]">{JSON.stringify(aiStatus, null, 2)}</pre>
-                </div>
-              )}
 
 
               <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4">
@@ -8838,8 +6613,20 @@ function App() {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(true);
-  const [viewMode, setViewMode] = useState('landing');
+  const [viewMode, setViewMode] = useState(() => getInitialRouteMode() === 'admin' ? 'auth' : 'landing');
+  const [routeMode, setRouteMode] = useState(getInitialRouteMode);
+  const [isAdminAccount, setIsAdminAccount] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
+
+  useEffect(() => {
+    const syncRoute = () => {
+      const nextMode = getInitialRouteMode();
+      setRouteMode(nextMode);
+      if (nextMode === 'admin') setViewMode('auth');
+    };
+    window.addEventListener('popstate', syncRoute);
+    return () => window.removeEventListener('popstate', syncRoute);
+  }, []);
 
   useEffect(() => {
       const handleBeforeInstallPrompt = (e) => { e.preventDefault(); setDeferredPrompt(e); };
@@ -8863,9 +6650,18 @@ function App() {
     if (!auth) return;
     const unsubAuth = onAuthStateChanged(auth, async (u) => {
       setUser(u);
+      setIsAdminAccount(false);
       setAuthLoading(false);
       if (u) {
         setLoading(true);
+        const emailAdmin = (u.email || '').toLowerCase() === PLATFORM_ADMIN_EMAIL;
+        setIsAdminAccount(emailAdmin);
+        try {
+          const adminSnap = await getDoc(doc(db, 'admins', u.uid));
+          if (emailAdmin || adminSnap.exists()) setIsAdminAccount(true);
+        } catch (adminError) {
+          console.warn('admin access check skipped:', adminError?.message);
+        }
         const unsubUser = onSnapshot(doc(db, 'users', u.uid), (docSnap) => {
           if (docSnap.exists()) {
             const dbUser = docSnap.data();
@@ -8927,17 +6723,25 @@ function App() {
     </div>
   );
 
+  const adminAllowed = isAdminAccount || isAdminIdentity(user, userData);
+  const isAdminRoute = routeMode === 'admin';
+
   return (
     <AppErrorBoundary>
+    <ToastCenter />
     <AnimatePresence mode='wait'>
       <DesignSystemLoader />
       <DebugCollector user={user} />
       <PlatformPerformanceBooster />
       <MobileExamHelperStyles />
       {!user ? (
-        viewMode === 'landing' ? <LandingPage key="landing" onAuthClick={() => setViewMode('auth')} installPrompt={deferredPrompt ? handleInstallClick : null} /> : <AuthPage key="auth" onBack={() => setViewMode('landing')} />
+        isAdminRoute
+          ? <AuthPage key="admin-auth" onBack={() => navigatePlatform('/')} />
+          : (viewMode === 'landing' ? <LandingPage key="landing" onAuthClick={() => setViewMode('auth')} installPrompt={deferredPrompt ? handleInstallClick : null} /> : <AuthPage key="auth" onBack={() => setViewMode('landing')} />)
+      ) : isAdminRoute ? (
+        adminAllowed ? <AdminDashboard key="admin" user={user} /> : <AdminAccessDenied key="admin-denied" user={user} />
       ) : (
-        user.email === 'mido16280@gmail.com' ? <AdminDashboard key="admin" user={user} /> : <StudentDashboard key="student" user={user} userData={userData} installPrompt={deferredPrompt ? handleInstallClick : null} />
+        <StudentDashboard key="student" user={user} userData={userData} installPrompt={deferredPrompt ? handleInstallClick : null} />
       )}
     </AnimatePresence>
     </AppErrorBoundary>

@@ -1,0 +1,322 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function adminEmail() {
+      return signedIn()
+        && request.auth.token.email != null
+        && request.auth.token.email == 'mido16280@gmail.com';
+    }
+
+    function adminDoc() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isAdmin() {
+      return adminEmail() || adminDoc();
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function ownUserIdOnCreate() {
+      return signedIn()
+        && request.resource.data.userId == request.auth.uid;
+    }
+
+    function ownStudentIdOnCreate() {
+      return signedIn()
+        && request.resource.data.studentId == request.auth.uid;
+    }
+
+    function ownsExistingUserId() {
+      return signedIn()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == resource.data.userId;
+    }
+
+    function ownsExistingStudentId() {
+      return signedIn()
+        && resource.data.studentId == request.auth.uid
+        && request.resource.data.studentId == resource.data.studentId;
+    }
+
+    function safeStudentExamResultUpdate() {
+      return ownsExistingStudentId()
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          'answers', 'answerText', 'essayAnswer', 'uploadedAnswerUrl', 'uploadedImages',
+          'localDraftSyncedAt', 'autosaveAt', 'lastSavedAt', 'updatedAt', 'submittedAt',
+          'status', 'timeLeft', 'remainingSeconds', 'studentNotes'
+        ])
+        && (!('score' in request.resource.data) || request.resource.data.score == resource.data.score)
+        && (!('totalScore' in request.resource.data) || request.resource.data.totalScore == resource.data.totalScore)
+        && (!('percentage' in request.resource.data) || request.resource.data.percentage == resource.data.percentage)
+        && (!('grade' in request.resource.data) || request.resource.data.grade == resource.data.grade);
+    }
+
+    function safeOwnerProgressUpdate() {
+      return ownsExistingUserId()
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          'progress', 'completed', 'completedLessons', 'watchedSeconds', 'lastPosition',
+          'notes', 'updatedAt', 'lastUpdatedAt', 'finishedAt', 'timeSpent', 'answers',
+          'status', 'score', 'totalScore'
+        ]);
+    }
+
+    match /admins/{adminId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId)
+        && request.resource.data.role == 'student'
+        && request.resource.data.status in ['pending', 'active'];
+      allow update: if isAdmin()
+        || (isOwner(userId)
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+            'name', 'phone', 'parentPhone', 'grade', 'photoURL', 'updatedAt',
+            'lastLoginAt', 'deviceInfo', 'notificationToken'
+          ])
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.status == resource.data.status
+          && request.resource.data.subscriptionStatus == resource.data.subscriptionStatus);
+      allow delete: if isAdmin();
+    }
+
+    match /content/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /exams/{docId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /exam_settings/{docId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /announcements/{docId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /quotes/{docId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /auto_replies/{docId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /exam_results/{docId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.studentId == request.auth.uid);
+      allow create: if ownStudentIdOnCreate();
+      allow update: if isAdmin() || safeStudentExamResultUpdate();
+      allow delete: if isAdmin();
+    }
+
+    match /attempts/{docId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow create: if ownUserIdOnCreate();
+      allow update: if isAdmin() || safeOwnerProgressUpdate();
+      allow delete: if isAdmin();
+    }
+
+    match /student_mistakes/{docId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow create: if ownUserIdOnCreate();
+      allow update, delete: if isAdmin();
+    }
+
+    match /smart_homeworks/{docId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /homework_results/{docId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.studentId == request.auth.uid);
+      allow create: if ownStudentIdOnCreate();
+      allow update, delete: if isAdmin();
+    }
+
+    match /assignments/{docId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /assignment_submissions/{docId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.studentId == request.auth.uid);
+      allow create: if ownStudentIdOnCreate();
+      allow update: if isAdmin() || safeStudentExamResultUpdate();
+      allow delete: if isAdmin();
+    }
+
+    match /video_views/{docId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow create: if ownUserIdOnCreate();
+      allow update: if isAdmin() || safeOwnerProgressUpdate();
+      allow delete: if isAdmin();
+    }
+
+    match /video_notes/{docId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow create: if ownUserIdOnCreate();
+      allow update, delete: if isAdmin() || ownsExistingUserId();
+    }
+
+    match /question_bank/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /lesson_explanations/{docId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /subscription_codes/{docId} {
+      allow read: if signedIn();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin()
+        || (signedIn()
+          && resource.data.isUsed == false
+          && request.resource.data.isUsed == true
+          && request.resource.data.usedBy == request.auth.uid
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly(['isUsed', 'usedBy', 'usedAt', 'updatedAt']));
+    }
+
+    match /courseAccessCodes/{codeId} {
+      allow read: if signedIn();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin()
+        || (signedIn()
+          && resource.data.isUsed == false
+          && request.resource.data.isUsed == true
+          && request.resource.data.usedBy == request.auth.uid
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly(['isUsed', 'usedBy', 'usedAt', 'updatedAt']));
+    }
+
+    match /banned_users/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /notifications/{docId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /notification_tokens/{docId} {
+      allow read: if isAdmin();
+      allow create, update: if ownUserIdOnCreate();
+      allow delete: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+    }
+
+    match /messages/{docId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /student_chats/{studentId} {
+      allow read: if isAdmin() || isOwner(studentId);
+      allow create, update: if isAdmin() || isOwner(studentId);
+      allow delete: if isAdmin();
+
+      match /messages/{messageId} {
+        allow read: if isAdmin() || isOwner(studentId);
+        allow create: if isAdmin() || isOwner(studentId);
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    match /payment_requests/{docId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'pending';
+      allow update, delete: if isAdmin();
+    }
+
+    match /debug_logs/{docId} {
+      allow create: if signedIn();
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /courses/{courseId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+
+      match /modules/{moduleId} {
+        allow read: if signedIn();
+        allow write: if isAdmin();
+
+        match /lessons/{lessonId} {
+          allow read: if signedIn();
+          allow write: if isAdmin();
+        }
+      }
+    }
+
+    match /enrollments/{enrollmentId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isAdmin() || ownUserIdOnCreate();
+      allow update: if isAdmin() || safeOwnerProgressUpdate();
+      allow delete: if isAdmin();
+    }
+
+    match /lessonProgress/{progressId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow create: if ownUserIdOnCreate();
+      allow update: if isAdmin() || safeOwnerProgressUpdate();
+      allow delete: if isAdmin();
+    }
+
+    match /lessonUnlockOverrides/{overrideId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow write: if isAdmin();
+    }
+
+    match /examResults/{resultId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow create: if ownUserIdOnCreate();
+      allow update: if isAdmin() || safeOwnerProgressUpdate();
+      allow delete: if isAdmin();
+    }
+
+    // Features removed from the cleaned platform: keep blocked unless you re-enable them intentionally.
+    match /live_sessions/{document=**} { allow read, write: if false; }
+    match /live_attendance/{document=**} { allow read, write: if false; }
+    match /ai_usage/{document=**} { allow read, write: if false; }
+    match /ai_exam_results/{document=**} { allow read, write: if false; }
+    match /ai_generated_exams/{document=**} { allow read, write: if false; }
+    match /rafiq_lessons/{document=**} { allow read, write: if false; }
+    match /rafiq_questions/{document=**} { allow read, write: if false; }
+    match /rafiq_question_bank/{document=**} { allow read, write: if false; }
+    match /rafiq_unanswered_questions/{document=**} { allow read, write: if false; }
+    match /rafiq_answered_questions/{document=**} { allow read, write: if false; }
+    match /rafiq_interactions/{document=**} { allow read, write: if false; }
+    match /rafiq_student_weak_points/{document=**} { allow read, write: if false; }
+    match /student_questions_log/{document=**} { allow read, write: if false; }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
