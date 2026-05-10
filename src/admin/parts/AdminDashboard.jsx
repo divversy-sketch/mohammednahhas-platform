@@ -172,7 +172,7 @@ export const AdminDashboard = ({ user }) => {
     linkedExamId: '', estimatedDurationMinutes: '', branch: ''
   });
 
-  const [newSmartHw, setNewSmartHw] = useState({ title: '', answerKey: '', grade: '3sec', bookName: '' });
+  const [newSmartHw, setNewSmartHw] = useState({ title: '', answerKey: '', grade: '3sec', bookName: '', instructions: '', maxAttempts: 1, allowResubmit: false, showResultToStudent: true, showFeedbackToStudent: true, status: 'active', startAt: '', endAt: '', totalQuestions: '' });
 
   // أكواد الاشتراك
   const [codeGenCount, setCodeGenCount] = useState(10);
@@ -683,6 +683,8 @@ export const AdminDashboard = ({ user }) => {
   const handleDeleteAllHomework = async () => {
     if (!platformConfirm('سيتم حذف كل الواجبات وتسليماتها والواجبات الذكية ونتائجها. هل أنت متأكد؟')) return;
     const refs = [];
+    const smartSnapForPrivate = await getDocs(collection(db, 'smart_homeworks'));
+    smartSnapForPrivate.docs.forEach((d) => refs.push(doc(db, 'smart_homeworks', d.id, 'private', 'answerKey')));
     for (const name of ['assignments', 'assignment_submissions', 'smart_homeworks', 'homework_results']) {
       const snap = await getDocs(collection(db, name));
       snap.docs.forEach((d) => refs.push(doc(db, name, d.id)));
@@ -795,9 +797,58 @@ export const AdminDashboard = ({ user }) => {
   const handleCreateSmartHw = async (e) => {
       e.preventDefault();
       if (!newSmartHw.title || !newSmartHw.answerKey || !newSmartHw.bookName) return platformNotify("أكمل البيانات (الاسم، الإجابة، والكتاب)");
-      await addDoc(collection(db, 'smart_homeworks'), { ...newSmartHw, createdAt: serverTimestamp() });
-      setNewSmartHw(prev => ({ ...prev, title: '', answerKey: '' }));
-      platformNotify("تم إنشاء الواجب! يمكنك نسخ الرابط الآن.");
+      const maxAttempts = Math.max(1, Number(newSmartHw.maxAttempts || 1));
+      const publicHomework = {
+        title: newSmartHw.title.trim(),
+        grade: newSmartHw.grade || '3sec',
+        bookName: newSmartHw.bookName.trim(),
+        instructions: newSmartHw.instructions?.trim() || '',
+        maxAttempts,
+        allowResubmit: Boolean(newSmartHw.allowResubmit),
+        showResultToStudent: newSmartHw.showResultToStudent !== false,
+        showFeedbackToStudent: newSmartHw.showFeedbackToStudent !== false,
+        status: newSmartHw.status || 'active',
+        totalQuestions: Number(newSmartHw.totalQuestions || 0) || null,
+        startAt: newSmartHw.startAt || null,
+        endAt: newSmartHw.endAt || null,
+        answerKeyProtected: true,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        createdBy: user?.uid || ''
+      };
+      const hwRef = await addDoc(collection(db, 'smart_homeworks'), publicHomework);
+      await setDoc(doc(db, 'smart_homeworks', hwRef.id, 'private', 'answerKey'), {
+        answerKey: newSmartHw.answerKey.trim(),
+        updatedAt: serverTimestamp(),
+        updatedBy: user?.uid || ''
+      });
+      setNewSmartHw(prev => ({ ...prev, title: '', answerKey: '', instructions: '', totalQuestions: '' }));
+      platformNotify("تم إنشاء الواجب الآمن! يمكنك نسخ الرابط أو تحميل QR الآن.");
+  };
+
+  const downloadSmartHwQr = (hwLink, title) => {
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=900x900&format=png&data=${encodeURIComponent(hwLink)}`;
+      const a = document.createElement('a');
+      a.href = qrUrl;
+      a.download = `${(title || 'smart-homework').replace(/[\/:*?"<>|]+/g, '-')}-QR.png`;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+  };
+
+  const handleDeleteSmartHw = async (hw) => {
+      if (!platformConfirm('هل أنت متأكد من حذف هذا الواجب ونتائجه؟')) return;
+      const refs = [doc(db, 'smart_homeworks', hw.id), doc(db, 'smart_homeworks', hw.id, 'private', 'answerKey')];
+      const resSnap = await getDocs(query(collection(db, 'homework_results'), where('homeworkId', '==', hw.id)));
+      resSnap.docs.forEach((d) => refs.push(doc(db, 'homework_results', d.id)));
+      for (let i = 0; i < refs.length; i += 400) {
+        const batch = writeBatch(db);
+        refs.slice(i, i + 400).forEach((r) => batch.delete(r));
+        await batch.commit();
+      }
+      platformNotify('تم حذف الواجب ونتائجه.');
   };
 
   const handleReplyMessage = async (msgId) => {
@@ -1391,8 +1442,20 @@ export const AdminDashboard = ({ user }) => {
                               <div><label className="block text-xs font-bold mb-1 text-slate-500">اسم الكتاب</label><input className="border p-3 rounded w-full" placeholder="مثال: كتاب النحو الجزء الأول" value={newSmartHw.bookName} onChange={e=>setNewSmartHw({...newSmartHw, bookName:e.target.value})} required/></div>
                           </div>
                           <input className="border p-3 rounded" placeholder="اسم الواجب/رقم الصفحة (مثال: تدريبات صفحة 15)" value={newSmartHw.title} onChange={e=>setNewSmartHw({...newSmartHw, title:e.target.value})} required/>
-                          <textarea className="border p-3 rounded h-24" placeholder="نموذج الإجابة (مثال: 1-أ, 2-ج, 3-د...)" value={newSmartHw.answerKey} onChange={e=>setNewSmartHw({...newSmartHw, answerKey:e.target.value})} required/>
-                          <button type="submit" className="bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-blue-500/50">توليد رابط للصفحة</button>
+                          <textarea className="border p-3 rounded h-24" placeholder="نموذج الإجابة الآمن (لن يظهر للطالب) مثال: 1-أ, 2-ج, 3-د..." value={newSmartHw.answerKey} onChange={e=>setNewSmartHw({...newSmartHw, answerKey:e.target.value})} required/>
+                          <textarea className="border p-3 rounded h-20" placeholder="تعليمات اختيارية للطالب قبل التصوير" value={newSmartHw.instructions} onChange={e=>setNewSmartHw({...newSmartHw, instructions:e.target.value})}/>
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div><label className="block text-xs font-bold mb-1 text-slate-500">عدد المحاولات</label><input type="number" min="1" className="border p-3 rounded w-full" value={newSmartHw.maxAttempts} onChange={e=>setNewSmartHw({...newSmartHw, maxAttempts:e.target.value})}/></div>
+                            <div><label className="block text-xs font-bold mb-1 text-slate-500">عدد الأسئلة</label><input type="number" min="0" className="border p-3 rounded w-full" placeholder="اختياري" value={newSmartHw.totalQuestions} onChange={e=>setNewSmartHw({...newSmartHw, totalQuestions:e.target.value})}/></div>
+                            <div><label className="block text-xs font-bold mb-1 text-slate-500">بداية الإتاحة</label><input type="datetime-local" className="border p-3 rounded w-full" value={newSmartHw.startAt} onChange={e=>setNewSmartHw({...newSmartHw, startAt:e.target.value})}/></div>
+                            <div><label className="block text-xs font-bold mb-1 text-slate-500">نهاية الإتاحة</label><input type="datetime-local" className="border p-3 rounded w-full" value={newSmartHw.endAt} onChange={e=>setNewSmartHw({...newSmartHw, endAt:e.target.value})}/></div>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                            <label className="flex items-center gap-2 bg-slate-50 border rounded-xl p-3"><input type="checkbox" checked={newSmartHw.allowResubmit} onChange={e=>setNewSmartHw({...newSmartHw, allowResubmit:e.target.checked})}/> السماح بتسليم أكثر من مرة</label>
+                            <label className="flex items-center gap-2 bg-slate-50 border rounded-xl p-3"><input type="checkbox" checked={newSmartHw.showResultToStudent} onChange={e=>setNewSmartHw({...newSmartHw, showResultToStudent:e.target.checked})}/> إظهار الدرجة للطالب</label>
+                            <label className="flex items-center gap-2 bg-slate-50 border rounded-xl p-3"><input type="checkbox" checked={newSmartHw.showFeedbackToStudent} onChange={e=>setNewSmartHw({...newSmartHw, showFeedbackToStudent:e.target.checked})}/> إظهار التعليق والتفاصيل</label>
+                          </div>
+                          <button type="submit" className="bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-blue-500/50">توليد واجب آمن + QR</button>
                       </form>
                   </div>
                   
@@ -1413,12 +1476,17 @@ export const AdminDashboard = ({ user }) => {
                                                   <div key={hw.id} className="bg-white border shadow-sm p-4 rounded-xl flex flex-col md:flex-row justify-between gap-4 hover:border-amber-400 transition">
                                                       <div className="flex-1">
                                                           <p className="font-bold text-lg text-slate-800">{hw.title} <span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600">{getGradeLabel(hw.grade)}</span></p>
-                                                          <p className="text-sm text-slate-500 mb-2 mt-1 bg-slate-50 p-2 rounded">الإجابات: <span className="font-mono text-blue-600">{hw.answerKey}</span></p>
+                                                          <div className="text-sm text-slate-500 mb-2 mt-1 bg-slate-50 p-2 rounded space-y-1">
+                                                            <p>نموذج الإجابة: <span className="font-bold text-green-700">{hw.answerKeyProtected ? 'محفوظ في جزء خاص لا يقرأه الطالب' : (hw.answerKey || 'قديم/غير مؤمن')}</span></p>
+                                                            <p>المحاولات: <span className="font-bold">{hw.maxAttempts || 1}</span> - النتيجة للطالب: <span className="font-bold">{hw.showResultToStudent === false ? 'مخفية' : 'ظاهرة'}</span></p>
+                                                          </div>
                                                           <code className="bg-slate-100 p-2 rounded text-xs break-all border block select-all">{hwLink}</code>
+                                                          <img alt="QR" className="mt-3 w-28 h-28 border rounded-xl p-1 bg-white" src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(hwLink)}`} />
                                                       </div>
                                                       <div className="flex gap-2 items-center flex-shrink-0">
                                                           <button onClick={() => { navigator.clipboard.writeText(hwLink); platformNotify("تم نسخ الرابط!"); }} className="bg-slate-800 text-white px-4 py-2 rounded-lg font-bold hover:bg-slate-700 text-sm h-fit shadow-md">نسخ الرابط</button>
-                                                          <button onClick={async () => { if(platformConfirm('هل أنت متأكد من حذف هذه الصفحة؟')) await deleteDoc(doc(db, 'smart_homeworks', hw.id)); }} className="text-red-500 bg-red-50 hover:bg-red-100 p-2 rounded-lg"><Trash2 size={18}/></button>
+                                                          <button onClick={() => downloadSmartHwQr(hwLink, hw.title)} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 text-sm h-fit shadow-md">تحميل QR</button>
+                                                          <button onClick={() => handleDeleteSmartHw(hw)} className="text-red-500 bg-red-50 hover:bg-red-100 p-2 rounded-lg"><Trash2 size={18}/></button>
                                                       </div>
                                                   </div>
                                               )
@@ -1439,7 +1507,8 @@ export const AdminDashboard = ({ user }) => {
                                       <div className="ml-4">
                                           <p className="font-bold">{res.studentName} <span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600 mx-1">{getGradeLabel(res.grade)}</span></p>
                                           <p className="text-slate-500 text-xs font-bold mt-1">الكتاب: {res.bookName} - {res.homeworkTitle}</p>
-                                          <p className="text-sm text-green-600 font-bold mt-1">الدرجة: {res.score}/{res.total}</p>
+                                          <p className="text-sm text-green-600 font-bold mt-1">الدرجة: {res.score}/{res.total} - محاولة رقم {res.attemptCount || 1}</p>
+                                          {Array.isArray(res.questions) && <p className="text-xs text-slate-500 mt-1">الأخطاء: {res.questions.filter(q => !q.isCorrect).length} / {res.questions.length}</p>}
                                       </div>
                                       <div className="text-xs text-slate-500 bg-slate-100 p-2 rounded-lg text-center flex-shrink-0">
                                           {res.submittedAt?.toDate().toLocaleDateString('ar-EG')}<br/>{res.submittedAt?.toDate().toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'})}

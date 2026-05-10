@@ -73,6 +73,7 @@ import { useStudentDashboardData } from '../hooks/useStudentDashboardData.js';
 import { StudentContinueCard, StudentSmartDashboard, StudentCompactHome } from '../components/home/StudentHomeCards.jsx';
 import { StudentTopGreeting, LearningHubTabs } from '../components/layout/StudentLayoutParts.jsx';
 import StudentAssignmentsPanel from '../../admin/parts/StudentAssignmentsPanel.jsx';
+import SmartHomeworkScanner from '../../features/homework/SmartHomeworkScanner.jsx';
 
 export const StudentDashboard = ({ user, userData, installPrompt }) => {
   userData = userData || {
@@ -909,6 +910,13 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
               </div>
         )}
       </main>
+      {scanningHwId && (
+        <SmartHomeworkScanner
+          hwId={scanningHwId}
+          user={user}
+          onClose={() => setScanningHwId(null)}
+        />
+      )}
     </div>
   );
 };

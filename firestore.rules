@@ -159,13 +159,19 @@ service cloud.firestore {
     }
 
     match /smart_homeworks/{docId} {
+      // الطلاب يقرأون بيانات الواجب العامة فقط. نموذج الإجابة محفوظ في private ولا يقرأه إلا الأدمن/Cloud Function.
       allow read: if signedIn();
-      allow write: if isAdmin();
+      allow create, update, delete: if isAdmin();
+
+      match /private/{privateId} {
+        allow read, write: if isAdmin();
+      }
     }
 
     match /homework_results/{docId} {
       allow read: if isAdmin() || (signedIn() && resource.data.studentId == request.auth.uid);
-      allow create: if ownStudentIdOnCreate();
+      // التصحيح الذكي يكتب النتائج من Cloud Function باستخدام Admin SDK، وليس من المتصفح.
+      allow create: if false;
       allow update, delete: if isAdmin();
     }
 
