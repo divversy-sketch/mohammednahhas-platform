@@ -8,18 +8,18 @@ service cloud.firestore {
     }
 
     function adminEmail() {
-      return signedIn()
-        && request.auth.token.email != null
-        && request.auth.token.email == 'mido16280@gmail.com';
+      return false;
     }
 
     function adminDoc() {
       return signedIn()
-        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.active == true
+        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'admin';
     }
 
     function isAdmin() {
-      return adminEmail() || adminDoc();
+      return adminDoc();
     }
 
     function isOwner(userId) {

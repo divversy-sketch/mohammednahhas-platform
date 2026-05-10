@@ -8,8 +8,9 @@ service firebase.storage {
 
     function isAdmin() {
       return signedIn()
-        && request.auth.token.email != null
-        && request.auth.token.email == 'mido16280@gmail.com';
+        && firestore.exists(/databases/(default)/documents/admins/$(request.auth.uid))
+        && firestore.get(/databases/(default)/documents/admins/$(request.auth.uid)).data.active == true
+        && firestore.get(/databases/(default)/documents/admins/$(request.auth.uid)).data.role == 'admin';
     }
 
     function validSmallFile() {

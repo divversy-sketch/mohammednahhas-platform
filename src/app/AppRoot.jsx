@@ -6303,12 +6303,16 @@ class AppErrorBoundary extends React.Component {
 }
 
 const DEBUG_EVENT_NAME = 'nahhas-platform-debug-log';
-const PLATFORM_ADMIN_EMAIL = 'mido16280@gmail.com';
 
-const isAdminIdentity = (user, userData) => {
-  const email = (user?.email || userData?.email || '').toLowerCase();
-  return email === PLATFORM_ADMIN_EMAIL || userData?.role === 'admin' || userData?.isAdmin === true;
+const isActiveAdminSnapshot = (snap) => {
+  if (!snap?.exists?.()) return false;
+  const data = snap.data() || {};
+  return data.active === true && data.role === 'admin';
 };
+
+// لا نعتمد على البريد الثابت ولا على users.role في صلاحيات الإدارة.
+// المصدر الوحيد لصلاحية الإدارة هو: Firestore => admins/{uid} مع active=true و role='admin'.
+const isAdminIdentity = () => false;
 
 const getInitialRouteMode = () => {
   const path = window.location.pathname || '/';
@@ -6648,66 +6652,91 @@ function App() {
 
   useEffect(() => {
     if (!auth) return;
+    let unsubUserProfile = null;
+
     const unsubAuth = onAuthStateChanged(auth, async (u) => {
+      if (unsubUserProfile) {
+        unsubUserProfile();
+        unsubUserProfile = null;
+      }
+
       setUser(u);
       setIsAdminAccount(false);
       setAuthLoading(false);
-      if (u) {
-        setLoading(true);
-        const emailAdmin = (u.email || '').toLowerCase() === PLATFORM_ADMIN_EMAIL;
-        setIsAdminAccount(emailAdmin);
-        try {
-          const adminSnap = await getDoc(doc(db, 'admins', u.uid));
-          if (emailAdmin || adminSnap.exists()) setIsAdminAccount(true);
-        } catch (adminError) {
-          console.warn('admin access check skipped:', adminError?.message);
-        }
-        const unsubUser = onSnapshot(doc(db, 'users', u.uid), (docSnap) => {
-          if (docSnap.exists()) {
-            const dbUser = docSnap.data();
-            setUserData({
-              name: dbUser?.name || u.displayName || u.email?.split('@')?.[0] || 'طالب',
-              email: dbUser?.email || u.email || '',
-              grade: dbUser?.grade || '1sec',
-              phone: dbUser?.phone || '',
-              parentPhone: dbUser?.parentPhone || '',
-              role: dbUser?.role || 'student',
-              status: dbUser?.status || 'pending',
-              subscriptionStatus: dbUser?.subscriptionStatus || 'free',
-              subscriptionExpiry: dbUser?.subscriptionExpiry || null,
-              ...dbUser
-            });
-          } else {
-            setUserData({
-              name: u.displayName || u.email?.split('@')?.[0] || 'طالب',
-              email: u.email || '',
-              grade: '1sec',
-              phone: '',
-              parentPhone: '',
-              role: 'student',
-              status: 'pending',
-              subscriptionStatus: 'free',
-              subscriptionExpiry: null
-            });
-          }
-          setLoading(false);
-        }, (error) => {
-          console.warn('user profile listener blocked:', error?.message);
+
+      if (!u) {
+        setUserData(null);
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+
+      let adminVerified = false;
+      try {
+        const adminSnap = await getDoc(doc(db, 'admins', u.uid));
+        adminVerified = isActiveAdminSnapshot(adminSnap);
+      } catch (adminError) {
+        console.warn('admin access check skipped:', adminError?.message);
+      }
+
+      setIsAdminAccount(adminVerified);
+
+      const currentRoute = getInitialRouteMode();
+      if (adminVerified && currentRoute !== 'admin') {
+        navigatePlatform('/admin');
+      } else if (!adminVerified && currentRoute === 'public') {
+        navigatePlatform('/student');
+      }
+
+      unsubUserProfile = onSnapshot(doc(db, 'users', u.uid), (docSnap) => {
+        if (docSnap.exists()) {
+          const dbUser = docSnap.data();
+          setUserData({
+            name: dbUser?.name || u.displayName || u.email?.split('@')?.[0] || 'طالب',
+            email: dbUser?.email || u.email || '',
+            grade: dbUser?.grade || '1sec',
+            phone: dbUser?.phone || '',
+            parentPhone: dbUser?.parentPhone || '',
+            role: dbUser?.role || 'student',
+            status: dbUser?.status || 'pending',
+            subscriptionStatus: dbUser?.subscriptionStatus || 'free',
+            subscriptionExpiry: dbUser?.subscriptionExpiry || null,
+            ...dbUser
+          });
+        } else {
           setUserData({
             name: u.displayName || u.email?.split('@')?.[0] || 'طالب',
             email: u.email || '',
             grade: '1sec',
+            phone: '',
+            parentPhone: '',
             role: 'student',
             status: 'pending',
             subscriptionStatus: 'free',
             subscriptionExpiry: null
           });
-          setLoading(false);
+        }
+        setLoading(false);
+      }, (error) => {
+        console.warn('user profile listener blocked:', error?.message);
+        setUserData({
+          name: u.displayName || u.email?.split('@')?.[0] || 'طالب',
+          email: u.email || '',
+          grade: '1sec',
+          role: 'student',
+          status: 'pending',
+          subscriptionStatus: 'free',
+          subscriptionExpiry: null
         });
-        return () => unsubUser();
-      } else { setUserData(null); setLoading(false); }
+        setLoading(false);
+      });
     });
-    return () => unsubAuth();
+
+    return () => {
+      if (unsubUserProfile) unsubUserProfile();
+      unsubAuth();
+    };
   }, []);
 
   if (authLoading || (user && loading)) return (
@@ -6723,7 +6752,7 @@ function App() {
     </div>
   );
 
-  const adminAllowed = isAdminAccount || isAdminIdentity(user, userData);
+  const adminAllowed = isAdminAccount;
   const isAdminRoute = routeMode === 'admin';
 
   return (

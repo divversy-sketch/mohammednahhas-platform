@@ -5,35 +5,35 @@
 
     "admins": {
       "$uid": {
-        ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).exists() || auth.token.email === 'mido16280@gmail.com')",
+        ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).child('active').val() === true && root.child('admins').child(auth.uid).child('role').val() === 'admin')",
         ".write": false
       }
     },
 
     "users": {
       "$uid": {
-        ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).exists() || auth.token.email === 'mido16280@gmail.com')",
-        ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.email === 'mido16280@gmail.com')"
+        ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).child('active').val() === true && root.child('admins').child(auth.uid).child('role').val() === 'admin')",
+        ".write": "auth != null && (root.child('admins').child(auth.uid).child('active').val() === true && root.child('admins').child(auth.uid).child('role').val() === 'admin')"
       }
     },
 
     "student_presence": {
       "$uid": {
-        ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).exists() || auth.token.email === 'mido16280@gmail.com')",
+        ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).child('active').val() === true && root.child('admins').child(auth.uid).child('role').val() === 'admin')",
         ".write": "auth != null && auth.uid === $uid"
       }
     },
 
     "exam_autosave": {
       "$uid": {
-        ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).exists() || auth.token.email === 'mido16280@gmail.com')",
+        ".read": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).child('active').val() === true && root.child('admins').child(auth.uid).child('role').val() === 'admin')",
         ".write": "auth != null && auth.uid === $uid"
       }
     },
 
     "admin_only": {
-      ".read": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.email === 'mido16280@gmail.com')",
-      ".write": "auth != null && (root.child('admins').child(auth.uid).exists() || auth.token.email === 'mido16280@gmail.com')"
+      ".read": "auth != null && (root.child('admins').child(auth.uid).child('active').val() === true && root.child('admins').child(auth.uid).child('role').val() === 'admin')",
+      ".write": "auth != null && (root.child('admins').child(auth.uid).child('active').val() === true && root.child('admins').child(auth.uid).child('role').val() === 'admin')"
     }
   }
 }
