@@ -67,7 +67,7 @@ import { isActiveAdminSnapshot, getInitialRouteMode, navigatePlatform, DebugColl
 
 
 
-import ExamRunner from './ExamRunner.jsx';
+import ExamRunner from '../../shared/platformParts/ExamRunner.jsx';
 import PerformanceOverview from './PerformanceOverview.jsx';
 
 export const StudentDashboard = ({ user, userData, installPrompt }) => {
@@ -89,21 +89,11 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
   const [lectureInnerTab, setLectureInnerTab] = useState('explanation');
   const [learningHubTab, setLearningHubTab] = useState('assignments');
   const [mobileMenu, setMobileMenu] = useState(false);
-  const [content, setContent] = useState([]);  
-  const [exams, setExams] = useState([]);
   const [activeExam, setActiveExam] = useState(null);
   const [playingVideo, setPlayingVideo] = useState(null);
   const [playingHtml, setPlayingHtml] = useState(null);
-  const [examResults, setExamResults] = useState([]);
-  const [hwResults, setHwResults] = useState([]); 
-  const [assignments, setAssignments] = useState([]);
-  const [assignmentSubmissions, setAssignmentSubmissions] = useState([]);
-  const [videoViews, setVideoViews] = useState([]);
   const [reviewingExam, setReviewingExam] = useState(null);
-  const [mistakes, setMistakes] = useState([]);
-  const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [hasNewNotif, setHasNewNotif] = useState(false);
   const [pushStatus, setPushStatus] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported');
   const [editFormData, setEditFormData] = useState({ name: '', phone: '', parentPhone: '', grade: '' });
   const [showFocusMode, setShowFocusMode] = useState(false);
@@ -111,6 +101,12 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
   
   const [subscriptionCodeInput, setSubscriptionCodeInput] = useState('');
   const [isCharging, setIsCharging] = useState(false);
+
+  const {
+    content, exams, examResults, hwResults, assignments, assignmentSubmissions, videoViews,
+    mistakes, notifications, hasNewNotif, setContent, setExams, setExamResults, setHwResults,
+    setAssignments, setAssignmentSubmissions, setVideoViews, setMistakes, setNotifications, setHasNewNotif
+  } = useStudentDashboardData({ user, userData, setScanningHwId, setEditFormData });
 
   useEffect(() => {
       window.history.pushState({ tab: activeTab }, '');
@@ -127,61 +123,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
 
   }, [activeTab]);
 
-  useEffect(() => {
-    if(!userData) return;
-    const urlParams = new URLSearchParams(window.location.search);
-    const hwParam = urlParams.get('hw');
-    if (hwParam) { setScanningHwId(hwParam); window.history.replaceState({}, document.title, window.location.pathname); }
-
-    const unsubContent = onSnapshot(query(collection(db, 'content'), where('grade', '==', userData?.grade)), s => {
-        const allContent = s.docs.map(d=>({id:d.id,...d.data()}));
-        const visibleContent = allContent.filter(c => { if (!c.allowedEmails || c.allowedEmails.length === 0) return true; return c.allowedEmails.includes(user.email); });
-        setContent(visibleContent);
-    }, error => { console.warn('content listener blocked:', error?.message); setContent([]); });
-
-    const unsubExams = onSnapshot(query(collection(db, 'exams'), where('grade', '==', userData?.grade)), s => setExams(s.docs.map(d=>({id:d.id,...d.data()}))), error => { console.warn('exams listener blocked:', error?.message); setExams([]); });
-    const unsubResults = onSnapshot(query(collection(db, 'exam_results'), where('studentId', '==', user.uid)), s => {
-        const rows = s.docs.map(d=>({id:d.id,...d.data()}));
-        rows.sort((a,b) => (b.submittedAt?.seconds || 0) - (a.submittedAt?.seconds || 0));
-        setExamResults(rows);
-    }, error => { console.warn('exam_results listener blocked:', error?.message); setExamResults([]); });
-    const unsubHwResults = onSnapshot(query(collection(db, 'homework_results'), where('studentId', '==', user.uid)), s => {
-        const results = s.docs.map(d=>({id:d.id,...d.data()})); results.sort((a,b) => (b.submittedAt?.seconds || 0) - (a.submittedAt?.seconds || 0)); setHwResults(results);
-    }, error => { console.warn('homework_results listener blocked:', error?.message); setHwResults([]); });
-    const unsubMistakes = onSnapshot(query(collection(db, 'student_mistakes'), where('userId', '==', user.uid)), s => {
-        const rows = s.docs.map(d => ({id: d.id, ...d.data()})); rows.sort((a,b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)); setMistakes(rows);
-    }, error => { console.warn('student_mistakes listener blocked:', error?.message); setMistakes([]); });
-    const unsubNotif = onSnapshot(query(collection(db, 'notifications'), where('grade', 'in', ['all', userData?.grade]), limit(10)), s => {
-        const newNotifs = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-        setNotifications(newNotifs);
-        if(newNotifs.length > 0) {
-          setHasNewNotif(true);
-          const latest = newNotifs[0];
-          if(latest.text) sendSystemNotification(latest.title || "تنبيه جديد 🔔", latest.text);
-        }
-    }, error => { console.warn('notifications listener blocked:', error?.message); setNotifications([]); });
-
-    const unsubAssignments = onSnapshot(query(collection(db, 'assignments'), where('grade', '==', userData?.grade)), s => {
-        const rows = s.docs.map(d=>({id:d.id,...d.data()}));
-        rows.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-        setAssignments(rows);
-    }, error => { console.warn('assignments listener blocked:', error?.message); setAssignments([]); });
-
-    const unsubAssignmentSubs = onSnapshot(query(collection(db, 'assignment_submissions'), where('studentId', '==', user.uid)), s => {
-        const rows = s.docs.map(d=>({id:d.id,...d.data()}));
-        rows.sort((a,b) => (b.submittedAt?.seconds || 0) - (a.submittedAt?.seconds || 0));
-        setAssignmentSubmissions(rows);
-    }, error => { console.warn('assignment_submissions listener blocked:', error?.message); setAssignmentSubmissions([]); });
-
-    const unsubVideoViews = onSnapshot(query(collection(db, 'video_views'), where('userId', '==', user.uid)), s => {
-        setVideoViews(s.docs.map(d=>({id:d.id,...d.data()})));
-    }, error => { console.warn('video_views listener blocked:', error?.message); setVideoViews([]); });
-
-    setEditFormData({ name: userData?.name, phone: userData.phone, parentPhone: userData.parentPhone, grade: userData?.grade });
-
-    return () => { unsubContent(); unsubExams(); unsubResults(); unsubHwResults(); unsubMistakes(); unsubNotif(); unsubAssignments(); unsubAssignmentSubs(); unsubVideoViews(); };
-  }, [userData, user]);
-
+  // بيانات الطالب الحية انتقلت إلى useStudentDashboardData.
 
   const enableMobilePushNotifications = async () => {
     setPushStatus('disabled');

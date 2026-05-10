@@ -67,16 +67,16 @@ import { isActiveAdminSnapshot, getInitialRouteMode, navigatePlatform, DebugColl
 
 
 
-import ExamRunner from '../parts/ExamRunner.jsx';
+import ExamRunner from '../../shared/platformParts/ExamRunner.jsx';
 import AppErrorBoundary from '../parts/AppErrorBoundary.jsx';
 import PerformanceOverview from '../parts/PerformanceOverview.jsx';
 import PlatformPerformanceBooster from '../parts/PlatformPerformanceBooster.jsx';
-import PaymentRequestStudentPanel from '../parts/PaymentRequestStudentPanel.jsx';
-import LeaderboardPanel from '../parts/LeaderboardPanel.jsx';
-import StudentSmartPerformanceReport from '../parts/StudentSmartPerformanceReport.jsx';
+import PaymentRequestStudentPanel from '../../shared/platformParts/PaymentRequestStudentPanel.jsx';
+import LeaderboardPanel from '../../shared/platformParts/LeaderboardPanel.jsx';
+import StudentSmartPerformanceReport from '../../shared/platformParts/StudentSmartPerformanceReport.jsx';
 import StudentDashboard from '../parts/StudentDashboard.jsx';
 import LandingPage from '../parts/LandingPage.jsx';
-import AuthPage from '../parts/AuthPage.jsx';
+import AuthPage from '../../shared/platformParts/AuthPage.jsx';
 
 // ExamRunner moved to src/student/parts/ExamRunner.jsx
 

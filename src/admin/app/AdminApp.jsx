@@ -67,16 +67,16 @@ import { isActiveAdminSnapshot, getInitialRouteMode, navigatePlatform, DebugColl
 
 
 
-import ExamRunner from '../parts/ExamRunner.jsx';
+import ExamRunner from '../../shared/platformParts/ExamRunner.jsx';
 import PlatformPerformanceBooster from '../parts/PlatformPerformanceBooster.jsx';
-import PaymentRequestStudentPanel from '../parts/PaymentRequestStudentPanel.jsx';
+import PaymentRequestStudentPanel from '../../shared/platformParts/PaymentRequestStudentPanel.jsx';
 import AdminPaymentRequestsPanel from '../parts/AdminPaymentRequestsPanel.jsx';
 import AdvancedAntiCheatInsights from '../parts/AdvancedAntiCheatInsights.jsx';
 import AppConversionGuidePanel from '../parts/AppConversionGuidePanel.jsx';
 import SmartSubscriptionManager from '../parts/SmartSubscriptionManager.jsx';
-import LeaderboardPanel from '../parts/LeaderboardPanel.jsx';
+import LeaderboardPanel from '../../shared/platformParts/LeaderboardPanel.jsx';
 import AdminQuestionDeepAnalytics from '../parts/AdminQuestionDeepAnalytics.jsx';
-import StudentSmartPerformanceReport from '../parts/StudentSmartPerformanceReport.jsx';
+import StudentSmartPerformanceReport from '../../shared/platformParts/StudentSmartPerformanceReport.jsx';
 import QuestionBankManager from '../parts/QuestionBankManager.jsx';
 import AssignmentsManager from '../parts/AssignmentsManager.jsx';
 import PerformanceOverview from '../parts/PerformanceOverview.jsx';
@@ -85,7 +85,7 @@ import AdminProDashboard from '../parts/AdminProDashboard.jsx';
 import ActivityIcon from '../parts/ActivityIcon.jsx';
 import AdminPerformanceAnalytics from '../parts/AdminPerformanceAnalytics.jsx';
 import AdminDashboard from '../parts/AdminDashboard.jsx';
-import AuthPage from '../parts/AuthPage.jsx';
+import AuthPage from '../../shared/platformParts/AuthPage.jsx';
 import AdminAccessDenied from '../parts/AdminAccessDenied.jsx';
 import AppErrorBoundary from '../parts/AppErrorBoundary.jsx';
 

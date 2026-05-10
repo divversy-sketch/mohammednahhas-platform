@@ -73,10 +73,13 @@ import AdminProDashboard from './AdminProDashboard.jsx';
 import AdminQuestionDeepAnalytics from './AdminQuestionDeepAnalytics.jsx';
 import AdvancedAntiCheatInsights from './AdvancedAntiCheatInsights.jsx';
 import AssignmentsManager from './AssignmentsManager.jsx';
-import ExamRunner from './ExamRunner.jsx';
-import LeaderboardPanel from './LeaderboardPanel.jsx';
+import ExamRunner from '../../shared/platformParts/ExamRunner.jsx';
+import LeaderboardPanel from '../../shared/platformParts/LeaderboardPanel.jsx';
 import QuestionBankManager from './QuestionBankManager.jsx';
 import SmartSubscriptionManager from './SmartSubscriptionManager.jsx';
+import { useAdminDashboardData } from '../hooks/useAdminDashboardData.js';
+import AdminHeader from '../components/AdminHeader.jsx';
+import AdminSidebar from '../components/AdminSidebar.jsx';
 
 export const AdminDashboard = ({ user }) => {
   const userData = user || {};
@@ -85,17 +88,11 @@ export const AdminDashboard = ({ user }) => {
   const [activeTab, setActiveTab] = useState('dashboard'); 
   const [adminExamView, setAdminExamView] = useState('manage');
   const [adminGradeFilter, setAdminGradeFilter] = useState('all'); 
-  const [pendingUsers, setPendingUsers] = useState([]);
-  const [activeUsersList, setActiveUsersList] = useState([]);
-  const [contentList, setContentList] = useState([]);
-  const [messagesList, setMessagesList] = useState([]); 
   const [newContent, setNewContent] = useState({ title: '', url: '', type: 'video', videoSection: 'explanation', isPublic: false, grade: '3sec', allowedEmails: '', isPremium: false, linkedExamId: '', estimatedDurationMinutes: '', branch: '' });
   const [editingUser, setEditingUser] = useState(null);
   const [replyTexts, setReplyTexts] = useState({});
   const [examBuilder, setExamBuilder] = useState({ title: '', grade: '3sec', duration: 60, startTime: '', endTime: '', questions: [], accessCode: '', isPremium: false });
   const [bulkText, setBulkText] = useState('');
-  const [examsList, setExamsList] = useState([]);
-  const [examResults, setExamResults] = useState([]); 
   const [viewingResult, setViewingResult] = useState(null); 
   const [resultsFilter, setResultsFilter] = useState('all');
   const [essayScoreDrafts, setEssayScoreDrafts] = useState({});
@@ -103,11 +100,9 @@ export const AdminDashboard = ({ user }) => {
   const [newAnnouncement, setNewAnnouncement] = useState(""); 
   const [newStudentNotification, setNewStudentNotification] = useState({ title: '', text: '', grade: 'all', clickUrl: '/' }); 
   const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [announcements, setAnnouncements] = useState([]);
   
   const [autoReplies, setAutoReplies] = useState([]);
   const [newAutoReply, setNewAutoReply] = useState({ keywords: '', response: '', isActive: true });
-  const [quotesList, setQuotesList] = useState([]);
   const [newQuote, setNewQuote] = useState({ text: '', source: '' });
 
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -169,14 +164,19 @@ export const AdminDashboard = ({ user }) => {
     linkedExamId: '', estimatedDurationMinutes: '', branch: ''
   });
 
-  const [smartHomeworks, setSmartHomeworks] = useState([]);
   const [newSmartHw, setNewSmartHw] = useState({ title: '', answerKey: '', grade: '3sec', bookName: '' });
-  const [hwResults, setHwResults] = useState([]);
 
   // أكواد الاشتراك
-  const [subscriptionCodes, setSubscriptionCodes] = useState([]);
   const [codeGenCount, setCodeGenCount] = useState(10);
   const [codeGenDays, setCodeGenDays] = useState(30);
+
+  const {
+    pendingUsers, activeUsersList, contentList, messagesList, examsList, examResults,
+    announcements, quotesList, smartHomeworks, hwResults, subscriptionCodes,
+    setPendingUsers, setActiveUsersList, setContentList, setMessagesList, setExamsList,
+    setExamResults, setAnnouncements, setQuotesList, setSmartHomeworks, setHwResults,
+    setSubscriptionCodes
+  } = useAdminDashboardData();
 
   // تحديث حالة زر الرجوع للموبايل للأدمن
   useEffect(() => {
@@ -189,71 +189,7 @@ export const AdminDashboard = ({ user }) => {
       return () => window.removeEventListener('popstate', handlePopState);
   }, [activeTab]);
 
-  useEffect(() => {
-      const q = query(collection(db, 'users'), where('status','==','pending'));
-      const u = onSnapshot(q, s => setPendingUsers(s.docs.map(d=>({id:d.id,...d.data()}))));
-      return u;
-  }, []);
-
-  useEffect(() => {
-      const q = query(collection(db, 'users'), where('status', 'in', ['active', 'banned_cheating', 'banned_all', 'banned_exam', 'banned_content', 'rejected']));
-      const u = onSnapshot(q, s => setActiveUsersList(s.docs.map(d=>({id:d.id,...d.data()}))));
-      return u;
-  }, []);
-
-  useEffect(() => {
-      const q = query(collection(db, 'content'), orderBy('createdAt','desc'));
-      const u = onSnapshot(q, s => setContentList(s.docs.map(d=>({id:d.id,...d.data()}))));
-      return u;
-  }, []);
-
-  useEffect(() => {
-      const q = query(collection(db, 'messages'), orderBy('createdAt','desc'));
-      const u = onSnapshot(q, s => setMessagesList(s.docs.map(d=>({id:d.id,...d.data()}))));
-      return u;
-  }, []);
-
-  useEffect(() => {
-      const q = query(collection(db, 'exams'), orderBy('createdAt', 'desc'));
-      const u = onSnapshot(q, s => setExamsList(s.docs.map(d=>({id:d.id,...d.data()}))));
-      return u;
-  }, []);
-
-  useEffect(() => {
-      const q = query(collection(db, 'exam_results'), orderBy('submittedAt', 'desc'));
-      const u = onSnapshot(q, s => setExamResults(s.docs.map(d=>({id:d.id,...d.data()}))));
-      return u;
-  }, []);
-
-  useEffect(() => {
-      const q = query(collection(db, 'announcements'), orderBy('createdAt', 'desc'));
-      const u = onSnapshot(q, s => setAnnouncements(s.docs.map(d => ({id: d.id, ...d.data()}))));
-      return u;
-  }, []);
-  // Auto replies removed permanently.
-
-
-  useEffect(() => {
-      const u = onSnapshot(collection(db, 'quotes'), s => setQuotesList(s.docs.map(d => ({id: d.id, ...d.data()}))));
-      return u;
-  }, []);
-  
-  useEffect(() => {
-      const u = onSnapshot(collection(db, 'smart_homeworks'), s => setSmartHomeworks(s.docs.map(d => ({id: d.id, ...d.data()}))));
-      return u;
-  }, []);
-
-  useEffect(() => {
-      const q = query(collection(db, 'homework_results'), orderBy('submittedAt', 'desc'));
-      const u = onSnapshot(q, s => setHwResults(s.docs.map(d => ({id: d.id, ...d.data()}))));
-      return u;
-  }, []);
-
-  useEffect(() => {
-      const q = query(collection(db, 'subscription_codes'), orderBy('createdAt', 'desc'));
-      const u = onSnapshot(q, s => setSubscriptionCodes(s.docs.map(d => ({id: d.id, ...d.data()}))));
-      return u;
-  }, []);
+  // بيانات لوحة الإدارة الحية انتقلت إلى useAdminDashboardData.
 
   const handleApprove = async (id) => {
     await updateDoc(doc(db,'users',id), {status:'active'});
@@ -1474,39 +1410,10 @@ export const AdminDashboard = ({ user }) => {
           </div>
       )}
 
-      <header className="flex justify-between items-center mb-8 glass-panel p-4 rounded-xl relative z-10 m-4">
-        <div className="flex items-center gap-2"><ShieldAlert className="text-amber-600"/> <h1 className="text-2xl font-bold font-arabic text-slate-800">لوحة تحكم النحاس (الأدمن)</h1></div>
-        <div className="flex gap-4 items-center">
-            <select className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg font-bold shadow-sm cursor-pointer hidden md:block" value={adminGradeFilter} onChange={(e) => setAdminGradeFilter(e.target.value)}>
-                <option value="all">كل المراحل الدراسية</option>
-                <GradeOptions />
-            </select>
-            <button onClick={() => signOut(auth)} className="text-red-500 font-bold px-4 py-2 flex gap-2 hover:bg-red-50 rounded-lg transition"><LogOut /> خروج</button>
-        </div>
-      </header>
+      <AdminHeader adminGradeFilter={adminGradeFilter} setAdminGradeFilter={setAdminGradeFilter} />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-4 md:p-6 relative z-10">
-        <div className="glass-panel p-4 rounded-xl h-fit space-y-2 flex md:flex-col overflow-x-auto md:overflow-x-visible whitespace-nowrap scrollbar-hide">
-          {[
-            ['dashboard', 'Dashboard شامل'],
-            ['users', 'طلبات الانضمام'],
-            ['all_users', 'الطلاب'],
-            ['payments', 'الاشتراكات والدفع'],
-            ['security_center', 'مركز الحماية'],
-            ['app_convert', 'تحويل App'],
-            ['question_bank', 'بنك الأسئلة'],
-            ['assignments', 'الواجبات'],
-            ['exams', 'الامتحانات والنتائج'],
-            ['smart_hw', 'الواجب الذكي QR'],
-            ['content', 'المحتوى'],
-            ['courses', 'الكورسات التعليمية'],
-            ['mistakes_admin', 'بنك الأخطاء']
-          ].map(([tab, label]) => (
-            <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3 rounded-lg font-bold flex gap-2 transition-all ${activeTab===tab?'bg-amber-100 text-amber-700 shadow-sm border-b-4 md:border-b-0 md:border-r-4 border-amber-500':'hover:bg-slate-50 text-slate-600'}`}>
-              {label}
-            </button>
-          ))}
-        </div>
+        <AdminSidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
         <div className="md:col-span-3 w-full overflow-hidden">
           {activeTab === 'dashboard' && (
