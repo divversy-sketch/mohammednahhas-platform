@@ -784,7 +784,11 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
         {activeTab === 'exams' && !isBannedExam && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
              {exams.map(e => {
-                const prevResult = examResults.find(r => r.examId === e.id);
+                const examAttempts = examResults.filter(r => r.examId === e.id);
+                const prevResult = examAttempts.find(r => ['continue', 'restart'].includes(r.adminDecision))
+                  || examAttempts.find(r => ['security_hold', 'in_progress', 'cheated'].includes(r.status))
+                  || examAttempts.find(r => r.status === 'completed')
+                  || examAttempts[0];
                 const isExamTimeOver = Date.now() > new Date(e.endTime).getTime();
                 
                 let statusText = null; let statusClass = "";

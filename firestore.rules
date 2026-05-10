@@ -49,16 +49,27 @@ service cloud.firestore {
     }
 
     function safeStudentExamResultUpdate() {
+      let changed = request.resource.data.diff(resource.data).changedKeys();
       return ownsExistingStudentId()
-        && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+        && changed.hasOnly([
           'answers', 'answerText', 'essayAnswer', 'uploadedAnswerUrl', 'uploadedImages',
           'localDraftSyncedAt', 'autosaveAt', 'lastSavedAt', 'updatedAt', 'submittedAt',
-          'status', 'timeLeft', 'remainingSeconds', 'studentNotes'
+          'status', 'timeLeft', 'remainingSeconds', 'remainingTime', 'currentQIndex',
+          'antiCheatWarnings', 'antiCheatLog', 'studentNotes',
+          'adminDecision', 'adminSecurityAction', 'resumeApproved',
+          'resumedAfterAdminApprovalAt', 'restartedByAdminDecisionAt', 'sourceVideoId'
         ])
-        && (!('score' in request.resource.data) || request.resource.data.score == resource.data.score)
-        && (!('totalScore' in request.resource.data) || request.resource.data.totalScore == resource.data.totalScore)
-        && (!('percentage' in request.resource.data) || request.resource.data.percentage == resource.data.percentage)
-        && (!('grade' in request.resource.data) || request.resource.data.grade == resource.data.grade);
+        && (!changed.hasAny(['adminDecision'])
+          || (resource.data.adminDecision == 'continue' && request.resource.data.adminDecision == 'continue_consumed')
+          || (resource.data.adminDecision == 'restart' && request.resource.data.adminDecision == 'restart_consumed'))
+        && (!changed.hasAny(['adminSecurityAction'])
+          || (resource.data.adminSecurityAction == 'continue' && request.resource.data.adminSecurityAction == 'continue_consumed')
+          || (resource.data.adminSecurityAction == 'restart' && request.resource.data.adminSecurityAction == 'restart_consumed'))
+        && (!changed.hasAny(['resumeApproved']) || request.resource.data.resumeApproved == false)
+        && (!changed.hasAny(['score']) || request.resource.data.score == resource.data.score)
+        && (!changed.hasAny(['totalScore']) || request.resource.data.totalScore == resource.data.totalScore)
+        && (!changed.hasAny(['percentage']) || request.resource.data.percentage == resource.data.percentage)
+        && (!changed.hasAny(['grade']) || request.resource.data.grade == resource.data.grade);
     }
 
     function safeOwnerProgressUpdate() {
