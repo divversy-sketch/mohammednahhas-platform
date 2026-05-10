@@ -1,0 +1,8 @@
+src/app/AppRoot.jsx
+src/admin/app/AdminApp.jsx
+src/student/app/StudentApp.jsx
+firebase.json
+firestore.rules
+storage.rules
+ADMIN_STUDENT_SPLIT_PHASE2_AR.md
+FILES_CHANGED_SPLIT_PHASE2.txt

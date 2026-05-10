@@ -1,7 +1,7 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react';
 
-const AdminApp = lazy(() => import('../admin/AdminApp.jsx'));
-const StudentApp = lazy(() => import('../student/StudentApp.jsx'));
+const AdminApp = lazy(() => import('../admin/app/AdminApp.jsx'));
+const StudentApp = lazy(() => import('../student/app/StudentApp.jsx'));
 
 const getRouteMode = () => {
   if (typeof window === 'undefined') return 'student';
