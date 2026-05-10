@@ -66,6 +66,12 @@ import {
 import { isActiveAdminSnapshot, getInitialRouteMode, navigatePlatform, DebugCollector, DebugPanel } from '../core/debugTools.jsx';
 import { makeExamAutosaveKey, readLocalExamBackup, writeLocalExamBackupToStorage, flattenExamQuestions } from '../exam/examState.js';
 import ExamDashboardView from '../../features/exam/components/ExamDashboardView.jsx';
+import ExamWatermarkLayer from '../../features/exam/components/ExamWatermarkLayer.jsx';
+import ExamSecurityHoldOverlay from '../../features/exam/components/ExamSecurityHoldOverlay.jsx';
+import ExamSubmitConfirmDialog from '../../features/exam/components/ExamSubmitConfirmDialog.jsx';
+import ExamTopBar from '../../features/exam/components/ExamTopBar.jsx';
+import ExamQuestionNavigator from '../../features/exam/components/ExamQuestionNavigator.jsx';
+import ExamQuestionPanel from '../../features/exam/components/ExamQuestionPanel.jsx';
 
 
 
@@ -574,283 +580,55 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-100 flex flex-col font-['Cairo'] no-select" dir="rtl">
-      {!isSubmitted && (
-        <div className="fixed inset-0 pointer-events-none z-[9999] overflow-hidden">
-          {wmPositions.map((pos, i) => (
-            <div key={i} className="watermark-text" style={{ top: pos.top, left: pos.left }}>
-              {user.displayName} - {user.email}
-            </div>
-          ))}
-        </div>
-      )}
+      {!isSubmitted && <ExamWatermarkLayer positions={wmPositions} user={user} />}
 
-      {showAntiCheatChoice && (
-        <div className="fixed inset-0 z-[10000] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-7 max-w-lg w-full shadow-2xl text-center border-t-8 border-red-500">
-            <ShieldAlert className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h3 className="text-2xl font-black mb-2 text-slate-900">تم إيقاف المحاولة مؤقتًا</h3>
-            <p className="text-slate-600 mb-5 font-bold leading-relaxed">
-              تم رصد أكثر من مخالفة أمان أثناء الامتحان. تم حفظ إجاباتك والوقت المتبقي، ولن يتم تصفيرك تلقائيًا.
-            </p>
-            <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-right text-sm text-red-800 mb-6 space-y-2">
-              <p><b>القرار الآن عند الأدمن فقط:</b></p>
-              <p>يمكن للأدمن من لوحة النتائج أن يسمح لك باستكمال الامتحان بنفس الإجابات والوقت المتبقي.</p>
-              <p>أو يسمح بإعادة الامتحان من البداية إذا رأى أن الحالة تستحق ذلك.</p>
-              <p className="font-black">نظام الأمان سيظل نشطًا بنفس الصرامة بعد السماح.</p>
-            </div>
-            <button onClick={onClose} className="bg-slate-900 text-white py-3 px-8 rounded-xl font-bold hover:bg-slate-800 shadow-md transition">
-              العودة للمنصة وانتظار قرار الأدمن
-            </button>
-          </div>
-        </div>
-      )}
+      {showAntiCheatChoice && <ExamSecurityHoldOverlay onClose={onClose} />}
 
       {showSubmitConfirm && (
-        <div className="fixed inset-0 z-[10000] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center border-t-8 border-amber-500">
-            <AlertTriangle className="w-16 h-16 text-amber-500 mx-auto mb-4" />
-            <h3 className="text-2xl font-bold mb-2 text-slate-800">هل أنت متأكد من التسليم؟</h3>
-            <p className="text-slate-500 mb-8 font-bold">لن يمكنك تعديل إجاباتك بعد ذلك، وسيتم نقلك للوحة النتيجة.</p>
-            <div className="flex gap-4">
-              <button onClick={() => handleSubmit(false)} className="flex-1 bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 shadow-md transition">نعم، سلم الآن</button>
-              <button onClick={() => setShowSubmitConfirm(false)} className="flex-1 bg-slate-200 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-300 shadow-sm transition">تراجع</button>
-            </div>
-          </div>
-        </div>
+        <ExamSubmitConfirmDialog
+          onSubmit={() => handleSubmit(false)}
+          onCancel={() => setShowSubmitConfirm(false)}
+        />
       )}
 
-      <div className="bg-slate-900 text-white p-4 flex flex-col md:flex-row justify-between items-center shadow-md relative z-50 gap-4">
-        <div className="flex items-center gap-4 w-full md:w-auto justify-between">
-          {isSubmitted && (
-            <button onClick={() => setActiveView('dashboard')} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl font-bold transition flex items-center gap-2 shadow-sm text-sm">
-              <Layout size={16} /> العودة للنتيجة
-            </button>
-          )}
-          <h2 className="font-bold text-lg font-sans text-amber-400 truncate hidden md:block">{exam.title} {isSubmitted ? '(مراجعة الإجابات)' : ''}</h2>
-          {!isSubmitted && (
-            <div className="flex items-center gap-2 md:gap-3 flex-wrap justify-end">
-              <div className="bg-slate-800 px-4 md:px-6 py-2 rounded-full font-mono shadow-inner border border-slate-700 font-bold text-amber-400 text-base md:text-lg flex items-center gap-2">
-                <Timer size={18} /> {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
-              </div>
-              <button
-                onClick={() => document.documentElement.requestFullscreen?.().catch(() => platformNotify('لو ملء الشاشة لم يعمل، افتح المنصة من المتصفح مباشرة وليس داخل تطبيق خارجي.'))}
-                className="bg-amber-500 hover:bg-amber-600 text-slate-900 px-3 md:px-4 py-2 rounded-xl font-black transition whitespace-nowrap flex items-center gap-2 shadow-lg"
-                title="تفعيل ملء الشاشة"
-              >
-                <Layout size={18} /> ملء الشاشة
-              </button>
-              <button onClick={confirmSubmit} className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-xl font-bold transition whitespace-nowrap flex items-center gap-2 shadow-lg">
-                <CheckCircle size={18} /> تسليم
-              </button>
-            </div>
-          )}
-        </div>
-
-        {isSubmitted && (
-          <div className="flex flex-wrap gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-hide items-center">
-            <button
-              onClick={() => setActiveBranchTab('الكل')}
-              className={`whitespace-nowrap px-5 py-2 rounded-full text-sm font-bold transition-colors ${activeBranchTab === 'الكل' ? 'bg-emerald-500 text-slate-900 shadow-md' : 'bg-emerald-900/40 text-emerald-200 hover:bg-emerald-900/60'}`}
-            >
-              مراجعة الامتحان كله
-            </button>
-            {uniqueBranches.filter(branch => branch !== 'الكل').map((branch, i) => (
-              <button
-                key={i}
-                onClick={() => setActiveBranchTab(branch)}
-                className={`whitespace-nowrap px-5 py-2 rounded-full text-sm font-bold transition-colors ${activeBranchTab === branch ? 'bg-amber-500 text-slate-900 shadow-md' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
-              >
-                {branch}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {!isSubmitted && (
-          <button onClick={() => setActiveView('dashboard')} className="bg-slate-700 hover:bg-slate-600 px-6 py-2.5 rounded-xl font-bold transition whitespace-nowrap flex items-center gap-2">
-            <Layout size={18} /> لوحة التحكم
-          </button>
-        )}
-      </div>
+      <ExamTopBar
+        exam={exam}
+        isSubmitted={isSubmitted}
+        timeLeft={timeLeft}
+        activeBranchTab={activeBranchTab}
+        uniqueBranches={uniqueBranches}
+        onDashboard={() => setActiveView('dashboard')}
+        onSubmit={confirmSubmit}
+        onBranchChange={setActiveBranchTab}
+        onFullscreen={() => document.documentElement.requestFullscreen?.().catch(() => platformNotify('لو ملء الشاشة لم يعمل، افتح المنصة من المتصفح مباشرة وليس داخل تطبيق خارجي.'))}
+      />
 
       <div className="flex-1 flex overflow-hidden relative z-50">
-        <div className="w-16 md:w-24 bg-white border-l flex flex-col p-2 overflow-y-auto shadow-inner scrollbar-hide">
-          <div className="grid grid-cols-1 gap-3">
-            {displayQuestions.map((q, idx) => {
-              let statusClass = 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-2 border-transparent';
-              const currentAnswer = answers[q.id];
-              const isAnswered = currentAnswer !== undefined && currentAnswer !== '' && currentAnswer !== null;
+        <ExamQuestionNavigator
+          displayQuestions={displayQuestions}
+          flatQuestions={flatQuestions}
+          answers={answers}
+          flagged={flagged}
+          isSubmitted={isSubmitted}
+          currentQIndex={currentQIndex}
+          onSelectQuestion={setCurrentQIndex}
+        />
 
-              if (isSubmitted) {
-                if (q.type === 'essay') {
-                  statusClass = isAnswered ? 'bg-blue-100 text-blue-700 border-blue-500 shadow-sm' : 'bg-slate-100 text-slate-400 border-slate-300 border-dashed';
-                } else if (answers[q.id] === q.correctIdx) {
-                  statusClass = 'bg-green-100 text-green-700 border-green-500 shadow-sm';
-                } else if (isAnswered) {
-                  statusClass = 'bg-red-100 text-red-700 border-red-500 shadow-sm';
-                } else {
-                  statusClass = 'bg-slate-100 text-slate-400 border-slate-300 border-dashed';
-                }
-              } else if (isAnswered) {
-                statusClass = q.type === 'essay' ? 'bg-purple-100 text-purple-700 border-purple-400 shadow-sm' : 'bg-blue-100 text-blue-700 border-blue-400 shadow-sm';
-              }
-
-              const originalIndex = flatQuestions.findIndex(origQ => origQ.id === q.id) + 1;
-              return (
-                <button key={idx} onClick={() => setCurrentQIndex(idx)} className={`aspect-square rounded-xl font-bold text-base transition-all relative ${currentQIndex === idx ? 'ring-4 ring-amber-500 ring-offset-2 scale-105 z-10' : ''} ${statusClass}`}>
-                  {originalIndex}
-                  {flagged[q.id] && !isSubmitted && <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full border-2 border-white shadow-sm"></div>}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className={`flex-1 flex flex-col ${currentQObj?.blockText && currentQObj.blockText.trim().length > 0 ? 'md:flex-row' : 'items-center'} h-full overflow-hidden bg-slate-100 w-full p-4 md:p-8 gap-6`}>
-          {currentQObj?.blockText && currentQObj.blockText.trim().length > 0 && (
-            <div className="flex-1 w-full bg-white p-6 md:p-10 overflow-y-auto rounded-3xl shadow-sm border border-slate-200">
-              <h3 className="font-bold text-blue-900 mb-6 flex items-center gap-2 text-xl border-b border-blue-100 pb-4 font-['Cairo']"><FileText size={24} /> نص المراجعة / القراءة:</h3>
-              <div className="leading-loose text-lg md:text-xl font-bold text-slate-700 font-['Cairo']">{renderBracketHighlightedText(currentQObj.blockText)}</div>
-            </div>
-          )}
-
-          <div className={`${currentQObj?.blockText && currentQObj.blockText.trim().length > 0 ? 'flex-1' : 'w-full max-w-4xl mx-auto'} bg-white p-6 md:p-10 overflow-y-auto flex flex-col shadow-xl rounded-3xl h-full border border-slate-200 relative`}>
-            <div className="flex justify-between items-center mb-8 border-b border-slate-100 pb-6">
-              <div className="flex items-center gap-3">
-                <span className="bg-slate-900 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-md font-['Cairo']">سؤال {flatQuestions.findIndex(origQ => origQ.id === currentQObj.id) + 1}</span>
-                {currentQObj.branch && currentQObj.branch !== 'عام' && (
-                  <span className="bg-blue-50 text-blue-700 px-4 py-2 rounded-xl text-sm font-bold border border-blue-100 flex items-center gap-2"><Layers size={16} /> {currentQObj.branch}</span>
-                )}
-                {currentQObj.type === 'essay' && (
-                  <span className="bg-purple-50 text-purple-700 px-4 py-2 rounded-xl text-sm font-bold border border-purple-100 flex items-center gap-2"><PenTool size={16} /> سؤال مقالي</span>
-                )}
-              </div>
-              {!isSubmitted && <button onClick={() => { setFlagged({ ...flagged, [currentQObj.id]: !flagged[currentQObj.id] }); }} className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold transition shadow-sm ${flagged[currentQObj.id] ? 'bg-amber-100 text-amber-700 border border-amber-300' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200'}`}><Flag size={16} /> {flagged[currentQObj.id] ? 'محدد للمراجعة' : 'تحديد لمراجعته لاحقاً'}</button>}
-            </div>
-
-            <div className="bg-slate-50 p-6 md:p-8 rounded-2xl border border-slate-200 mb-8 shadow-inner text-center">
-              <h3 className="text-2xl md:text-3xl font-bold text-slate-900 leading-loose font-['Cairo'] drop-shadow-sm">
-                {String(currentQObj.text || '').split('|').map((part, i) => (
-                  <React.Fragment key={i}>
-                    {renderBracketHighlightedText(part.trim())}
-                    {i !== String(currentQObj.text || '').split('|').length - 1 && <br />}
-                  </React.Fragment>
-                ))}
-              </h3>
-            </div>
-
-            {isSubmitted && (
-              <div className="mb-6">
-                <LocalQuestionExplanation question={currentQObj} answers={answers} />
-              </div>
-            )}
-
-            {currentQObj.type === 'essay' ? (
-              <div className="space-y-4">
-                {isSubmitted && (
-                  <LocalEssayReviewBox question={currentQObj} answer={answers[currentQObj.id]} />
-                )}
-                {!isSubmitted ? (
-                  <>
-                    <textarea
-                      className="w-full min-h-[180px] border-2 border-slate-200 rounded-2xl p-4 text-lg focus:border-amber-500 outline-none transition"
-                      placeholder="اكتب إجابتك المقالية هنا..."
-                      value={typeof answers[currentQObj.id] === 'object' ? (answers[currentQObj.id]?.text || '') : (answers[currentQObj.id] || '')}
-                      onChange={(e) => {
-                        const previousImage = typeof answers[currentQObj.id] === 'object' ? answers[currentQObj.id]?.image : null;
-                        const previousFileName = typeof answers[currentQObj.id] === 'object' ? answers[currentQObj.id]?.fileName : null;
-                        handleAnswer(currentQObj.id, { text: e.target.value, image: previousImage, fileName: previousFileName });
-                      }}
-                    />
-                    <div className="border-2 border-dashed border-slate-300 rounded-2xl p-5 bg-slate-50">
-                      <label className="cursor-pointer flex flex-col md:flex-row items-center justify-between gap-4">
-                        <div>
-                          <p className="font-bold text-slate-700 flex items-center gap-2"><UploadCloud size={18} /> أو ارفع صورة لإجابة مكتوبة يدويًا</p>
-                          <p className="text-sm text-slate-500 mt-1">فتح الكاميرا/الملفات لهذا السؤال لا يُعتبر غشًا.</p>
-                        </div>
-                        <span className="bg-blue-600 text-white px-4 py-2 rounded-xl font-bold">اختيار صورة</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          capture="environment"
-                          className="hidden"
-                          onClick={() => { fileDialogBypassRef.current = true; }}
-                          onChange={(e) => handleEssayImageUpload(currentQObj.id, e.target.files?.[0])}
-                        />
-                      </label>
-                      {typeof answers[currentQObj.id] === 'object' && answers[currentQObj.id]?.image && (
-                        <div className="mt-4">
-                          <img src={answers[currentQObj.id].image} alt="إجابة مقالية" className="max-h-64 rounded-xl border border-slate-200 mx-auto" />
-                          <p className="text-xs text-slate-500 mt-2">{answers[currentQObj.id]?.fileName || 'تم رفع صورة'}</p>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5">
-                      <p className="font-bold text-blue-800 mb-2">إجابتك النصية</p>
-                      <p className="whitespace-pre-wrap text-slate-700">
-                        {typeof answers[currentQObj.id] === 'object' ? (answers[currentQObj.id]?.text || 'لم يتم إدخال نص') : (answers[currentQObj.id] || 'لم يتم إدخال نص')}
-                      </p>
-                    </div>
-                    {typeof answers[currentQObj.id] === 'object' && answers[currentQObj.id]?.image && (
-                      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5">
-                        <p className="font-bold text-slate-800 mb-2">الصورة المرفوعة</p>
-                        <img src={answers[currentQObj.id].image} alt="إجابة مقالية" className="max-h-80 rounded-xl border border-slate-200 mx-auto" />
-                      </div>
-                    )}
-                    {currentQObj.modelAnswer && (
-                      <div className="bg-green-50 border border-green-200 rounded-2xl p-5">
-                        <p className="font-bold text-green-800 mb-2">نموذج الإجابة</p>
-                        <p className="whitespace-pre-wrap text-slate-700">{currentQObj.modelAnswer}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {(Array.isArray(currentQObj.options) ? currentQObj.options : []).map((opt, idx) => {
-                  let optionClass = 'border-slate-200 hover:bg-slate-50 bg-white text-slate-700';
-                  const isSelected = answers[currentQObj.id] === idx;
-
-                  if (isSubmitted) {
-                    if (idx === currentQObj.correctIdx) optionClass = 'border-green-500 bg-green-50 text-green-900 shadow-md ring-2 ring-green-200';
-                    else if (isSelected) optionClass = 'border-red-500 bg-red-50 text-red-900 shadow-md';
-                    else optionClass = 'border-slate-200 bg-slate-50 opacity-50';
-                  } else if (isSelected) {
-                    optionClass = 'border-amber-500 bg-amber-50 text-amber-900 shadow-md transform scale-[1.02] ring-2 ring-amber-200';
-                  }
-
-                  return (
-                    <div key={idx} onClick={() => handleAnswer(currentQObj.id, idx)} className={`p-5 rounded-2xl border-2 cursor-pointer transition-all duration-200 flex items-center gap-4 ${optionClass}`}>
-                      <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${isSelected || (isSubmitted && idx === currentQObj.correctIdx) ? 'border-transparent bg-current' : 'border-slate-300'}`}>
-                        {(isSubmitted && idx === currentQObj.correctIdx) && <Check size={16} className="text-white" />}
-                        {(isSubmitted && isSelected && idx !== currentQObj.correctIdx) && <X size={16} className="text-white" />}
-                      </div>
-                      <span className="font-['Cairo'] text-xl font-bold leading-relaxed">{opt}</span>
-                      {isSubmitted && idx === currentQObj.correctIdx && <span className="mr-auto text-green-600 bg-green-100 px-3 py-1 rounded-lg text-xs font-bold">الإجابة الصحيحة</span>}
-                      {isSubmitted && isSelected && idx !== currentQObj.correctIdx && <span className="mr-auto text-red-600 bg-red-100 px-3 py-1 rounded-lg text-xs font-bold">إجابتك (خطأ)</span>}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {isSubmitted && currentQObj.explanation && (
-              <div className="mt-6 bg-blue-50 border border-blue-200 rounded-2xl p-5 text-right">
-                <p className="font-bold text-blue-800 mb-2 flex items-center gap-2"><HelpCircle size={18}/> شرح الإجابة</p>
-                <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">{currentQObj.explanation}</p>
-              </div>
-            )}
-
-            <div className="mt-auto pt-10 flex justify-between">
-              <button disabled={currentQIndex === 0} onClick={() => setCurrentQIndex((p) => p - 1)} className="px-8 py-4 rounded-xl bg-slate-200 text-slate-700 font-bold disabled:opacity-50 hover:bg-slate-300 transition shadow-sm font-['Cairo'] flex items-center gap-2"><ChevronRight size={20} /> السابق</button>
-              <button disabled={currentQIndex === displayQuestions.length - 1} onClick={() => setCurrentQIndex((p) => p + 1)} className="px-8 py-4 rounded-xl bg-slate-900 text-white font-bold disabled:opacity-50 hover:bg-slate-800 transition shadow-lg font-['Cairo'] flex items-center gap-2">التالي <ChevronRight size={20} className="rotate-180" /></button>
-            </div>
-          </div>
-        </div>
+        <ExamQuestionPanel
+          question={currentQObj}
+          flatQuestions={flatQuestions}
+          displayQuestions={displayQuestions}
+          answers={answers}
+          flagged={flagged}
+          currentQIndex={currentQIndex}
+          isSubmitted={isSubmitted}
+          onAnswer={handleAnswer}
+          onFlagToggle={(questionId) => setFlagged((prev) => ({ ...prev, [questionId]: !prev[questionId] }))}
+          onImageUpload={handleEssayImageUpload}
+          onFileDialogOpen={() => { fileDialogBypassRef.current = true; }}
+          onPrevious={() => setCurrentQIndex((p) => p - 1)}
+          onNext={() => setCurrentQIndex((p) => p + 1)}
+        />
       </div>
     </div>
   );

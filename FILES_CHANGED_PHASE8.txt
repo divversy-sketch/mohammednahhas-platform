@@ -1,0 +1,9 @@
+src/shared/platformParts/ExamRunner.jsx
+src/features/exam/components/ExamWatermarkLayer.jsx
+src/features/exam/components/ExamSecurityHoldOverlay.jsx
+src/features/exam/components/ExamSubmitConfirmDialog.jsx
+src/features/exam/components/ExamTopBar.jsx
+src/features/exam/components/ExamQuestionNavigator.jsx
+src/features/exam/components/ExamQuestionPanel.jsx
+DEEP_SPLIT_PHASE8_EXAM_UI_AR.md
+FILES_CHANGED_PHASE8.txt
