@@ -319,7 +319,16 @@ export const AdminDashboard = ({ user }) => {
     platformNotify('تم حذف الامتحان وسجلاته المرتبطة.');
   };
   const handleDeleteAnnouncement = async (id) => { if(platformConfirm("حذف الإعلان؟")) await adminSecureFunctions.deleteAdminDocument('announcements', id); };
-  const handleDeleteResult = async (resultId) => { if(platformConfirm("حذف النتيجة؟")) await adminSecureFunctions.deleteAdminDocument('exam_results', resultId); };
+  const handleDeleteResult = async (resultId) => {
+    if (!platformConfirm("حذف النتيجة؟")) return;
+    try {
+      await adminSecureFunctions.deleteAdminDocument('exam_results', resultId);
+    } catch (error) {
+      console.warn('delete result callable failed; trying direct Firestore delete:', error?.message);
+      await deleteDoc(doc(db, 'exam_results', resultId));
+    }
+    platformNotify('تم حذف النتيجة.');
+  };
 
   const openAdminResultReview = async (result) => {
     try {
@@ -584,7 +593,9 @@ export const AdminDashboard = ({ user }) => {
     if (!result?.id) return;
     if (!platformConfirm(`السماح للطالب ${result.studentName || ''} باستكمال الامتحان بنفس الإجابات والوقت المتبقي؟`)) return;
 
-    const safeRemainingTime = safeNumber(result.remainingTime, safeNumber(result.totalTime, 60) * 60);
+    const fullSeconds = safeNumber(result.totalTime, 60) * 60;
+    const savedRemainingTime = safeNumber(result.remainingTime, fullSeconds);
+    const safeRemainingTime = savedRemainingTime > 0 ? savedRemainingTime : fullSeconds;
     const payload = {
       status: 'in_progress',
       adminDecision: 'continue',
@@ -621,8 +632,6 @@ export const AdminDashboard = ({ user }) => {
       answers: {},
       remainingTime: fullSeconds,
       currentQIndex: 0,
-      score: 0,
-      total: 0,
       antiCheatWarnings: 0,
       restartCount: increment(1),
       adminApprovedBy: user.email || user.uid,
@@ -1536,7 +1545,7 @@ export const AdminDashboard = ({ user }) => {
                            })()}
                        </div>
                        <h3 className="font-bold text-lg mb-2">إجابات الطالب: {viewingResult.studentName}</h3>
-                       {(['security_hold', 'in_progress', 'cheated'].includes(viewingResult.status) && !['continue', 'restart', 'continue_consumed', 'restart_consumed'].includes(viewingResult.adminDecision)) && (
+                       {(!['continue', 'restart'].includes(viewingResult.adminDecision)) && (
                          <div className="mb-4 bg-red-50 border border-red-200 text-red-800 p-4 rounded-xl">
                            <p className="font-black mb-2 flex items-center gap-2"><ShieldAlert size={18}/> هذه المحاولة تحتاج قرار الأدمن</p>
                            <p className="text-sm font-bold mb-3">يمكنك السماح للطالب بالاستكمال من نفس الإجابات والوقت المتبقي، أو السماح بإعادة الامتحان من البداية.</p>
@@ -1658,7 +1667,7 @@ export const AdminDashboard = ({ user }) => {
                                        </p>
                                    </div>
                                    <div className="flex gap-2 flex-wrap justify-end">
-                                      {(['security_hold', 'in_progress', 'cheated'].includes(res.status) && !['continue', 'restart', 'continue_consumed', 'restart_consumed'].includes(res.adminDecision)) && (
+                                      {(!['continue', 'restart'].includes(res.adminDecision)) && (
                                         <>
                                           <button onClick={()=>handleApproveSecurityContinue(res)} className="bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-blue-700">السماح بالاستكمال</button>
                                           <button onClick={()=>handleApproveSecurityRestart(res)} className="bg-amber-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-amber-700">السماح بالإعادة</button>

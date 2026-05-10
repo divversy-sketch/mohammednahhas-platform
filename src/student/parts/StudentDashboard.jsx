@@ -387,17 +387,12 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
         const hasAdminContinueApproval = previousResult.adminDecision === 'continue';
         const hasAdminRestartApproval = previousResult.adminDecision === 'restart';
 
-        if (previousResult.status === 'completed') {
-          platformNotify(`أنت امتحنت الامتحان ده قبل كده وجبت ${previousResult.score}.`);
-          return;
-        }
-
-        if (hasAdminContinueApproval && ['security_hold', 'in_progress', 'cheated'].includes(previousResult.status)) {
+        if (hasAdminContinueApproval) {
           const approvedResume = {
             ...previousResult,
             status: 'in_progress',
             answers: previousResult.answers || {},
-            remainingTime: safeNumber(previousResult.remainingTime, exam.duration * 60),
+            remainingTime: safeNumber(previousResult.remainingTime, exam.duration * 60) > 0 ? safeNumber(previousResult.remainingTime, exam.duration * 60) : exam.duration * 60,
             currentQIndex: safeNumber(previousResult.currentQIndex, 0),
             antiCheatWarnings: safeNumber(previousResult.antiCheatWarnings, 0),
             antiCheatLog: previousResult.antiCheatLog || []
@@ -417,7 +412,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
           return;
         }
 
-        if (hasAdminRestartApproval && ['security_hold', 'in_progress', 'cheated'].includes(previousResult.status)) {
+        if (hasAdminRestartApproval) {
           const freshResume = {
             answers: {},
             remainingTime: exam.duration * 60,
@@ -439,6 +434,11 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
           }, { merge: true });
 
           openExamFromSavedResult({ ...previousResult, ...freshResume, status: 'in_progress', adminDecision: 'restart_consumed' }, freshResume);
+          return;
+        }
+
+        if (previousResult.status === 'completed') {
+          platformNotify(`أنت امتحنت الامتحان ده قبل كده وجبت ${previousResult.score}.`);
           return;
         }
 
@@ -792,9 +792,9 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
                 const canRestartByAdmin = prevResult && prevResult.adminDecision === 'restart';
                 const waitingAdminDecision = prevResult && ['security_hold', 'in_progress', 'cheated'].includes(prevResult.status) && !canResumeByAdmin && !canRestartByAdmin;
                 if (prevResult) {
-                    if (prevResult.status === 'completed') { statusText = `تم الحل: ${prevResult.score} درجة`; statusClass = "bg-green-500 text-white"; } 
-                    else if (canResumeByAdmin) { statusText = "مسموح بالاستكمال ✅"; statusClass = "bg-blue-600 text-white"; }
+                    if (canResumeByAdmin) { statusText = "مسموح بالاستكمال ✅"; statusClass = "bg-blue-600 text-white"; }
                     else if (canRestartByAdmin) { statusText = "مسموح بالإعادة ✅"; statusClass = "bg-amber-600 text-white"; }
+                    else if (prevResult.status === 'completed') { statusText = `تم الحل: ${prevResult.score} درجة`; statusClass = "bg-green-500 text-white"; }
                     else if (prevResult.status === 'security_hold') { statusText = "موقوف في انتظار الأدمن 🛡️"; statusClass = "bg-red-600 text-white"; }
                     else if (prevResult.status === 'in_progress') { statusText = "ينتظر موافقة الأدمن ⏳"; statusClass = "bg-yellow-500 text-white"; } 
                     else if (prevResult.status === 'cheated') { statusText = "تم الحظر (غش)"; statusClass = "bg-red-600 text-white"; }
@@ -809,17 +809,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
                     <div className="flex justify-between text-xs md:text-sm text-slate-500 mb-4"><span>⏳ {e.duration} دقيقة</span><span>📝 {e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0)} سؤال</span></div>
                     
                     <div className="mt-auto">
-                        {prevResult && prevResult.status === 'completed' ? (
-                            <div className="flex flex-col sm:flex-row gap-2">
-                                 <button disabled className="flex-1 bg-slate-200 text-slate-500 py-2 md:py-3 rounded-xl font-bold cursor-not-allowed text-xs md:text-sm">تم الانتهاء</button>
-                                 {isExamTimeOver ? (
-                                    <button onClick={() => setReviewingExam(e)} className="flex-1 bg-blue-100 text-blue-700 py-2 md:py-3 rounded-xl font-bold hover:bg-blue-200 transition shadow-sm text-xs md:text-sm">عرض الأخطاء</button>
-                                 ) : (
-                                    <button disabled className="flex-1 bg-gray-100 text-gray-400 py-2 md:py-3 rounded-xl font-bold cursor-not-allowed text-[10px] md:text-xs">المراجعة بعد الوقت</button>
-                                 )}
-                                 <button onClick={() => generatePDF('student', {studentName: user.displayName, score: prevResult.score, total: e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0), status: prevResult.status, examTitle: e.title, questions: e.questions.flatMap(q => q.subQuestions), answers: prevResult.answers })} className="flex-1 bg-green-100 text-green-700 py-2 md:py-3 rounded-xl font-bold hover:bg-green-200 flex items-center justify-center gap-1 transition shadow-sm text-xs md:text-sm"><Download size={14}/> شهادة</button>
-                            </div>
-                        ) : canResumeByAdmin ? (
+                        {canResumeByAdmin ? (
                             <button onClick={() => startExamWithCode(e, { skipCode: true })} className="w-full bg-blue-600 text-white py-2 md:py-3 rounded-xl font-bold hover:bg-blue-700 flex items-center justify-center gap-2 shadow-lg transition text-sm">
                                 <Play size={14}/> استكمال الامتحان بموافقة الأدمن
                             </button>
@@ -830,6 +820,16 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
                         ) : waitingAdminDecision ? (
                             <div className="bg-amber-50 text-amber-700 p-2 md:p-3 rounded-xl font-bold text-center border border-amber-200 text-sm">
                                 المحاولة محفوظة. انتظر موافقة الأدمن للاستكمال أو الإعادة.
+                            </div>
+                        ) : prevResult && prevResult.status === 'completed' ? (
+                            <div className="flex flex-col sm:flex-row gap-2">
+                                 <button disabled className="flex-1 bg-slate-200 text-slate-500 py-2 md:py-3 rounded-xl font-bold cursor-not-allowed text-xs md:text-sm">تم الانتهاء</button>
+                                 {isExamTimeOver ? (
+                                    <button onClick={() => setReviewingExam(e)} className="flex-1 bg-blue-100 text-blue-700 py-2 md:py-3 rounded-xl font-bold hover:bg-blue-200 transition shadow-sm text-xs md:text-sm">عرض الأخطاء</button>
+                                 ) : (
+                                    <button disabled className="flex-1 bg-gray-100 text-gray-400 py-2 md:py-3 rounded-xl font-bold cursor-not-allowed text-[10px] md:text-xs">المراجعة بعد الوقت</button>
+                                 )}
+                                 <button onClick={() => generatePDF('student', {studentName: user.displayName, score: prevResult.score, total: e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0), status: prevResult.status, examTitle: e.title, questions: e.questions.flatMap(q => q.subQuestions), answers: prevResult.answers })} className="flex-1 bg-green-100 text-green-700 py-2 md:py-3 rounded-xl font-bold hover:bg-green-200 flex items-center justify-center gap-1 transition shadow-sm text-xs md:text-sm"><Download size={14}/> شهادة</button>
                             </div>
                         ) : prevResult ? (
                             <div className="bg-red-50 text-red-600 p-2 md:p-3 rounded-xl font-bold text-center border border-red-200 text-sm">لا يمكن دخول الامتحان</div>
