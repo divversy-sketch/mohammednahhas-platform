@@ -31,7 +31,6 @@ export const ADMIN_TAB_LABELS = Object.freeze({
   admin_roles: 'صلاحيات الأدمن',
   audit_logs: 'سجل الإدارة',
   notifications_admin: 'الإشعارات',
-  growth_suite: 'التطوير الشامل',
   assignments: 'الواجبات',
   exams: 'الامتحانات والنتائج',
   smart_hw: 'الواجب الذكي QR',
@@ -49,7 +48,7 @@ export const ROLE_TAB_ACCESS = Object.freeze({
   students_supervisor: ['dashboard', 'follow_up', 'users', 'all_users', 'student_reports', 'student_groups', 'messages_center', 'notifications_admin', 'password_resets'],
   content_supervisor: ['dashboard', 'content', 'courses', 'assignments', 'smart_hw', 'question_bank', 'notifications_admin'],
   finance_supervisor: ['dashboard', 'payments', 'subscriptions_legacy', 'finance_dashboard', 'all_users'],
-  support: ['dashboard', 'users', 'all_users', 'messages_center', 'password_resets', 'notifications_admin', 'growth_suite'],
+  support: ['dashboard', 'users', 'all_users', 'messages_center', 'password_resets', 'notifications_admin'],
 });
 
 export const ROLE_PERMISSIONS = Object.freeze({

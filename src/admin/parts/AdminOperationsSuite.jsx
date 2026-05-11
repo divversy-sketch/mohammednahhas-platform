@@ -3,7 +3,7 @@ import { collection, doc, limit, onSnapshot, orderBy, query, serverTimestamp, se
 import { db } from '../../services/firebase';
 import { platformNotify } from '../../shared/core/platformShared.jsx';
 import { Bell, ClipboardList, History, Save, Settings, Shield, Users } from '../../shared/icons/lucide-shim.jsx';
-import { getGradeLabel } from '../../shared/constants/grades.jsx';
+import { GradeOptions, getGradeLabel } from '../../shared/constants/grades.jsx';
 
 import { ADMIN_ROLE_LABELS as ROLE_LABELS, ADMIN_TAB_LABELS, ROLE_TAB_ACCESS, getRolePermissions, getRoleTabs, isOwnerEmail } from '../../config/adminPermissions';
 
@@ -270,8 +270,8 @@ const csvDownload = (filename, rows) => {
   URL.revokeObjectURL(url);
 };
 
-export function AdminGrowthSuite({ users = [], exams = [], examResults = [], content = [], assignments = [], assignmentSubmissions = [], subscriptionCodes = [], notifications = [], userData = {} }) {
-  const [tab, setTab] = useState('payments');
+export function AdminGrowthSuite({ users = [], exams = [], examResults = [], content = [], assignments = [], assignmentSubmissions = [], subscriptionCodes = [], notifications = [], userData = {}, initialTab = 'payments', compact = false }) {
+  const [tab, setTab] = useState(initialTab || 'payments');
   const [payments, setPayments] = useState([]);
   const [plans, setPlans] = useState([]);
   const [units, setUnits] = useState([]);
@@ -532,14 +532,16 @@ export function AdminGrowthSuite({ users = [], exams = [], examResults = [], con
 
   return (
     <div className="space-y-6" dir="rtl">
-      <div className="bg-slate-950 text-white rounded-3xl p-6 shadow-sm">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div><h2 className="text-2xl md:text-3xl font-black">مركز التشغيل الشامل</h2><p className="text-slate-300 font-bold mt-2">الـ 7 أفكار هنا شغالة كأدوات فعلية: إنشاء، تعديل حالة، إرسال، استيراد، تصدير، وردود دعم.</p></div>
-          <button onClick={exportPlan} className="bg-amber-500 text-slate-950 rounded-2xl px-5 py-3 font-black hover:bg-amber-400">تصدير ملخص التشغيل CSV</button>
+      {!compact && (
+        <div className="bg-slate-950 text-white rounded-3xl p-6 shadow-sm">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div><h2 className="text-2xl md:text-3xl font-black">مركز التشغيل الشامل</h2><p className="text-slate-300 font-bold mt-2">الـ 7 أفكار هنا شغالة كأدوات فعلية: إنشاء، تعديل حالة، إرسال، استيراد، تصدير، وردود دعم.</p></div>
+            <button onClick={exportPlan} className="bg-amber-500 text-slate-950 rounded-2xl px-5 py-3 font-black hover:bg-amber-400">تصدير ملخص التشغيل CSV</button>
+          </div>
         </div>
-      </div>
-      <div className="grid grid-cols-2 lg:grid-cols-7 gap-3">{growthTabs.map(([key,label])=><button key={key} onClick={()=>setTab(key)} className={`rounded-2xl border p-3 text-sm font-black transition ${tab===key?'bg-amber-500 text-slate-950 border-amber-500 shadow':'bg-white text-slate-700 hover:bg-amber-50'}`}>{label}</button>)}</div>
-      <div className="grid grid-cols-2 lg:grid-cols-7 gap-3"><StatBox title="نشطون" value={dashboardStats.active}/><StatBox title="VIP" value={dashboardStats.premium}/><StatBox title="دفع معلق" value={dashboardStats.pendingPayments}/><StatBox title="أسئلة" value={dashboardStats.questionCount}/><StatBox title="وحدات" value={dashboardStats.units}/><StatBox title="تذاكر" value={dashboardStats.openTickets}/><StatBox title="متوسط" value={`${dashboardStats.avg}%`}/></div>
+      )}
+      {!compact && <div className="grid grid-cols-2 lg:grid-cols-7 gap-3">{growthTabs.map(([key,label])=><button key={key} onClick={()=>setTab(key)} className={`rounded-2xl border p-3 text-sm font-black transition ${tab===key?'bg-amber-500 text-slate-950 border-amber-500 shadow':'bg-white text-slate-700 hover:bg-amber-50'}`}>{label}</button>)}</div>}
+      {!compact && <div className="grid grid-cols-2 lg:grid-cols-7 gap-3"><StatBox title="نشطون" value={dashboardStats.active}/><StatBox title="VIP" value={dashboardStats.premium}/><StatBox title="دفع معلق" value={dashboardStats.pendingPayments}/><StatBox title="أسئلة" value={dashboardStats.questionCount}/><StatBox title="وحدات" value={dashboardStats.units}/><StatBox title="تذاكر" value={dashboardStats.openTickets}/><StatBox title="متوسط" value={`${dashboardStats.avg}%`}/></div>}
       {renderActive()}
     </div>
   );

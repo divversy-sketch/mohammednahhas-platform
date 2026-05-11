@@ -421,6 +421,7 @@ export default function AdminDashboardTabs({ ctx }) {
             <div className="space-y-6">
               <AdminPaymentRequestsPanel users={activeUsersList} />
               <SmartSubscriptionManager users={activeUsersList} adminGradeFilter={adminGradeFilter} />
+              <AdminGrowthSuite initialTab="payments" compact users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} assignments={assignments} assignmentSubmissions={assignmentSubmissions} subscriptionCodes={subscriptionCodes} notifications={announcements} userData={userData} />
             </div>
           )}
 
@@ -531,15 +532,30 @@ export default function AdminDashboardTabs({ ctx }) {
             />
           )}
 
-          {activeTab === 'question_bank' && <AdminQuestionBankPage adminGradeFilter={adminGradeFilter} />}
+          {activeTab === 'question_bank' && (
+            <div className="space-y-6">
+              <AdminQuestionBankPage adminGradeFilter={adminGradeFilter} />
+              <AdminGrowthSuite initialTab="questions" compact users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} assignments={assignments} assignmentSubmissions={assignmentSubmissions} subscriptionCodes={subscriptionCodes} notifications={announcements} userData={userData} />
+            </div>
+          )}
 
           {activeTab === 'smart_exam_engine' && <AdminSmartExamEngine adminGradeFilter={adminGradeFilter} exams={examsList} examResults={examResults} userData={userData} />}
 
-          {activeTab === 'student_reports' && <AdminStudentReports users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} videoViews={videoViews} mistakes={mistakes} assignments={assignments} assignmentSubmissions={assignmentSubmissions} />}
+          {activeTab === 'student_reports' && (
+            <div className="space-y-6">
+              <AdminStudentReports users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} videoViews={videoViews} mistakes={mistakes} assignments={assignments} assignmentSubmissions={assignmentSubmissions} />
+              <AdminGrowthSuite initialTab="analytics" compact users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} assignments={assignments} assignmentSubmissions={assignmentSubmissions} subscriptionCodes={subscriptionCodes} notifications={announcements} userData={userData} />
+            </div>
+          )}
 
           {activeTab === 'student_groups' && <AdminGroupsManager users={activeUsersList} userData={userData} />}
 
-          {activeTab === 'messages_center' && <AdminMessagingCenter users={activeUsersList} userData={userData} />}
+          {activeTab === 'messages_center' && (
+            <div className="space-y-6">
+              <AdminMessagingCenter users={activeUsersList} userData={userData} />
+              <AdminGrowthSuite initialTab="support" compact users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} assignments={assignments} assignmentSubmissions={assignmentSubmissions} subscriptionCodes={subscriptionCodes} notifications={announcements} userData={userData} />
+            </div>
+          )}
 
           {activeTab === 'finance_dashboard' && <AdminFinanceDashboard users={activeUsersList} subscriptionCodes={subscriptionCodes} />}
 
@@ -863,7 +879,12 @@ export default function AdminDashboardTabs({ ctx }) {
           )}
 
 
-          {activeTab === 'platform_settings' && <AdminPlatformSettingsManager userData={userData} />}
+          {activeTab === 'platform_settings' && (
+            <div className="space-y-6">
+              <AdminPlatformSettingsManager userData={userData} />
+              <AdminGrowthSuite initialTab="mobile" compact users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} assignments={assignments} assignmentSubmissions={assignmentSubmissions} subscriptionCodes={subscriptionCodes} notifications={announcements} userData={userData} />
+            </div>
+          )}
 
           {activeTab === 'admin_roles' && <AdminRolesManager users={activeUsersList} userData={userData} />}
 
@@ -871,9 +892,13 @@ export default function AdminDashboardTabs({ ctx }) {
 
           {activeTab === 'notifications_admin' && <AdminNotificationsManager users={activeUsersList} userData={userData} />}
 
-          {activeTab === 'growth_suite' && <AdminGrowthSuite users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} assignments={assignments} assignmentSubmissions={assignmentSubmissions} subscriptionCodes={subscriptionCodes} notifications={announcements} userData={userData} />}
 
-{activeTab === 'courses' && <AdminCoursesManager users={activeUsersList} exams={examsList} adminUser={userData} />}
+{activeTab === 'courses' && (
+  <div className="space-y-6">
+    <AdminCoursesManager users={activeUsersList} exams={examsList} adminUser={userData} />
+    <AdminGrowthSuite initialTab="courses" compact users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} assignments={assignments} assignmentSubmissions={assignmentSubmissions} subscriptionCodes={subscriptionCodes} notifications={announcements} userData={userData} />
+  </div>
+)}
 
 {activeTab === 'mistakes_admin' && (
   <div className="glass-panel p-4 md:p-6 rounded-xl space-y-4">
@@ -1029,6 +1054,13 @@ export default function AdminDashboardTabs({ ctx }) {
             </div>
           )}
 
+
+
+          {activeTab === 'notifications' && (
+            <div className="mt-6">
+              <AdminGrowthSuite initialTab="notifications" compact users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} assignments={assignments} assignmentSubmissions={assignmentSubmissions} subscriptionCodes={subscriptionCodes} notifications={announcements} userData={userData} />
+            </div>
+          )}
 
           {/* تم حذف صفحة الرد الآلي وإدارة الحكم من لوحة الأدمن */}
         </div>
