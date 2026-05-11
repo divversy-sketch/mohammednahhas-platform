@@ -4,7 +4,6 @@ export function registerPWAUpdate() {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register("/sw.js");
-      console.log("SW registered:", registration);
 
       const showUpdateBanner = (waitingWorker) => {
         if (!waitingWorker) return;

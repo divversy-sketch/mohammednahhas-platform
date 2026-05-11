@@ -1,0 +1,13 @@
+src/config/collections.js
+src/config/routes.js
+src/config/roles.js
+src/shared/firebase/firestoreMaps.js
+src/shared/auth/adminAccess.js
+src/admin/services/adminDashboard.listeners.js
+src/student/services/studentDashboard.listeners.js
+src/admin/hooks/useAdminDashboardData.js
+src/student/hooks/useStudentDashboardData.js
+src/features/exam/components/ExamDashboardView.jsx
+src/shared/platformParts/ExamRunner.jsx
+DEEP_SPLIT_PHASE7_SERVICES_EXAM_AR.md
+FILES_CHANGED_PHASE7_SERVICES_EXAM.txt

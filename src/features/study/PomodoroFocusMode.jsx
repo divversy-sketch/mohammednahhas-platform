@@ -22,7 +22,7 @@ const PomodoroFocusMode = ({ onClose }) => {
 
     const toggleTimer = () => {
         setIsActive(!isActive);
-        if(!isActive && audioRef.current && !isBreak) { audioRef.current.play().catch(e => console.log("Audio play blocked")); } 
+        if(!isActive && audioRef.current && !isBreak) { audioRef.current.play().catch(() => {}); } 
         else if(isActive && audioRef.current) { audioRef.current.pause(); }
     };
 

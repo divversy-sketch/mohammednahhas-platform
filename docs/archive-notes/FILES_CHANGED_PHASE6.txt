@@ -1,0 +1,11 @@
+Modified:
+- src/student/parts/StudentDashboard.jsx
+- src/admin/parts/AdminDashboard.jsx
+
+Added:
+- src/student/components/home/StudentHomeCards.jsx
+- src/student/components/layout/StudentLayoutParts.jsx
+- src/admin/pages/AdminPendingUsersPage.jsx
+- src/admin/pages/AdminUtilityPages.jsx
+- DEEP_SPLIT_PHASE6_AR.md
+- FILES_CHANGED_PHASE6.txt

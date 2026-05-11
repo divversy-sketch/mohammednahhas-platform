@@ -1,0 +1,13 @@
+Modified:
+- src/app/AppRoot.jsx
+- src/admin/app/AdminApp.jsx
+- src/student/app/StudentApp.jsx
+
+Added:
+- src/shared/ui/AppLoadingScreen.jsx
+- src/shared/pwa/usePwaInstallPrompt.js
+- src/shared/pwa/useServiceWorkerRegistration.js
+- src/admin/hooks/useAdminSession.js
+- src/student/hooks/useStudentSession.js
+- FINAL_SPLIT_PHASE9_AR.md
+- FILES_CHANGED_PHASE9_FINAL.txt

@@ -1,0 +1,16 @@
+Full restructure batch applied:
+
+Modified:
+- src/app/AppRoot.jsx
+
+Added:
+- src/features/home/HomeWidgets.jsx
+- src/features/study/PomodoroFocusMode.jsx
+- src/features/content/InteractiveViewer.jsx
+- src/features/homework/SmartHomeworkScanner.jsx
+- FULL_RESTRUCTURE_NOTES.md
+- FILES_CHANGED_FULL_RESTRUCTURE.txt
+
+Notes:
+- .env was intentionally removed from this ZIP for safety. Use your local .env.
+- node_modules is not included.
