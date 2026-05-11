@@ -1,10 +1,34 @@
 import { httpsCallable } from 'firebase/functions';
-import { functions } from '../../services/firebase.js';
+import { auth, functions } from '../../services/firebase.js';
 
 const callAdminFunction = async (name, payload = {}) => {
   const fn = httpsCallable(functions, name);
   const result = await fn(payload);
   return result.data || { ok: true };
+};
+
+const callVercelAdminApi = async (path, payload = {}) => {
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    throw new Error('يجب تسجيل الدخول أولاً.');
+  }
+
+  const token = await currentUser.getIdToken(true);
+  const response = await fetch(path, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data?.ok === false) {
+    throw new Error(data?.message || 'فشل تنفيذ العملية من السيرفر.');
+  }
+
+  return data || { ok: true };
 };
 
 export const adminSecureFunctions = {
@@ -17,8 +41,10 @@ export const adminSecureFunctions = {
   setExamPublishedState: (examId, isPublished) => callAdminFunction('setExamPublishedState', { examId, isPublished }),
   updateResultScore: (resultId, payload) => callAdminFunction('updateResultScore', { resultId, payload }),
   deleteAdminDocument: (collectionName, docId) => callAdminFunction('deleteAdminDocument', { collectionName, docId }),
-  setStudentPassword: (studentId, newPassword, requestId = '') => callAdminFunction('adminSetStudentPassword', { studentId, newPassword, requestId }),
-  updatePasswordResetRequestStatus: (requestId, status) => callAdminFunction('updatePasswordResetRequestStatus', { requestId, status })
+
+  // Password reset flow uses Vercel Serverless API so it works on the free Firebase Spark plan.
+  setStudentPassword: (studentId, newPassword, requestId = '') => callVercelAdminApi('/api/admin-set-student-password', { studentId, newPassword, requestId }),
+  updatePasswordResetRequestStatus: (requestId, status) => callVercelAdminApi('/api/admin-password-request-status', { requestId, status })
 };
 
 export default adminSecureFunctions;
