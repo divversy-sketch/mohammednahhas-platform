@@ -1,13 +1,13 @@
 # Cleanup Report
 
-Generated: 2026-05-11T22:04:05.015Z
+Generated: 2026-05-11T22:12:01.738Z
 
 ## Large active files
 | File | Lines |
 | --- | ---: |
 | src\admin\parts\AdminDashboard.jsx | 1396 |
-| src\student\parts\StudentDashboard.jsx | 1175 |
-| src\admin\parts\AdminDashboardTabs.jsx | 1076 |
+| src\student\parts\StudentDashboard.jsx | 1179 |
+| src\admin\parts\AdminDashboardTabs.jsx | 1079 |
 | src\admin\parts\AdminOperationsSuite.jsx | 728 |
 
 ## Archive leaks inside src

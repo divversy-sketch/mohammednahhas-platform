@@ -35,6 +35,7 @@ import { canAccessAdminTab } from '../../config/adminPermissions';
 import AdminCommandCenter from '../components/AdminCommandCenter.jsx';
 import AdminSystemHealthPanel from '../components/AdminSystemHealthPanel.jsx';
 import AdminStudentSuccessSuite from '../../features/studentSuccess/StudentSuccessAdminSuite.jsx';
+import { AdminGlobalSearch, AdminLiveClassesPanel, AdminCertificatesPanel, AdminCommandQuickActions } from '../../features/product/ProductExperienceSuite.jsx';
 
 
 // Render-only split from AdminDashboard.jsx.
@@ -282,7 +283,7 @@ export default function AdminDashboardTabs({ ctx }) {
             <InlineTabs
               defaultTab="overview"
               tabs={[
-                { key: 'overview', label: 'نظرة عامة', content: <div className="space-y-6"><AdminCommandCenter users={activeUsersList} exams={examsList} examResults={examResults} onNavigate={setActiveTab} /><AdminStudentSuccessSuite variant="dashboard" users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} assignments={assignments} assignmentSubmissions={assignmentSubmissions} videoViews={videoViews} /><AdminProDashboard users={activeUsersList} exams={examsList} results={examResults} content={contentList} subscriptionCodes={subscriptionCodes} hwResults={hwResults} adminGradeFilter={adminGradeFilter} /></div> },
+                { key: 'overview', label: 'نظرة عامة', content: <div className="space-y-6"><AdminGlobalSearch users={activeUsersList} exams={examsList} content={contentList} assignments={assignments} examResults={examResults} supportTickets={messagesList} onNavigate={setActiveTab} /><AdminCommandQuickActions onNavigate={setActiveTab} /><AdminCommandCenter users={activeUsersList} exams={examsList} examResults={examResults} onNavigate={setActiveTab} /><AdminStudentSuccessSuite variant="dashboard" users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} assignments={assignments} assignmentSubmissions={assignmentSubmissions} videoViews={videoViews} /><AdminProDashboard users={activeUsersList} exams={examsList} results={examResults} content={contentList} subscriptionCodes={subscriptionCodes} hwResults={hwResults} adminGradeFilter={adminGradeFilter} /></div> },
                 { key: 'performance', label: 'تحليل الأداء', content: <AdminPerformanceAnalytics examResults={examResults} examsList={examsList} users={activeUsersList} adminGradeFilter={adminGradeFilter} /> },
                 { key: 'questions', label: 'تحليل الأسئلة', content: <AdminQuestionDeepAnalytics examsList={examsList} examResults={examResults} /> },
                 { key: 'leaderboard', label: 'لوحة الشرف', content: <LeaderboardPanel examResults={examResults} users={activeUsersList} gradeFilter={adminGradeFilter} /> }
@@ -547,6 +548,7 @@ export default function AdminDashboardTabs({ ctx }) {
           {activeTab === 'student_reports' && (
             <div className="space-y-6">
               <AdminStudentReports users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} videoViews={videoViews} mistakes={mistakes} assignments={assignments} assignmentSubmissions={assignmentSubmissions} />
+              <AdminCertificatesPanel users={activeUsersList} examResults={examResults} />
               <AdminStudentSuccessSuite variant="reports" users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} assignments={assignments} assignmentSubmissions={assignmentSubmissions} videoViews={videoViews} />
               <AdminGrowthSuite initialTab="analytics" compact users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} assignments={assignments} assignmentSubmissions={assignmentSubmissions} subscriptionCodes={subscriptionCodes} notifications={announcements} userData={userData} />
             </div>
@@ -902,6 +904,7 @@ export default function AdminDashboardTabs({ ctx }) {
 
 {activeTab === 'courses' && (
   <div className="space-y-6">
+    <AdminLiveClassesPanel users={activeUsersList} adminUser={userData} />
     <AdminCoursesManager users={activeUsersList} exams={examsList} adminUser={userData} />
     <AdminGrowthSuite initialTab="courses" compact users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} assignments={assignments} assignmentSubmissions={assignmentSubmissions} subscriptionCodes={subscriptionCodes} notifications={announcements} userData={userData} />
   </div>

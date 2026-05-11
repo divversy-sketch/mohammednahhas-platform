@@ -23,6 +23,7 @@ import { StudentContinueCard, StudentSmartDashboard, StudentCompactHome } from '
 import { StudentTopGreeting, LearningHubTabs } from '../components/layout/StudentLayoutParts.jsx';
 import StudentAssignmentsPanel from '../../admin/parts/StudentAssignmentsPanel.jsx';
 import StudentSuccessPanel from '../../features/studentSuccess/StudentSuccessPanel.jsx';
+import { StudentLiveClassesPanel, StudentExamReviewCenter, StudentCertificatePanel } from '../../features/product/ProductExperienceSuite.jsx';
 
 
 const SecureVideoPlayer = lazy(() => import('../../features/lectures/SecureVideoPlayer'));
@@ -715,6 +716,8 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
                 <StudentContinueCard latestVideoActivity={latestVideoActivity} inProgressExam={inProgressExam} pendingAssignments={pendingAssignments} nextStudyAction={nextStudyAction} setActiveTab={setActiveTab} completedExamResults={completedExamResults} averageScore={averageScore} latestCompletedResult={latestCompletedResult} pendingAssignmentsCount={pendingAssignmentsCount} />
                 <StudentSmartDashboard setActiveTab={setActiveTab} videoCompletionPercent={videoCompletionPercent} completedVideoCount={completedVideoCount} videos={videos} completedExamResults={completedExamResults} averageScore={averageScore} pendingAssignmentsCount={pendingAssignmentsCount} examResults={examResults} nextStudyAction={nextStudyAction} smartWeakBranches={smartWeakBranches} />
                 <StudentSuccessPanel userData={userData} videos={videos} exams={exams} examResults={examResults} assignments={assignments} assignmentSubmissions={assignmentSubmissions} videoViews={videoViews} setActiveTab={setActiveTab} />
+                <StudentExamReviewCenter exams={exams} examResults={examResults} content={content} mistakes={mistakes} setActiveTab={setActiveTab} />
+                <StudentLiveClassesPanel userData={userData} />
                 <StudentCompactHome setActiveTab={setActiveTab} isBannedContent={isBannedContent} isBannedExam={isBannedExam} videos={videos} exams={exams} examResults={examResults} />
                                 <Announcements />
                 <PWAInstallBox installPrompt={installPrompt} />
@@ -830,7 +833,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
             </div>
         )}
 
-          {activeTab === 'courses' && !isBannedContent && <LazyPanel><StudentCoursesHub user={user} userData={userData} exams={exams} onStartExam={startExamWithCode} /></LazyPanel>}
+          {activeTab === 'courses' && !isBannedContent && <div className="space-y-6"><StudentLiveClassesPanel userData={userData} /><LazyPanel><StudentCoursesHub user={user} userData={userData} exams={exams} onStartExam={startExamWithCode} /></LazyPanel></div>}
 
           {activeTab === 'learning_path' && !isBannedContent && (
             <StudentLearningPath
@@ -1138,6 +1141,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
         {activeTab === 'settings' && (
               <div className="space-y-6 max-w-5xl">
                 <div className="glass-panel p-4 md:p-6 rounded-2xl"><PerformanceOverview examResults={examResults} content={content} /></div>
+                <StudentCertificatePanel user={user} userData={userData} examResults={examResults} />
                 <div className="glass-panel p-4 md:p-6 rounded-xl max-w-2xl">
                 <form onSubmit={handleUpdateMyProfile} className="space-y-4">
                   <div><label className="block text-sm font-bold text-slate-700 mb-2">الاسم</label><input disabled className="w-full border p-3 rounded-xl bg-slate-100 text-slate-500 cursor-not-allowed" value={editFormData.name} /><p className="text-xs text-red-500 mt-1">لا يمكن تغيير الاسم (تواصل مع الإدارة).</p></div>

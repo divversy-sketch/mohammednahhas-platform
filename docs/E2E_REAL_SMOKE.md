@@ -1,6 +1,6 @@
 # E2E Real Smoke Specification
 
-Generated: 2026-05-11T22:04:06.762Z
+Generated: 2026-05-11T22:12:03.707Z
 
 | Area | Status |
 | --- | --- |

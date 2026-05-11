@@ -319,6 +319,18 @@ service cloud.firestore {
       allow update, delete: if canManageMessages();
     }
 
+
+    match /live_classes/{classId} {
+      allow read: if signedIn();
+      allow create, update, delete: if canManageContent();
+    }
+
+    match /certificates/{certificateId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isAdmin() || (signedIn() && request.resource.data.userId == request.auth.uid);
+      allow update, delete: if canManageUsers() || canManageExams();
+    }
+
     match /notification_tokens/{docId} {
       allow read: if isAdmin();
       allow create, update: if ownUserIdOnCreate();
