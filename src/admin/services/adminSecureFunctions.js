@@ -32,7 +32,8 @@ const callVercelAdminApi = async (path, payload = {}) => {
 };
 
 export const adminSecureFunctions = {
-  deleteStudentAccount: (studentId) => callAdminFunction('deleteStudentAccount', { studentId }),
+  // Student deletion uses Vercel Serverless API to delete the Firebase Auth user without requiring Firebase Blaze/Cloud Functions.
+  deleteStudentAccount: (studentId, options = {}) => callVercelAdminApi('/api/admin-delete-student', { studentId, ...options }),
   setStudentStatus: (studentId, status) => callAdminFunction('setStudentStatus', { studentId, status }),
   createSubscriptionCode: (payload) => callAdminFunction('createSubscriptionCode', payload),
   approvePaymentRequest: (requestId, durationDays = 30) => callAdminFunction('approvePaymentRequest', { requestId, durationDays }),

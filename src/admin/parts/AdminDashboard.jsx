@@ -308,7 +308,19 @@ export const AdminDashboard = ({ user }) => {
   };
 
 
-  const handleDeleteUser = async (id) => { if(platformConfirm("حذف نهائي؟")) await adminSecureFunctions.deleteStudentAccount(id); };
+  const handleDeleteUser = async (id) => {
+    if (!id) return;
+    const student = activeUsersList.find((u) => u.id === id) || pendingUsers.find((u) => u.id === id) || {};
+    const label = student.name || student.email || id;
+    const confirmed = platformConfirm(`تحذير مهم: سيتم حذف الطالب "${label}" من المنصة ومن Firebase Authentication.\n\nسيتم أرشفة نسخة في deleted_users وحذف بياناته المرتبطة مثل النتائج والمشاهدات والاشتراكات. هل أنت متأكد؟`);
+    if (!confirmed) return;
+    try {
+      const result = await adminSecureFunctions.deleteStudentAccount(id, { archiveBeforeDelete: true, deleteRelatedData: true });
+      platformNotify(`تم حذف الطالب من المنصة ومن Firebase Auth. تم حذف ${result?.relatedDeletedCount || 0} سجل مرتبط.`, 'success');
+    } catch (error) {
+      platformNotify(error?.message || 'تعذر حذف الطالب الآن.', 'error');
+    }
+  };
   const handleDeleteMessage = async (id) => { if(platformConfirm("حذف الرسالة؟")) await adminSecureFunctions.deleteAdminDocument('messages', id); };
   const handleDeleteExam = async (id) => {
     if (!platformConfirm("حذف الامتحان؟")) return;
