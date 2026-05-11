@@ -10,6 +10,7 @@ export const ADMIN_TABS = [
   ['security_center', 'مركز الحماية'],
   ['app_convert', 'تحويل App'],
   ['question_bank', 'بنك الأسئلة'],
+  ['platform_upgrade', 'تطوير المنصة'],
   ['assignments', 'الواجبات'],
   ['exams', 'الامتحانات والنتائج'],
   ['smart_hw', 'الواجب الذكي QR'],

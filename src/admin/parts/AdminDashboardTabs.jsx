@@ -90,6 +90,7 @@ import { AdminAssignmentsPage, AdminExamViewTabs, AdminQuestionBankPage } from '
 import { adminSecureFunctions } from '../services/adminSecureFunctions.js';
 import AdminFollowUpPanel from '../../features/insights/AdminFollowUpPanel.jsx';
 import AdminSmartHomeworkManager from '../../features/homework/AdminSmartHomeworkManager.jsx';
+import AdminPlatformUpgradeCenter from '../../features/platformUpgrade/AdminPlatformUpgradeCenter.jsx';
 
 
 
@@ -811,6 +812,9 @@ export default function AdminDashboardTabs({ ctx }) {
           {activeTab === 'security_center' && (
             <InlineTabs tabs={[{ key: 'anti_cheat', label: 'تنبيهات الحماية', content: <AdvancedAntiCheatInsights examResults={examResults} /> }]} />
           )}
+
+
+          {activeTab === 'platform_upgrade' && <AdminPlatformUpgradeCenter ctx={ctx} />}
 
 {activeTab === 'courses' && <AdminCoursesManager users={activeUsersList} exams={examsList} adminUser={userData} />}
 
