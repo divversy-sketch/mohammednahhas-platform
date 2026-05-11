@@ -34,6 +34,7 @@ import { AdminSmartExamEngine, AdminStudentReports, AdminGroupsManager, AdminMes
 import { canAccessAdminTab } from '../../config/adminPermissions';
 import AdminCommandCenter from '../components/AdminCommandCenter.jsx';
 import AdminSystemHealthPanel from '../components/AdminSystemHealthPanel.jsx';
+import AdminStudentSuccessSuite from '../../features/studentSuccess/StudentSuccessAdminSuite.jsx';
 
 
 // Render-only split from AdminDashboard.jsx.
@@ -281,7 +282,7 @@ export default function AdminDashboardTabs({ ctx }) {
             <InlineTabs
               defaultTab="overview"
               tabs={[
-                { key: 'overview', label: 'نظرة عامة', content: <div className="space-y-6"><AdminCommandCenter users={activeUsersList} exams={examsList} examResults={examResults} onNavigate={setActiveTab} /><AdminProDashboard users={activeUsersList} exams={examsList} results={examResults} content={contentList} subscriptionCodes={subscriptionCodes} hwResults={hwResults} adminGradeFilter={adminGradeFilter} /></div> },
+                { key: 'overview', label: 'نظرة عامة', content: <div className="space-y-6"><AdminCommandCenter users={activeUsersList} exams={examsList} examResults={examResults} onNavigate={setActiveTab} /><AdminStudentSuccessSuite variant="dashboard" users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} assignments={assignments} assignmentSubmissions={assignmentSubmissions} videoViews={videoViews} /><AdminProDashboard users={activeUsersList} exams={examsList} results={examResults} content={contentList} subscriptionCodes={subscriptionCodes} hwResults={hwResults} adminGradeFilter={adminGradeFilter} /></div> },
                 { key: 'performance', label: 'تحليل الأداء', content: <AdminPerformanceAnalytics examResults={examResults} examsList={examsList} users={activeUsersList} adminGradeFilter={adminGradeFilter} /> },
                 { key: 'questions', label: 'تحليل الأسئلة', content: <AdminQuestionDeepAnalytics examsList={examsList} examResults={examResults} /> },
                 { key: 'leaderboard', label: 'لوحة الشرف', content: <LeaderboardPanel examResults={examResults} users={activeUsersList} gradeFilter={adminGradeFilter} /> }
@@ -546,6 +547,7 @@ export default function AdminDashboardTabs({ ctx }) {
           {activeTab === 'student_reports' && (
             <div className="space-y-6">
               <AdminStudentReports users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} videoViews={videoViews} mistakes={mistakes} assignments={assignments} assignmentSubmissions={assignmentSubmissions} />
+              <AdminStudentSuccessSuite variant="reports" users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} assignments={assignments} assignmentSubmissions={assignmentSubmissions} videoViews={videoViews} />
               <AdminGrowthSuite initialTab="analytics" compact users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} assignments={assignments} assignmentSubmissions={assignmentSubmissions} subscriptionCodes={subscriptionCodes} notifications={announcements} userData={userData} />
             </div>
           )}
@@ -555,15 +557,16 @@ export default function AdminDashboardTabs({ ctx }) {
           {activeTab === 'messages_center' && (
             <div className="space-y-6">
               <AdminMessagingCenter users={activeUsersList} userData={userData} />
+              <AdminStudentSuccessSuite variant="parent" users={activeUsersList} examResults={examResults} assignments={assignments} assignmentSubmissions={assignmentSubmissions} />
               <AdminGrowthSuite initialTab="support" compact users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} assignments={assignments} assignmentSubmissions={assignmentSubmissions} subscriptionCodes={subscriptionCodes} notifications={announcements} userData={userData} />
             </div>
           )}
 
           {activeTab === 'finance_dashboard' && <AdminFinanceDashboard users={activeUsersList} subscriptionCodes={subscriptionCodes} />}
 
-          {activeTab === 'video_security' && <AdminVideoSecurityPanel />}
+          {activeTab === 'video_security' && <div className="space-y-6"><AdminVideoSecurityPanel /><AdminStudentSuccessSuite variant="security" users={activeUsersList} /></div>}
 
-          {activeTab === 'assignments' && <AdminAssignmentsPage adminGradeFilter={adminGradeFilter} handleDeleteAllHomework={handleDeleteAllHomework} />}
+          {activeTab === 'assignments' && <div className="space-y-6"><AdminAssignmentsPage adminGradeFilter={adminGradeFilter} handleDeleteAllHomework={handleDeleteAllHomework} /><AdminStudentSuccessSuite variant="assignments" assignments={assignments} assignmentSubmissions={assignmentSubmissions} /></div>}
 
           {activeTab === 'exams' && <AdminExamViewTabs adminExamView={adminExamView} setAdminExamView={setAdminExamView} />}
 
@@ -885,6 +888,7 @@ export default function AdminDashboardTabs({ ctx }) {
             <div className="space-y-6">
               <AdminPlatformSettingsManager userData={userData} />
               <AdminGrowthSuite initialTab="mobile" compact users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} assignments={assignments} assignmentSubmissions={assignmentSubmissions} subscriptionCodes={subscriptionCodes} notifications={announcements} userData={userData} />
+              <AdminStudentSuccessSuite variant="gamification" users={activeUsersList} examResults={examResults} />
               <AdminSystemHealthPanel />
             </div>
           )}
@@ -893,7 +897,7 @@ export default function AdminDashboardTabs({ ctx }) {
 
           {activeTab === 'audit_logs' && <AdminAuditLogViewer />}
 
-          {activeTab === 'notifications_admin' && <AdminNotificationsManager users={activeUsersList} userData={userData} />}
+          {activeTab === 'notifications_admin' && <div className="space-y-6"><AdminNotificationsManager users={activeUsersList} userData={userData} /><AdminStudentSuccessSuite variant="broadcast" users={activeUsersList} /></div>}
 
 
 {activeTab === 'courses' && (

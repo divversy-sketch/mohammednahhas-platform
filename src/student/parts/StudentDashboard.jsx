@@ -22,6 +22,7 @@ import { useStudentDashboardData } from '../hooks/useStudentDashboardData.js';
 import { StudentContinueCard, StudentSmartDashboard, StudentCompactHome } from '../components/home/StudentHomeCards.jsx';
 import { StudentTopGreeting, LearningHubTabs } from '../components/layout/StudentLayoutParts.jsx';
 import StudentAssignmentsPanel from '../../admin/parts/StudentAssignmentsPanel.jsx';
+import StudentSuccessPanel from '../../features/studentSuccess/StudentSuccessPanel.jsx';
 
 
 const SecureVideoPlayer = lazy(() => import('../../features/lectures/SecureVideoPlayer'));
@@ -713,6 +714,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
             <div className="space-y-8 page-soft-enter">
                 <StudentContinueCard latestVideoActivity={latestVideoActivity} inProgressExam={inProgressExam} pendingAssignments={pendingAssignments} nextStudyAction={nextStudyAction} setActiveTab={setActiveTab} completedExamResults={completedExamResults} averageScore={averageScore} latestCompletedResult={latestCompletedResult} pendingAssignmentsCount={pendingAssignmentsCount} />
                 <StudentSmartDashboard setActiveTab={setActiveTab} videoCompletionPercent={videoCompletionPercent} completedVideoCount={completedVideoCount} videos={videos} completedExamResults={completedExamResults} averageScore={averageScore} pendingAssignmentsCount={pendingAssignmentsCount} examResults={examResults} nextStudyAction={nextStudyAction} smartWeakBranches={smartWeakBranches} />
+                <StudentSuccessPanel userData={userData} videos={videos} exams={exams} examResults={examResults} assignments={assignments} assignmentSubmissions={assignmentSubmissions} videoViews={videoViews} setActiveTab={setActiveTab} />
                 <StudentCompactHome setActiveTab={setActiveTab} isBannedContent={isBannedContent} isBannedExam={isBannedExam} videos={videos} exams={exams} examResults={examResults} />
                                 <Announcements />
                 <PWAInstallBox installPrompt={installPrompt} />
