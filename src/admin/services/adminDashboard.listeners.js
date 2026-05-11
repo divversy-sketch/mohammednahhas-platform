@@ -19,6 +19,7 @@ export function subscribeAdminDashboardData(handlers) {
     onSnapshot(query(collection(db, COLLECTIONS.ASSIGNMENTS), orderBy('createdAt', 'desc')), (snapshot) => handlers.setAssignments?.(mapDocs(snapshot))),
     onSnapshot(query(collection(db, COLLECTIONS.ASSIGNMENT_SUBMISSIONS), orderBy('submittedAt', 'desc')), (snapshot) => handlers.setAssignmentSubmissions?.(mapDocs(snapshot))),
     onSnapshot(collection(db, COLLECTIONS.STUDENT_MISTAKES), (snapshot) => handlers.setMistakes?.(mapDocs(snapshot))),
-    onSnapshot(collection(db, COLLECTIONS.VIDEO_VIEWS), (snapshot) => handlers.setVideoViews?.(mapDocs(snapshot)))
+    onSnapshot(collection(db, COLLECTIONS.VIDEO_VIEWS), (snapshot) => handlers.setVideoViews?.(mapDocs(snapshot))),
+    onSnapshot(query(collection(db, COLLECTIONS.PASSWORD_RESET_REQUESTS), orderBy('createdAt', 'desc')), (snapshot) => handlers.setPasswordResetRequests?.(mapDocs(snapshot)))
   ];
 }

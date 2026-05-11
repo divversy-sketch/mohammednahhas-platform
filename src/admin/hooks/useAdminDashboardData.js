@@ -17,6 +17,7 @@ export function useAdminDashboardData() {
   const [assignmentSubmissions, setAssignmentSubmissions] = useState([]);
   const [mistakes, setMistakes] = useState([]);
   const [videoViews, setVideoViews] = useState([]);
+  const [passwordResetRequests, setPasswordResetRequests] = useState([]);
 
   useEffect(() => {
     const subscriptions = subscribeAdminDashboardData({
@@ -34,7 +35,8 @@ export function useAdminDashboardData() {
       setAssignments,
       setAssignmentSubmissions,
       setMistakes,
-      setVideoViews
+      setVideoViews,
+      setPasswordResetRequests
     });
 
     return () => subscriptions.forEach((unsubscribe) => unsubscribe?.());
@@ -56,6 +58,7 @@ export function useAdminDashboardData() {
     assignmentSubmissions,
     mistakes,
     videoViews,
+    passwordResetRequests,
     setPendingUsers,
     setActiveUsersList,
     setContentList,
@@ -70,6 +73,7 @@ export function useAdminDashboardData() {
     setAssignments,
     setAssignmentSubmissions,
     setMistakes,
-    setVideoViews
+    setVideoViews,
+    setPasswordResetRequests
   };
 }

@@ -5,6 +5,7 @@ export const ADMIN_TABS = [
   ['follow_up', 'المتابعة والتقارير'],
   ['users', 'طلبات الانضمام'],
   ['all_users', 'الطلاب'],
+  ['password_resets', 'تغيير كلمات السر'],
   ['payments', 'الاشتراكات والدفع'],
   ['security_center', 'مركز الحماية'],
   ['app_convert', 'تحويل App'],

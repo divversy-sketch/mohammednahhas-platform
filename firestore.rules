@@ -261,6 +261,15 @@ service cloud.firestore {
       }
     }
 
+    match /password_reset_requests/{docId} {
+      // الطالب غير مسجل دخول عند نسيان كلمة السر، لذلك نسمح بإنشاء طلب فقط.
+      // القراءة/المراجعة/الحذف للأدمن فقط، وتغيير كلمة السر الفعلي يتم من Cloud Function.
+      allow create: if request.resource.data.email is string
+        && request.resource.data.status == 'pending'
+        && request.resource.data.keys().hasOnly(['email', 'name', 'status', 'source', 'createdAt', 'updatedAt']);
+      allow read, update, delete: if isAdmin();
+    }
+
     match /payment_requests/{docId} {
       allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
       allow create: if signedIn()

@@ -264,6 +264,89 @@ exports.setStudentStatus = functions
     return { ok: true, status };
   });
 
+
+exports.adminSetStudentPassword = functions
+  .region("us-central1")
+  .https
+  .onCall(async (data, context) => {
+    const adminUser = await assertAdmin(context);
+    const studentId = requireString(data && data.studentId, "studentId");
+    const newPassword = requireString(data && data.newPassword, "newPassword");
+    const requestId = typeof (data && data.requestId) === "string" ? data.requestId.trim() : "";
+
+    if (newPassword.length < 8) {
+      throw new functions.https.HttpsError("invalid-argument", "كلمة السر يجب ألا تقل عن 8 حروف/أرقام.");
+    }
+
+    const userRef = db.collection("users").doc(studentId);
+    const userSnap = await userRef.get();
+    if (!userSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "الطالب غير موجود في قاعدة البيانات.");
+    }
+
+    await admin.auth().updateUser(studentId, {
+      password: newPassword
+    });
+
+    await userRef.set({
+      passwordLastChangedAt: admin.firestore.FieldValue.serverTimestamp(),
+      passwordLastChangedBy: adminUser.uid,
+      passwordResetRequired: false,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedBy: adminUser.uid
+    }, { merge: true });
+
+    if (requestId) {
+      await db.collection("password_reset_requests").doc(requestId).set({
+        status: "completed",
+        studentId,
+        completedBy: adminUser.uid,
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    }
+
+    await db.collection("admin_audit_logs").add({
+      action: "adminSetStudentPassword",
+      adminUid: adminUser.uid,
+      studentId,
+      requestId: requestId || null,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return { ok: true, studentId };
+  });
+
+exports.updatePasswordResetRequestStatus = functions
+  .region("us-central1")
+  .https
+  .onCall(async (data, context) => {
+    const adminUser = await assertAdmin(context);
+    const requestId = requireString(data && data.requestId, "requestId");
+    const status = requireString(data && data.status, "status");
+    const allowed = ["pending", "reviewing", "completed", "rejected"];
+    if (!allowed.includes(status)) {
+      throw new functions.https.HttpsError("invalid-argument", "حالة الطلب غير صحيحة.");
+    }
+
+    await db.collection("password_reset_requests").doc(requestId).set({
+      status,
+      reviewedBy: adminUser.uid,
+      reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    await db.collection("admin_audit_logs").add({
+      action: "updatePasswordResetRequestStatus",
+      adminUid: adminUser.uid,
+      requestId,
+      status,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return { ok: true, requestId, status };
+  });
+
 exports.createSubscriptionCode = functions
   .region("us-central1")
   .https

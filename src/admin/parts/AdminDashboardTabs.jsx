@@ -212,6 +212,7 @@ export default function AdminDashboardTabs({ ctx }) {
     handleSendStudentNotification,
     handleUpdateUser,
     handleSendResetPassword,
+    AdminPasswordResetRequestsPanel,
     approveGrade,
     rejectGrade,
     handleFileSelect,
@@ -243,6 +244,7 @@ export default function AdminDashboardTabs({ ctx }) {
     assignmentSubmissions,
     mistakes,
     videoViews,
+    passwordResetRequests,
     setPendingUsers,
     setActiveUsersList,
     setContentList,
@@ -349,7 +351,7 @@ export default function AdminDashboardTabs({ ctx }) {
                                       <div className="flex gap-2 justify-end mt-2">
                                           <button onClick={()=>openStudentProfile(u)} className="flex-1 lg:flex-none bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-bold shadow-md flex items-center justify-center gap-2"><FileCheck size={16}/> ملف الطالب</button>
                                           <button onClick={()=>setEditingUser(u)} className="bg-blue-100 text-blue-600 p-2 rounded-lg hover:bg-blue-200"><Edit size={16}/></button>
-                                          <button onClick={()=>handleSendResetPassword(u.email)} className="bg-amber-100 text-amber-600 p-2 rounded-lg hover:bg-amber-200"><KeyRound size={16}/></button>
+                                          <button onClick={()=>handleSendResetPassword(u)} title="تغيير كلمة السر من الأدمن" className="bg-amber-100 text-amber-600 p-2 rounded-lg hover:bg-amber-200"><KeyRound size={16}/></button>
                                           <button onClick={()=>handleDeleteUser(u.id)} className="bg-red-100 text-red-600 p-2 rounded-lg hover:bg-red-200"><Trash2 size={16}/></button>
                                       </div>
                                   </div>
@@ -365,6 +367,10 @@ export default function AdminDashboardTabs({ ctx }) {
                       ))}
                   </div>
               </div>
+          )}
+
+          {activeTab === 'password_resets' && AdminPasswordResetRequestsPanel && (
+            <AdminPasswordResetRequestsPanel requests={passwordResetRequests || []} users={[...(activeUsersList || []), ...(pendingUsers || [])]} />
           )}
 
           {activeTab === 'payments' && (

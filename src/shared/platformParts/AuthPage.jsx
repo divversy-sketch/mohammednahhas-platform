@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {  signInWithEmailAndPassword, createUserWithEmailAndPassword, 
-  signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail 
+  signOut, onAuthStateChanged, updateProfile 
 } from 'firebase/auth';
 import {  doc, setDoc, getDoc, getDocs, collection, addDoc, query, where, 
   onSnapshot, updateDoc, deleteDoc, orderBy, serverTimestamp, writeBatch, limit, increment 
@@ -108,8 +108,24 @@ export const AuthPage = ({ onBack }) => {
   };
 
   const handleForgotPassword = async () => {
-    if(!formData.email) { platformNotify("من فضلك اكتب الإيميل الأول."); return; }
-    try { await sendPasswordResetEmail(auth, formData.email); platformNotify("تم إرسال رابط استعادة كلمة السر."); } catch (error) { platformNotify("حدث خطأ: " + error.message); }
+    const email = String(formData.email || '').trim().toLowerCase();
+    if(!email) { platformNotify("من فضلك اكتب الإيميل الأول."); return; }
+    setLoading(true);
+    try {
+      await addDoc(collection(db, 'password_reset_requests'), {
+        email,
+        name: formData.name?.trim() || '',
+        status: 'pending',
+        source: 'auth_page',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      platformNotify("تم إرسال طلب تغيير كلمة السر للإدارة. سيتم التواصل معك بعد الموافقة.", 'success');
+    } catch (error) {
+      platformNotify("تعذر إرسال الطلب الآن، تواصل مع الإدارة عبر واتساب.", 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -130,7 +146,7 @@ export const AuthPage = ({ onBack }) => {
           )}
           <div className="relative"><Mail className="absolute top-3.5 right-4 text-slate-400" size={18} /><input required type="email" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition text-sm md:text-base" placeholder="البريد" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></div>
           <div className="relative"><Lock className="absolute top-3.5 right-4 text-slate-400" size={18} /><input required type="password" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition text-sm md:text-base" placeholder="كلمة السر" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} /></div>
-          {!isRegister && (<div className="text-left"><button type="button" onClick={handleForgotPassword} className="text-xs text-amber-600 font-bold hover:underline">نسيت كلمة السر؟</button></div>)}
+          {!isRegister && (<div className="text-left"><button type="button" onClick={handleForgotPassword} disabled={loading} className="text-xs text-amber-600 font-bold hover:underline disabled:opacity-50">طلب تغيير كلمة السر من الإدارة</button></div>)}
           <button disabled={loading} className="bg-gradient-to-r from-amber-600 to-amber-700 text-white py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-amber-500/50 transition mt-2 flex justify-center">{loading ? <Loader2 className="animate-spin" /> : (isRegister ? 'تسجيل' : 'دخول')}</button>
         </form>
         <button onClick={() => setIsRegister(!isRegister)} className="mt-4 md:mt-6 text-amber-800 font-bold hover:underline w-full text-center block text-sm">{isRegister ? 'تسجيل الدخول' : 'حساب جديد'}</button>

@@ -16,7 +16,9 @@ export const adminSecureFunctions = {
   deleteExam: (examId) => callAdminFunction('deleteExam', { examId }),
   setExamPublishedState: (examId, isPublished) => callAdminFunction('setExamPublishedState', { examId, isPublished }),
   updateResultScore: (resultId, payload) => callAdminFunction('updateResultScore', { resultId, payload }),
-  deleteAdminDocument: (collectionName, docId) => callAdminFunction('deleteAdminDocument', { collectionName, docId })
+  deleteAdminDocument: (collectionName, docId) => callAdminFunction('deleteAdminDocument', { collectionName, docId }),
+  setStudentPassword: (studentId, newPassword, requestId = '') => callAdminFunction('adminSetStudentPassword', { studentId, newPassword, requestId }),
+  updatePasswordResetRequestStatus: (requestId, status) => callAdminFunction('updatePasswordResetRequestStatus', { requestId, status })
 };
 
 export default adminSecureFunctions;

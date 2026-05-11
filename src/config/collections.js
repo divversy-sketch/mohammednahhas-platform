@@ -14,4 +14,5 @@ export const COLLECTIONS = Object.freeze({
   STUDENT_MISTAKES: 'student_mistakes',
   VIDEO_VIEWS: 'video_views',
   NOTIFICATIONS: 'notifications',
+  PASSWORD_RESET_REQUESTS: 'password_reset_requests',
 });

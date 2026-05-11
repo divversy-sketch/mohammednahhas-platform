@@ -92,6 +92,7 @@ import AdminFollowUpPanel from '../../features/insights/AdminFollowUpPanel.jsx';
 import AdminSmartHomeworkManager from '../../features/homework/AdminSmartHomeworkManager.jsx';
 import AdminDashboardTabs from './AdminDashboardTabs.jsx';
 import AdminDashboardModals from './AdminDashboardModals.jsx';
+import AdminPasswordResetRequestsPanel from './AdminPasswordResetRequestsPanel.jsx';
 
 export const AdminDashboard = ({ user }) => {
   const userData = user || {};
@@ -185,10 +186,10 @@ export const AdminDashboard = ({ user }) => {
   const {
     pendingUsers, activeUsersList, contentList, messagesList, examsList, examResults,
     announcements, quotesList, smartHomeworks, hwResults, subscriptionCodes,
-    assignments, assignmentSubmissions, mistakes, videoViews,
+    assignments, assignmentSubmissions, mistakes, videoViews, passwordResetRequests,
     setPendingUsers, setActiveUsersList, setContentList, setMessagesList, setExamsList,
     setExamResults, setAnnouncements, setQuotesList, setSmartHomeworks, setHwResults,
-    setSubscriptionCodes
+    setSubscriptionCodes, setPasswordResetRequests
   } = useAdminDashboardData();
 
   // تحديث حالة زر الرجوع للموبايل للأدمن
@@ -852,8 +853,37 @@ export const AdminDashboard = ({ user }) => {
       setEditingUser(null); 
   };
   
-  const handleSendResetPassword = async (email) => { 
-      if(platformConfirm(`إرسال رابط تغيير كلمة السر لـ ${email}؟`)) await sendPasswordResetEmail(auth, email); 
+  const generateAdminPassword = () => {
+      const random = Math.random().toString(36).slice(2, 8).toUpperCase();
+      const tail = Math.floor(1000 + Math.random() * 9000);
+      return `Nahas@${random}${tail}`;
+  };
+
+  const handleSendResetPassword = async (studentOrEmail, requestId = '') => {
+      const student = typeof studentOrEmail === 'object'
+        ? studentOrEmail
+        : activeUsersList.find(u => String(u.email || '').trim().toLowerCase() === String(studentOrEmail || '').trim().toLowerCase());
+
+      if (!student?.id) {
+          platformNotify('لم يتم العثور على الطالب داخل قائمة الطلاب.', 'error');
+          return;
+      }
+
+      const suggestedPassword = generateAdminPassword();
+      const newPassword = platformPrompt(`اكتب كلمة السر الجديدة للطالب ${student.name || student.email}`, suggestedPassword);
+      if (!newPassword) return;
+      if (String(newPassword).length < 8) {
+          platformNotify('كلمة السر يجب ألا تقل عن 8 حروف/أرقام.', 'error');
+          return;
+      }
+
+      try {
+          await adminSecureFunctions.setStudentPassword(student.id, newPassword, requestId);
+          try { await navigator.clipboard?.writeText(newPassword); } catch (_) {}
+          platformNotify(`تم تغيير كلمة السر. الكلمة الجديدة: ${newPassword} — تم نسخها إن أمكن.`, 'success');
+      } catch (error) {
+          platformNotify(error?.message || 'فشل تغيير كلمة السر من السيرفر.', 'error');
+      }
   };
   
   const approveGrade = async (user) => {
@@ -1237,6 +1267,7 @@ export const AdminDashboard = ({ user }) => {
     handleSendStudentNotification,
     handleUpdateUser,
     handleSendResetPassword,
+    AdminPasswordResetRequestsPanel,
     approveGrade,
     rejectGrade,
     handleFileSelect,
@@ -1268,6 +1299,7 @@ export const AdminDashboard = ({ user }) => {
     assignmentSubmissions,
     mistakes,
     videoViews,
+    passwordResetRequests,
     setPendingUsers,
     setActiveUsersList,
     setContentList,
@@ -1278,7 +1310,8 @@ export const AdminDashboard = ({ user }) => {
     setQuotesList,
     setSmartHomeworks,
     setHwResults,
-    setSubscriptionCodes
+    setSubscriptionCodes,
+    setPasswordResetRequests
   };
 
   return (
