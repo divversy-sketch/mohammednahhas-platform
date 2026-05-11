@@ -29,7 +29,7 @@ import { AdminAssignmentsPage, AdminExamViewTabs, AdminQuestionBankPage } from '
 
 import AdminFollowUpPanel from '../../features/insights/AdminFollowUpPanel.jsx';
 import AdminSmartHomeworkManager from '../../features/homework/AdminSmartHomeworkManager.jsx';
-import { AdminAuditLogViewer, AdminNotificationsManager, AdminPlatformSettingsManager, AdminRolesManager } from './AdminOperationsSuite.jsx';
+import { AdminAuditLogViewer, AdminNotificationsManager, AdminPlatformSettingsManager, AdminRolesManager, AdminGrowthSuite } from './AdminOperationsSuite.jsx';
 import { AdminSmartExamEngine, AdminStudentReports, AdminGroupsManager, AdminMessagingCenter, AdminFinanceDashboard, AdminVideoSecurityPanel } from '../../features/smartLearning/SmartLearningEngine.jsx';
 import { canAccessAdminTab } from '../../config/adminPermissions';
 
@@ -870,6 +870,8 @@ export default function AdminDashboardTabs({ ctx }) {
           {activeTab === 'audit_logs' && <AdminAuditLogViewer />}
 
           {activeTab === 'notifications_admin' && <AdminNotificationsManager users={activeUsersList} userData={userData} />}
+
+          {activeTab === 'growth_suite' && <AdminGrowthSuite users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} assignments={assignments} assignmentSubmissions={assignmentSubmissions} subscriptionCodes={subscriptionCodes} notifications={announcements} userData={userData} />}
 
 {activeTab === 'courses' && <AdminCoursesManager users={activeUsersList} exams={examsList} adminUser={userData} />}
 

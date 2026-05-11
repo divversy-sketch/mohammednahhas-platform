@@ -21,6 +21,7 @@ import AdminSidebar from '../components/AdminSidebar.jsx';
 
 
 import { adminSecureFunctions } from '../services/adminSecureFunctions.js';
+import { logAdminAction, confirmSensitiveAction } from '../services/adminAudit.js';
 
 
 
@@ -138,6 +139,9 @@ export const AdminDashboard = ({ user, adminProfile }) => {
     setSubscriptionCodes, setPasswordResetRequests, setExamAccessOverrides
   } = useAdminDashboardData();
 
+
+  const audit = (action, details = {}) => logAdminAction(action, details, userData);
+
   // تحديث حالة زر الرجوع للموبايل للأدمن
   useEffect(() => {
       window.history.pushState({ tab: activeTab }, '');
@@ -161,16 +165,24 @@ export const AdminDashboard = ({ user, adminProfile }) => {
   };
 
   const handleApprove = async (id) => {
+    const student = pendingUsers.find((u) => u.id === id) || activeUsersList.find((u) => u.id === id) || {};
     await updateStudentStatusSafely(id, 'active');
+    await audit('student_approved', { title: 'تفعيل طالب', targetUserId: id, targetEmail: student.email || '', after: { status: 'active' } });
     sendSystemNotification("مبروك! 🎉", "تم تفعيل حسابك بنجاح.");
   };
 
   const handleReject = async (id) => {
+      const student = pendingUsers.find((u) => u.id === id) || activeUsersList.find((u) => u.id === id) || {};
+      if (!confirmSensitiveAction(`تأكيد حظر/رفض الطالب: ${student.name || student.email || id}`, { confirmText: 'حظر' })) return;
       await updateStudentStatusSafely(id, 'blocked');
+      await audit('student_rejected_or_blocked', { title: 'رفض أو حظر طالب', severity: 'warning', targetUserId: id, targetEmail: student.email || '', before: { status: student.status || 'pending' }, after: { status: 'blocked' } });
   };
   
   const handleChangeUserStatus = async (id, newStatus) => {
+      const student = activeUsersList.find((u) => u.id === id) || pendingUsers.find((u) => u.id === id) || {};
+      if (String(newStatus || '').startsWith('banned') && !confirmSensitiveAction(`تأكيد تغيير حالة الطالب ${student.name || student.email || id} إلى ${newStatus}`, { confirmText: 'تأكيد' })) return;
       await updateStudentStatusSafely(id, newStatus);
+      await audit('student_status_changed', { title: 'تغيير حالة طالب', severity: String(newStatus || '').startsWith('banned') ? 'warning' : 'info', targetUserId: id, targetEmail: student.email || '', before: { status: student.status || '' }, after: { status: newStatus } });
   };
 
   const handleToggleSubscription = async (user) => {
@@ -178,6 +190,7 @@ export const AdminDashboard = ({ user, adminProfile }) => {
       if (isCurrentlyPremium) {
           if(platformConfirm("تحويل الطالب لباقة مجانية؟")) {
               await updateDoc(doc(db, 'users', user.id), { subscriptionStatus: 'free', subscriptionExpiry: null });
+              await audit('subscription_cancelled', { title: 'إلغاء اشتراك VIP', targetUserId: user.id, targetEmail: user.email || '', before: { subscriptionStatus: user.subscriptionStatus }, after: { subscriptionStatus: 'free' } });
           }
       } else {
           const days = platformPrompt("كم يوم تريد تفعيل الباقة لهذا الطالب؟", "30");
@@ -185,6 +198,7 @@ export const AdminDashboard = ({ user, adminProfile }) => {
               const expiryDate = new Date();
               expiryDate.setDate(expiryDate.getDate() + parseInt(days));
               await updateDoc(doc(db, 'users', user.id), { subscriptionStatus: 'premium', subscriptionExpiry: expiryDate });
+              await audit('subscription_activated', { title: `تفعيل اشتراك VIP لمدة ${days} يوم`, targetUserId: user.id, targetEmail: user.email || '', after: { subscriptionStatus: 'premium', days: Number(days), subscriptionExpiry: expiryDate.toISOString() } });
               platformNotify(`تم تفعيل الطالب لمدة ${days} يوم.`);
           }
       }
@@ -202,6 +216,7 @@ export const AdminDashboard = ({ user, adminProfile }) => {
                   type: 'subscription'
               });
           }
+          await audit('subscription_codes_generated', { title: `توليد ${codeGenCount} كود اشتراك`, targetCollection: 'subscription_codes', meta: { count: Number(codeGenCount), days: Number(codeGenDays) } });
           platformNotify("تم توليد الأكواد بنجاح!");
       }
   };
@@ -250,6 +265,7 @@ export const AdminDashboard = ({ user, adminProfile }) => {
           batch.update(doc(db, 'users', u.id), { subscriptionExpiry: expiry, subscriptionStatus: 'premium' });
       });
       await batch.commit();
+      await audit('bulk_subscriptions_extended', { title: `تمديد اشتراكات VIP ${days} يوم`, severity: 'warning', meta: { days: Number(days), affected: activeUsersList.filter(u => u.subscriptionStatus === 'premium').length } });
       platformNotify('تم تمديد اشتراكات VIP الحالية.');
   };
 
@@ -258,10 +274,11 @@ export const AdminDashboard = ({ user, adminProfile }) => {
     if (!id) return;
     const student = activeUsersList.find((u) => u.id === id) || pendingUsers.find((u) => u.id === id) || {};
     const label = student.name || student.email || id;
-    const confirmed = platformConfirm(`تحذير مهم: سيتم حذف الطالب "${label}" من المنصة ومن Firebase Authentication.\n\nسيتم أرشفة نسخة في deleted_users وحذف بياناته المرتبطة مثل النتائج والمشاهدات والاشتراكات. هل أنت متأكد؟`);
+    const confirmed = confirmSensitiveAction(`تحذير مهم: سيتم حذف الطالب "${label}" من المنصة ومن Firebase Authentication.\n\nسيتم أرشفة نسخة في deleted_users وحذف بياناته المرتبطة مثل النتائج والمشاهدات والاشتراكات.`, { confirmText: 'حذف' });
     if (!confirmed) return;
     try {
       const result = await adminSecureFunctions.deleteStudentAccount(id, { archiveBeforeDelete: true, deleteRelatedData: true });
+      await audit('student_deleted', { title: 'حذف طالب من المنصة', severity: 'critical', targetUserId: id, targetEmail: student.email || '', before: { name: student.name || '', status: student.status || '', subscriptionStatus: student.subscriptionStatus || '' }, meta: { relatedDeletedCount: result?.relatedDeletedCount || 0 } });
       platformNotify(`تم حذف الطالب من المنصة ومن Firebase Auth. تم حذف ${result?.relatedDeletedCount || 0} سجل مرتبط.`, 'success');
     } catch (error) {
       platformNotify(error?.message || 'تعذر حذف الطالب الآن.', 'error');
@@ -269,7 +286,8 @@ export const AdminDashboard = ({ user, adminProfile }) => {
   };
   const handleDeleteMessage = async (id) => { if(platformConfirm("حذف الرسالة؟")) await adminSecureFunctions.deleteAdminDocument('messages', id); };
   const handleDeleteExam = async (id) => {
-    if (!platformConfirm("حذف الامتحان؟")) return;
+    const exam = examsList.find((e) => e.id === id) || {};
+    if (!confirmSensitiveAction(`حذف الامتحان "${exam.title || id}" وكل نتائجه المرتبطة؟`, { confirmText: 'حذف' })) return;
     try {
       await adminSecureFunctions.deleteExam(id);
     } catch (error) {
@@ -280,6 +298,7 @@ export const AdminDashboard = ({ user, adminProfile }) => {
       related.forEach((resultDoc) => batch.delete(resultDoc.ref));
       await batch.commit();
     }
+    await audit('exam_deleted', { title: 'حذف امتحان وسجلاته', severity: 'critical', targetCollection: 'exams', targetDocId: id, before: { title: exam.title || '', grade: exam.grade || '' } });
     platformNotify('تم حذف الامتحان وسجلاته المرتبطة.');
   };
   const handleDeleteAnnouncement = async (id) => { if(platformConfirm("حذف الإعلان؟")) await adminSecureFunctions.deleteAdminDocument('announcements', id); };
@@ -291,6 +310,7 @@ export const AdminDashboard = ({ user, adminProfile }) => {
       console.warn('delete result callable failed; trying direct Firestore delete:', error?.message);
       await deleteDoc(doc(db, 'exam_results', resultId));
     }
+    await audit('exam_result_deleted', { title: 'حذف نتيجة امتحان', severity: 'warning', targetCollection: 'exam_results', targetDocId: resultId });
     platformNotify('تم حذف النتيجة.');
   };
 
@@ -498,6 +518,7 @@ export const AdminDashboard = ({ user, adminProfile }) => {
       platformNotify('تم إنشاء نسخة جديدة من الامتحان بنجاح. النتائج القديمة محفوظة كما هي.');
     }
 
+    await audit(examEditMode === 'direct' ? 'exam_updated' : 'exam_cloned', { title: examEditMode === 'direct' ? 'تعديل امتحان' : 'إنشاء نسخة امتحان معدلة', severity: editingFullExam.hasResults ? 'warning' : 'info', targetCollection: 'exams', targetDocId: editingFullExam.id, before: { title: editingFullExam.title, version: editingFullExam.version || 1 }, after: { title: payload.title, grade: payload.grade, duration: payload.duration } });
     setEditingFullExam(null);
   };
 
@@ -824,6 +845,7 @@ export const AdminDashboard = ({ user, adminProfile }) => {
       await updateDoc(doc(db, 'users', editingUser.id), { 
           name: editingUser.name?.trim(), phone: validation.normalizedStudentPhone, parentPhone: validation.normalizedParentPhone, grade: editingUser.grade 
       }); 
+      await audit('student_profile_updated', { title: 'تعديل بيانات طالب', targetUserId: editingUser.id, targetEmail: editingUser.email || '', before: { name: editingUser.originalName || editingUser.name || '', grade: editingUser.originalGrade || '' }, after: { name: editingUser.name?.trim(), phone: validation.normalizedStudentPhone, grade: editingUser.grade } });
       setEditingUser(null); 
   };
   
@@ -853,6 +875,7 @@ export const AdminDashboard = ({ user, adminProfile }) => {
 
       try {
           await adminSecureFunctions.setStudentPassword(student.id, newPassword, requestId);
+          await audit('student_password_reset', { title: 'تغيير كلمة سر طالب', severity: 'critical', targetUserId: student.id, targetEmail: student.email || '', meta: { requestId: requestId || '' } });
           try { await navigator.clipboard?.writeText(newPassword); } catch (_) {}
           platformNotify(`تم تغيير كلمة السر. الكلمة الجديدة: ${newPassword} — تم نسخها إن أمكن.`, 'success');
       } catch (error) {
@@ -863,11 +886,13 @@ export const AdminDashboard = ({ user, adminProfile }) => {
   const approveGrade = async (user) => {
       if (!user.requestedGrade) return;
       await updateDoc(doc(db, 'users', user.id), { grade: user.requestedGrade, requestedGrade: null, gradeUpdateStatus: null });
+      await audit('student_grade_request_approved', { title: 'قبول تغيير مرحلة طالب', targetUserId: user.id, targetEmail: user.email || '', before: { grade: user.grade }, after: { grade: user.requestedGrade } });
       platformNotify(`تم تغيير مرحلة الطالب ${user.name} بنجاح.`);
   };
 
   const rejectGrade = async (user) => {
       await updateDoc(doc(db, 'users', user.id), { requestedGrade: null, gradeUpdateStatus: null });
+      await audit('student_grade_request_rejected', { title: 'رفض تغيير مرحلة طالب', targetUserId: user.id, targetEmail: user.email || '', meta: { requestedGrade: user.requestedGrade || '' } });
       platformNotify(`تم رفض طلب تغيير المرحلة للطالب ${user.name}.`);
   };
 
@@ -938,7 +963,8 @@ export const AdminDashboard = ({ user, adminProfile }) => {
           createdAt: new Date() 
       };
       
-      await addDoc(collection(db, 'content'), contentData);
+      const addedContentRef = await addDoc(collection(db, 'content'), contentData);
+      await audit('content_created', { title: 'إضافة محتوى جديد', targetCollection: 'content', targetDocId: addedContentRef.id, after: { title: newContent.title, type: contentData.type, grade: contentData.grade, isPremium: contentData.isPremium } });
       
       if (allowedEmailsArray.length === 0) {
           await addDoc(collection(db, 'notifications'), { text: `تم إضافة درس جديد: ${newContent.title}`, grade: newContent.grade, createdAt: serverTimestamp() });
@@ -949,7 +975,11 @@ export const AdminDashboard = ({ user, adminProfile }) => {
   }; 
   
   const handleDeleteContent = async (id) => { 
-      if(platformConfirm("حذف هذا المحتوى؟")) await deleteDoc(doc(db, 'content', id)); 
+      const item = contentList.find((c) => c.id === id) || {};
+      if(confirmSensitiveAction(`حذف المحتوى "${item.title || id}"؟`, { confirmText: 'حذف' })) {
+        await deleteDoc(doc(db, 'content', id));
+        await audit('content_deleted', { title: 'حذف محتوى', severity: 'warning', targetCollection: 'content', targetDocId: id, before: { title: item.title || '', type: item.type || '', grade: item.grade || '' } });
+      }
   };
 
   const parseExam = async () => {
@@ -1144,13 +1174,7 @@ export const AdminDashboard = ({ user, adminProfile }) => {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     }, { merge: true });
-    await addDoc(collection(db, 'admin_audit_logs'), {
-      action: 'exam_access_override_granted',
-      examId: examOverrideDraft.examId,
-      studentId: examOverrideDraft.studentId,
-      reason: examOverrideDraft.reason?.trim() || 'فتح استثنائي من الإدارة',
-      createdAt: serverTimestamp()
-    }).catch(() => null);
+    await audit('exam_access_override_granted', { title: 'فتح امتحان استثنائي لطالب', severity: 'warning', targetCollection: 'exam_access_overrides', targetDocId: overrideId, targetUserId: selectedStudent.id || examOverrideDraft.studentId, targetEmail: selectedStudent.email || '', meta: { examId: examOverrideDraft.examId, examTitle: selectedExam.title || '', reason: examOverrideDraft.reason?.trim() || 'فتح استثنائي من الإدارة' } });
     platformNotify('تم فتح الامتحان للطالب استثنائيًا.');
   };
 
@@ -1162,12 +1186,7 @@ export const AdminDashboard = ({ user, adminProfile }) => {
       revokedAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
-    await addDoc(collection(db, 'admin_audit_logs'), {
-      action: 'exam_access_override_revoked',
-      examId: override.examId,
-      studentId: override.studentId,
-      createdAt: serverTimestamp()
-    }).catch(() => null);
+    await audit('exam_access_override_revoked', { title: 'إلغاء فتح امتحان استثنائي', severity: 'warning', targetCollection: 'exam_access_overrides', targetDocId: override.id, targetUserId: override.studentId || '', targetEmail: override.studentEmail || '', meta: { examId: override.examId, examTitle: override.examTitle || '' } });
     platformNotify('تم إلغاء الاستثناء.');
   };
 

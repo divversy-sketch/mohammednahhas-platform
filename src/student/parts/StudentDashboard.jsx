@@ -141,6 +141,10 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
   
   const [subscriptionCodeInput, setSubscriptionCodeInput] = useState('');
   const [isCharging, setIsCharging] = useState(false);
+  const [supportDraft, setSupportDraft] = useState({ category: 'exam', message: '' });
+  const [isSendingSupport, setIsSendingSupport] = useState(false);
+  const [paymentDraft, setPaymentDraft] = useState({ amount: '', method: 'vodafone_cash', transactionId: '', note: '' });
+  const [isSendingPayment, setIsSendingPayment] = useState(false);
 
   const {
     content, exams, examResults, hwResults, assignments, assignmentSubmissions, videoViews,
@@ -194,6 +198,74 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
           setSubscriptionCodeInput('');
       } catch (err) { console.error(err); platformNotify("حدث خطأ أثناء الشحن"); }
       setIsCharging(false);
+  };
+
+
+  const handleSubmitPaymentRequest = async (e) => {
+      e.preventDefault();
+      if (!paymentDraft.amount || Number(paymentDraft.amount) <= 0) return platformNotify('اكتب قيمة التحويل أولاً.');
+      if (!paymentDraft.transactionId.trim()) return platformNotify('اكتب رقم العملية أو آخر 4 أرقام من الوصل.');
+      setIsSendingPayment(true);
+      try {
+          await addDoc(collection(db, 'payment_requests'), {
+              userId: user.uid,
+              studentId: user.uid,
+              studentName: userData?.name || user.displayName || user.email || 'طالب',
+              studentEmail: user.email || userData?.email || '',
+              grade: userData?.grade || '',
+              amount: Number(paymentDraft.amount || 0),
+              method: paymentDraft.method,
+              transactionId: paymentDraft.transactionId.trim(),
+              note: paymentDraft.note.trim(),
+              status: 'pending',
+              days: 30,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+          });
+          setPaymentDraft({ amount: '', method: 'vodafone_cash', transactionId: '', note: '' });
+          platformNotify('تم إرسال طلب الدفع للإدارة. سيتم تفعيل الاشتراك بعد المراجعة.');
+      } catch (error) {
+          console.error('payment request error:', error);
+          platformNotify('تعذر إرسال طلب الدفع الآن. حاول مرة أخرى.');
+      } finally {
+          setIsSendingPayment(false);
+      }
+  };
+
+
+  const handleSendSupportTicket = async (e) => {
+      e.preventDefault();
+      if (!supportDraft.message.trim()) return platformNotify('اكتب تفاصيل المشكلة أولاً.');
+      setIsSendingSupport(true);
+      try {
+          const chatRef = doc(db, 'student_chats', user.uid);
+          await setDoc(chatRef, {
+              userId: user.uid,
+              studentId: user.uid,
+              studentName: userData?.name || user.displayName || user.email || 'طالب',
+              studentEmail: user.email || userData?.email || '',
+              lastMessage: supportDraft.message.trim().slice(0, 180),
+              category: supportDraft.category,
+              status: 'open',
+              updatedAt: serverTimestamp(),
+          }, { merge: true });
+          await addDoc(collection(db, 'student_chats', user.uid, 'messages'), {
+              senderId: user.uid,
+              senderRole: 'student',
+              senderName: userData?.name || user.displayName || 'طالب',
+              category: supportDraft.category,
+              text: supportDraft.message.trim(),
+              readByAdmin: false,
+              createdAt: serverTimestamp(),
+          });
+          setSupportDraft({ category: 'exam', message: '' });
+          platformNotify('تم إرسال تذكرة الدعم. هتظهر للإدارة في مركز الرسائل.');
+      } catch (error) {
+          console.error('support ticket error:', error);
+          platformNotify('تعذر إرسال تذكرة الدعم الآن. حاول مرة أخرى.');
+      } finally {
+          setIsSendingSupport(false);
+      }
   };
 
   const videos = content.filter(c => c.type === 'video');
@@ -604,6 +676,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
                 <div onClick={() => {setActiveTab('learning_path'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='learning_path'?'bg-blue-100 text-blue-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-blue-600'}`}><Target/> مساري التعليمي</div>
                 <div onClick={() => {setActiveTab('remediation'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='remediation'?'bg-red-100 text-red-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-red-600'}`}><BrainCircuit/> العلاج الذكي</div>
                 <div onClick={() => {setActiveTab('student_messages'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='student_messages'?'bg-emerald-100 text-emerald-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-emerald-600'}`}><MessageSquare/> رسائلي</div>
+                <div onClick={() => {setActiveTab('support'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='support'?'bg-sky-100 text-sky-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-sky-600'}`}><MessageSquare/> الدعم الفني</div>
                 <div onClick={() => {setActiveTab('videos'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='videos'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><PlayCircle/> المحاضرات</div>
                 <div onClick={() => {setActiveTab('files'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='files'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><FileText/> الملفات و الروابط</div>
                 <div onClick={() => {setActiveTab('htmls'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='htmls'?'bg-purple-100 text-purple-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-purple-600'}`}><Code/> محتوى تفاعلي</div>
@@ -714,6 +787,24 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
                             <Phone size={20}/> إرسال الوصل واتساب
                         </button>
                     </div>
+
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border-t-4 border-emerald-500 md:col-span-2">
+                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><CreditCard className="text-emerald-500"/> إرسال طلب دفع من داخل المنصة</h3>
+                        <p className="text-slate-500 text-sm mb-4">بعد التحويل اكتب بيانات العملية هنا، وستظهر مباشرة في لوحة الأدمن داخل مركز التشغيل الشامل.</p>
+                        <form onSubmit={handleSubmitPaymentRequest} className="grid md:grid-cols-4 gap-3">
+                            <input type="number" className="border p-3 rounded-xl" placeholder="المبلغ" value={paymentDraft.amount} onChange={(e)=>setPaymentDraft({...paymentDraft, amount:e.target.value})} />
+                            <select className="border p-3 rounded-xl" value={paymentDraft.method} onChange={(e)=>setPaymentDraft({...paymentDraft, method:e.target.value})}>
+                                <option value="vodafone_cash">فودافون كاش</option>
+                                <option value="instapay">إنستا باي</option>
+                                <option value="center">دفع في السنتر</option>
+                            </select>
+                            <input className="border p-3 rounded-xl" placeholder="رقم العملية / آخر 4 أرقام" value={paymentDraft.transactionId} onChange={(e)=>setPaymentDraft({...paymentDraft, transactionId:e.target.value})} />
+                            <input className="border p-3 rounded-xl" placeholder="ملاحظة اختيارية" value={paymentDraft.note} onChange={(e)=>setPaymentDraft({...paymentDraft, note:e.target.value})} />
+                            <button disabled={isSendingPayment} className="md:col-span-4 bg-emerald-600 text-white font-bold py-4 rounded-xl hover:bg-emerald-700 shadow-lg flex items-center justify-center gap-2">
+                                {isSendingPayment ? <Loader2 className="animate-spin" /> : 'إرسال طلب الدفع للمراجعة'}
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </div>
         )}
@@ -766,6 +857,29 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
 
           {activeTab === 'student_messages' && (
             <StudentMessagesInbox user={user} userData={userData} />
+          )}
+
+          {activeTab === 'support' && (
+            <div className="glass-panel p-4 md:p-8 rounded-2xl max-w-4xl mx-auto">
+              <div className="mb-6">
+                <p className="text-sm font-black text-sky-700">الدعم الفني</p>
+                <h2 className="text-2xl md:text-3xl font-black text-slate-900">افتح تذكرة للإدارة</h2>
+                <p className="text-slate-500 font-bold mt-2">اكتب المشكلة مرة واحدة بوضوح، وهتظهر للأدمن في مركز الدعم والرسائل.</p>
+              </div>
+              <form onSubmit={handleSendSupportTicket} className="bg-white rounded-3xl border p-5 space-y-4">
+                <select className="w-full border p-3 rounded-xl font-bold" value={supportDraft.category} onChange={(e)=>setSupportDraft({...supportDraft, category:e.target.value})}>
+                  <option value="exam">مشكلة امتحان</option>
+                  <option value="payment">دفع أو اشتراك</option>
+                  <option value="video">فيديو أو ملف</option>
+                  <option value="account">حسابي وبياناتي</option>
+                  <option value="other">أخرى</option>
+                </select>
+                <textarea className="w-full border p-3 rounded-xl min-h-36" placeholder="اكتب تفاصيل المشكلة هنا..." value={supportDraft.message} onChange={(e)=>setSupportDraft({...supportDraft, message:e.target.value})} />
+                <button disabled={isSendingSupport} className="w-full bg-sky-700 text-white font-bold py-4 rounded-xl hover:bg-sky-800 flex items-center justify-center gap-2">
+                  {isSendingSupport ? <Loader2 className="animate-spin" /> : <><MessageSquare size={20}/> إرسال التذكرة</>}
+                </button>
+              </form>
+            </div>
           )}
 
           {activeTab === 'videos' && !isBannedContent && (
