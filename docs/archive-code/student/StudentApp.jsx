@@ -1,25 +1,9 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import {  signInWithEmailAndPassword, createUserWithEmailAndPassword, 
-  signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail 
-} from 'firebase/auth';
-import {  doc, setDoc, getDoc, getDocs, collection, addDoc, query, where, 
-  onSnapshot, updateDoc, deleteDoc, orderBy, serverTimestamp, writeBatch, limit, increment 
-} from 'firebase/firestore';
-import { 
-  PlayCircle, FileText, LogOut, User, GraduationCap, Quote, CheckCircle, 
-  Lock, Mail, ChevronRight, Menu, X, Loader2, AlertTriangle, PlusCircle, 
-  Check, Trash2, Eye, ShieldAlert, Video, UploadCloud, Phone, Edit, KeyRound,
-  MessageSquare, Send, MessageCircle, Facebook, BookOpen, Feather, Radio, 
-  ExternalLink, ClipboardList, Timer, AlertOctagon, Flag, Save, HelpCircle, 
-  Reply, Unlock, Layout, Settings, Trophy, Megaphone, Bell, Download, XCircle, 
-  Calendar, Clock, FileWarning, Settings as GearIcon, Star, Bot, Power, Upload,
-  Users, PenTool, Code, Sparkles, Lamp, Ban, Shield, RefreshCw, Link as LinkIcon, 
-  History, Camera, QrCode, FileCheck, MousePointerClick, BarChart3, Layers,
-  BrainCircuit, Headphones, DownloadCloud, PenLine, Play, Pause, SkipForward, 
-  Target, AlertCircle, Crown, CreditCard, Key, Wand2, WalletCards, Smartphone
-} from '../shared/icons/lucide-shim.jsx';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
+import { doc, setDoc, getDoc, getDocs, collection, addDoc, query, where, onSnapshot, updateDoc, deleteDoc, orderBy, serverTimestamp, writeBatch, limit, increment } from 'firebase/firestore';
+import { PlayCircle, FileText, LogOut, User, GraduationCap, CheckCircle, Lock, Mail, ChevronRight, Menu, X, Loader2, AlertTriangle, Check, Trash2, Eye, ShieldAlert, Video, UploadCloud, Phone, Edit, KeyRound, Send, MessageCircle, Facebook, BookOpen, ClipboardList, Timer, AlertOctagon, Flag, HelpCircle, Layout, Settings, Trophy, Bell, Download, XCircle, Calendar, Clock, Settings as GearIcon, Upload, Users, PenTool, Code, Sparkles, Ban, RefreshCw, Link as LinkIcon, QrCode, FileCheck, BarChart3, Layers, BrainCircuit, Headphones, DownloadCloud, Play, Target, Crown, CreditCard, Key, WalletCards, Smartphone } from '../shared/icons/lucide-shim.jsx';
 import { motion, AnimatePresence } from 'framer-motion';
-import { auth, db, savePushTokenForUser, setupForegroundPushListener } from '../services/firebase';
+import { auth, db } from '../services/firebase';
 import SecureVideoPlayer from '../features/lectures/SecureVideoPlayer';
 import MobileStudentBottomNav from '../features/student/MobileStudentBottomNav';
 import MobileExamHelperStyles from '../shared/components/MobileExamHelperStyles';
@@ -32,7 +16,6 @@ import InteractiveViewer from '../features/content/InteractiveViewer';
 import { AdminCoursesManager, StudentCoursesHub } from '../features/courses/CourseSystem';
 import { uploadToCloudinary } from '../services/cloudinaryUpload';
 import { uploadToFirebaseContent, detectContentType, readHtmlFileAsInlineContent } from '../services/firebaseContentUpload';
-
 
 
 const platformNotify = (message, type = 'info') => {
@@ -407,19 +390,6 @@ const getReviewRecommendations = (branchStats = {}, content = []) => {
         return { branch: item.branch, pct: item.pct, title: related?.title || `راجع فرع ${item.branch}` };
     });
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 const StudentLocalAdvice = ({ metrics = {}, content = [] }) => {
@@ -1421,28 +1391,6 @@ const PlatformPerformanceBooster = () => {
 };
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const PaymentRequestStudentPanel = ({ user, userData }) => {
   const [method, setMethod] = useState('vodafone_cash');
   const [plan, setPlan] = useState('monthly');
@@ -1731,15 +1679,6 @@ const AppConversionGuidePanel = () => (
     </div>
   </div>
 );
-
-
-
-
-
-
-
-
-
 
 
 const SmartSubscriptionManager = ({ users = [], adminGradeFilter = 'all' }) => {
@@ -2551,8 +2490,6 @@ const StudentAssignmentsPanel = ({ assignments = [], submissions = [], user, use
     </div>
   );
 };
-
-
 
 
 const AdminProDashboard = ({ users = [], exams = [], results = [], content = [], subscriptionCodes = [], hwResults = [], adminGradeFilter = 'all' }) => {
@@ -5022,7 +4959,6 @@ const AdminDashboard = ({ user }) => {
                   </div>
               </div>
           )}
-
 
 
           {activeTab === 'notifications' && (

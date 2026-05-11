@@ -10,7 +10,7 @@ import { uploadToCloudinary } from '../../services/cloudinaryUpload';
 
 import { platformNotify, safeNumber, calculateDetailedExamMetrics } from '../core/platformShared.jsx';
 
-import { makeExamAutosaveKey, readLocalExamBackup, writeLocalExamBackupToStorage, flattenExamQuestions } from '../exam/examState.js';
+import { makeExamAutosaveKey, readLocalExamBackup, writeLocalExamBackupToStorage, clearLocalExamBackup, flattenExamQuestions } from '../exam/examState.js';
 import ExamDashboardView from '../../features/exam/components/ExamDashboardView.jsx';
 import ExamWatermarkLayer from '../../features/exam/components/ExamWatermarkLayer.jsx';
 import ExamSecurityHoldOverlay from '../../features/exam/components/ExamSecurityHoldOverlay.jsx';
@@ -32,7 +32,10 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
   const [isCheating, setIsCheating] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(isReviewMode || existingResult !== null);
   const [score, setScore] = useState(existingResult?.score || 0);
-  const [startTime, setStartTime] = useState(Date.now());
+  const [startTime, setStartTime] = useState(() => {
+    const savedStart = existingResult?.startedAt?.toDate?.()?.getTime?.() || existingResult?.startedAtMillis || exam.resumeData?.startedAt?.toDate?.()?.getTime?.() || exam.resumeData?.startedAtMillis || (localExamBackup?.startedAt ? new Date(localExamBackup.startedAt).getTime() : null);
+    return Number.isFinite(savedStart) && savedStart > 0 ? savedStart : Date.now();
+  });
   const [wmPositions, setWmPositions] = useState([]);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [activeBranchTab, setActiveBranchTab] = useState('الكل');
@@ -108,7 +111,8 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
       timeLeft: extra.remainingTime ?? timeLeft,
       currentQIndex: extra.currentQIndex ?? currentQIndex,
       antiCheatWarnings: antiCheatWarningsRef.current,
-      antiCheatLog
+      antiCheatLog,
+      startedAt: new Date(startTime).toISOString()
     });
     if (didSaveLocally) setLastLocalSaveAt(new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
   };
@@ -128,6 +132,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
         status: extra.status || 'in_progress',
         antiCheatWarnings: antiCheatWarningsRef.current,
         antiCheatLog,
+        startedAtMillis: startTime,
         lastSavedAt: serverTimestamp(),
         ...extra
       }, { merge: true });
@@ -150,7 +155,8 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
     setCurrentQIndex(0);
     setScore(0);
     setTimeLeft(exam.duration * 60);
-    setStartTime(Date.now());
+    const freshStartTime = Date.now();
+    setStartTime(freshStartTime);
     setAntiCheatWarnings(0);
     antiCheatWarningsRef.current = 0;
     setAntiCheatLog(nextLog);
@@ -169,6 +175,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
           antiCheatWarnings: 0,
           antiCheatLog: nextLog,
           restartCount: increment(1),
+          startedAtMillis: freshStartTime,
           restartedAfterSecurityAt: serverTimestamp(),
           lastSavedAt: serverTimestamp()
         }, { merge: true });
@@ -301,6 +308,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
             remainingTime: timeLeft,
             currentQIndex,
             status: 'in_progress',
+            startedAtMillis: startTime,
             lastSavedAt: serverTimestamp()
           }, { merge: true }).catch((e) => console.warn('answer autosave blocked:', e?.message));
         }
@@ -327,7 +335,8 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
       currentQIndex: backup.currentQIndex,
       localDraftSyncedAt: serverTimestamp(),
       lastSavedAt: serverTimestamp(),
-      status: 'in_progress'
+      status: 'in_progress',
+      startedAtMillis: startTime
     }, { merge: true }).catch((e) => console.warn('local backup sync failed:', e?.message));
   }, [isOnline, isReviewMode, isSubmitted, autosaveKey, exam.attemptId, exam.id]);
 
@@ -448,8 +457,12 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
 
     try {
       await batch.commit();
+      clearLocalExamBackup(autosaveKey);
+      platformNotify(auto ? 'انتهى الوقت وتم تسليم الامتحان تلقائيًا. تم حفظ الإجابات.' : 'تم تسليم الامتحان وحفظ النتيجة بنجاح.');
     } catch (err) {
       console.error("Error saving results or mistakes", err);
+      writeLocalExamBackup(answers, { status: 'completed_locally', submittedLocallyAt: new Date().toISOString() });
+      platformNotify('تعذر رفع النتيجة للسيرفر الآن. تم حفظ نسخة محلية، لا تغلق الجهاز وحاول الاتصال بالإنترنت.');
     }
   };
 

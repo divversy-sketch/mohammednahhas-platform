@@ -206,6 +206,62 @@ export default function AdminDashboardTabs({ ctx }) {
     setSubscriptionCodes
   } = ctx;
 
+
+  const [studentSearchTerm, setStudentSearchTerm] = React.useState('');
+  const [studentStatusFilter, setStudentStatusFilter] = React.useState('all');
+  const [studentSubscriptionFilter, setStudentSubscriptionFilter] = React.useState('all');
+
+  const getDateText = (value) => {
+    const date = value?.toDate ? value.toDate() : (value ? new Date(value) : null);
+    return date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString('ar-EG') : '';
+  };
+
+  const dailyFilteredActiveUsers = React.useMemo(() => {
+    const q = studentSearchTerm.trim().toLowerCase();
+    return (filteredActiveUsers || []).filter((student) => {
+      const searchable = [student.name, student.email, student.phone, student.parentPhone, student.id].filter(Boolean).join(' ').toLowerCase();
+      const matchesSearch = !q || searchable.includes(q);
+      const matchesStatus = studentStatusFilter === 'all' || student.status === studentStatusFilter || (studentStatusFilter === 'banned' && String(student.status || '').startsWith('banned'));
+      const matchesSubscription = studentSubscriptionFilter === 'all' || (studentSubscriptionFilter === 'premium' ? student.subscriptionStatus === 'premium' : student.subscriptionStatus !== 'premium');
+      return matchesSearch && matchesStatus && matchesSubscription;
+    });
+  }, [filteredActiveUsers, studentSearchTerm, studentStatusFilter, studentSubscriptionFilter]);
+
+  const dailyAdminStats = React.useMemo(() => {
+    const users = filteredActiveUsers || [];
+    const pendingGradeUpdates = users.filter((student) => student.gradeUpdateStatus === 'pending').length;
+    const vipUsers = users.filter((student) => student.subscriptionStatus === 'premium').length;
+    const bannedUsers = users.filter((student) => String(student.status || '').startsWith('banned')).length;
+    const securityHeldAttempts = (examResults || []).filter((result) => ['security_hold', 'cheated', 'in_progress'].includes(result.status)).length;
+    return { total: users.length, vipUsers, bannedUsers, pendingGradeUpdates, securityHeldAttempts };
+  }, [filteredActiveUsers, examResults]);
+
+  const exportStudentsCSV = () => {
+    const header = ['name','email','phone','parentPhone','grade','status','subscriptionStatus','subscriptionExpiry'];
+    const rows = dailyFilteredActiveUsers.map((student) => [
+      student.name || '',
+      student.email || '',
+      student.phone || '',
+      student.parentPhone || '',
+      getGradeLabel(student.grade),
+      student.status || '',
+      student.subscriptionStatus || 'free',
+      getDateText(student.subscriptionExpiry)
+    ]);
+    const escapeCsv = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const csv = [header, ...rows].map((row) => row.map(escapeCsv).join(',')).join('\n');
+    const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `students-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    platformNotify('تم تجهيز ملف الطلاب CSV.');
+  };
+
   if (!canAccessAdminTab(adminProfile || userData, activeTab)) {
     return (
       <div className="md:col-span-3 w-full overflow-hidden" dir="rtl">
@@ -250,11 +306,39 @@ export default function AdminDashboardTabs({ ctx }) {
           {activeTab === 'all_users' && (
               <div className="glass-panel p-4 md:p-6 rounded-xl">
                   <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
-                      <h2 className="font-bold font-arabic text-xl">قائمة الطلاب ({filteredActiveUsers.length})</h2>
+                      <h2 className="font-bold font-arabic text-xl">قائمة الطلاب ({dailyFilteredActiveUsers.length} / {filteredActiveUsers.length})</h2>
                       <div className="md:hidden">
                           <select className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg font-bold shadow-sm w-full" value={adminGradeFilter} onChange={(e) => setAdminGradeFilter(e.target.value)}>
                               <option value="all">كل المراحل</option><GradeOptions />
                           </select>
+                      </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
+                      <div className="rounded-2xl border border-slate-100 bg-white p-4"><p className="text-xs font-bold text-slate-500">إجمالي الطلاب</p><p className="text-2xl font-black text-slate-900">{dailyAdminStats.total}</p></div>
+                      <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4"><p className="text-xs font-bold text-amber-700">VIP</p><p className="text-2xl font-black text-amber-900">{dailyAdminStats.vipUsers}</p></div>
+                      <div className="rounded-2xl border border-red-100 bg-red-50 p-4"><p className="text-xs font-bold text-red-700">محظورين</p><p className="text-2xl font-black text-red-900">{dailyAdminStats.bannedUsers}</p></div>
+                      <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4"><p className="text-xs font-bold text-blue-700">طلبات مرحلة</p><p className="text-2xl font-black text-blue-900">{dailyAdminStats.pendingGradeUpdates}</p></div>
+                      <div className="rounded-2xl border border-purple-100 bg-purple-50 p-4"><p className="text-xs font-bold text-purple-700">محاولات تحتاج متابعة</p><p className="text-2xl font-black text-purple-900">{dailyAdminStats.securityHeldAttempts}</p></div>
+                  </div>
+
+                  <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                      <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                          <input value={studentSearchTerm} onChange={(e) => setStudentSearchTerm(e.target.value)} placeholder="بحث بالاسم / الهاتف / البريد" className="md:col-span-2 border border-slate-200 p-3 rounded-xl font-bold outline-none focus:border-blue-400" />
+                          <select value={studentStatusFilter} onChange={(e) => setStudentStatusFilter(e.target.value)} className="border border-slate-200 p-3 rounded-xl font-bold bg-white">
+                              <option value="all">كل الحالات</option>
+                              <option value="active">نشط</option>
+                              <option value="banned">أي حظر</option>
+                              <option value="banned_exam">حظر امتحانات</option>
+                              <option value="banned_content">حظر محتوى</option>
+                              <option value="banned_all">حظر شامل</option>
+                          </select>
+                          <select value={studentSubscriptionFilter} onChange={(e) => setStudentSubscriptionFilter(e.target.value)} className="border border-slate-200 p-3 rounded-xl font-bold bg-white">
+                              <option value="all">كل الاشتراكات</option>
+                              <option value="premium">VIP فقط</option>
+                              <option value="free">مجاني فقط</option>
+                          </select>
+                          <button onClick={exportStudentsCSV} className="bg-slate-900 text-white rounded-xl font-black flex items-center justify-center gap-2 px-4 py-3 hover:bg-slate-800"><Download size={16}/> تصدير الطلاب</button>
                       </div>
                   </div>
                   
@@ -275,7 +359,7 @@ export default function AdminDashboardTabs({ ctx }) {
                   )}
                   
                   <div className="grid gap-4">
-                      {filteredActiveUsers.map(u=>(
+                      {dailyFilteredActiveUsers.map(u=> (
                           <div key={u.id} className={`p-4 rounded-xl border flex flex-col justify-between gap-4 transition-all hover:shadow-lg ${u.status.startsWith('banned') ? 'bg-red-50 border-red-200' : 'bg-white/50 border-slate-100'}`}>
                               <div className="flex flex-col lg:flex-row justify-between w-full gap-4">
                                   <div className="flex-1">
@@ -324,6 +408,7 @@ export default function AdminDashboardTabs({ ctx }) {
                               )}
                           </div>
                       ))}
+                      {dailyFilteredActiveUsers.length === 0 && <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center font-bold text-slate-500">لا يوجد طلاب مطابقين للفلاتر الحالية.</div>}
                   </div>
               </div>
           )}
