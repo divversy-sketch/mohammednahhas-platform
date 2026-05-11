@@ -77,6 +77,7 @@ import StudentAssignmentsPanel from '../../admin/parts/StudentAssignmentsPanel.j
 import SmartHomeworkScanner from '../../features/homework/SmartHomeworkScanner.jsx';
 import StudentGrowthPanel from '../../features/insights/StudentGrowthPanel.jsx';
 import StudentLearningPath from '../../features/student/StudentLearningPath.jsx';
+import { StudentMessagesInbox, StudentRemediationCenter, ExamPreStartPanel } from '../../features/smartLearning/SmartLearningEngine.jsx';
 
 export const StudentDashboard = ({ user, userData, installPrompt }) => {
   userData = userData || {
@@ -105,6 +106,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
   const [pushStatus, setPushStatus] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported');
   const [editFormData, setEditFormData] = useState({ name: '', phone: '', parentPhone: '', grade: '' });
   const [showFocusMode, setShowFocusMode] = useState(false);
+  const [preExam, setPreExam] = useState(null);
   const [scanningHwId, setScanningHwId] = useState(null);
   
   const [subscriptionCodeInput, setSubscriptionCodeInput] = useState('');
@@ -545,6 +547,8 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
               <>
                 <div onClick={() => {setActiveTab('courses'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='courses'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><BookOpen/> الكورسات التعليمية</div>
                 <div onClick={() => {setActiveTab('learning_path'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='learning_path'?'bg-blue-100 text-blue-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-blue-600'}`}><Target/> مساري التعليمي</div>
+                <div onClick={() => {setActiveTab('remediation'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='remediation'?'bg-red-100 text-red-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-red-600'}`}><BrainCircuit/> العلاج الذكي</div>
+                <div onClick={() => {setActiveTab('student_messages'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='student_messages'?'bg-emerald-100 text-emerald-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-emerald-600'}`}><MessageSquare/> رسائلي</div>
                 <div onClick={() => {setActiveTab('videos'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='videos'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><PlayCircle/> المحاضرات</div>
                 <div onClick={() => {setActiveTab('files'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='files'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><FileText/> الملفات و الروابط</div>
                 <div onClick={() => {setActiveTab('htmls'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='htmls'?'bg-purple-100 text-purple-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-purple-600'}`}><Code/> محتوى تفاعلي</div>
@@ -691,6 +695,22 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
               mistakes={mistakes}
               setActiveTab={setActiveTab}
             />
+          )}
+
+          {activeTab === 'remediation' && !isBannedExam && (
+            <StudentRemediationCenter
+              user={user}
+              exams={exams}
+              examResults={examResults}
+              mistakes={mistakes}
+              content={content}
+              onStartMistakesExam={startMistakesExam}
+              setActiveTab={setActiveTab}
+            />
+          )}
+
+          {activeTab === 'student_messages' && (
+            <StudentMessagesInbox user={user} userData={userData} />
           )}
 
           {activeTab === 'videos' && !isBannedContent && (
@@ -889,7 +909,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
                                 {e.isPremium && !isPremium ? (
                                     <button onClick={()=>handlePremiumClick(()=>{})} className="w-full bg-slate-200 text-slate-500 py-3 rounded-xl font-bold flex items-center justify-center gap-2 cursor-not-allowed text-sm"><Lock size={16}/> امتحان مقفل (للمشتركين)</button>
                                 ) : (
-                                    <button onClick={() => startExamWithCode(e)} className="w-full bg-slate-900 text-white py-2 md:py-3 rounded-xl font-bold hover:bg-slate-800 flex items-center justify-center gap-2 shadow-lg hover:shadow-slate-500/30 transition text-sm"><Lock size={14}/> ابدأ الامتحان</button>
+                                    <button onClick={() => setPreExam(e)} className="w-full bg-slate-900 text-white py-2 md:py-3 rounded-xl font-bold hover:bg-slate-800 flex items-center justify-center gap-2 shadow-lg hover:shadow-slate-500/30 transition text-sm"><Lock size={14}/> صفحة ما قبل الامتحان</button>
                                 )}
                             </div>
                         )}
@@ -959,6 +979,19 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
               </div>
         )}
       </main>
+      {preExam && (
+        <ExamPreStartPanel
+          exam={preExam}
+          results={examResults}
+          previousExam={preExam.accessRule?.requiredExamId ? exams.find((e) => e.id === preExam.accessRule.requiredExamId) : null}
+          previousPercent={(() => {
+            const prev = preExam.accessRule?.requiredExamId ? examResults.filter((r) => r.examId === preExam.accessRule.requiredExamId && r.status === 'completed') : [];
+            return prev.length ? Math.max(...prev.map((r) => Number(r.percentage ?? r.percent ?? r.scorePercentage ?? r.score ?? 0))) : null;
+          })()}
+          onStart={() => { const target = preExam; setPreExam(null); startExamWithCode(target); }}
+          onClose={() => setPreExam(null)}
+        />
+      )}
       {scanningHwId && <SmartHomeworkScanner hwId={scanningHwId} user={user} onClose={() => setScanningHwId(null)} />}
     </div>
   );

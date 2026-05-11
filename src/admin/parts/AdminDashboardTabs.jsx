@@ -91,6 +91,7 @@ import { adminSecureFunctions } from '../services/adminSecureFunctions.js';
 import AdminFollowUpPanel from '../../features/insights/AdminFollowUpPanel.jsx';
 import AdminSmartHomeworkManager from '../../features/homework/AdminSmartHomeworkManager.jsx';
 import { AdminAuditLogViewer, AdminNotificationsManager, AdminPlatformSettingsManager, AdminRolesManager } from './AdminOperationsSuite.jsx';
+import { AdminSmartExamEngine, AdminStudentReports, AdminGroupsManager, AdminMessagingCenter, AdminFinanceDashboard, AdminVideoSecurityPanel } from '../../features/smartLearning/SmartLearningEngine.jsx';
 
 
 
@@ -495,6 +496,18 @@ export default function AdminDashboardTabs({ ctx }) {
           )}
 
           {activeTab === 'question_bank' && <AdminQuestionBankPage adminGradeFilter={adminGradeFilter} />}
+
+          {activeTab === 'smart_exam_engine' && <AdminSmartExamEngine adminGradeFilter={adminGradeFilter} exams={examsList} examResults={examResults} userData={userData} />}
+
+          {activeTab === 'student_reports' && <AdminStudentReports users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} videoViews={videoViews} mistakes={mistakes} assignments={assignments} assignmentSubmissions={assignmentSubmissions} />}
+
+          {activeTab === 'student_groups' && <AdminGroupsManager users={activeUsersList} userData={userData} />}
+
+          {activeTab === 'messages_center' && <AdminMessagingCenter users={activeUsersList} userData={userData} />}
+
+          {activeTab === 'finance_dashboard' && <AdminFinanceDashboard users={activeUsersList} subscriptionCodes={subscriptionCodes} />}
+
+          {activeTab === 'video_security' && <AdminVideoSecurityPanel />}
 
           {activeTab === 'assignments' && <AdminAssignmentsPage adminGradeFilter={adminGradeFilter} handleDeleteAllHomework={handleDeleteAllHomework} />}
 

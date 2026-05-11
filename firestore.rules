@@ -243,6 +243,16 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /student_groups/{groupId} {
+      allow read: if isAdmin() || signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /student_messages/{messageId} {
+      allow read: if isAdmin() || signedIn();
+      allow write: if isAdmin();
+    }
+
     match /notification_tokens/{docId} {
       allow read: if isAdmin();
       allow create, update: if ownUserIdOnCreate();
