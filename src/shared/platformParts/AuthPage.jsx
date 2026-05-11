@@ -72,12 +72,25 @@ export const AuthPage = ({ onBack }) => {
   const [isRegister, setIsRegister] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({ email: '', password: '', name: '', grade: '1sec', phone: '', parentPhone: '' });
+  const [platformSettings, setPlatformSettings] = useState({ registrationOpen: true, platformName: 'منصة النحاس التعليمية', welcomeMessage: '' });
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'platform_settings', 'main'), (snap) => {
+      if (snap.exists()) setPlatformSettings((prev) => ({ ...prev, ...snap.data() }));
+    }, () => {});
+    return () => unsub();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     if (isRegister) {
+        if (platformSettings.registrationOpen === false) {
+            platformNotify('التسجيل مغلق حاليًا من إدارة المنصة. تواصل مع الإدارة للتفعيل.');
+            setLoading(false);
+            return;
+        }
         if (!formData.name.trim()) {
             platformNotify("من فضلك اكتب اسم الطالب.");
             setLoading(false);
@@ -135,6 +148,8 @@ export const AuthPage = ({ onBack }) => {
         <button onClick={onBack} className="text-slate-500 hover:text-slate-800 text-sm mb-4 md:mb-6 flex items-center gap-1 font-bold"><ChevronRight size={18} /> العودة</button>
         <div className="flex justify-center mb-4"><ModernLogo /></div>
         <h2 className="text-2xl md:text-3xl font-bold font-arabic text-slate-800 mb-2 text-center">{isRegister ? 'حساب جديد' : 'تسجيل دخول'}</h2>
+        {platformSettings.welcomeMessage && <p className="text-center text-sm text-slate-500 font-bold leading-6">{platformSettings.welcomeMessage}</p>}
+        {isRegister && platformSettings.registrationOpen === false && <div className="mt-4 bg-red-50 border border-red-100 text-red-700 rounded-2xl p-3 text-sm font-black text-center">التسجيل مغلق حاليًا من الإدارة</div>}
         <form onSubmit={handleSubmit} className="flex flex-col gap-3 md:gap-4 mt-4 md:mt-6">
           {isRegister && (
             <>

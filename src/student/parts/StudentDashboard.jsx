@@ -76,6 +76,7 @@ import { StudentTopGreeting, LearningHubTabs } from '../components/layout/Studen
 import StudentAssignmentsPanel from '../../admin/parts/StudentAssignmentsPanel.jsx';
 import SmartHomeworkScanner from '../../features/homework/SmartHomeworkScanner.jsx';
 import StudentGrowthPanel from '../../features/insights/StudentGrowthPanel.jsx';
+import StudentLearningPath from '../../features/student/StudentLearningPath.jsx';
 
 export const StudentDashboard = ({ user, userData, installPrompt }) => {
   userData = userData || {
@@ -248,8 +249,8 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
   const averageScore = completedExamResults.length > 0
       ? Math.round(completedExamResults.reduce((sum, r) => sum + getResultPercentage(r), 0) / completedExamResults.length)
       : 0;
-  const unseenNotificationCount = 0;
-  const recentNotificationItems = [];
+  const recentNotificationItems = (notifications || []).slice(0, 5);
+  const unseenNotificationCount = (notifications || []).filter((n) => !n.read).length;
 
   const smartWeakBranches = (() => {
       const totals = {};
@@ -516,6 +517,16 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
       {playingHtml && <InteractiveViewer content={playingHtml} user={userData} onClose={() => setPlayingHtml(null)} />}
       {/* النظام امتحانات الطلاب متوقفة مؤقتًا  */}
       <FloatingArabicBackground />
+      {showNotifications && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setShowNotifications(false)}>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-auto p-5" onClick={(e)=>e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4"><h2 className="text-xl font-black flex items-center gap-2"><Bell className="text-amber-600"/> إشعارات المنصة</h2><button onClick={() => setShowNotifications(false)} className="bg-slate-100 rounded-full p-2"><X size={18}/></button></div>
+            {(notifications || []).length ? (notifications || []).map((n, i) => (
+              <div key={n.id || i} className="border rounded-2xl p-4 mb-3 bg-slate-50"><p className="font-black text-slate-900">{n.title || 'تنبيه جديد'}</p><p className="text-sm text-slate-600 mt-1 leading-6">{n.body || n.text || n.message}</p><p className="text-[11px] text-slate-400 mt-2">{n.createdAt?.toDate ? n.createdAt.toDate().toLocaleString('ar-EG') : ''}</p></div>
+            )) : <div className="text-center text-slate-500 font-bold py-8">لا توجد إشعارات حاليًا.</div>}
+          </div>
+        </div>
+      )}
       
       <aside className={`fixed top-0 bottom-0 right-0 z-40 bg-white/95 backdrop-blur-xl w-72 p-6 shadow-xl transition-transform duration-300 ${mobileMenu ? 'translate-x-0' : 'translate-x-full md:translate-x-0'} border-l border-slate-200 flex flex-col`}>
         <div className="flex items-center justify-between mb-10 px-2">
@@ -533,6 +544,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
           {!isBannedContent && (
               <>
                 <div onClick={() => {setActiveTab('courses'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='courses'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><BookOpen/> الكورسات التعليمية</div>
+                <div onClick={() => {setActiveTab('learning_path'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='learning_path'?'bg-blue-100 text-blue-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-blue-600'}`}><Target/> مساري التعليمي</div>
                 <div onClick={() => {setActiveTab('videos'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='videos'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><PlayCircle/> المحاضرات</div>
                 <div onClick={() => {setActiveTab('files'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='files'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><FileText/> الملفات و الروابط</div>
                 <div onClick={() => {setActiveTab('htmls'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='htmls'?'bg-purple-100 text-purple-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-purple-600'}`}><Code/> محتوى تفاعلي</div>
@@ -555,6 +567,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
             <div className="flex gap-2">
                 {installPrompt && ( <button onClick={installPrompt} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full font-bold shadow-lg shadow-green-500/30 transition flex items-center gap-2"><DownloadCloud size={18}/><span className="hidden md:inline">تثبيت التطبيق</span></button> )}
                 <button onClick={() => setShowFocusMode(true)} className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-full font-bold shadow-lg transition flex items-center gap-2"><Headphones size={18}/><span className="hidden md:inline">التركيز</span></button>
+                <button onClick={() => setShowNotifications(true)} className="relative bg-white hover:bg-amber-50 text-slate-800 px-4 py-2 rounded-full font-bold shadow border transition flex items-center gap-2"><Bell size={18}/><span className="hidden md:inline">الإشعارات</span>{unseenNotificationCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center">{unseenNotificationCount}</span>}</button>
             </div>
             <div className="flex items-center gap-3">
                 {isPremium && <span className="hidden md:flex bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-bold items-center gap-1 border border-amber-200"><Crown size={14}/> VIP صالح حتى: {userData?.subscriptionExpiry?.toDate().toLocaleDateString('ar-EG')}</span>}
@@ -666,6 +679,19 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
         )}
 
           {activeTab === 'courses' && !isBannedContent && <StudentCoursesHub user={user} userData={userData} exams={exams} onStartExam={startExamWithCode} />}
+
+          {activeTab === 'learning_path' && !isBannedContent && (
+            <StudentLearningPath
+              videos={videos}
+              exams={exams}
+              examResults={examResults}
+              assignments={assignments}
+              assignmentSubmissions={assignmentSubmissions}
+              videoViews={videoViews}
+              mistakes={mistakes}
+              setActiveTab={setActiveTab}
+            />
+          )}
 
           {activeTab === 'videos' && !isBannedContent && (
             <div className="space-y-6">

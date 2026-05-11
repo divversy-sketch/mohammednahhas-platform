@@ -90,7 +90,7 @@ import { AdminAssignmentsPage, AdminExamViewTabs, AdminQuestionBankPage } from '
 import { adminSecureFunctions } from '../services/adminSecureFunctions.js';
 import AdminFollowUpPanel from '../../features/insights/AdminFollowUpPanel.jsx';
 import AdminSmartHomeworkManager from '../../features/homework/AdminSmartHomeworkManager.jsx';
-import AdminPlatformUpgradeCenter from '../../features/platformUpgrade/AdminPlatformUpgradeCenter.jsx';
+import { AdminAuditLogViewer, AdminNotificationsManager, AdminPlatformSettingsManager, AdminRolesManager } from './AdminOperationsSuite.jsx';
 
 
 
@@ -814,7 +814,13 @@ export default function AdminDashboardTabs({ ctx }) {
           )}
 
 
-          {activeTab === 'platform_upgrade' && <AdminPlatformUpgradeCenter ctx={ctx} />}
+          {activeTab === 'platform_settings' && <AdminPlatformSettingsManager userData={userData} />}
+
+          {activeTab === 'admin_roles' && <AdminRolesManager users={activeUsersList} userData={userData} />}
+
+          {activeTab === 'audit_logs' && <AdminAuditLogViewer />}
+
+          {activeTab === 'notifications_admin' && <AdminNotificationsManager users={activeUsersList} userData={userData} />}
 
 {activeTab === 'courses' && <AdminCoursesManager users={activeUsersList} exams={examsList} adminUser={userData} />}
 
