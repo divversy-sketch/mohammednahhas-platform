@@ -13,7 +13,7 @@ import AppErrorBoundary from '../parts/AppErrorBoundary.jsx';
 import { useAdminSession } from '../hooks/useAdminSession.js';
 
 function AdminApp() {
-  const { user, isAdminAccount, isLoading } = useAdminSession();
+  const { user, adminProfile, isAdminAccount, isLoading } = useAdminSession();
 
   if (isLoading) {
     return (
@@ -36,7 +36,7 @@ function AdminApp() {
         {!user ? (
           <AuthPage key="admin-auth" onBack={() => navigatePlatform('/')} />
         ) : isAdminAccount ? (
-          <AdminDashboard key="admin" user={user} />
+          <AdminDashboard key="admin" user={user} adminProfile={adminProfile} />
         ) : (
           <AdminAccessDenied key="admin-denied" user={user} />
         )}

@@ -5,23 +5,7 @@ import { platformNotify } from '../../shared/core/platformShared.jsx';
 import { Bell, ClipboardList, History, Save, Settings, Shield, Users } from '../../shared/icons/lucide-shim.jsx';
 import { getGradeLabel } from '../../shared/constants/grades.jsx';
 
-const ROLE_LABELS = {
-  owner: 'مالك المنصة',
-  manager: 'مدير عام',
-  exams_supervisor: 'مشرف امتحانات',
-  students_supervisor: 'مشرف طلاب',
-  content_supervisor: 'مشرف محتوى',
-  support: 'دعم فني',
-};
-
-const ROLE_PERMISSIONS = {
-  owner: ['كل الصلاحيات'],
-  manager: ['إدارة الطلاب', 'إدارة الامتحانات', 'إدارة المحتوى', 'الاشتراكات', 'التقارير'],
-  exams_supervisor: ['إنشاء وتعديل الامتحانات', 'مراجعة النتائج', 'الفتح الاستثنائي'],
-  students_supervisor: ['قبول الطلاب', 'تعديل بيانات الطلاب', 'متابعة الأداء'],
-  content_supervisor: ['إدارة المحاضرات', 'إدارة الملفات', 'إدارة الكورسات'],
-  support: ['قراءة الطلبات', 'مساعدة الطلاب', 'بدون حذف نهائي'],
-};
+import { ADMIN_ROLE_LABELS as ROLE_LABELS, ADMIN_TAB_LABELS, ROLE_TAB_ACCESS, getRolePermissions, getRoleTabs, isOwnerEmail } from '../../config/adminPermissions';
 
 const DEFAULT_SETTINGS = {
   platformName: 'منصة النحاس التعليمية',
@@ -106,16 +90,30 @@ export function AdminRolesManager({ users = [], userData = {} }) {
 
   const saveRole = async () => {
     if (!target) return platformNotify('اختار مستخدم أولاً');
+    if (!userData?.isOwner && !isOwnerEmail(userData?.email)) return platformNotify('تعيين المساعدين متاح للمالك فقط.');
     const selected = users.find((u) => u.id === target);
-    await updateDoc(doc(db, 'users', target), {
+    if (!selected?.id) return platformNotify('المستخدم المحدد غير موجود.');
+    if (isOwnerEmail(selected.email)) return platformNotify('حساب المالك ثابت ولا يحتاج تعيين.');
+
+    const permissions = getRolePermissions(role);
+    const allowedTabs = getRoleTabs(role);
+    const rolePayload = {
       role: 'admin',
       isAdmin: true,
       adminRole: role,
       adminRoleLabel: ROLE_LABELS[role],
-      permissions: ROLE_PERMISSIONS[role],
+      permissions,
+      allowedTabs,
+      active: true,
+      email: selected.email || '',
+      name: selected.name || selected.displayName || selected.email || '',
+      sourceUserId: target,
       roleUpdatedAt: serverTimestamp(),
       roleUpdatedBy: userData?.email || '',
-    });
+    };
+
+    await setDoc(doc(db, 'admins', target), rolePayload, { merge: true });
+    await updateDoc(doc(db, 'users', target), rolePayload);
     await setDoc(doc(collection(db, 'admin_client_logs')), {
       action: 'admin_role_update',
       title: `تعيين صلاحية ${ROLE_LABELS[role]}`,
@@ -124,13 +122,17 @@ export function AdminRolesManager({ users = [], userData = {} }) {
       adminEmail: userData?.email || '',
       createdAt: serverTimestamp(),
     });
-    platformNotify('تم تعيين صلاحية الأدمن للمستخدم.');
+    platformNotify('تم تحويل الحساب لمساعد وتفعيل صلاحياته في بوابة الإدارة.');
   };
 
   const revokeAdmin = async (u) => {
-    await updateDoc(doc(db, 'users', u.id), { role: 'student', isAdmin: false, adminRole: '', permissions: [], roleRevokedAt: serverTimestamp(), roleRevokedBy: userData?.email || '' });
+    if (!userData?.isOwner && !isOwnerEmail(userData?.email)) return platformNotify('إلغاء صلاحيات المساعدين متاح للمالك فقط.');
+    if (isOwnerEmail(u.email)) return platformNotify('لا يمكن إلغاء صلاحية المالك الأساسي.');
+    const resetPayload = { role: 'student', isAdmin: false, adminRole: '', adminRoleLabel: '', permissions: [], allowedTabs: [], roleRevokedAt: serverTimestamp(), roleRevokedBy: userData?.email || '' };
+    await setDoc(doc(db, 'admins', u.id), { active: false, revokedAt: serverTimestamp(), revokedBy: userData?.email || '' }, { merge: true });
+    await updateDoc(doc(db, 'users', u.id), resetPayload);
     await setDoc(doc(collection(db, 'admin_client_logs')), { action: 'admin_role_revoke', title: 'إلغاء صلاحية أدمن', targetUserId: u.id, targetEmail: u.email || '', adminEmail: userData?.email || '', createdAt: serverTimestamp() });
-    platformNotify('تم إلغاء صلاحية الأدمن.');
+    platformNotify('تم إلغاء صلاحية المساعد وإرجاعه كطالب.');
   };
 
   return (
@@ -145,7 +147,7 @@ export function AdminRolesManager({ users = [], userData = {} }) {
           {[...admins, ...students].map((u)=><option key={u.id} value={u.id}>{u.name || u.email} — {getGradeLabel(u.grade)}</option>)}
         </select>
         <select className="border rounded-xl p-3" value={role} onChange={(e)=>setRole(e.target.value)}>
-          {Object.entries(ROLE_LABELS).map(([key, label])=><option key={key} value={key}>{label}</option>)}
+          {Object.entries(ROLE_LABELS).filter(([key]) => key !== 'owner').map(([key, label])=><option key={key} value={key}>{label}</option>)}
         </select>
         <button onClick={saveRole} className="bg-blue-700 text-white rounded-xl p-3 font-black flex items-center justify-center gap-2"><Users/> حفظ الصلاحية</button>
       </div>
@@ -154,7 +156,7 @@ export function AdminRolesManager({ users = [], userData = {} }) {
           <h3 className="font-black text-slate-900">{u.name || u.email}</h3>
           <p className="text-xs text-slate-500 mt-1">{u.email}</p>
           <p className="mt-3 bg-blue-50 text-blue-700 rounded-xl px-3 py-2 font-black text-sm">{ROLE_LABELS[u.adminRole] || u.adminRoleLabel || 'أدمن'}</p>
-          <div className="mt-3 space-y-1 text-xs text-slate-600">{(ROLE_PERMISSIONS[u.adminRole] || u.permissions || []).map((p)=><p key={p}>• {p}</p>)}</div>
+          <div className="mt-3 space-y-1 text-xs text-slate-600">{(ROLE_TAB_ACCESS[u.adminRole] || u.allowedTabs || []).map((p)=><p key={p}>• {ADMIN_TAB_LABELS[p] || p}</p>)}</div>
           <button onClick={()=>revokeAdmin(u)} className="mt-4 w-full bg-red-50 text-red-700 border border-red-100 rounded-xl p-2 font-black">إلغاء الصلاحية</button>
         </div>)}
         {!admins.length && <div className="bg-white border rounded-3xl p-6 text-center text-slate-500 font-bold">لا يوجد مشرفون مسجلون حتى الآن.</div>}

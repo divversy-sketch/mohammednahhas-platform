@@ -94,8 +94,8 @@ import AdminDashboardTabs from './AdminDashboardTabs.jsx';
 import AdminDashboardModals from './AdminDashboardModals.jsx';
 import AdminPasswordResetRequestsPanel from './AdminPasswordResetRequestsPanel.jsx';
 
-export const AdminDashboard = ({ user }) => {
-  const userData = user || {};
+export const AdminDashboard = ({ user, adminProfile }) => {
+  const userData = { ...(user || {}), ...(adminProfile || {}) };
   const [adminReviewExamData, setAdminReviewExamData] = useState(null);
   const [adminReviewResult, setAdminReviewResult] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard'); 
@@ -1315,6 +1315,7 @@ export const AdminDashboard = ({ user }) => {
     codeGenDays,
     setCodeGenDays,
     userData,
+    adminProfile,
     examEditQuestionsPreview,
     updateQuestionInExamDraft,
     updateStudentStatusSafely,
@@ -1419,7 +1420,7 @@ export const AdminDashboard = ({ user }) => {
       <AdminHeader adminGradeFilter={adminGradeFilter} setAdminGradeFilter={setAdminGradeFilter} />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-4 md:p-6 relative z-10">
-        <AdminSidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+        <AdminSidebar activeTab={activeTab} setActiveTab={setActiveTab} adminProfile={adminProfile} />
 
         <AdminDashboardTabs ctx={dashboardContext} />
       </div>

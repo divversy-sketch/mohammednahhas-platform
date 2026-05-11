@@ -92,6 +92,7 @@ import AdminFollowUpPanel from '../../features/insights/AdminFollowUpPanel.jsx';
 import AdminSmartHomeworkManager from '../../features/homework/AdminSmartHomeworkManager.jsx';
 import { AdminAuditLogViewer, AdminNotificationsManager, AdminPlatformSettingsManager, AdminRolesManager } from './AdminOperationsSuite.jsx';
 import { AdminSmartExamEngine, AdminStudentReports, AdminGroupsManager, AdminMessagingCenter, AdminFinanceDashboard, AdminVideoSecurityPanel } from '../../features/smartLearning/SmartLearningEngine.jsx';
+import { canAccessAdminTab } from '../../config/adminPermissions';
 
 
 
@@ -174,6 +175,7 @@ export default function AdminDashboardTabs({ ctx }) {
     codeGenDays,
     setCodeGenDays,
     userData,
+    adminProfile,
     examEditQuestionsPreview,
     updateQuestionInExamDraft,
     updateStudentStatusSafely,
@@ -265,6 +267,17 @@ export default function AdminDashboardTabs({ ctx }) {
     setHwResults,
     setSubscriptionCodes
   } = ctx;
+
+  if (!canAccessAdminTab(adminProfile || userData, activeTab)) {
+    return (
+      <div className="md:col-span-3 w-full overflow-hidden" dir="rtl">
+        <div className="bg-white border rounded-3xl p-8 text-center shadow-sm">
+          <h2 className="text-2xl font-black text-slate-900 mb-2">هذه الصفحة خارج صلاحيات هذا الحساب</h2>
+          <p className="text-slate-500 font-bold">سيظهر للمساعد فقط الأقسام التي حددها المالك من صفحة صلاحيات الأدمن.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
         <div className="md:col-span-3 w-full overflow-hidden">

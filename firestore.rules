@@ -8,7 +8,7 @@ service cloud.firestore {
     }
 
     function adminEmail() {
-      return false;
+      return signedIn() && request.auth.token.email == 'mido16280@gmail.com';
     }
 
     function adminDoc() {
@@ -19,7 +19,41 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return adminDoc();
+      return adminEmail() || adminDoc();
+    }
+
+    function ownerAdmin() {
+      return adminEmail();
+    }
+
+    function adminPermissions() {
+      return adminEmail()
+        ? ['all']
+        : (adminDoc() && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.permissions is list
+          ? get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.permissions
+          : []);
+    }
+
+    function hasAdminPermission(permission) {
+      return adminEmail() || adminPermissions().hasAny(['all', permission]);
+    }
+
+    function canManageUsers() { return hasAdminPermission('manage_users'); }
+    function canReadUsers() { return isAdmin(); }
+    function canManageExams() { return hasAdminPermission('manage_exams') || hasAdminPermission('manage_exam_results'); }
+    function canManageContent() { return hasAdminPermission('manage_content') || hasAdminPermission('manage_courses'); }
+    function canManageHomework() { return hasAdminPermission('manage_homework'); }
+    function canManageSubscriptions() { return hasAdminPermission('manage_subscriptions') || hasAdminPermission('manage_payments'); }
+    function canManageMessages() { return hasAdminPermission('manage_messages') || hasAdminPermission('manage_notifications'); }
+    function canManageSettings() { return hasAdminPermission('manage_settings'); }
+    function canManageQuestionBank() { return hasAdminPermission('manage_question_bank') || hasAdminPermission('manage_exams'); }
+    function canManageSecurity() { return hasAdminPermission('manage_security') || hasAdminPermission('manage_exams'); }
+
+    function changesAdminRoleFields() {
+      return request.resource.data.diff(resource.data).changedKeys().hasAny([
+        'role', 'isAdmin', 'adminRole', 'adminRoleLabel', 'permissions', 'allowedTabs',
+        'active', 'sourceUserId', 'roleUpdatedAt', 'roleUpdatedBy', 'roleRevokedAt', 'roleRevokedBy'
+      ]);
     }
 
     function isOwner(userId) {
@@ -83,7 +117,7 @@ service cloud.firestore {
 
     match /admins/{adminId} {
       allow read: if isAdmin();
-      allow write: if false;
+      allow create, update, delete: if ownerAdmin();
     }
 
     match /users/{userId} {
@@ -91,7 +125,8 @@ service cloud.firestore {
       allow create: if isOwner(userId)
         && request.resource.data.role == 'student'
         && request.resource.data.status in ['pending', 'active'];
-      allow update: if isAdmin()
+      allow update: if ownerAdmin()
+        || (canManageUsers() && !changesAdminRoleFields())
         || (isOwner(userId)
           && request.resource.data.diff(resource.data).changedKeys().hasOnly([
             'name', 'phone', 'parentPhone', 'grade', 'photoURL', 'updatedAt',
@@ -100,101 +135,101 @@ service cloud.firestore {
           && request.resource.data.role == resource.data.role
           && request.resource.data.status == resource.data.status
           && request.resource.data.subscriptionStatus == resource.data.subscriptionStatus);
-      allow delete: if isAdmin();
+      allow delete: if canManageUsers();
     }
 
     match /content/{docId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if canManageContent();
     }
 
     match /settings/{docId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if canManageSettings();
     }
 
     match /exams/{docId} {
       allow read: if signedIn();
-      allow write: if isAdmin();
+      allow write: if canManageExams();
     }
 
     match /exam_settings/{docId} {
       allow read: if signedIn();
-      allow write: if isAdmin();
+      allow write: if canManageExams();
     }
 
     match /announcements/{docId} {
       allow read: if signedIn();
-      allow write: if isAdmin();
+      allow write: if canManageMessages();
     }
 
     match /quotes/{docId} {
       allow read: if signedIn();
-      allow write: if isAdmin();
+      allow write: if canManageMessages();
     }
 
     match /auto_replies/{docId} {
       allow read: if signedIn();
-      allow write: if isAdmin();
+      allow write: if canManageMessages();
     }
 
     match /exam_access_overrides/{docId} {
       allow read: if isAdmin() || (signedIn() && resource.data.studentId == request.auth.uid);
-      allow create, update, delete: if isAdmin();
+      allow create, update, delete: if canManageExams();
     }
 
     match /exam_results/{docId} {
       allow read: if isAdmin() || (signedIn() && resource.data.studentId == request.auth.uid);
       allow create: if ownStudentIdOnCreate();
-      allow update: if isAdmin() || safeStudentExamResultUpdate();
-      allow delete: if isAdmin();
+      allow update: if canManageExams() || safeStudentExamResultUpdate();
+      allow delete: if canManageExams();
     }
 
     match /attempts/{docId} {
       allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
       allow create: if ownUserIdOnCreate();
       allow update: if isAdmin() || safeOwnerProgressUpdate();
-      allow delete: if isAdmin();
+      allow delete: if canManageExams();
     }
 
     match /student_mistakes/{docId} {
       allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
       allow create: if ownUserIdOnCreate();
-      allow update, delete: if isAdmin();
+      allow update, delete: if canManageQuestionBank();
     }
 
     match /smart_homeworks/{docId} {
       allow read: if signedIn();
-      allow write: if isAdmin();
+      allow write: if canManageHomework();
 
       match /private/{privateDocId} {
-        allow read, write: if isAdmin();
+        allow read, write: if canManageHomework();
       }
     }
 
     match /homework_results/{docId} {
       allow read: if isAdmin() || (signedIn() && resource.data.studentId == request.auth.uid);
       // نتائج واجب QR تكتب من Cloud Function فقط حتى لا يرى الطالب نموذج الإجابة ولا يزوّر الدرجة.
-      allow create, update, delete: if isAdmin();
+      allow create, update, delete: if canManageHomework();
     }
 
     match /assignments/{docId} {
       allow read: if signedIn();
-      allow write: if isAdmin();
+      allow write: if canManageHomework();
     }
 
     match /assignment_submissions/{docId} {
       allow read: if isAdmin() || (signedIn() && resource.data.studentId == request.auth.uid);
       allow create: if ownStudentIdOnCreate();
-      allow update: if isAdmin() || safeStudentExamResultUpdate();
-      allow delete: if isAdmin();
+      allow update: if canManageHomework() || safeStudentExamResultUpdate();
+      allow delete: if canManageHomework();
     }
 
     match /video_views/{docId} {
       allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
       allow create: if ownUserIdOnCreate();
       allow update: if isAdmin() || safeOwnerProgressUpdate();
-      allow delete: if isAdmin();
+      allow delete: if canManageExams();
     }
 
     match /video_notes/{docId} {
@@ -204,18 +239,19 @@ service cloud.firestore {
     }
 
     match /question_bank/{docId} {
-      allow read, write: if isAdmin();
+      allow read: if isAdmin();
+      allow write: if canManageQuestionBank();
     }
 
     match /lesson_explanations/{docId} {
       allow read: if signedIn();
-      allow write: if isAdmin();
+      allow write: if canManageContent();
     }
 
     match /subscription_codes/{docId} {
       allow read: if signedIn();
-      allow create, delete: if isAdmin();
-      allow update: if isAdmin()
+      allow create, delete: if canManageSubscriptions();
+      allow update: if canManageSubscriptions()
         || (signedIn()
           && ((resource.data.isUsed == false && request.resource.data.isUsed == true)
               || (resource.data.used == false && request.resource.data.used == true))
@@ -225,8 +261,8 @@ service cloud.firestore {
 
     match /courseAccessCodes/{codeId} {
       allow read: if signedIn();
-      allow create, delete: if isAdmin();
-      allow update: if isAdmin()
+      allow create, delete: if canManageSubscriptions();
+      allow update: if canManageSubscriptions()
         || (signedIn()
           && resource.data.isUsed == false
           && request.resource.data.isUsed == true
@@ -235,44 +271,46 @@ service cloud.firestore {
     }
 
     match /banned_users/{docId} {
-      allow read, write: if isAdmin();
+      allow read: if isAdmin();
+      allow write: if canManageSecurity() || canManageUsers();
     }
 
     match /notifications/{docId} {
       allow read: if isAdmin() || (signedIn() && (resource.data.userId == request.auth.uid || resource.data.target == 'all'));
-      allow write: if isAdmin();
+      allow write: if canManageMessages();
     }
 
     match /student_groups/{groupId} {
       allow read: if isAdmin() || signedIn();
-      allow write: if isAdmin();
+      allow write: if canManageUsers();
     }
 
     match /student_messages/{messageId} {
       allow read: if isAdmin() || signedIn();
-      allow write: if isAdmin();
+      allow write: if canManageMessages();
     }
 
     match /notification_tokens/{docId} {
       allow read: if isAdmin();
       allow create, update: if ownUserIdOnCreate();
-      allow delete: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow delete: if canManageMessages() || (signedIn() && resource.data.userId == request.auth.uid);
     }
 
     match /messages/{docId} {
       allow create: if true;
-      allow read, update, delete: if isAdmin();
+      allow read: if isAdmin();
+      allow update, delete: if canManageMessages();
     }
 
     match /student_chats/{studentId} {
       allow read: if isAdmin() || isOwner(studentId);
-      allow create, update: if isAdmin() || isOwner(studentId);
-      allow delete: if isAdmin();
+      allow create, update: if canManageMessages() || isOwner(studentId);
+      allow delete: if canManageMessages();
 
       match /messages/{messageId} {
         allow read: if isAdmin() || isOwner(studentId);
-        allow create: if isAdmin() || isOwner(studentId);
-        allow update, delete: if isAdmin();
+        allow create: if canManageMessages() || isOwner(studentId);
+        allow update, delete: if canManageMessages();
       }
     }
 
@@ -282,7 +320,8 @@ service cloud.firestore {
       allow create: if request.resource.data.email is string
         && request.resource.data.status == 'pending'
         && request.resource.data.keys().hasOnly(['email', 'name', 'status', 'source', 'createdAt', 'updatedAt']);
-      allow read, update, delete: if isAdmin();
+      allow read: if isAdmin();
+      allow update, delete: if canManageUsers() || canManageMessages();
     }
 
     match /payment_requests/{docId} {
@@ -290,12 +329,13 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.status == 'pending';
-      allow update, delete: if isAdmin();
+      allow update, delete: if canManageSubscriptions();
     }
 
     match /debug_logs/{docId} {
       allow create: if signedIn();
-      allow read, update, delete: if isAdmin();
+      allow read: if isAdmin();
+      allow update, delete: if canManageSecurity();
     }
 
     match /admin_audit_logs/{docId} {
@@ -310,20 +350,20 @@ service cloud.firestore {
 
     match /platform_settings/{docId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if canManageSettings();
     }
 
     match /courses/{courseId} {
       allow read: if signedIn();
-      allow write: if isAdmin();
+      allow write: if canManageContent();
 
       match /modules/{moduleId} {
         allow read: if signedIn();
-        allow write: if isAdmin();
+        allow write: if canManageContent();
 
         match /lessons/{lessonId} {
           allow read: if signedIn();
-          allow write: if isAdmin();
+          allow write: if canManageContent();
         }
       }
     }
@@ -332,26 +372,26 @@ service cloud.firestore {
       allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
       allow create: if isAdmin() || ownUserIdOnCreate();
       allow update: if isAdmin() || safeOwnerProgressUpdate();
-      allow delete: if isAdmin();
+      allow delete: if canManageExams();
     }
 
     match /lessonProgress/{progressId} {
       allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
       allow create: if ownUserIdOnCreate();
       allow update: if isAdmin() || safeOwnerProgressUpdate();
-      allow delete: if isAdmin();
+      allow delete: if canManageExams();
     }
 
     match /lessonUnlockOverrides/{overrideId} {
       allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
-      allow write: if isAdmin();
+      allow write: if canManageContent();
     }
 
     match /examResults/{resultId} {
       allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
       allow create: if ownUserIdOnCreate();
       allow update: if isAdmin() || safeOwnerProgressUpdate();
-      allow delete: if isAdmin();
+      allow delete: if canManageExams();
     }
 
     // Features removed from the cleaned platform: keep blocked unless you re-enable them intentionally.
