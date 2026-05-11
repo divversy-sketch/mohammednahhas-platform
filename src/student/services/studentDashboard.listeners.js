@@ -2,6 +2,7 @@ import { collection, limit, onSnapshot, query, where } from 'firebase/firestore'
 import { db } from '../../services/firebase';
 import { COLLECTIONS } from '../../config/collections';
 import { mapDocs, sortByCreatedAtDesc, sortBySubmittedAtDesc, sortByTimestampDesc } from '../../shared/firebase/firestoreMaps';
+import { normalizeResult } from '../../services/platformData';
 
 const emptyOnBlocked = (label, setter) => (error) => {
   console.warn(`${label} listener blocked:`, error?.message);
@@ -9,6 +10,11 @@ const emptyOnBlocked = (label, setter) => (error) => {
 };
 
 export function subscribeStudentDashboardData({ user, userData, handlers, onLatestNotification }) {
+  const examResultBuckets = { canonical: [], legacy: [] };
+  const setUnifiedStudentResults = () => {
+    const rows = [...examResultBuckets.canonical, ...examResultBuckets.legacy];
+    handlers.setExamResults(sortBySubmittedAtDesc(rows));
+  };
   return [
     onSnapshot(query(collection(db, COLLECTIONS.CONTENT), where('grade', '==', userData?.grade)), (snapshot) => {
       const allContent = mapDocs(snapshot);
@@ -18,7 +24,9 @@ export function subscribeStudentDashboardData({ user, userData, handlers, onLate
 
     onSnapshot(query(collection(db, COLLECTIONS.EXAMS), where('grade', '==', userData?.grade)), (snapshot) => handlers.setExams(mapDocs(snapshot)), emptyOnBlocked('exams', handlers.setExams)),
 
-    onSnapshot(query(collection(db, COLLECTIONS.EXAM_RESULTS), where('studentId', '==', user.uid)), (snapshot) => handlers.setExamResults(sortBySubmittedAtDesc(mapDocs(snapshot))), emptyOnBlocked('exam_results', handlers.setExamResults)),
+    onSnapshot(query(collection(db, COLLECTIONS.EXAM_RESULTS), where('studentId', '==', user.uid)), (snapshot) => { examResultBuckets.canonical = mapDocs(snapshot).map((row) => normalizeResult(row, COLLECTIONS.EXAM_RESULTS)); setUnifiedStudentResults(); }, emptyOnBlocked('exam_results', handlers.setExamResults)),
+
+    onSnapshot(query(collection(db, COLLECTIONS.LEGACY_EXAM_RESULTS), where('userId', '==', user.uid)), (snapshot) => { examResultBuckets.legacy = mapDocs(snapshot).map((row) => normalizeResult(row, COLLECTIONS.LEGACY_EXAM_RESULTS)); setUnifiedStudentResults(); }, emptyOnBlocked('legacy_exam_results', handlers.setExamResults)),
 
     onSnapshot(query(collection(db, COLLECTIONS.HOMEWORK_RESULTS), where('studentId', '==', user.uid)), (snapshot) => handlers.setHwResults(sortBySubmittedAtDesc(mapDocs(snapshot))), emptyOnBlocked('homework_results', handlers.setHwResults)),
 

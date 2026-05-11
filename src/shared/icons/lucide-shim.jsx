@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 
 const baseStroke = {
   fill: 'none',
@@ -97,6 +97,7 @@ export const Quote = makeIcon('Quote');
 export const Mail = makeIcon('Mail', <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></>);
 export const Loader2 = makeIcon('Loader2');
 export const AlertTriangle = makeIcon('AlertTriangle');
+export const Activity = makeIcon('Activity', <><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></>);
 export const PlusCircle = makeIcon('PlusCircle');
 export const ShieldAlert = makeIcon('ShieldAlert');
 export const Video = makeIcon('Video');
@@ -136,6 +137,7 @@ export const Camera = makeIcon('Camera');
 export const QrCode = makeIcon('QrCode');
 export const MousePointerClick = makeIcon('MousePointerClick');
 export const BarChart3 = makeIcon('BarChart3');
+export const TrendingDown = makeIcon('TrendingDown', <><path d="M22 17 13.5 8.5 8.5 13.5 2 7" /><path d="M16 17h6v-6" /></>);
 export const Layers = makeIcon('Layers');
 export const BrainCircuit = makeIcon('BrainCircuit');
 export const Headphones = makeIcon('Headphones');
@@ -150,3 +152,4 @@ export const WalletCards = makeIcon('WalletCards');
 export const Smartphone = makeIcon('Smartphone');
 export const Lightbulb = makeIcon('Lightbulb');
 export default makeIcon('Icon');
+

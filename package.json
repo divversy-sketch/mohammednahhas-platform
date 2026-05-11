@@ -16,8 +16,10 @@
     "app:qa": "npm run source:health && npm run build && npm run security:smoke && npm audit --audit-level=moderate",
     "release:tag": "git tag v1.0.0-stable && git push origin v1.0.0-stable",
     "bundle:report": "node scripts/bundle-report.mjs",
-    "production:check": "npm run app:qa && npm run bundle:report",
-    "source:health": "node scripts/source-health-check.mjs"
+    "production:check": "npm run source:health && npm run build && npm run security:smoke && npm run e2e:smoke && npm run bundle:report",
+    "source:health": "node scripts/source-health-check.mjs",
+    "migrate:plan": "node scripts/migrations/normalize-platform-data.mjs",
+    "e2e:smoke": "node scripts/e2e-smoke.mjs"
   },
   "dependencies": {
     "@capacitor/cli": "^8.3.1",

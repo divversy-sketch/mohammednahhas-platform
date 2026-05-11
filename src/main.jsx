@@ -31,6 +31,8 @@ if (import.meta.env.VITE_RECAPTCHA_V3_SITE_KEY) {
   console.warn('App Check disabled: VITE_RECAPTCHA_V3_SITE_KEY is missing.')
 }
 
+installGlobalErrorLogger();
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />

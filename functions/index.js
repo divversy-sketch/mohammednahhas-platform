@@ -810,3 +810,131 @@ exports.redeemSubscriptionCode = functions
     });
     return { ok: true, days, expiry: expiryDate.toISOString() };
   });
+
+// -----------------------------------------------------------------------------
+// Operational hardening callable functions - server-side audit source of truth
+// -----------------------------------------------------------------------------
+async function writeAudit(action, adminUser, payload = {}) {
+  return db.collection("admin_audit_logs").add({
+    action,
+    adminUid: adminUser.uid,
+    adminEmail: adminUser.email || "",
+    ...payload,
+    createdAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+}
+
+exports.updateStudentSubscription = functions
+  .region("us-central1")
+  .https
+  .onCall(async (data, context) => {
+    const adminUser = await assertAdmin(context);
+    const studentId = requireString(data && data.studentId, "studentId");
+    const status = requireString(data && data.subscriptionStatus, "subscriptionStatus");
+    const allowed = ["free", "premium", "expired", "suspended"];
+    if (!allowed.includes(status)) {
+      throw new functions.https.HttpsError("invalid-argument", "حالة الاشتراك غير مسموحة.");
+    }
+    const durationDays = Number(data && data.durationDays ? data.durationDays : 30);
+    const patch = {
+      subscriptionStatus: status,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedBy: adminUser.uid
+    };
+    if (status === "premium") {
+      patch.subscriptionExpiry = admin.firestore.Timestamp.fromDate(new Date(Date.now() + durationDays * 86400000));
+      patch.status = "active";
+    }
+    await db.collection("users").doc(studentId).set(patch, { merge: true });
+    await writeAudit("updateStudentSubscription", adminUser, { studentId, subscriptionStatus: status, durationDays });
+    return { ok: true, studentId, subscriptionStatus: status };
+  });
+
+exports.banStudent = functions
+  .region("us-central1")
+  .https
+  .onCall(async (data, context) => {
+    const adminUser = await assertAdmin(context);
+    const studentId = requireString(data && data.studentId, "studentId");
+    const banType = requireString(data && data.banType, "banType");
+    const allowed = ["banned_all", "banned_exam", "banned_content", "banned_cheating", "active"];
+    if (!allowed.includes(banType)) {
+      throw new functions.https.HttpsError("invalid-argument", "نوع الحظر غير صحيح.");
+    }
+    await db.collection("users").doc(studentId).set({
+      status: banType,
+      banReason: (data && data.reason) || "",
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedBy: adminUser.uid
+    }, { merge: true });
+    await writeAudit("banStudent", adminUser, { studentId, banType, reason: (data && data.reason) || "" });
+    return { ok: true, studentId, status: banType };
+  });
+
+exports.sendInternalNotification = functions
+  .region("us-central1")
+  .https
+  .onCall(async (data, context) => {
+    const adminUser = await assertAdmin(context);
+    const title = requireString(data && data.title, "title");
+    const body = requireString(data && data.body, "body");
+    const target = (data && data.target) || "all";
+    const allowedTargets = ["all", "grade", "user"];
+    if (!allowedTargets.includes(target)) {
+      throw new functions.https.HttpsError("invalid-argument", "نوع المستلمين غير صحيح.");
+    }
+    const payload = {
+      title,
+      body,
+      message: body,
+      target,
+      targetType: target,
+      grade: (data && data.grade) || "",
+      targetGrade: (data && data.grade) || "",
+      userId: (data && data.userId) || "",
+      targetUserId: (data && data.userId) || "",
+      createdBy: adminUser.uid,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+    const notificationRef = await db.collection("notifications").add(payload);
+    const messageRef = await db.collection("student_messages").add(payload);
+    await writeAudit("sendInternalNotification", adminUser, { target, grade: payload.grade, userId: payload.userId, notificationId: notificationRef.id, messageId: messageRef.id });
+    return { ok: true, notificationId: notificationRef.id, messageId: messageRef.id };
+  });
+
+exports.replySupportTicket = functions
+  .region("us-central1")
+  .https
+  .onCall(async (data, context) => {
+    const adminUser = await assertAdmin(context);
+    const ticketId = requireString(data && data.ticketId, "ticketId");
+    const reply = requireString(data && data.reply, "reply");
+    const status = (data && data.status) || "answered";
+    await db.collection("student_messages").doc(ticketId).set({
+      adminReply: reply,
+      status,
+      repliedBy: adminUser.uid,
+      repliedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    await writeAudit("replySupportTicket", adminUser, { ticketId, status });
+    return { ok: true, ticketId, status };
+  });
+
+exports.recordSystemMigrationReport = functions
+  .region("us-central1")
+  .https
+  .onCall(async (data, context) => {
+    const adminUser = await assertAdmin(context);
+    const title = requireString(data && data.title, "title");
+    const report = data && typeof data.report === "object" ? data.report : {};
+    const ref = await db.collection("migration_reports").add({
+      title,
+      report,
+      createdBy: adminUser.uid,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    await writeAudit("recordSystemMigrationReport", adminUser, { reportId: ref.id, title });
+    return { ok: true, reportId: ref.id };
+  });

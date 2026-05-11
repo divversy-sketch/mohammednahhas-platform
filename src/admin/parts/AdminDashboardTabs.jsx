@@ -32,6 +32,8 @@ import AdminSmartHomeworkManager from '../../features/homework/AdminSmartHomewor
 import { AdminAuditLogViewer, AdminNotificationsManager, AdminPlatformSettingsManager, AdminRolesManager, AdminGrowthSuite } from './AdminOperationsSuite.jsx';
 import { AdminSmartExamEngine, AdminStudentReports, AdminGroupsManager, AdminMessagingCenter, AdminFinanceDashboard, AdminVideoSecurityPanel } from '../../features/smartLearning/SmartLearningEngine.jsx';
 import { canAccessAdminTab } from '../../config/adminPermissions';
+import AdminCommandCenter from '../components/AdminCommandCenter.jsx';
+import AdminSystemHealthPanel from '../components/AdminSystemHealthPanel.jsx';
 
 
 // Render-only split from AdminDashboard.jsx.
@@ -279,7 +281,7 @@ export default function AdminDashboardTabs({ ctx }) {
             <InlineTabs
               defaultTab="overview"
               tabs={[
-                { key: 'overview', label: 'نظرة عامة', content: <AdminProDashboard users={activeUsersList} exams={examsList} results={examResults} content={contentList} subscriptionCodes={subscriptionCodes} hwResults={hwResults} adminGradeFilter={adminGradeFilter} /> },
+                { key: 'overview', label: 'نظرة عامة', content: <div className="space-y-6"><AdminCommandCenter users={activeUsersList} exams={examsList} examResults={examResults} onNavigate={setActiveTab} /><AdminProDashboard users={activeUsersList} exams={examsList} results={examResults} content={contentList} subscriptionCodes={subscriptionCodes} hwResults={hwResults} adminGradeFilter={adminGradeFilter} /></div> },
                 { key: 'performance', label: 'تحليل الأداء', content: <AdminPerformanceAnalytics examResults={examResults} examsList={examsList} users={activeUsersList} adminGradeFilter={adminGradeFilter} /> },
                 { key: 'questions', label: 'تحليل الأسئلة', content: <AdminQuestionDeepAnalytics examsList={examsList} examResults={examResults} /> },
                 { key: 'leaderboard', label: 'لوحة الشرف', content: <LeaderboardPanel examResults={examResults} users={activeUsersList} gradeFilter={adminGradeFilter} /> }
@@ -883,6 +885,7 @@ export default function AdminDashboardTabs({ ctx }) {
             <div className="space-y-6">
               <AdminPlatformSettingsManager userData={userData} />
               <AdminGrowthSuite initialTab="mobile" compact users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} assignments={assignments} assignmentSubmissions={assignmentSubmissions} subscriptionCodes={subscriptionCodes} notifications={announcements} userData={userData} />
+              <AdminSystemHealthPanel />
             </div>
           )}
 

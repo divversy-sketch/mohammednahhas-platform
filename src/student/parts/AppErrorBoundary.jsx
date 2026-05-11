@@ -1,5 +1,6 @@
 import React from 'react';
 import { AlertTriangle } from '../../shared/icons/lucide-shim.jsx';
+import { logSystemError } from '../../services/monitoring/errorLogger.js';
 
 
 export class AppErrorBoundary extends React.Component {
@@ -12,6 +13,7 @@ export class AppErrorBoundary extends React.Component {
   }
   componentDidCatch(error, info) {
     console.error('AppErrorBoundary caught:', error, info);
+    logSystemError(error, { area: 'student', info });
   }
   render() {
     if (this.state.hasError) {

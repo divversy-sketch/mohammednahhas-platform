@@ -99,3 +99,24 @@ export const canAccessAdminTab = (adminProfile, tab) => {
   if (isOwnerEmail(adminProfile?.email) || adminProfile?.adminRole === 'owner' || adminProfile?.permissions?.includes('all')) return true;
   return (adminProfile?.allowedTabs || []).includes(tab);
 };
+
+
+export const ADMIN_ACTION_PERMISSIONS = Object.freeze({
+  'students.read': ['read_users', 'manage_users'],
+  'students.edit': ['manage_users'],
+  'students.ban': ['manage_users', 'manage_security'],
+  'students.delete': ['manage_users'],
+  'payments.approve': ['manage_payments', 'manage_subscriptions'],
+  'payments.export': ['read_finance', 'manage_payments', 'manage_subscriptions'],
+  'exams.edit': ['manage_exams'],
+  'exams.delete': ['manage_exams'],
+  'results.edit': ['manage_exam_results', 'manage_exams'],
+  'content.edit': ['manage_content', 'manage_courses'],
+  'questionBank.edit': ['manage_question_bank', 'manage_exams'],
+  'notifications.send': ['manage_notifications', 'manage_messages'],
+  'messages.reply': ['manage_messages'],
+  'settings.edit': ['manage_settings'],
+  'security.view': ['manage_security'],
+  'audit.view': ['manage_security', 'read_reports'],
+  'data.export': ['export_data', 'read_reports'],
+});

@@ -45,7 +45,12 @@ export const adminSecureFunctions = {
 
   // Password reset flow uses Vercel Serverless API so it works on the free Firebase Spark plan.
   setStudentPassword: (studentId, newPassword, requestId = '') => callVercelAdminApi('/api/admin-set-student-password', { studentId, newPassword, requestId }),
-  updatePasswordResetRequestStatus: (requestId, status) => callVercelAdminApi('/api/admin-password-request-status', { requestId, status })
+  updatePasswordResetRequestStatus: (requestId, status) => callVercelAdminApi('/api/admin-password-request-status', { requestId, status }),
+  updateStudentSubscription: (studentId, subscriptionStatus, durationDays = 30) => callAdminFunction('updateStudentSubscription', { studentId, subscriptionStatus, durationDays }),
+  banStudent: (studentId, banType, reason = '') => callAdminFunction('banStudent', { studentId, banType, reason }),
+  sendInternalNotification: (payload) => callAdminFunction('sendInternalNotification', payload),
+  replySupportTicket: (ticketId, reply, status = 'answered') => callAdminFunction('replySupportTicket', { ticketId, reply, status }),
+  recordSystemMigrationReport: (title, report = {}) => callAdminFunction('recordSystemMigrationReport', { title, report })
 };
 
 export default adminSecureFunctions;

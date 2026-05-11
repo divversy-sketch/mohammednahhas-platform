@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { collection, doc, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { platformNotify } from '../../shared/core/platformShared.jsx';
+import { platformConfirm, platformNotify } from '../../shared/core/platformShared.jsx';
 import { Bell, ClipboardList, History, Save, Settings, Shield, Users } from '../../shared/icons/lucide-shim.jsx';
 import { GradeOptions, getGradeLabel } from '../../shared/constants/grades.jsx';
 
@@ -284,8 +284,12 @@ export function AdminGrowthSuite({ users = [], exams = [], examResults = [], con
   const [unitDraft, setUnitDraft] = useState({ title: '', grade: '3sec', week: 1, publishAt: '', prerequisiteContentId: '', status: 'published' });
   const [questionDraft, setQuestionDraft] = useState({ text: '', grade: '3sec', branch: 'النحو', topic: '', difficulty: 'medium', options: '', correctIdx: 0, explanation: '' });
   const [bulkQuestions, setBulkQuestions] = useState('');
-  const [messageDraft, setMessageDraft] = useState({ title: '', body: '', audience: 'all', grade: 'all', userIdsText: '' });
+  const [messageDraft, setMessageDraft] = useState({ title: '', body: '', audience: 'all', grade: 'all', userIdsText: '', scheduledAt: '' });
   const [replyDrafts, setReplyDrafts] = useState({});
+  const [paymentFilter, setPaymentFilter] = useState('pending');
+  const [questionFilter, setQuestionFilter] = useState({ grade: 'all', branch: 'all', difficulty: 'all', search: '' });
+  const [analyticsGradeFilter, setAnalyticsGradeFilter] = useState('all');
+  const [examDraft, setExamDraft] = useState({ title: 'امتحان من بنك الأسئلة', grade: '3sec', count: 10, branch: 'all', difficulty: 'all', durationMinutes: 30 });
 
   useEffect(() => onSnapshot(query(collection(db, 'payment_requests'), orderBy('createdAt', 'desc'), limit(100)), (snap) => setPayments(snap.docs.map((d)=>({ id:d.id, ...d.data() }))), () => setPayments([])), []);
   useEffect(() => onSnapshot(query(collection(db, 'subscription_plans'), orderBy('createdAt', 'desc'), limit(50)), (snap) => setPlans(snap.docs.map((d)=>({ id:d.id, ...d.data() }))), () => setPlans([])), []);
@@ -332,6 +336,46 @@ export function AdminGrowthSuite({ users = [], exams = [], examResults = [], con
       setPlanDraft({ title: 'اشتراك شهري', price: 150, days: 30, features: 'فتح المحاضرات والامتحانات' });
       platformNotify('تم إنشاء الباقة.');
     } finally { setBusy(false); }
+  };
+
+
+  const togglePlan = async (plan) => {
+    await setDoc(doc(db, 'subscription_plans', plan.id), { active: plan.active === false, updatedAt: serverTimestamp(), updatedBy: userData?.email || '' }, { merge: true });
+    await writeLog('subscription_plan_toggle', plan.active === false ? 'تفعيل باقة اشتراك' : 'إيقاف باقة اشتراك', { planId: plan.id, title: plan.title || '' });
+    platformNotify(plan.active === false ? 'تم تفعيل الباقة.' : 'تم إيقاف الباقة.');
+  };
+
+  const deletePlan = async (plan) => {
+    if (!platformConfirm(`حذف باقة ${plan.title || ''}؟`)) return;
+    await deleteDoc(doc(db, 'subscription_plans', plan.id));
+    await writeLog('subscription_plan_deleted', 'حذف باقة اشتراك', { planId: plan.id, title: plan.title || '', severity: 'warning' });
+    platformNotify('تم حذف الباقة.');
+  };
+
+  const exportPayments = () => csvDownload(`nahhas-payments-${new Date().toISOString().slice(0,10)}.csv`, [
+    ['studentName','email','phone','amount','method','status','days','createdAt','reviewedBy'],
+    ...payments.map((p)=>[p.studentName || p.name || '', p.email || p.studentEmail || '', p.phone || '', p.amount || p.price || '', p.method || '', p.status || 'pending', p.days || p.planDays || '', toInputDate(p.createdAt), p.reviewedBy || ''])
+  ]);
+
+  const notifyExpiringSubscriptions = async () => {
+    const expiring = users.filter((u) => {
+      const exp = u.subscriptionExpiry?.toDate?.() || u.subscription?.expiresAt?.toDate?.() || (u.subscriptionExpiry ? new Date(u.subscriptionExpiry) : null);
+      return exp && exp > new Date() && (exp.getTime() - Date.now()) / 86400000 <= 7;
+    });
+    if (!expiring.length) return platformNotify('لا يوجد طلاب اشتراكهم قريب الانتهاء خلال 7 أيام.');
+    for (const u of expiring) {
+      await setDoc(doc(collection(db, 'student_messages')), {
+        userId: u.id,
+        title: 'تنبيه قرب انتهاء الاشتراك',
+        body: 'اشتراكك أوشك على الانتهاء. يرجى التجديد قبل توقف الوصول للمحتوى.',
+        audience: 'student',
+        read: false,
+        createdAt: serverTimestamp(),
+        createdBy: userData?.email || '',
+      });
+    }
+    await writeLog('expiring_subscription_notifications_sent', 'إرسال تنبيهات قرب انتهاء الاشتراك', { count: expiring.length });
+    platformNotify(`تم إرسال تنبيه إلى ${expiring.length} طالب.`);
   };
 
   const decidePayment = async (payment, status) => {
@@ -407,6 +451,60 @@ export function AdminGrowthSuite({ users = [], exams = [], examResults = [], con
     platformNotify(`تم استيراد ${count} سؤال.`);
   };
 
+
+  const filteredQuestions = useMemo(() => questions.filter((q) => {
+    const search = questionFilter.search.trim().toLowerCase();
+    const matchesSearch = !search || [q.text, q.topic, q.branch, q.explanation].filter(Boolean).join(' ').toLowerCase().includes(search);
+    const matchesGrade = questionFilter.grade === 'all' || q.grade === questionFilter.grade;
+    const matchesBranch = questionFilter.branch === 'all' || q.branch === questionFilter.branch;
+    const matchesDifficulty = questionFilter.difficulty === 'all' || q.difficulty === questionFilter.difficulty;
+    return matchesSearch && matchesGrade && matchesBranch && matchesDifficulty;
+  }), [questions, questionFilter]);
+
+  const deleteQuestion = async (q) => {
+    if (!platformConfirm('حذف السؤال من بنك الأسئلة؟')) return;
+    await deleteDoc(doc(db, 'question_bank', q.id));
+    await writeLog('question_bank_item_deleted', 'حذف سؤال من بنك الأسئلة', { questionId: q.id, grade: q.grade || '', severity: 'warning' });
+    platformNotify('تم حذف السؤال.');
+  };
+
+  const exportQuestionBank = () => csvDownload(`nahhas-question-bank-${new Date().toISOString().slice(0,10)}.csv`, [
+    ['text','grade','branch','topic','difficulty','options','correctIdx','explanation'],
+    ...filteredQuestions.map((q)=>[q.text || '', q.grade || '', q.branch || '', q.topic || '', q.difficulty || '', (q.options || []).join('|'), q.correctIdx ?? 0, q.explanation || ''])
+  ]);
+
+  const buildExamFromBank = async () => {
+    const pool = questions.filter((q) =>
+      (examDraft.grade === 'all' || q.grade === examDraft.grade) &&
+      (examDraft.branch === 'all' || q.branch === examDraft.branch) &&
+      (examDraft.difficulty === 'all' || q.difficulty === examDraft.difficulty)
+    );
+    const count = Math.min(Number(examDraft.count || 10), pool.length);
+    if (!count) return platformNotify('لا توجد أسئلة مطابقة لاختيارات الامتحان.');
+    const selected = [...pool].sort(() => Math.random() - 0.5).slice(0, count);
+    await setDoc(doc(collection(db, 'exam_drafts')), {
+      title: examDraft.title || 'امتحان من بنك الأسئلة',
+      grade: examDraft.grade,
+      branch: examDraft.branch,
+      difficulty: examDraft.difficulty,
+      durationMinutes: Number(examDraft.durationMinutes || 30),
+      questions: selected.map((q, index) => ({
+        id: q.id,
+        order: index + 1,
+        text: q.text || '',
+        options: q.options || [],
+        correctIdx: Number(q.correctIdx || 0),
+        explanation: q.explanation || '',
+        maxScore: Number(q.maxScore || 1),
+      })),
+      status: 'draft',
+      createdAt: serverTimestamp(),
+      createdBy: userData?.email || '',
+    });
+    await writeLog('exam_draft_generated_from_bank', 'توليد مسودة امتحان من بنك الأسئلة', { count, grade: examDraft.grade, branch: examDraft.branch });
+    platformNotify(`تم إنشاء مسودة امتحان بعدد ${count} سؤال في exam_drafts.`);
+  };
+
   const sendMessage = async () => {
     if (!messageDraft.title.trim() || !messageDraft.body.trim()) return platformNotify('اكتب عنوان ونص التنبيه.');
     const userIds = messageDraft.userIdsText.split(/[\n,]+/).map((x)=>x.trim()).filter(Boolean);
@@ -416,13 +514,14 @@ export function AdminGrowthSuite({ users = [], exams = [], examResults = [], con
       audience: messageDraft.audience,
       grade: messageDraft.grade,
       userIds,
+      scheduledAt: messageDraft.scheduledAt || '',
       createdAt: serverTimestamp(),
       createdBy: userData?.email || '',
     };
     await setDoc(doc(collection(db, 'student_messages')), payload);
     await setDoc(doc(collection(db, 'announcements')), { ...payload, text: payload.body, isActive: true }, { merge: true });
     await writeLog('student_message_sent', 'إرسال إشعار للطلاب', { audience: payload.audience, grade: payload.grade, userIdsCount: userIds.length });
-    setMessageDraft({ title: '', body: '', audience: 'all', grade: 'all', userIdsText: '' });
+    setMessageDraft({ title: '', body: '', audience: 'all', grade: 'all', userIdsText: '', scheduledAt: '' });
     platformNotify('تم إرسال التنبيه داخل المنصة.');
   };
 
@@ -463,10 +562,31 @@ export function AdminGrowthSuite({ users = [], exams = [], examResults = [], con
     return { ...u, avg, resultsCount: results.length, submitted, risk: Math.min(100, risk) };
   }).filter((u)=>u.risk >= 35).sort((a,b)=>b.risk-a.risk), [users, examResults, assignments, assignmentSubmissions]);
 
+  const visibleStudentsAtRisk = useMemo(() => studentsAtRisk.filter((u) => analyticsGradeFilter === 'all' || u.grade === analyticsGradeFilter), [studentsAtRisk, analyticsGradeFilter]);
+
   const exportAnalytics = () => csvDownload(`nahhas-students-risk-${new Date().toISOString().slice(0,10)}.csv`, [
     ['name','email','phone','grade','average','resultsCount','assignmentsSubmitted','risk'],
-    ...studentsAtRisk.map((u)=>[u.name || u.displayName || '', u.email || '', u.phone || '', u.grade || '', u.avg, u.resultsCount, u.submitted, u.risk])
+    ...visibleStudentsAtRisk.map((u)=>[u.name || u.displayName || '', u.email || '', u.phone || '', u.grade || '', u.avg, u.resultsCount, u.submitted, u.risk])
   ]);
+
+  const sendRiskFollowUp = async () => {
+    const targets = visibleStudentsAtRisk.slice(0, 100);
+    if (!targets.length) return platformNotify('لا يوجد طلاب يحتاجون متابعة حسب الفلتر الحالي.');
+    if (!platformConfirm(`إرسال تنبيه متابعة إلى ${targets.length} طالب؟`)) return;
+    for (const u of targets) {
+      await setDoc(doc(collection(db, 'student_messages')), {
+        userId: u.id,
+        title: 'خطة متابعة شخصية',
+        body: 'لاحظنا أنك تحتاج مراجعة إضافية. افتح الدروس والواجبات المطلوبة اليوم لتحسين مستواك.',
+        audience: 'student',
+        read: false,
+        createdAt: serverTimestamp(),
+        createdBy: userData?.email || '',
+      });
+    }
+    await writeLog('risk_followup_notifications_sent', 'إرسال تنبيهات للطلاب المتأخرين', { count: targets.length, grade: analyticsGradeFilter });
+    platformNotify(`تم إرسال المتابعة إلى ${targets.length} طالب.`);
+  };
   const exportPlan = () => csvDownload(`nahhas-growth-suite-${new Date().toISOString().slice(0,10)}.csv`, [
     ['module','status','mainMetric'],
     ['payments','working',`${payments.length} payment requests / ${plans.length} plans`],
@@ -478,7 +598,9 @@ export function AdminGrowthSuite({ users = [], exams = [], examResults = [], con
     ['support','working',`${supportTickets.length} tickets`],
   ]);
 
-  const renderPayments = () => <div className="space-y-5">
+  const renderPayments = () => {
+    const visiblePayments = payments.filter((p) => paymentFilter === 'all' || (p.status || 'pending') === paymentFilter);
+    return <div className="space-y-5">
     <div className="grid md:grid-cols-4 gap-3"><StatBox title="طلبات دفع معلقة" value={dashboardStats.pendingPayments}/><StatBox title="باقات مفعلة" value={plans.filter((p)=>p.active !== false).length}/><StatBox title="طلاب VIP" value={dashboardStats.premium}/><StatBox title="أكواد غير مستخدمة" value={subscriptionCodes.filter((c)=>!c.used&&!c.isUsed).length}/></div>
     <section className="bg-white rounded-3xl border p-5 grid md:grid-cols-5 gap-3">
       <input className="border rounded-xl p-3" placeholder="اسم الباقة" value={planDraft.title} onChange={(e)=>setPlanDraft({...planDraft,title:e.target.value})}/>
@@ -487,8 +609,28 @@ export function AdminGrowthSuite({ users = [], exams = [], examResults = [], con
       <input className="border rounded-xl p-3" placeholder="المميزات" value={planDraft.features} onChange={(e)=>setPlanDraft({...planDraft,features:e.target.value})}/>
       <button disabled={busy} onClick={savePlan} className="bg-emerald-700 text-white rounded-xl p-3 font-black">حفظ الباقة</button>
     </section>
-    <section className="bg-white rounded-3xl border p-5 overflow-x-auto"><h3 className="font-black mb-3">طلبات الدفع</h3>{payments.length ? payments.map((p)=><div key={p.id} className="min-w-[760px] grid grid-cols-7 gap-2 border-b py-3 text-sm items-center"><b>{p.studentName || p.name || p.email || p.userId}</b><span>{p.amount || p.price || '—'} جنيه</span><span>{p.method || '—'}</span><span>{statusLabel(p.status)}</span><span>{toInputDate(p.createdAt) || '—'}</span><button disabled={p.status==='approved'} onClick={()=>decidePayment(p,'approved')} className="bg-emerald-600 disabled:bg-slate-200 text-white rounded-lg px-3 py-2 font-bold">قبول</button><button onClick={()=>decidePayment(p,'rejected')} className="bg-red-50 text-red-700 rounded-lg px-3 py-2 font-bold">رفض</button></div>) : <p className="text-slate-500 font-bold">لا توجد طلبات دفع بعد.</p>}</section>
+    <section className="bg-white rounded-3xl border p-5">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+        <h3 className="font-black">الباقات الحالية</h3>
+        <button onClick={notifyExpiringSubscriptions} className="bg-amber-100 text-amber-800 rounded-xl px-4 py-2 font-black">تنبيه قرب انتهاء الاشتراك</button>
+      </div>
+      <div className="grid md:grid-cols-3 gap-3">
+        {plans.map((plan)=><div key={plan.id} className="border rounded-2xl p-4 bg-slate-50">
+          <div className="flex justify-between gap-2"><b>{plan.title}</b><span className={plan.active === false ? 'text-red-600 font-black' : 'text-emerald-700 font-black'}>{plan.active === false ? 'متوقفة' : 'مفعلة'}</span></div>
+          <p className="text-sm text-slate-600 mt-2">{plan.price || 0} جنيه • {plan.days || 30} يوم</p>
+          <p className="text-xs text-slate-500 mt-2">{Array.isArray(plan.features) ? plan.features.join('، ') : plan.features}</p>
+          <div className="grid grid-cols-2 gap-2 mt-3"><button onClick={()=>togglePlan(plan)} className="bg-white border rounded-xl p-2 font-bold">{plan.active === false ? 'تفعيل' : 'إيقاف'}</button><button onClick={()=>deletePlan(plan)} className="bg-red-50 text-red-700 rounded-xl p-2 font-bold">حذف</button></div>
+        </div>)}
+        {!plans.length && <p className="text-slate-500 font-bold">لا توجد باقات بعد.</p>}
+      </div>
+    </section>
+    <section className="bg-white rounded-3xl border p-5 overflow-x-auto">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3"><h3 className="font-black">طلبات الدفع</h3><div className="flex gap-2"><select className="border rounded-xl p-2" value={paymentFilter} onChange={(e)=>setPaymentFilter(e.target.value)}><option value="all">كل الطلبات</option><option value="pending">معلقة</option><option value="approved">مقبولة</option><option value="rejected">مرفوضة</option></select><button onClick={exportPayments} className="bg-slate-900 text-white rounded-xl px-4 py-2 font-black">تصدير CSV</button></div></div>
+      {visiblePayments.length ? visiblePayments.map((p)=><div key={p.id} className="min-w-[760px] grid grid-cols-7 gap-2 border-b py-3 text-sm items-center"><b>{p.studentName || p.name || p.email || p.userId}</b><span>{p.amount || p.price || '—'} جنيه</span><span>{p.method || '—'}</span><span>{statusLabel(p.status)}</span><span>{toInputDate(p.createdAt) || '—'}</span><button disabled={p.status==='approved'} onClick={()=>decidePayment(p,'approved')} className="bg-emerald-600 disabled:bg-slate-200 text-white rounded-lg px-3 py-2 font-bold">قبول</button><button onClick={()=>decidePayment(p,'rejected')} className="bg-red-50 text-red-700 rounded-lg px-3 py-2 font-bold">رفض</button></div>) : <p className="text-slate-500 font-bold">لا توجد طلبات دفع حسب الفلتر.</p>}
+    </section>
   </div>;
+  };
+
 
   const renderCourses = () => <div className="space-y-5">
     <div className="grid md:grid-cols-4 gap-3"><StatBox title="وحدات منظمة" value={units.length}/><StatBox title="فيديوهات" value={content.filter((c)=>c.type==='video').length}/><StatBox title="ملفات وروابط" value={content.filter((c)=>['file','link','html','interactive_exam'].includes(c.type)).length}/><StatBox title="امتحانات مرتبطة" value={exams.length}/></div>
@@ -505,7 +647,7 @@ export function AdminGrowthSuite({ users = [], exams = [], examResults = [], con
   </div>;
 
   const renderQuestions = () => <div className="space-y-5">
-    <div className="grid md:grid-cols-4 gap-3"><StatBox title="إجمالي الأسئلة" value={questions.length}/><StatBox title="نحو" value={questions.filter((q)=>q.branch==='النحو').length}/><StatBox title="بلاغة" value={questions.filter((q)=>q.branch==='البلاغة').length}/><StatBox title="صعبة" value={questions.filter((q)=>q.difficulty==='hard').length}/></div>
+    <div className="grid md:grid-cols-4 gap-3"><StatBox title="إجمالي الأسئلة" value={questions.length}/><StatBox title="نتائج الفلتر" value={filteredQuestions.length}/><StatBox title="نحو" value={questions.filter((q)=>q.branch==='النحو').length}/><StatBox title="صعبة" value={questions.filter((q)=>q.difficulty==='hard').length}/></div>
     <section className="bg-white rounded-3xl border p-5 grid md:grid-cols-4 gap-3">
       <textarea className="border rounded-xl p-3 md:col-span-2 min-h-28" placeholder="نص السؤال" value={questionDraft.text} onChange={(e)=>setQuestionDraft({...questionDraft,text:e.target.value})}/>
       <textarea className="border rounded-xl p-3 md:col-span-2 min-h-28" placeholder={'الاختيارات كل اختيار في سطر'} value={questionDraft.options} onChange={(e)=>setQuestionDraft({...questionDraft,options:e.target.value})}/>
@@ -518,11 +660,44 @@ export function AdminGrowthSuite({ users = [], exams = [], examResults = [], con
       <button onClick={saveQuestion} className="bg-purple-700 text-white rounded-xl p-3 font-black">إضافة السؤال</button>
     </section>
     <section className="bg-white rounded-3xl border p-5"><h3 className="font-black mb-2">استيراد CSV</h3><p className="text-xs text-slate-500 font-bold mb-3">الصيغة: text,grade,branch,topic,difficulty,option1|option2|option3,correctIdx,explanation</p><textarea className="w-full border rounded-2xl p-3 min-h-32" value={bulkQuestions} onChange={(e)=>setBulkQuestions(e.target.value)} /><button onClick={importQuestions} className="mt-3 bg-slate-900 text-white rounded-xl px-5 py-3 font-black">استيراد الأسئلة</button></section>
+    <section className="bg-white rounded-3xl border p-5 grid md:grid-cols-6 gap-3">
+      <h3 className="font-black md:col-span-6">توليد مسودة امتحان من بنك الأسئلة</h3>
+      <input className="border rounded-xl p-3 md:col-span-2" placeholder="عنوان الامتحان" value={examDraft.title} onChange={(e)=>setExamDraft({...examDraft,title:e.target.value})}/>
+      <select className="border rounded-xl p-3" value={examDraft.grade} onChange={(e)=>setExamDraft({...examDraft,grade:e.target.value})}><option value="all">كل المراحل</option><GradeOptions/></select>
+      <select className="border rounded-xl p-3" value={examDraft.branch} onChange={(e)=>setExamDraft({...examDraft,branch:e.target.value})}><option value="all">كل الفروع</option><option>النحو</option><option>البلاغة</option><option>الأدب</option><option>القصة</option><option>عام</option></select>
+      <select className="border rounded-xl p-3" value={examDraft.difficulty} onChange={(e)=>setExamDraft({...examDraft,difficulty:e.target.value})}><option value="all">كل الصعوبات</option><option value="easy">سهل</option><option value="medium">متوسط</option><option value="hard">صعب</option></select>
+      <input className="border rounded-xl p-3" type="number" min="1" placeholder="عدد الأسئلة" value={examDraft.count} onChange={(e)=>setExamDraft({...examDraft,count:e.target.value})}/>
+      <input className="border rounded-xl p-3" type="number" min="5" placeholder="المدة بالدقائق" value={examDraft.durationMinutes} onChange={(e)=>setExamDraft({...examDraft,durationMinutes:e.target.value})}/>
+      <button onClick={buildExamFromBank} className="bg-indigo-700 text-white rounded-xl p-3 font-black md:col-span-5">إنشاء مسودة الامتحان</button>
+    </section>
+    <section className="bg-white rounded-3xl border p-5">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4"><h3 className="font-black">إدارة الأسئلة</h3><button onClick={exportQuestionBank} className="bg-slate-900 text-white rounded-xl px-4 py-2 font-black">تصدير CSV</button></div>
+      <div className="grid md:grid-cols-5 gap-3 mb-4"><input className="border rounded-xl p-3 md:col-span-2" placeholder="بحث في السؤال/الشرح" value={questionFilter.search} onChange={(e)=>setQuestionFilter({...questionFilter,search:e.target.value})}/><select className="border rounded-xl p-3" value={questionFilter.grade} onChange={(e)=>setQuestionFilter({...questionFilter,grade:e.target.value})}><option value="all">كل المراحل</option><GradeOptions/></select><select className="border rounded-xl p-3" value={questionFilter.branch} onChange={(e)=>setQuestionFilter({...questionFilter,branch:e.target.value})}><option value="all">كل الفروع</option><option>النحو</option><option>البلاغة</option><option>الأدب</option><option>القصة</option><option>عام</option></select><select className="border rounded-xl p-3" value={questionFilter.difficulty} onChange={(e)=>setQuestionFilter({...questionFilter,difficulty:e.target.value})}><option value="all">كل الصعوبات</option><option value="easy">سهل</option><option value="medium">متوسط</option><option value="hard">صعب</option></select></div>
+      {filteredQuestions.slice(0,100).map((q)=><div key={q.id} className="border-b py-3 text-sm"><div className="flex justify-between gap-3"><b>{q.text}</b><button onClick={()=>deleteQuestion(q)} className="text-red-700 bg-red-50 rounded-lg px-3 py-1 font-bold">حذف</button></div><p className="text-xs text-slate-500 mt-1">{getGradeLabel(q.grade)} • {q.branch} • {q.topic} • {statusLabel(q.difficulty)}</p></div>)}
+      {!filteredQuestions.length && <p className="text-slate-500 font-bold">لا توجد أسئلة مطابقة.</p>}
+    </section>
   </div>;
 
-  const renderAnalytics = () => <div className="space-y-5"><div className="grid md:grid-cols-4 gap-3"><StatBox title="طلاب يحتاجون متابعة" value={studentsAtRisk.length}/><StatBox title="متوسط الامتحانات" value={`${dashboardStats.avg}%`}/><StatBox title="تسليمات واجب" value={assignmentSubmissions.length}/><StatBox title="نتائج مكتملة" value={examResults.filter((r)=>r.status==='completed').length}/></div><button onClick={exportAnalytics} className="bg-indigo-700 text-white rounded-xl px-5 py-3 font-black">تصدير الطلاب المتأخرين CSV</button><section className="bg-white rounded-3xl border p-5"><h3 className="font-black mb-3">أولوية المتابعة</h3>{studentsAtRisk.slice(0,50).map((u)=><div key={u.id || u.uid || u.email} className="grid md:grid-cols-6 gap-2 border-b py-3 text-sm"><b>{u.name || u.email}</b><span>{getGradeLabel(u.grade)}</span><span>متوسط {u.avg}%</span><span>{u.resultsCount} امتحان</span><span>{u.submitted} واجب</span><span className="font-black text-red-700">خطر {u.risk}%</span></div>)}</section></div>;
 
-  const renderNotifications = () => <div className="space-y-5"><section className="bg-white rounded-3xl border p-5 grid md:grid-cols-4 gap-3"><input className="border rounded-xl p-3 md:col-span-2" placeholder="عنوان التنبيه" value={messageDraft.title} onChange={(e)=>setMessageDraft({...messageDraft,title:e.target.value})}/><select className="border rounded-xl p-3" value={messageDraft.audience} onChange={(e)=>setMessageDraft({...messageDraft,audience:e.target.value})}><option value="all">كل الطلاب</option><option value="grade">مرحلة محددة</option><option value="selected">طلاب محددين</option></select><select className="border rounded-xl p-3" value={messageDraft.grade} onChange={(e)=>setMessageDraft({...messageDraft,grade:e.target.value})}><option value="all">كل المراحل</option><GradeOptions/></select><textarea className="border rounded-xl p-3 md:col-span-2 min-h-28" placeholder="نص التنبيه" value={messageDraft.body} onChange={(e)=>setMessageDraft({...messageDraft,body:e.target.value})}/><textarea className="border rounded-xl p-3 min-h-28" placeholder="IDs الطلاب لو التنبيه محدد" value={messageDraft.userIdsText} onChange={(e)=>setMessageDraft({...messageDraft,userIdsText:e.target.value})}/><button onClick={sendMessage} className="bg-amber-600 text-white rounded-xl p-3 font-black">إرسال التنبيه</button></section><section className="bg-white rounded-3xl border p-5"><h3 className="font-black mb-3">آخر التنبيهات</h3>{messages.slice(0,30).map((m)=><div key={m.id} className="border-b py-3"><b>{m.title}</b><p className="text-sm text-slate-600">{m.body}</p><p className="text-xs text-slate-400">{statusLabel(m.audience)} • {m.grade || 'all'}</p></div>)}</section></div>;
+  const renderAnalytics = () => <div className="space-y-5">
+    <div className="grid md:grid-cols-4 gap-3"><StatBox title="طلاب يحتاجون متابعة" value={visibleStudentsAtRisk.length}/><StatBox title="متوسط الامتحانات" value={`${dashboardStats.avg}%`}/><StatBox title="تسليمات واجب" value={assignmentSubmissions.length}/><StatBox title="نتائج مكتملة" value={examResults.filter((r)=>r.status==='completed').length}/></div>
+    <div className="bg-white rounded-3xl border p-5 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+      <select className="border rounded-xl p-3" value={analyticsGradeFilter} onChange={(e)=>setAnalyticsGradeFilter(e.target.value)}><option value="all">كل المراحل</option><GradeOptions/></select>
+      <div className="flex flex-wrap gap-2"><button onClick={sendRiskFollowUp} className="bg-amber-600 text-white rounded-xl px-5 py-3 font-black">إرسال تنبيه متابعة</button><button onClick={exportAnalytics} className="bg-indigo-700 text-white rounded-xl px-5 py-3 font-black">تصدير CSV</button></div>
+    </div>
+    <section className="bg-white rounded-3xl border p-5"><h3 className="font-black mb-3">أولوية المتابعة</h3>{visibleStudentsAtRisk.slice(0,50).map((u)=><div key={u.id || u.uid || u.email} className="grid md:grid-cols-6 gap-2 border-b py-3 text-sm"><b>{u.name || u.email}</b><span>{getGradeLabel(u.grade)}</span><span>متوسط {u.avg}%</span><span>{u.resultsCount} امتحان</span><span>{u.submitted} واجب</span><span className="font-black text-red-700">خطر {u.risk}%</span></div>)}{!visibleStudentsAtRisk.length && <p className="text-slate-500 font-bold">لا يوجد طلاب يحتاجون متابعة حسب الفلتر.</p>}</section>
+  </div>;
+
+
+  const renderNotifications = () => {
+    const recipientCount = messageDraft.audience === 'all'
+      ? users.length
+      : messageDraft.audience === 'grade'
+        ? users.filter((u)=>messageDraft.grade === 'all' || u.grade === messageDraft.grade).length
+        : messageDraft.userIdsText.split(/[\n,]+/).map((x)=>x.trim()).filter(Boolean).length;
+    return <div className="space-y-5"><section className="bg-white rounded-3xl border p-5 grid md:grid-cols-4 gap-3"><input className="border rounded-xl p-3 md:col-span-2" placeholder="عنوان التنبيه" value={messageDraft.title} onChange={(e)=>setMessageDraft({...messageDraft,title:e.target.value})}/><select className="border rounded-xl p-3" value={messageDraft.audience} onChange={(e)=>setMessageDraft({...messageDraft,audience:e.target.value})}><option value="all">كل الطلاب</option><option value="grade">مرحلة محددة</option><option value="selected">طلاب محددين</option></select><select className="border rounded-xl p-3" value={messageDraft.grade} onChange={(e)=>setMessageDraft({...messageDraft,grade:e.target.value})}><option value="all">كل المراحل</option><GradeOptions/></select><textarea className="border rounded-xl p-3 md:col-span-2 min-h-28" placeholder="نص التنبيه" value={messageDraft.body} onChange={(e)=>setMessageDraft({...messageDraft,body:e.target.value})}/><textarea className="border rounded-xl p-3 min-h-28" placeholder="IDs الطلاب لو التنبيه محدد" value={messageDraft.userIdsText} onChange={(e)=>setMessageDraft({...messageDraft,userIdsText:e.target.value})}/><div className="space-y-2"><input type="datetime-local" className="border rounded-xl p-3 w-full" value={messageDraft.scheduledAt} onChange={(e)=>setMessageDraft({...messageDraft,scheduledAt:e.target.value})}/><p className="text-xs font-black text-slate-500">عدد المستلمين المتوقع: {recipientCount}</p></div><button onClick={sendMessage} className="bg-amber-600 text-white rounded-xl p-3 font-black">إرسال التنبيه</button></section><section className="bg-white rounded-3xl border p-5"><h3 className="font-black mb-3">آخر التنبيهات</h3>{messages.slice(0,30).map((m)=><div key={m.id} className="border-b py-3"><b>{m.title}</b><p className="text-sm text-slate-600">{m.body}</p><p className="text-xs text-slate-400">{statusLabel(m.audience)} • {m.grade || 'all'} {m.scheduledAt ? `• مجدول: ${m.scheduledAt}` : ''}</p></div>)}</section></div>;
+  };
+
 
   const renderMobile = () => <div className="space-y-5"><section className="bg-white rounded-3xl border p-5 grid md:grid-cols-2 gap-3">{Object.keys(mobileSettings).filter((k)=>typeof mobileSettings[k] === 'boolean').map((k)=><label key={k} className="bg-slate-50 rounded-2xl p-4 font-black flex gap-2"><input type="checkbox" checked={!!mobileSettings[k]} onChange={(e)=>setMobileSettings({...mobileSettings,[k]:e.target.checked})}/>{({bottomNav:'شريط تنقل سفلي',compactCards:'كروت مختصرة',dataSaver:'وضع توفير بيانات',examSafeMode:'وضع امتحان آمن للموبايل',showInstallPrompt:'إظهار زر تثبيت التطبيق'}[k] || k)}</label>)}<button onClick={saveMobileSettings} className="bg-slate-900 text-white rounded-xl p-3 font-black md:col-span-2">حفظ إعدادات الموبايل</button></section><section className="bg-white rounded-3xl border p-5"><h3 className="font-black mb-3">Checklist الموبايل</h3>{['Dashboard مختصر', 'أزرار كبيرة', 'إخفاء الزحام أثناء الامتحان', 'تقليل تحميل PDF والفيديو عند الحاجة', 'زر تثبيت التطبيق'].map((x)=><div key={x} className="border-b py-3 font-bold">✅ {x}</div>)}</section></div>;
 

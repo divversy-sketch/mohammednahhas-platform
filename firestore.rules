@@ -49,6 +49,34 @@ service cloud.firestore {
     function canManageQuestionBank() { return hasAdminPermission('manage_question_bank') || hasAdminPermission('manage_exams'); }
     function canManageSecurity() { return hasAdminPermission('manage_security') || hasAdminPermission('manage_exams'); }
 
+
+    function isPublicTarget() {
+      return resource.data.target == 'all' || resource.data.targetType == 'all' || resource.data.grade == 'all';
+    }
+
+    function isGradeTarget() {
+      return signedIn()
+        && (resource.data.target == 'grade' || resource.data.targetType == 'grade')
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && (
+          resource.data.grade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.grade
+          || resource.data.targetGrade == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.grade
+        );
+    }
+
+    function isUserTarget() {
+      return signedIn()
+        && (
+          resource.data.userId == request.auth.uid
+          || resource.data.studentId == request.auth.uid
+          || resource.data.targetUserId == request.auth.uid
+        );
+    }
+
+    function canReadTargetedDocument() {
+      return isAdmin() || isPublicTarget() || isGradeTarget() || isUserTarget();
+    }
+
     function changesAdminRoleFields() {
       return request.resource.data.diff(resource.data).changedKeys().hasAny([
         'role', 'isAdmin', 'adminRole', 'adminRoleLabel', 'permissions', 'allowedTabs',
@@ -276,7 +304,7 @@ service cloud.firestore {
     }
 
     match /notifications/{docId} {
-      allow read: if isAdmin() || (signedIn() && (resource.data.userId == request.auth.uid || resource.data.target == 'all'));
+      allow read: if canReadTargetedDocument();
       allow write: if canManageMessages();
     }
 
@@ -286,8 +314,9 @@ service cloud.firestore {
     }
 
     match /student_messages/{messageId} {
-      allow read: if isAdmin() || signedIn();
-      allow write: if canManageMessages();
+      allow read: if canReadTargetedDocument();
+      allow create: if canManageMessages() || (signedIn() && request.resource.data.userId == request.auth.uid && request.resource.data.kind == 'support');
+      allow update, delete: if canManageMessages();
     }
 
     match /notification_tokens/{docId} {
@@ -336,6 +365,23 @@ service cloud.firestore {
       allow create: if signedIn();
       allow read: if isAdmin();
       allow update, delete: if canManageSecurity();
+    }
+
+    match /system_errors/{docId} {
+      allow create: if signedIn();
+      allow read: if isAdmin();
+      allow update, delete: if canManageSecurity();
+    }
+
+    match /performance_metrics/{docId} {
+      allow create: if signedIn();
+      allow read: if isAdmin();
+      allow update, delete: if canManageSecurity();
+    }
+
+    match /migration_reports/{docId} {
+      allow read: if isAdmin();
+      allow write: if canManageSecurity();
     }
 
     match /admin_audit_logs/{docId} {
