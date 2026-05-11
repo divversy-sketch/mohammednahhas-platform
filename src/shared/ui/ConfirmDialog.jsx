@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { AlertTriangle, X } from '../icons/lucide-shim.jsx';
 
 export default function ConfirmDialog({ open, title = 'تأكيد العملية', message, confirmText = 'تأكيد', cancelText = 'إلغاء', tone = 'danger', busy = false, onConfirm, onCancel }) {

@@ -1,98 +1,39 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import {  signInWithEmailAndPassword, createUserWithEmailAndPassword, 
-  signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail 
-} from 'firebase/auth';
-import {  doc, setDoc, getDoc, getDocs, collection, addDoc, query, where, 
-  onSnapshot, updateDoc, deleteDoc, orderBy, serverTimestamp, writeBatch, limit, increment 
-} from 'firebase/firestore';
-import { 
-  PlayCircle, FileText, LogOut, User, GraduationCap, Quote, CheckCircle, 
-  Lock, Mail, ChevronRight, Menu, X, Loader2, AlertTriangle, PlusCircle, 
-  Check, Trash2, Eye, ShieldAlert, Video, UploadCloud, Phone, Edit, KeyRound,
-  MessageSquare, Send, MessageCircle, Facebook, BookOpen, Feather, Radio, 
-  ExternalLink, ClipboardList, Timer, AlertOctagon, Flag, Save, HelpCircle, 
-  Reply, Unlock, Layout, Settings, Trophy, Megaphone, Bell, Download, XCircle, 
-  Calendar, Clock, FileWarning, Settings as GearIcon, Star, Bot, Power, Upload,
-  Users, PenTool, Code, Sparkles, Lamp, Ban, Shield, RefreshCw, Link as LinkIcon, 
-  History, Camera, QrCode, FileCheck, MousePointerClick, BarChart3, Layers,
-  BrainCircuit, Headphones, DownloadCloud, PenLine, Play, Pause, SkipForward, 
-  Target, AlertCircle, Crown, CreditCard, Key, Wand2, WalletCards, Smartphone
-} from '../../shared/icons/lucide-shim.jsx';
-import { motion, AnimatePresence } from 'framer-motion';
-import { auth, db, savePushTokenForUser, setupForegroundPushListener } from '../../services/firebase';
-import SecureVideoPlayer from '../../features/lectures/SecureVideoPlayer';
-import MobileStudentBottomNav from '../../features/student/MobileStudentBottomNav';
-import MobileExamHelperStyles from '../../shared/components/MobileExamHelperStyles';
-import DesignSystemLoader from '../../shared/components/DesignSystemLoader';
-import { GradeOptions, getGradeLabel } from '../../shared/constants/grades';
-import { normalizeEgyptPhone, isValidEgyptPhone, validateEgyptianPhones } from '../../shared/utils/phone';
-import { PWAInstallBox, ModernLogo, FloatingArabicBackground, WisdomBox, Announcements, Leaderboard } from '../../features/home/HomeWidgets';
-import PomodoroFocusMode from '../../features/study/PomodoroFocusMode';
-import InteractiveViewer from '../../features/content/InteractiveViewer';
-import { AdminCoursesManager, StudentCoursesHub } from '../../features/courses/CourseSystem';
-import { uploadToCloudinary } from '../../services/cloudinaryUpload';
+import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
+
+import { doc, setDoc, getDoc, getDocs, collection, addDoc, query, where, updateDoc, deleteDoc, serverTimestamp, writeBatch, increment } from 'firebase/firestore';
+
+
+import { db } from '../../services/firebase';
+
+
+import { validateEgyptianPhones } from '../../shared/utils/phone';
+import { FloatingArabicBackground } from '../../features/home/HomeWidgets';
+
+
 import { uploadToFirebaseContent, detectContentType, readHtmlFileAsInlineContent } from '../../services/firebaseContentUpload';
-import {
-  platformNotify,
-  platformConfirm,
-  platformPrompt,
-  ToastCenter,
-  formatWatchTime,
-  requestNotificationPermission,
-  sendSystemNotification,
-  getYouTubeID,
-  PLATFORM_WHATSAPP_NUMBER,
-  openPlatformWhatsApp,
-  WhatsAppContactButton,
-  renderBracketHighlightedText,
-  getQuestionsForExam,
-  generatePDF,
-  safeNumber,
-  getResultPercentage,
-  getGradeBadge,
-  VIDEO_EXAM_UNLOCK_PERCENT,
-  InlineTabs,
-  TabPaneCard,
-  getQuestionMaxScore,
-  extractAllQuestions,
-  calculateDetailedExamMetrics,
-  getPerformanceInsights,
-  getReviewRecommendations,
-  StudentLocalAdvice,
-  StudentLocalHomeCoach,
-  LocalQuestionExplanation,
-  LocalEssayReviewBox
-} from '../../shared/core/platformShared.jsx';
-import { isActiveAdminSnapshot, getInitialRouteMode, navigatePlatform, DebugCollector, DebugPanel } from '../../shared/core/debugTools.jsx';
+import { platformNotify, platformConfirm, platformPrompt, sendSystemNotification, safeNumber, VIDEO_EXAM_UNLOCK_PERCENT, getQuestionMaxScore, calculateDetailedExamMetrics } from '../../shared/core/platformShared.jsx';
+import { DebugPanel } from '../../shared/core/debugTools.jsx';
 
 
-
-import AdminPaymentRequestsPanel from './AdminPaymentRequestsPanel.jsx';
-import AdminPerformanceAnalytics from './AdminPerformanceAnalytics.jsx';
-import AdminProDashboard from './AdminProDashboard.jsx';
-import AdminQuestionDeepAnalytics from './AdminQuestionDeepAnalytics.jsx';
-import AdvancedAntiCheatInsights from './AdvancedAntiCheatInsights.jsx';
-import AssignmentsManager from './AssignmentsManager.jsx';
-import ExamRunner from '../../shared/platformParts/ExamRunner.jsx';
-import LeaderboardPanel from '../../shared/platformParts/LeaderboardPanel.jsx';
-import QuestionBankManager from './QuestionBankManager.jsx';
-import SmartSubscriptionManager from './SmartSubscriptionManager.jsx';
 import { useAdminDashboardData } from '../hooks/useAdminDashboardData.js';
 import AdminHeader from '../components/AdminHeader.jsx';
 import AdminSidebar from '../components/AdminSidebar.jsx';
-import AdminExamTimeModal from '../modals/AdminExamTimeModal.jsx';
-import AdminReviewExamOverlay from '../modals/AdminReviewExamOverlay.jsx';
-import AdminFullExamEditorModal from '../modals/AdminFullExamEditorModal.jsx';
-import AdminFullContentEditorModal from '../modals/AdminFullContentEditorModal.jsx';
-import AdminStudentProfileModal from '../modals/AdminStudentProfileModal.jsx';
-import AdminPendingUsersPage from '../pages/AdminPendingUsersPage.jsx';
-import { AdminAssignmentsPage, AdminExamViewTabs, AdminQuestionBankPage } from '../pages/AdminUtilityPages.jsx';
+
+
 import { adminSecureFunctions } from '../services/adminSecureFunctions.js';
-import AdminFollowUpPanel from '../../features/insights/AdminFollowUpPanel.jsx';
-import AdminSmartHomeworkManager from '../../features/homework/AdminSmartHomeworkManager.jsx';
-import AdminDashboardTabs from './AdminDashboardTabs.jsx';
-import AdminDashboardModals from './AdminDashboardModals.jsx';
-import AdminPasswordResetRequestsPanel from './AdminPasswordResetRequestsPanel.jsx';
+
+
+
+
+const AdminDashboardTabs = lazy(() => import('./AdminDashboardTabs.jsx'));
+const AdminDashboardModals = lazy(() => import('./AdminDashboardModals.jsx'));
+const AdminPasswordResetRequestsPanel = lazy(() => import('./AdminPasswordResetRequestsPanel.jsx'));
+
+const AdminLazyFallback = () => (
+  <div className="rounded-3xl border border-slate-200 bg-white p-6 text-center text-sm font-bold text-slate-600 shadow-sm">
+    جاري تحميل أدوات الإدارة...
+  </div>
+);
 
 export const AdminDashboard = ({ user, adminProfile }) => {
   const userData = { ...(user || {}), ...(adminProfile || {}) };
@@ -1415,14 +1356,18 @@ export const AdminDashboard = ({ user, adminProfile }) => {
       <DebugPanel user={user} />
       <FloatingArabicBackground />
 
-      <AdminDashboardModals ctx={dashboardContext} />
+      <Suspense fallback={<AdminLazyFallback />}>
+        <AdminDashboardModals ctx={dashboardContext} />
+      </Suspense>
 
       <AdminHeader adminGradeFilter={adminGradeFilter} setAdminGradeFilter={setAdminGradeFilter} />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-4 md:p-6 relative z-10">
         <AdminSidebar activeTab={activeTab} setActiveTab={setActiveTab} adminProfile={adminProfile} />
 
-        <AdminDashboardTabs ctx={dashboardContext} />
+        <Suspense fallback={<AdminLazyFallback />}>
+          <AdminDashboardTabs ctx={dashboardContext} />
+        </Suspense>
       </div>
     </div>
   );

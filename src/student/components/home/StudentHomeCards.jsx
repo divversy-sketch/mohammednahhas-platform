@@ -1,15 +1,5 @@
-import React from 'react';
-import {
-  BarChart3,
-  Bell,
-  BrainCircuit,
-  ClipboardList,
-  Crown,
-  GraduationCap,
-  PlayCircle,
-  Sparkles,
-  Target,
-} from '../../../shared/icons/lucide-shim.jsx';
+
+import { BarChart3, Bell, BrainCircuit, ClipboardList, GraduationCap, PlayCircle, Sparkles, Target } from '../../../shared/icons/lucide-shim.jsx';
 import { formatWatchTime } from '../../../shared/core/platformShared.jsx';
 
 export function StudentContinueCard({

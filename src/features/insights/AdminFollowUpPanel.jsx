@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { AlertTriangle, BarChart3, ClipboardList, MessageCircle, Send, Users, Bell, Crown } from '../../shared/icons/lucide-shim.jsx';
+import { AlertTriangle, BarChart3, ClipboardList, MessageCircle, Users, Bell, Crown } from '../../shared/icons/lucide-shim.jsx';
 import { buildAdminInsights, buildParentReportText, buildWhatsAppLink } from './learningInsights.js';
 import { getGradeLabel } from '../../shared/constants/grades';
 

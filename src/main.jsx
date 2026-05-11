@@ -1,10 +1,10 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './App.jsx'
-import { registerPWAUpdate } from './pwaUpdate.js'
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App.jsx';
+import { registerPWAUpdate } from './pwaUpdate.js';
 
-import { initializeApp, getApps, getApp } from 'firebase/app'
-import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check'
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -18,13 +18,17 @@ const firebaseConfig = {
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig)
 
-try {
-  initializeAppCheck(app, {
-    provider: new ReCaptchaV3Provider('6LdktsksAAAAAAPmXZsvJ1doy3YZ0LEROQVrZ8XE'),
-    isTokenAutoRefreshEnabled: true
-  })
-} catch (error) {
-  console.warn('App Check init skipped:', error)
+if (import.meta.env.VITE_RECAPTCHA_V3_SITE_KEY) {
+  try {
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(import.meta.env.VITE_RECAPTCHA_V3_SITE_KEY),
+      isTokenAutoRefreshEnabled: true
+    })
+  } catch (error) {
+    console.warn('App Check init skipped:', error)
+  }
+} else if (import.meta.env.PROD) {
+  console.warn('App Check disabled: VITE_RECAPTCHA_V3_SITE_KEY is missing.')
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(

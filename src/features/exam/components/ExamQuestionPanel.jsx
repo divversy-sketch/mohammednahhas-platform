@@ -1,10 +1,6 @@
 import React from 'react';
 import { Check, ChevronRight, FileText, Flag, HelpCircle, Layers, PenTool, UploadCloud, X } from '../../../shared/icons/lucide-shim.jsx';
-import {
-  LocalEssayReviewBox,
-  LocalQuestionExplanation,
-  renderBracketHighlightedText,
-} from '../../../shared/core/platformShared.jsx';
+import { LocalEssayReviewBox, LocalQuestionExplanation, renderBracketHighlightedText } from '../../../shared/core/platformShared.jsx';
 
 function EssayAnswerEditor({ question, answer, isSubmitted, onAnswer, onImageUpload, onFileDialogOpen }) {
   if (isSubmitted) {

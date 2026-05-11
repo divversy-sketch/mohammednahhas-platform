@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { RouteLoadingScreen } from '../shared/ui/AppLoadingScreen.jsx';
 
 const AdminApp = lazy(() => import('../admin/app/AdminApp.jsx'));

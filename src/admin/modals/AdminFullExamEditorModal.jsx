@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Edit, X } from '../../shared/icons/lucide-shim.jsx';
 import { GradeOptions } from '../../shared/constants/grades';
 import { safeNumber } from '../../shared/core/platformShared.jsx';

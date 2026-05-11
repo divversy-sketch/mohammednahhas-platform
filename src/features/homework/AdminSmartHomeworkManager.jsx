@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { addDoc, collection, deleteDoc, doc, getDocs, query, serverTimestamp, setDoc, where, writeBatch } from 'firebase/firestore';
+import { useMemo, useState } from 'react';
+import { addDoc, collection, doc, getDocs, query, serverTimestamp, setDoc, where, writeBatch } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { BookOpen, ClipboardList, Download, QrCode, Trash2, BarChart3 } from '../../shared/icons/lucide-shim.jsx';
 import { GradeOptions, getGradeLabel } from '../../shared/constants/grades';

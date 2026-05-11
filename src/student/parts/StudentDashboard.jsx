@@ -1,83 +1,51 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import {  signInWithEmailAndPassword, createUserWithEmailAndPassword, 
-  signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail 
-} from 'firebase/auth';
-import {  doc, setDoc, getDoc, getDocs, collection, addDoc, query, where, 
-  onSnapshot, updateDoc, deleteDoc, orderBy, serverTimestamp, writeBatch, limit, increment 
-} from 'firebase/firestore';
+import { useState, useEffect, lazy, Suspense } from 'react';
+import { signOut } from 'firebase/auth';
+import { doc, setDoc, collection, addDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { 
-  PlayCircle, FileText, LogOut, User, GraduationCap, Quote, CheckCircle, 
-  Lock, Mail, ChevronRight, Menu, X, Loader2, AlertTriangle, PlusCircle, 
-  Check, Trash2, Eye, ShieldAlert, Video, UploadCloud, Phone, Edit, KeyRound,
-  MessageSquare, Send, MessageCircle, Facebook, BookOpen, Feather, Radio, 
-  ExternalLink, ClipboardList, Timer, AlertOctagon, Flag, Save, HelpCircle, 
-  Reply, Unlock, Layout, Settings, Trophy, Megaphone, Bell, Download, XCircle, 
-  Calendar, Clock, FileWarning, Settings as GearIcon, Star, Bot, Power, Upload,
-  Users, PenTool, Code, Sparkles, Lamp, Ban, Shield, RefreshCw, Link as LinkIcon, 
-  History, Camera, QrCode, FileCheck, MousePointerClick, BarChart3, Layers,
-  BrainCircuit, Headphones, DownloadCloud, PenLine, Play, Pause, SkipForward, 
-  Target, AlertCircle, Crown, CreditCard, Key, Wand2, WalletCards, Smartphone
-} from '../../shared/icons/lucide-shim.jsx';
-import { motion, AnimatePresence } from 'framer-motion';
-import { auth, db, functions, savePushTokenForUser, setupForegroundPushListener } from '../../services/firebase';
-import SecureVideoPlayer from '../../features/lectures/SecureVideoPlayer';
+import { PlayCircle, FileText, LogOut, User, Lock, Menu, X, Loader2, Phone, MessageSquare, BookOpen, ClipboardList, Unlock, Settings, Bell, Download, Code, Sparkles, Ban, RefreshCw, Link as LinkIcon, QrCode, FileCheck, BarChart3, BrainCircuit, Headphones, DownloadCloud, Play, Target, Crown, CreditCard, Key } from '../../shared/icons/lucide-shim.jsx';
+import { motion } from 'framer-motion';
+import { auth, db, functions } from '../../services/firebase';
 import MobileStudentBottomNav from '../../features/student/MobileStudentBottomNav';
-import MobileExamHelperStyles from '../../shared/components/MobileExamHelperStyles';
-import DesignSystemLoader from '../../shared/components/DesignSystemLoader';
+
+
 import { GradeOptions, getGradeLabel } from '../../shared/constants/grades';
-import { normalizeEgyptPhone, isValidEgyptPhone, validateEgyptianPhones } from '../../shared/utils/phone';
+import { normalizeEgyptPhone, isValidEgyptPhone } from '../../shared/utils/phone';
 import { PWAInstallBox, ModernLogo, FloatingArabicBackground, WisdomBox, Announcements, Leaderboard } from '../../features/home/HomeWidgets';
 import PomodoroFocusMode from '../../features/study/PomodoroFocusMode';
-import InteractiveViewer from '../../features/content/InteractiveViewer';
-import { AdminCoursesManager, StudentCoursesHub } from '../../features/courses/CourseSystem';
-import { uploadToCloudinary } from '../../services/cloudinaryUpload';
-import { uploadToFirebaseContent, detectContentType, readHtmlFileAsInlineContent } from '../../services/firebaseContentUpload';
-import {
-  platformNotify,
-  platformConfirm,
-  platformPrompt,
-  ToastCenter,
-  formatWatchTime,
-  requestNotificationPermission,
-  sendSystemNotification,
-  getYouTubeID,
-  PLATFORM_WHATSAPP_NUMBER,
-  openPlatformWhatsApp,
-  WhatsAppContactButton,
-  renderBracketHighlightedText,
-  getQuestionsForExam,
-  generatePDF,
-  safeNumber,
-  getResultPercentage,
-  getGradeBadge,
-  VIDEO_EXAM_UNLOCK_PERCENT,
-  InlineTabs,
-  TabPaneCard,
-  getQuestionMaxScore,
-  extractAllQuestions,
-  calculateDetailedExamMetrics,
-  getPerformanceInsights,
-  getReviewRecommendations,
-  StudentLocalAdvice,
-  StudentLocalHomeCoach,
-  LocalQuestionExplanation,
-  LocalEssayReviewBox
-} from '../../shared/core/platformShared.jsx';
-import { isActiveAdminSnapshot, getInitialRouteMode, navigatePlatform, DebugCollector, DebugPanel } from '../../shared/core/debugTools.jsx';
 
 
+import { platformNotify, platformPrompt, generatePDF, safeNumber, getResultPercentage, VIDEO_EXAM_UNLOCK_PERCENT } from '../../shared/core/platformShared.jsx';
 
-import ExamRunner from '../../shared/platformParts/ExamRunner.jsx';
+
 import PerformanceOverview from './PerformanceOverview.jsx';
 import { useStudentDashboardData } from '../hooks/useStudentDashboardData.js';
 import { StudentContinueCard, StudentSmartDashboard, StudentCompactHome } from '../components/home/StudentHomeCards.jsx';
 import { StudentTopGreeting, LearningHubTabs } from '../components/layout/StudentLayoutParts.jsx';
 import StudentAssignmentsPanel from '../../admin/parts/StudentAssignmentsPanel.jsx';
-import SmartHomeworkScanner from '../../features/homework/SmartHomeworkScanner.jsx';
-import StudentGrowthPanel from '../../features/insights/StudentGrowthPanel.jsx';
-import StudentLearningPath from '../../features/student/StudentLearningPath.jsx';
-import { StudentMessagesInbox, StudentRemediationCenter, ExamPreStartPanel } from '../../features/smartLearning/SmartLearningEngine.jsx';
+
+
+const SecureVideoPlayer = lazy(() => import('../../features/lectures/SecureVideoPlayer'));
+const InteractiveViewer = lazy(() => import('../../features/content/InteractiveViewer'));
+const ExamRunner = lazy(() => import('../../shared/platformParts/ExamRunner.jsx'));
+const SmartHomeworkScanner = lazy(() => import('../../features/homework/SmartHomeworkScanner.jsx'));
+const StudentGrowthPanel = lazy(() => import('../../features/insights/StudentGrowthPanel.jsx'));
+const StudentLearningPath = lazy(() => import('../../features/student/StudentLearningPath.jsx'));
+const StudentCoursesHub = lazy(() => import('../../features/courses/CourseSystem').then((module) => ({ default: module.StudentCoursesHub })));
+const StudentMessagesInbox = lazy(() => import('../../features/smartLearning/SmartLearningEngine.jsx').then((module) => ({ default: module.StudentMessagesInbox })));
+const StudentRemediationCenter = lazy(() => import('../../features/smartLearning/SmartLearningEngine.jsx').then((module) => ({ default: module.StudentRemediationCenter })));
+const ExamPreStartPanel = lazy(() => import('../../features/smartLearning/SmartLearningEngine.jsx').then((module) => ({ default: module.ExamPreStartPanel })));
+
+const LazyPanelFallback = () => (
+  <div className="rounded-3xl border border-amber-100 bg-white/80 p-6 text-center text-sm font-bold text-amber-700 shadow-sm">
+    جاري تحميل الجزء المطلوب...
+  </div>
+);
+
+const LazyPanel = ({ children }) => (
+  <Suspense fallback={<LazyPanelFallback />}>
+    {children}
+  </Suspense>
+);
 
 export const StudentDashboard = ({ user, userData, installPrompt }) => {
   userData = userData || {
@@ -339,11 +307,11 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
       await updateDoc(doc(db, 'users', user.uid), payload);
       platformNotify(editFormData.grade !== userData?.grade ? "تم حفظ رقم الهاتف وإرسال طلب تغيير المرحلة إلى الأدمن." : "تم تحديث رقم الهاتف بنجاح.");
   };
-  if (activeExam) return <ExamRunner exam={activeExam} user={user} onClose={() => setActiveExam(null)} />;
+  if (activeExam) return <LazyPanel><ExamRunner exam={activeExam} user={user} onClose={() => setActiveExam(null)} /></LazyPanel>;
   if (showFocusMode) return <PomodoroFocusMode onClose={() => setShowFocusMode(false)} />;
   if (reviewingExam) {
       const result = examResults.find(r => r.examId === reviewingExam.id);
-      return <ExamRunner exam={reviewingExam} user={user} onClose={() => setReviewingExam(null)} isReviewMode={true} existingResult={result} />;
+      return <LazyPanel><ExamRunner exam={reviewingExam} user={user} onClose={() => setReviewingExam(null)} isReviewMode={true} existingResult={result} /></LazyPanel>;
   }
 
   const isBannedAll = userData.status === 'banned_all';
@@ -512,11 +480,12 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
   };
 
   return (
+    <LazyPanel>
     <div className="bg-slate-50 relative font-['Cairo'] min-h-screen block" dir="rtl">
 
       <MobileStudentBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
-      {playingVideo && <SecureVideoPlayer video={playingVideo} user={user} userName={userData?.name} onClose={() => setPlayingVideo(null)} onProgress={handleVideoProgress} />}
-      {playingHtml && <InteractiveViewer content={playingHtml} user={userData} onClose={() => setPlayingHtml(null)} />}
+      {playingVideo && <LazyPanel><SecureVideoPlayer video={playingVideo} user={user} userName={userData?.name} onClose={() => setPlayingVideo(null)} onProgress={handleVideoProgress} /></LazyPanel>}
+      {playingHtml && <LazyPanel><InteractiveViewer content={playingHtml} user={userData} onClose={() => setPlayingHtml(null)} /></LazyPanel>}
       {/* النظام امتحانات الطلاب متوقفة مؤقتًا  */}
       <FloatingArabicBackground />
       {showNotifications && (
@@ -682,7 +651,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
             </div>
         )}
 
-          {activeTab === 'courses' && !isBannedContent && <StudentCoursesHub user={user} userData={userData} exams={exams} onStartExam={startExamWithCode} />}
+          {activeTab === 'courses' && !isBannedContent && <LazyPanel><StudentCoursesHub user={user} userData={userData} exams={exams} onStartExam={startExamWithCode} /></LazyPanel>}
 
           {activeTab === 'learning_path' && !isBannedContent && (
             <StudentLearningPath
@@ -980,6 +949,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
         )}
       </main>
       {preExam && (
+        <LazyPanel>
         <ExamPreStartPanel
           exam={preExam}
           results={examResults}
@@ -991,9 +961,11 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
           onStart={() => { const target = preExam; setPreExam(null); startExamWithCode(target); }}
           onClose={() => setPreExam(null)}
         />
+        </LazyPanel>
       )}
-      {scanningHwId && <SmartHomeworkScanner hwId={scanningHwId} user={user} onClose={() => setScanningHwId(null)} />}
+      {scanningHwId && <LazyPanel><SmartHomeworkScanner hwId={scanningHwId} user={user} onClose={() => setScanningHwId(null)} /></LazyPanel>}
     </div>
+    </LazyPanel>
   );
 };
 

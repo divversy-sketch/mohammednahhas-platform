@@ -1,42 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import {
-  addDoc,
-  collection,
-  doc,
-  getDocs,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
-  where,
-} from 'firebase/firestore';
+import { useEffect, useMemo, useState } from 'react';
+import { addDoc, collection, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import {
-  BarChart3,
-  Bell,
-  BookOpen,
-  CheckCircle,
-  ClipboardList,
-  CreditCard,
-  Download,
-  Eye,
-  FileText,
-  Lock,
-  MessageSquare,
-  PlayCircle,
-  Save,
-  Send,
-  Shield,
-  Sparkles,
-  Target,
-  Users,
-  Video,
-  Wand2,
-} from '../../shared/icons/lucide-shim.jsx';
+import { BarChart3, ClipboardList, CreditCard, Download, Lock, MessageSquare, PlayCircle, Save, Send, Shield, Sparkles, Target, Users, Wand2 } from '../../shared/icons/lucide-shim.jsx';
 import { GradeOptions, getGradeLabel } from '../../shared/constants/grades.jsx';
-import { platformConfirm, platformNotify } from '../../shared/core/platformShared.jsx';
+import { platformNotify } from '../../shared/core/platformShared.jsx';
 import PageHeader from '../../shared/ui/PageHeader.jsx';
 import EmptyState from '../../shared/ui/EmptyState.jsx';
 

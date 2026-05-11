@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Code } from '../../shared/icons/lucide-shim.jsx';
 import { platformNotify } from '../../shared/core/platformShared.jsx';
 
@@ -41,9 +41,6 @@ const InteractiveViewer = ({ content, user, onClose }) => {
         </div>
     );
 };
-
-
-
 
 
 export default InteractiveViewer;

@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, doc } from 'firebase/firestore';
+import React from 'react';
+import { useState, useEffect } from 'react';
+
+import { collection, query, onSnapshot, orderBy, doc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { CheckCircle, DownloadCloud, Feather, Quote, Megaphone, Trophy, Star, X } from '../../shared/icons/lucide-shim.jsx';
+import { CheckCircle, DownloadCloud, Feather, Quote, Megaphone, Trophy, Star } from '../../shared/icons/lucide-shim.jsx';
 import { platformNotify } from '../../shared/core/platformShared.jsx';
 
 const safeNumber = (value, fallback = 0) => {
@@ -182,9 +183,6 @@ const Leaderboard = () => {
         </div>
     );
 };
-
-
-
 
 
 export { PWAInstallBox, ModernLogo, FloatingArabicBackground, WisdomBox, Announcements, Leaderboard };

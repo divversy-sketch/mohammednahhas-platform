@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { ToastCenter } from '../../shared/core/platformShared.jsx';
 import { DebugCollector } from '../../shared/core/debugTools.jsx';
@@ -9,10 +9,21 @@ import { usePwaInstallPrompt } from '../../shared/pwa/usePwaInstallPrompt.js';
 import { useServiceWorkerRegistration } from '../../shared/pwa/useServiceWorkerRegistration.js';
 import { useStudentSession } from '../hooks/useStudentSession.js';
 import PlatformPerformanceBooster from '../parts/PlatformPerformanceBooster.jsx';
-import StudentDashboard from '../parts/StudentDashboard.jsx';
-import LandingPage from '../parts/LandingPage.jsx';
-import AuthPage from '../../shared/platformParts/AuthPage.jsx';
 import AppErrorBoundary from '../parts/AppErrorBoundary.jsx';
+
+const StudentDashboard = lazy(() => import('../parts/StudentDashboard.jsx'));
+const LandingPage = lazy(() => import('../parts/LandingPage.jsx'));
+const AuthPage = lazy(() => import('../../shared/platformParts/AuthPage.jsx'));
+
+function StudentRouteFallback() {
+  return (
+    <AppLoadingScreen
+      title="منصة النحاس التعليمية"
+      message="بنجهز الصفحة المطلوبة..."
+      variant="student"
+    />
+  );
+}
 
 function StudentApp() {
   const [viewMode, setViewMode] = useState(() => 'landing');
@@ -39,13 +50,15 @@ function StudentApp() {
         <DebugCollector user={user} />
         <PlatformPerformanceBooster />
         <MobileExamHelperStyles />
-        {!user ? (
-          viewMode === 'landing'
-            ? <LandingPage key="landing" onAuthClick={() => setViewMode('auth')} installPrompt={installPrompt} />
-            : <AuthPage key="auth" onBack={() => setViewMode('landing')} />
-        ) : (
-          <StudentDashboard key="student" user={user} userData={userData} installPrompt={installPrompt} />
-        )}
+        <Suspense fallback={<StudentRouteFallback />}>
+          {!user ? (
+            viewMode === 'landing'
+              ? <LandingPage key="landing" onAuthClick={() => setViewMode('auth')} installPrompt={installPrompt} />
+              : <AuthPage key="auth" onBack={() => setViewMode('landing')} />
+          ) : (
+            <StudentDashboard key="student" user={user} userData={userData} installPrompt={installPrompt} />
+          )}
+        </Suspense>
       </AnimatePresence>
     </AppErrorBoundary>
   );

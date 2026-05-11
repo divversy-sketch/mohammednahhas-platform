@@ -12,6 +12,7 @@ export default defineConfig({
           if (id.includes('node_modules/firebase')) return 'vendor-firebase'
           if (id.includes('node_modules/framer-motion') || id.includes('node_modules/lucide-react')) return 'vendor-ui'
           if (id.includes('node_modules/recharts')) return 'vendor-charts'
+          if (id.includes('node_modules/pdfjs-dist')) return 'vendor-pdf'
         }
       }
     }

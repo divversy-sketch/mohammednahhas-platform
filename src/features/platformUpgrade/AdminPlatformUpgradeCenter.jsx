@@ -1,16 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { platformNotify } from '../../shared/core/platformShared.jsx';
-import {
-  DEFAULT_PLATFORM_SETTINGS,
-  buildCourseTree,
-  calculateStudentPerformance,
-  detectWeaknesses,
-  generateSmartExamFromQuestionBank,
-  buildSmartReviewPlan,
-  canAdmin,
-} from './learningIntelligence.js';
+import { DEFAULT_PLATFORM_SETTINGS, buildCourseTree, calculateStudentPerformance, detectWeaknesses, generateSmartExamFromQuestionBank, buildSmartReviewPlan, canAdmin } from './learningIntelligence.js';
 
 const featureCards = [
   ['هيكلة الكورسات', 'كورس ← وحدة/باب ← درس ← فيديو/واجب/امتحان'],

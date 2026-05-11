@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { X, Phone, Users, PlayCircle, ClipboardList, QrCode, Crown } from '../../shared/icons/lucide-shim.jsx';
 import { getGradeLabel } from '../../shared/constants/grades';
 import { formatWatchTime } from '../../shared/core/platformShared.jsx';

@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Check, X } from '../../shared/icons/lucide-shim.jsx';
 
 export default function AdminPendingUsersPage({ filteredPendingUsers, handleApprove, handleReject }) {

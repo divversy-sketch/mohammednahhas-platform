@@ -1,4 +1,4 @@
-import React from 'react';
+
 
 export default function ExamWatermarkLayer({ positions = [], user }) {
   return (

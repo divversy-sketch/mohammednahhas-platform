@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { AlertTriangle } from '../../../shared/icons/lucide-shim.jsx';
 
 export default function ExamSubmitConfirmDialog({ onSubmit, onCancel }) {

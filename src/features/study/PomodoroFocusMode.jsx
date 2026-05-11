@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Headphones, X, CheckCircle, Pause, Play, RefreshCw, PlusCircle, Check } from '../../shared/icons/lucide-shim.jsx';
 
 const PomodoroFocusMode = ({ onClose }) => {
@@ -77,7 +77,6 @@ const PomodoroFocusMode = ({ onClose }) => {
         </div>
     );
 };
-
 
 
 export default PomodoroFocusMode;

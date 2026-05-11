@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { addDoc, collection, deleteDoc, doc, getDoc, increment, onSnapshot, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { Settings as GearIcon, Maximize2, Minimize2, PenLine, Play, RefreshCw, Search, Shrink, Trash2, X } from '../../shared/icons/lucide-shim.jsx';

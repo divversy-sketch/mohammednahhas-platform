@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Crown } from '../../../shared/icons/lucide-shim.jsx';
 import { getGradeLabel } from '../../../shared/constants/grades';
 

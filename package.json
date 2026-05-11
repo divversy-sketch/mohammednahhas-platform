@@ -13,10 +13,11 @@
     "deploy:hosting": "firebase deploy --only hosting",
     "deploy:functions": "firebase deploy --only functions",
     "security:smoke": "node scripts/security-smoke-check.mjs",
-    "app:qa": "npm run build && npm run security:smoke && npm audit --audit-level=moderate",
+    "app:qa": "npm run source:health && npm run build && npm run security:smoke && npm audit --audit-level=moderate",
     "release:tag": "git tag v1.0.0-stable && git push origin v1.0.0-stable",
     "bundle:report": "node scripts/bundle-report.mjs",
-    "production:check": "npm run app:qa && npm run bundle:report"
+    "production:check": "npm run app:qa && npm run bundle:report",
+    "source:health": "node scripts/source-health-check.mjs"
   },
   "dependencies": {
     "@capacitor/cli": "^8.3.1",

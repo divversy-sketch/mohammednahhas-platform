@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle, BrainCircuit, PenTool } from '../icons/lucide-shim.jsx';
 
@@ -374,19 +375,6 @@ export const getReviewRecommendations = (branchStats = {}, content = []) => {
         return { branch: item.branch, pct: item.pct, title: related?.title || `راجع فرع ${item.branch}` };
     });
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 export const StudentLocalAdvice = ({ metrics = {}, content = [] }) => {

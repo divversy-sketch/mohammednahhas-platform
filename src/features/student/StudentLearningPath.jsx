@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { BookOpen, CheckCircle, ClipboardList, FileCheck, Lock, PlayCircle, Target } from '../../shared/icons/lucide-shim.jsx';
+import { useMemo } from 'react';
+import { CheckCircle, ClipboardList, FileCheck, Lock, PlayCircle, Target } from '../../shared/icons/lucide-shim.jsx';
 import { getResultPercentage, safeNumber, VIDEO_EXAM_UNLOCK_PERCENT } from '../../shared/core/platformShared.jsx';
 
 const pct = (value) => Math.max(0, Math.min(100, Math.round(Number(value) || 0)));

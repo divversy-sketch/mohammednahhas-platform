@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { BarChart3, BrainCircuit, CheckCircle, ClipboardList, MessageCircle, Target, Trophy, AlertTriangle, BookOpen } from '../../shared/icons/lucide-shim.jsx';
 import { buildParentReportText, buildStudentInsight, buildWhatsAppLink } from './learningInsights.js';
 

@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { ShieldAlert } from '../../../shared/icons/lucide-shim.jsx';
 
 export default function ExamSecurityHoldOverlay({ onClose }) {

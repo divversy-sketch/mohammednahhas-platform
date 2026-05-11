@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { doc, getDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../../services/firebase';
-import { Loader2, QrCode, Camera, CheckCircle, XCircle, AlertTriangle } from '../../shared/icons/lucide-shim.jsx';
+import { Loader2, QrCode, Camera, CheckCircle, AlertTriangle } from '../../shared/icons/lucide-shim.jsx';
 
 const toDate = (value) => {
     if (!value) return null;

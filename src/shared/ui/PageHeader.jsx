@@ -1,4 +1,4 @@
-import React from 'react';
+
 
 export default function PageHeader({ title, description, icon, children, tone = 'amber' }) {
   const toneClass = tone === 'blue' ? 'from-blue-100 to-white text-blue-800' : tone === 'emerald' ? 'from-emerald-100 to-white text-emerald-800' : 'from-amber-100 to-white text-amber-800';

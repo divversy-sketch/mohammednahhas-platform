@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { signOut } from 'firebase/auth';
 import { LogOut, ShieldAlert } from '../../shared/icons/lucide-shim.jsx';
 import { auth } from '../../services/firebase';

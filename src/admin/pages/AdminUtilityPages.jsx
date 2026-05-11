@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Trash2 } from '../../shared/icons/lucide-shim.jsx';
 import { InlineTabs } from '../../shared/core/platformShared.jsx';
 import AssignmentsManager from '../parts/AssignmentsManager.jsx';

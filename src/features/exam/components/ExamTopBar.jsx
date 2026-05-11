@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { CheckCircle, Layout, Timer } from '../../../shared/icons/lucide-shim.jsx';
 
 export default function ExamTopBar({

@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { signOut } from 'firebase/auth';
 import { auth } from '../../services/firebase';
 import { MOBILE_STUDENT_NAV_ITEMS } from '../../shared/constants/navigation';

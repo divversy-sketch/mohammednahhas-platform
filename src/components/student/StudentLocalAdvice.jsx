@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { BrainCircuit, CheckCircle, AlertTriangle, Target } from '../../shared/icons/lucide-shim.jsx';
 
 const buildAdvice = (metrics = {}) => {

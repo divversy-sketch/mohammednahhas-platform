@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 
 const shouldUseLowPerformanceMode = () => {
   if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;

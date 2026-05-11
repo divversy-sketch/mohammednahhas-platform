@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Settings as GearIcon } from '../icons/lucide-shim.jsx';
 
 export const AppLoadingScreen = ({

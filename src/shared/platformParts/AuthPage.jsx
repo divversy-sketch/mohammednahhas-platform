@@ -1,72 +1,34 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import {  signInWithEmailAndPassword, createUserWithEmailAndPassword, 
-  signOut, onAuthStateChanged, updateProfile 
-} from 'firebase/auth';
-import {  doc, setDoc, getDoc, getDocs, collection, addDoc, query, where, 
-  onSnapshot, updateDoc, deleteDoc, orderBy, serverTimestamp, writeBatch, limit, increment 
-} from 'firebase/firestore';
-import { 
-  PlayCircle, FileText, LogOut, User, GraduationCap, Quote, CheckCircle, 
-  Lock, Mail, ChevronRight, Menu, X, Loader2, AlertTriangle, PlusCircle, 
-  Check, Trash2, Eye, ShieldAlert, Video, UploadCloud, Phone, Edit, KeyRound,
-  MessageSquare, Send, MessageCircle, Facebook, BookOpen, Feather, Radio, 
-  ExternalLink, ClipboardList, Timer, AlertOctagon, Flag, Save, HelpCircle, 
-  Reply, Unlock, Layout, Settings, Trophy, Megaphone, Bell, Download, XCircle, 
-  Calendar, Clock, FileWarning, Settings as GearIcon, Star, Bot, Power, Upload,
-  Users, PenTool, Code, Sparkles, Lamp, Ban, Shield, RefreshCw, Link as LinkIcon, 
-  History, Camera, QrCode, FileCheck, MousePointerClick, BarChart3, Layers,
-  BrainCircuit, Headphones, DownloadCloud, PenLine, Play, Pause, SkipForward, 
-  Target, AlertCircle, Crown, CreditCard, Key, Wand2, WalletCards, Smartphone
-} from '../icons/lucide-shim.jsx';
-import { motion, AnimatePresence } from 'framer-motion';
-import { auth, db, savePushTokenForUser, setupForegroundPushListener } from '../../services/firebase';
-import SecureVideoPlayer from '../../features/lectures/SecureVideoPlayer';
-import MobileStudentBottomNav from '../../features/student/MobileStudentBottomNav';
-import MobileExamHelperStyles from '../components/MobileExamHelperStyles';
-import DesignSystemLoader from '../components/DesignSystemLoader';
-import { GradeOptions, getGradeLabel } from '../constants/grades';
-import { normalizeEgyptPhone, isValidEgyptPhone, validateEgyptianPhones } from '../utils/phone';
-import { PWAInstallBox, ModernLogo, FloatingArabicBackground, WisdomBox, Announcements, Leaderboard } from '../../features/home/HomeWidgets';
-import PomodoroFocusMode from '../../features/study/PomodoroFocusMode';
-import InteractiveViewer from '../../features/content/InteractiveViewer';
-import { AdminCoursesManager, StudentCoursesHub } from '../../features/courses/CourseSystem';
-import { uploadToCloudinary } from '../../services/cloudinaryUpload';
-import { uploadToFirebaseContent, detectContentType, readHtmlFileAsInlineContent } from '../../services/firebaseContentUpload';
-import {
-  platformNotify,
-  platformConfirm,
-  platformPrompt,
-  ToastCenter,
-  formatWatchTime,
-  requestNotificationPermission,
-  sendSystemNotification,
-  getYouTubeID,
-  PLATFORM_WHATSAPP_NUMBER,
-  openPlatformWhatsApp,
-  WhatsAppContactButton,
-  renderBracketHighlightedText,
-  getQuestionsForExam,
-  generatePDF,
-  safeNumber,
-  getResultPercentage,
-  getGradeBadge,
-  VIDEO_EXAM_UNLOCK_PERCENT,
-  InlineTabs,
-  TabPaneCard,
-  getQuestionMaxScore,
-  extractAllQuestions,
-  calculateDetailedExamMetrics,
-  getPerformanceInsights,
-  getReviewRecommendations,
-  StudentLocalAdvice,
-  StudentLocalHomeCoach,
-  LocalQuestionExplanation,
-  LocalEssayReviewBox
-} from '../core/platformShared.jsx';
-import { isActiveAdminSnapshot, getInitialRouteMode, navigatePlatform, DebugCollector, DebugPanel } from '../core/debugTools.jsx';
+import { useState, useEffect } from 'react';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { doc, setDoc, collection, addDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { User, GraduationCap, Lock, Mail, ChevronRight, Loader2, Phone } from '../icons/lucide-shim.jsx';
+import { motion } from 'framer-motion';
+import { auth, db } from '../../services/firebase';
+
+
+import { GradeOptions } from '../constants/grades';
+import { normalizeEgyptPhone, validateEgyptianPhones } from '../utils/phone';
+import { ModernLogo, FloatingArabicBackground } from '../../features/home/HomeWidgets';
+
+
+import { platformNotify, WhatsAppContactButton } from '../core/platformShared.jsx';
 
 
 
+const getFriendlyAuthError = (error) => {
+  const code = error?.code || '';
+  const messages = {
+    'auth/invalid-email': 'الإيميل مكتوب بطريقة غير صحيحة.',
+    'auth/user-not-found': 'لا يوجد حساب بهذا الإيميل.',
+    'auth/wrong-password': 'كلمة السر غير صحيحة.',
+    'auth/invalid-credential': 'بيانات الدخول غير صحيحة. راجع الإيميل وكلمة السر.',
+    'auth/email-already-in-use': 'هذا الإيميل مسجل بالفعل. جرّب تسجيل الدخول بدل إنشاء حساب جديد.',
+    'auth/weak-password': 'كلمة السر ضعيفة. استخدم 6 أحرف أو أكثر.',
+    'auth/too-many-requests': 'تمت محاولات كثيرة. انتظر قليلًا ثم جرّب مرة أخرى.',
+    'auth/network-request-failed': 'مشكلة في الاتصال بالإنترنت. تأكد من الشبكة ثم أعد المحاولة.'
+  };
+  return messages[code] || 'حدث خطأ غير متوقع. جرّب مرة أخرى أو تواصل مع الإدارة.';
+};
 
 export const AuthPage = ({ onBack }) => {
   const [isRegister, setIsRegister] = useState(false);
@@ -116,7 +78,7 @@ export const AuthPage = ({ onBack }) => {
         });
         platformNotify("تم إنشاء الحساب! انتظر تفعيل الأدمن.");
       } else { await signInWithEmailAndPassword(auth, formData.email, formData.password); }
-    } catch (error) { platformNotify("حدث خطأ: " + error.message); } 
+    } catch (error) { platformNotify(getFriendlyAuthError(error)); } 
     finally { setLoading(false); }
   };
 

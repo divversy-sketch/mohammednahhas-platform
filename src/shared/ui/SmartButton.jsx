@@ -1,4 +1,4 @@
-import React from 'react';
+
 
 export default function SmartButton({ children, variant = 'primary', className = '', ...props }) {
   const variants = {

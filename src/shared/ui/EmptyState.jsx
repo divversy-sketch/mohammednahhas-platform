@@ -1,4 +1,4 @@
-import React from 'react';
+
 
 export default function EmptyState({ title = 'لا توجد بيانات', description = 'سيظهر المحتوى هنا بمجرد إضافته.', icon = '📭', action }) {
   return (

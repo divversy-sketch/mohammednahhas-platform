@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { ADMIN_TABS, canAccessAdminTab } from '../../config/adminPermissions';
 
 export { ADMIN_TABS };

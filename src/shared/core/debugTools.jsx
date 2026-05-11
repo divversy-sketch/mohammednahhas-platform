@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { useEffect, useState } from 'react';
 import { doc, getDoc, collection, addDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { X } from '../icons/lucide-shim.jsx';
