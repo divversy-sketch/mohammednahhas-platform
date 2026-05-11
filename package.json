@@ -19,7 +19,13 @@
     "production:check": "npm run source:health && npm run build && npm run security:smoke && npm run e2e:smoke && npm run bundle:report",
     "source:health": "node scripts/source-health-check.mjs",
     "migrate:plan": "node scripts/migrations/normalize-platform-data.mjs",
-    "e2e:smoke": "node scripts/e2e-smoke.mjs"
+    "e2e:smoke": "node scripts/e2e-smoke.mjs",
+    "postdeploy:qa": "node scripts/post-deploy-qa.mjs",
+    "cleanup:report": "node scripts/cleanup-report.mjs",
+    "firestore:performance": "node scripts/firestore-performance-audit.mjs",
+    "backup:plan": "node scripts/backup-export-plan.mjs",
+    "e2e:real": "node scripts/e2e-real-smoke.mjs",
+    "production:ready": "npm run source:health && npm run cleanup:report && npm run firestore:performance && npm run e2e:smoke && npm run e2e:real && npm run backup:plan && npm run postdeploy:qa && npm run build && npm run security:smoke && npm run bundle:report"
   },
   "dependencies": {
     "@capacitor/cli": "^8.3.1",

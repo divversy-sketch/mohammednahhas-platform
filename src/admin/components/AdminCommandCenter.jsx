@@ -1,8 +1,8 @@
-﻿import React from 'react';
+import React from 'react';
 import { collection, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { db } from '../../services/firebase.js';
 import { COLLECTIONS } from '../../config/collections.js';
-import { AlertTriangle, Bell, CreditCard, FileCheck, MessageCircle, ShieldAlert, BarChart3, Users } from '../../shared/icons/lucide-shim.jsx';
+import { AlertTriangle, Bell, CreditCard, FileCheck, MessageCircle, ShieldAlert, TrendingDown, Users } from '../../shared/icons/lucide-shim.jsx';
 import { getGradeLabel } from '../../shared/constants/grades';
 
 const toDate = (value) => value?.toDate ? value.toDate() : (value ? new Date(value) : null);
@@ -63,28 +63,27 @@ export default function AdminCommandCenter({ users = [], exams = [], examResults
   });
   const lowScores = examResults.filter((r) => r.status === 'completed' && Number(r.percentage || 0) < 50).length;
 
-  const topExpiring = expiring.slice(0, 4).map((u) => `${u.name || u.email || u.id} (${getGradeLabel(u.grade)} - ${daysUntil(u.subscriptionExpiry)} ظٹظˆظ…)`).join('طŒ ');
+  const topExpiring = expiring.slice(0, 4).map((u) => `${u.name || u.email || u.id} (${getGradeLabel(u.grade)} - ${daysUntil(u.subscriptionExpiry)} يوم)`).join('، ');
 
   return (
     <section className="rounded-[2rem] border border-slate-200 bg-slate-50 p-4 md:p-6 shadow-sm" dir="rtl">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
         <div>
-          <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2"><ShieldAlert className="text-blue-600"/> ظ…ط±ظƒط² ظ…طھط§ط¨ط¹ط© ط§ظ„ظٹظˆظ…</h2>
-          <p className="text-sm text-slate-500 font-bold mt-1">ظ…ظ„ط®طµ طھظ†ظپظٹط°ظٹ ظٹط¬ظ…ط¹ ط§ظ„ظ…ط·ظ„ظˆط¨ ظ…ظ† ط§ظ„ط£ظ‚ط³ط§ظ… ط§ظ„ظ…ظˆط¬ظˆط¯ط© ط¨ط¯ظˆظ† ط¥ط¶ط§ظپط© طھط¨ظˆظٹط¨ط§طھ ط¬ط¯ظٹط¯ط©.</p>
+          <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2"><ShieldAlert className="text-blue-600"/> مركز متابعة اليوم</h2>
+          <p className="text-sm text-slate-500 font-bold mt-1">ملخص تنفيذي يجمع المطلوب من الأقسام الموجودة بدون إضافة تبويبات جديدة.</p>
         </div>
-        <span className="text-xs font-black bg-white border border-slate-200 rounded-full px-3 py-2 text-slate-500">ط¢ط®ط± طھط­ط¯ظٹط« ظ…ظ† ط¨ظٹط§ظ†ط§طھ ط§ظ„ظ„ظˆط­ط© ط§ظ„ط­ط§ظ„ظٹط©</span>
+        <span className="text-xs font-black bg-white border border-slate-200 rounded-full px-3 py-2 text-slate-500">آخر تحديث من بيانات اللوحة الحالية</span>
       </div>
       <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3">
-        <Card tone="amber" title="ط·ظ„ط¨ط§طھ ط¯ظپط¹ ظ…ط¹ظ„ظ‚ط©" value={pendingPayments.length} note="ط§ط¶ط؛ط· ظ„ظ„ط°ظ‡ط§ط¨ ط¥ظ„ظ‰ ط§ظ„ط§ط´طھط±ط§ظƒط§طھ ظˆط§ظ„ط¯ظپط¹" icon={<CreditCard size={24}/>} onClick={() => onNavigate?.('payments')} />
-        <Card tone="red" title="ط§ط´طھط±ط§ظƒط§طھ ظ‚ط±ط¨ ط§ظ„ط§ظ†طھظ‡ط§ط،" value={expiring.length} note={topExpiring || 'ظ„ط§ ظٹظˆط¬ط¯ ط®ط·ط± ظ‚ط±ظٹط¨'} icon={<Bell size={24}/>} onClick={() => onNavigate?.('payments')} />
-        <Card tone="purple" title="طھط°ط§ظƒط± ط¯ط¹ظ… ظ…ظپطھظˆط­ط©" value={openTickets.length} note="طھط¯ط§ط± ظ…ظ† ط±ط³ط§ط¦ظ„ ط§ظ„ط·ظ„ط§ط¨" icon={<MessageCircle size={24}/>} onClick={() => onNavigate?.('messages_center')} />
-        <Card tone="blue" title="ظ…ط­ط§ظˆظ„ط§طھ ط§ظ…طھط­ط§ظ† طھط­طھط§ط¬ ظ…طھط§ط¨ط¹ط©" value={held} note="ط£ظ…ظ† ط§ظ„ط§ظ…طھط­ط§ظ†ط§طھ ظˆط§ظ„ظ†طھط§ط¦ط¬" icon={<FileCheck size={24}/>} onClick={() => onNavigate?.('exams')} />
-        <Card tone="red" title="ط£ط®ط·ط§ط، ظ†ط¸ط§ظ… ط¢ط®ط± 7 ط£ظٹط§ظ…" value={recentErrors.length} note="طھط¸ظ‡ط± ط¯ط§ط®ظ„ ط¥ط¹ط¯ط§ط¯ط§طھ ط§ظ„ظ…ظ†طµط© ظˆط³ط¬ظ„ ط§ظ„ط£ظ…ط§ظ†" icon={<AlertTriangle size={24}/>} onClick={() => onNavigate?.('platform_settings')} />
-        <Card tone="amber" title="ط·ظ„ط§ط¨ ط؛ظٹط± ظ†ط´ط·ظٹظ†" value={inactive.length} note="ظ…طھط§ط¨ط¹ط© طھط¹ظ„ظٹظ…ظٹط© ظˆطھط³ظˆظٹظ‚ظٹط©" icon={<Users size={24}/>} onClick={() => onNavigate?.('student_reports')} />
-        <Card tone="red" title="ظ†طھط§ط¦ط¬ ط£ظ‚ظ„ ظ…ظ† 50%" value={lowScores} note="طھط­طھط§ط¬ ظ…ط±ط§ط¬ط¹ط© طھط¹ظ„ظٹظ…ظٹط©" icon={<BarChart3 size={24}/>} onClick={() => onNavigate?.('student_reports')} />
-        <Card tone="emerald" title="ط¥ط¬ظ…ط§ظ„ظٹ ط§ظ„ط§ظ…طھط­ط§ظ†ط§طھ" value={exams.length} note="ظ…ط¤ط´ط± ط¬ط§ظ‡ط²ظٹط© ط§ظ„ظ…ط­طھظˆظ‰" icon={<FileCheck size={24}/>} onClick={() => onNavigate?.('exams')} />
+        <Card tone="amber" title="طلبات دفع معلقة" value={pendingPayments.length} note="اضغط للذهاب إلى الاشتراكات والدفع" icon={<CreditCard size={24}/>} onClick={() => onNavigate?.('payments')} />
+        <Card tone="red" title="اشتراكات قرب الانتهاء" value={expiring.length} note={topExpiring || 'لا يوجد خطر قريب'} icon={<Bell size={24}/>} onClick={() => onNavigate?.('payments')} />
+        <Card tone="purple" title="تذاكر دعم مفتوحة" value={openTickets.length} note="تدار من رسائل الطلاب" icon={<MessageCircle size={24}/>} onClick={() => onNavigate?.('messages_center')} />
+        <Card tone="blue" title="محاولات امتحان تحتاج متابعة" value={held} note="أمن الامتحانات والنتائج" icon={<FileCheck size={24}/>} onClick={() => onNavigate?.('exams')} />
+        <Card tone="red" title="أخطاء نظام آخر 7 أيام" value={recentErrors.length} note="تظهر داخل إعدادات المنصة وسجل الأمان" icon={<AlertTriangle size={24}/>} onClick={() => onNavigate?.('platform_settings')} />
+        <Card tone="amber" title="طلاب غير نشطين" value={inactive.length} note="متابعة تعليمية وتسويقية" icon={<Users size={24}/>} onClick={() => onNavigate?.('student_reports')} />
+        <Card tone="red" title="نتائج أقل من 50%" value={lowScores} note="تحتاج مراجعة تعليمية" icon={<TrendingDown size={24}/>} onClick={() => onNavigate?.('student_reports')} />
+        <Card tone="emerald" title="إجمالي الامتحانات" value={exams.length} note="مؤشر جاهزية المحتوى" icon={<FileCheck size={24}/>} onClick={() => onNavigate?.('exams')} />
       </div>
     </section>
   );
 }
-

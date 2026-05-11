@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
+import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, startAfter, where } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import { COLLECTIONS } from '../../config/collections.js';
 
@@ -57,6 +57,28 @@ export const normalizeSubscription = (student = {}) => {
 };
 
 const mapDocs = (snapshot, source, normalizer = (row) => row) => snapshot.docs.map((d) => normalizer({ id: d.id, ...d.data() }, source));
+
+
+export async function getPaginatedCollection({ collectionName, orderField = 'createdAt', direction = 'desc', pageSize = 50, cursor = null, filters = [], normalizer = (row) => row } = {}) {
+  if (!collectionName) throw new Error('collectionName is required');
+  const clauses = [orderBy(orderField, direction), limit(Number(pageSize) || 50)];
+  if (cursor) clauses.splice(1, 0, startAfter(cursor));
+  const snap = await getDocs(query(collection(db, collectionName), ...filters, ...clauses));
+  const rows = snap.docs.map((d) => normalizer({ id: d.id, ...d.data() }, collectionName));
+  return { rows, cursor: snap.docs.at(-1) || null, hasMore: snap.docs.length >= (Number(pageSize) || 50) };
+}
+
+export async function getStudentsPage({ cursor = null, pageSize = 50, filters = [] } = {}) {
+  return getPaginatedCollection({ collectionName: PLATFORM_COLLECTIONS.users, orderField: 'createdAt', direction: 'desc', pageSize, cursor, filters, normalizer: normalizeSubscription });
+}
+
+export async function getResultsPage({ cursor = null, pageSize = 50, filters = [] } = {}) {
+  return getPaginatedCollection({ collectionName: PLATFORM_COLLECTIONS.examResults, orderField: 'submittedAt', direction: 'desc', pageSize, cursor, filters, normalizer: normalizeResult });
+}
+
+export async function getMessagesPage({ cursor = null, pageSize = 50, filters = [] } = {}) {
+  return getPaginatedCollection({ collectionName: PLATFORM_COLLECTIONS.studentMessages, orderField: 'createdAt', direction: 'desc', pageSize, cursor, filters });
+}
 
 export async function getUnifiedExamResults({ studentId = '', examId = '', max = 500 } = {}) {
   const collections = [PLATFORM_COLLECTIONS.examResults, PLATFORM_COLLECTIONS.legacyExamResults];
@@ -121,6 +143,10 @@ export const platformData = {
   getUnifiedExamResults,
   listenUnifiedStudentMessages,
   writePlatformNotification,
+  getPaginatedCollection,
+  getStudentsPage,
+  getResultsPage,
+  getMessagesPage,
   normalizeResult,
   normalizeProgress,
   normalizeSubscription,
