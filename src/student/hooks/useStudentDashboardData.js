@@ -13,6 +13,7 @@ export function useStudentDashboardData({ user, userData, setScanningHwId, setEd
   const [mistakes, setMistakes] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [hasNewNotif, setHasNewNotif] = useState(false);
+  const [examAccessOverrides, setExamAccessOverrides] = useState([]);
 
   useEffect(() => {
     if (!userData || !user?.uid) return undefined;
@@ -36,7 +37,8 @@ export function useStudentDashboardData({ user, userData, setScanningHwId, setEd
         setAssignmentSubmissions,
         setVideoViews,
         setMistakes,
-        setNotifications
+        setNotifications,
+        setExamAccessOverrides
       },
       onLatestNotification: (latest) => {
         setHasNewNotif(true);
@@ -60,6 +62,7 @@ export function useStudentDashboardData({ user, userData, setScanningHwId, setEd
     mistakes,
     notifications,
     hasNewNotif,
+    examAccessOverrides,
     setContent,
     setExams,
     setExamResults,
@@ -69,6 +72,7 @@ export function useStudentDashboardData({ user, userData, setScanningHwId, setEd
     setVideoViews,
     setMistakes,
     setNotifications,
-    setHasNewNotif
+    setHasNewNotif,
+    setExamAccessOverrides
   };
 }

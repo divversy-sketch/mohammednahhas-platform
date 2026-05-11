@@ -104,7 +104,10 @@ export const AdminDashboard = ({ user }) => {
   const [newContent, setNewContent] = useState({ title: '', url: '', type: 'video', videoSection: 'explanation', isPublic: false, grade: '3sec', allowedEmails: '', isPremium: false, linkedExamId: '', estimatedDurationMinutes: '', branch: '' });
   const [editingUser, setEditingUser] = useState(null);
   const [replyTexts, setReplyTexts] = useState({});
-  const [examBuilder, setExamBuilder] = useState({ title: '', grade: '3sec', duration: 60, startTime: '', endTime: '', questions: [], accessCode: '', isPremium: false });
+  const [examBuilder, setExamBuilder] = useState({
+    title: '', grade: '3sec', duration: 60, startTime: '', endTime: '', questions: [], accessCode: '', isPremium: false,
+    accessRule: { enabled: false, requiredExamId: '', requiredPercentage: 70, visibilityWhenLocked: 'locked', useBestAttempt: true, allowAdminOverride: true }
+  });
   const [bulkText, setBulkText] = useState('');
   const [viewingResult, setViewingResult] = useState(null); 
   const [resultsFilter, setResultsFilter] = useState('all');
@@ -132,8 +135,10 @@ export const AdminDashboard = ({ user }) => {
   const [recalculateAfterExamEdit, setRecalculateAfterExamEdit] = useState(true);
   const [examEditDraft, setExamEditDraft] = useState({
     title: '', grade: '3sec', duration: 60, startTime: '', endTime: '',
-    accessCode: '', isPremium: false, questionsText: ''
+    accessCode: '', isPremium: false, questionsText: '',
+    accessRule: { enabled: false, requiredExamId: '', requiredPercentage: 70, visibilityWhenLocked: 'locked', useBestAttempt: true, allowAdminOverride: true }
   });
+  const [examOverrideDraft, setExamOverrideDraft] = useState({ examId: '', studentId: '', reason: '' });
 
   const examEditQuestionsPreview = useMemo(() => {
     try {
@@ -184,12 +189,12 @@ export const AdminDashboard = ({ user }) => {
   const [codeGenDays, setCodeGenDays] = useState(30);
 
   const {
-    pendingUsers, activeUsersList, contentList, messagesList, examsList, examResults,
+    pendingUsers, activeUsersList, contentList, messagesList, examsList, examResults, examAccessOverrides,
     announcements, quotesList, smartHomeworks, hwResults, subscriptionCodes,
     assignments, assignmentSubmissions, mistakes, videoViews, passwordResetRequests,
     setPendingUsers, setActiveUsersList, setContentList, setMessagesList, setExamsList,
     setExamResults, setAnnouncements, setQuotesList, setSmartHomeworks, setHwResults,
-    setSubscriptionCodes, setPasswordResetRequests
+    setSubscriptionCodes, setPasswordResetRequests, setExamAccessOverrides
   } = useAdminDashboardData();
 
   // تحديث حالة زر الرجوع للموبايل للأدمن
@@ -400,7 +405,15 @@ export const AdminDashboard = ({ user }) => {
       endTime: exam.endTime || '',
       accessCode: exam.accessCode || '',
       isPremium: !!exam.isPremium,
-      questionsText: JSON.stringify(exam.questions || [], null, 2)
+      questionsText: JSON.stringify(exam.questions || [], null, 2),
+      accessRule: {
+        enabled: !!exam.accessRule?.enabled,
+        requiredExamId: exam.accessRule?.requiredExamId || '',
+        requiredPercentage: safeNumber(exam.accessRule?.requiredPercentage, 70),
+        visibilityWhenLocked: 'locked',
+        useBestAttempt: exam.accessRule?.useBestAttempt !== false,
+        allowAdminOverride: exam.accessRule?.allowAdminOverride !== false
+      }
     });
   };
 
@@ -504,6 +517,14 @@ export const AdminDashboard = ({ user }) => {
       endTime: examEditDraft.endTime,
       accessCode: examEditDraft.accessCode.trim(),
       isPremium: !!examEditDraft.isPremium,
+      accessRule: {
+        enabled: !!examEditDraft.accessRule?.enabled && !!examEditDraft.accessRule?.requiredExamId,
+        requiredExamId: examEditDraft.accessRule?.requiredExamId || '',
+        requiredPercentage: Math.min(100, Math.max(0, safeNumber(examEditDraft.accessRule?.requiredPercentage, 70))),
+        visibilityWhenLocked: 'locked',
+        useBestAttempt: examEditDraft.accessRule?.useBestAttempt !== false,
+        allowAdminOverride: true
+      },
       questions: parsedQuestions,
       updatedAt: serverTimestamp()
     };
@@ -1128,6 +1149,14 @@ export const AdminDashboard = ({ user }) => {
         title: examBuilder.title, grade: examBuilder.grade, duration: examBuilder.duration, 
         startTime: examBuilder.startTime, endTime: examBuilder.endTime, accessCode: examBuilder.accessCode, 
         isPremium: examBuilder.isPremium,
+        accessRule: {
+          enabled: !!examBuilder.accessRule?.enabled && !!examBuilder.accessRule?.requiredExamId,
+          requiredExamId: examBuilder.accessRule?.requiredExamId || '',
+          requiredPercentage: Math.min(100, Math.max(0, safeNumber(examBuilder.accessRule?.requiredPercentage, 70))),
+          visibilityWhenLocked: 'locked',
+          useBestAttempt: examBuilder.accessRule?.useBestAttempt !== false,
+          allowAdminOverride: true
+        },
         questions: finalBlocks, createdAt: serverTimestamp() 
     });
 
@@ -1154,6 +1183,53 @@ export const AdminDashboard = ({ user }) => {
   const filteredPendingUsers = pendingUsers.filter(u => adminGradeFilter === 'all' || u.grade === adminGradeFilter);
   const filteredActiveUsers = activeUsersList.filter(u => adminGradeFilter === 'all' || u.grade === adminGradeFilter);
   const filteredContentList = contentList.filter(c => adminGradeFilter === 'all' || c.grade === adminGradeFilter);
+
+  const gatedExamsList = examsList.filter((exam) => !!exam.accessRule?.enabled);
+  const openExamAccessOverride = async () => {
+    if (!examOverrideDraft.examId || !examOverrideDraft.studentId) return platformNotify('اختر الامتحان والطالب أولاً.');
+    const selectedExam = examsList.find((exam) => exam.id === examOverrideDraft.examId);
+    const selectedStudent = activeUsersList.find((student) => student.id === examOverrideDraft.studentId || student.uid === examOverrideDraft.studentId);
+    if (!selectedExam || !selectedStudent) return platformNotify('بيانات الامتحان أو الطالب غير مكتملة.');
+    const overrideId = `${examOverrideDraft.examId}_${examOverrideDraft.studentId}`;
+    await setDoc(doc(db, 'exam_access_overrides', overrideId), {
+      examId: examOverrideDraft.examId,
+      examTitle: selectedExam.title || '',
+      studentId: examOverrideDraft.studentId,
+      studentName: selectedStudent.name || selectedStudent.displayName || selectedStudent.email || 'طالب',
+      studentEmail: selectedStudent.email || '',
+      allowed: true,
+      reason: examOverrideDraft.reason?.trim() || 'فتح استثنائي من الإدارة',
+      createdBy: userData.uid || user?.uid || userData.email || 'admin',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+    await addDoc(collection(db, 'admin_audit_logs'), {
+      action: 'exam_access_override_granted',
+      examId: examOverrideDraft.examId,
+      studentId: examOverrideDraft.studentId,
+      reason: examOverrideDraft.reason?.trim() || 'فتح استثنائي من الإدارة',
+      createdAt: serverTimestamp()
+    }).catch(() => null);
+    platformNotify('تم فتح الامتحان للطالب استثنائيًا.');
+  };
+
+  const revokeExamAccessOverride = async (override) => {
+    if (!override?.id) return;
+    if (!platformConfirm('هل تريد إلغاء الفتح الاستثنائي لهذا الطالب؟')) return;
+    await updateDoc(doc(db, 'exam_access_overrides', override.id), {
+      allowed: false,
+      revokedAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    await addDoc(collection(db, 'admin_audit_logs'), {
+      action: 'exam_access_override_revoked',
+      examId: override.examId,
+      studentId: override.studentId,
+      createdAt: serverTimestamp()
+    }).catch(() => null);
+    platformNotify('تم إلغاء الاستثناء.');
+  };
+
   const filteredExamsList = examsList.filter(e => adminGradeFilter === 'all' || e.grade === adminGradeFilter);
     const filteredExamResultsForAdmin = examResults.filter(result => {
       const exam = examsList.find(e => e.id === result.examId);
@@ -1182,6 +1258,8 @@ export const AdminDashboard = ({ user }) => {
     setReplyTexts,
     examBuilder,
     setExamBuilder,
+    examOverrideDraft,
+    setExamOverrideDraft,
     bulkText,
     setBulkText,
     viewingResult,
@@ -1280,6 +1358,8 @@ export const AdminDashboard = ({ user }) => {
     handleUpdateUser,
     handleSendResetPassword,
     AdminPasswordResetRequestsPanel,
+    openExamAccessOverride,
+    revokeExamAccessOverride,
     approveGrade,
     rejectGrade,
     handleFileSelect,
@@ -1302,6 +1382,8 @@ export const AdminDashboard = ({ user }) => {
     messagesList,
     examsList,
     examResults,
+    examAccessOverrides,
+    gatedExamsList,
     announcements,
     quotesList,
     smartHomeworks,
@@ -1318,6 +1400,7 @@ export const AdminDashboard = ({ user }) => {
     setMessagesList,
     setExamsList,
     setExamResults,
+    setExamAccessOverrides,
     setAnnouncements,
     setQuotesList,
     setSmartHomeworks,

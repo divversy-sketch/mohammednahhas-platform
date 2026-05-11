@@ -34,6 +34,8 @@ export function subscribeStudentDashboardData({ user, userData, handlers, onLate
 
     onSnapshot(query(collection(db, COLLECTIONS.ASSIGNMENT_SUBMISSIONS), where('studentId', '==', user.uid)), (snapshot) => handlers.setAssignmentSubmissions(sortBySubmittedAtDesc(mapDocs(snapshot))), emptyOnBlocked('assignment_submissions', handlers.setAssignmentSubmissions)),
 
-    onSnapshot(query(collection(db, COLLECTIONS.VIDEO_VIEWS), where('userId', '==', user.uid)), (snapshot) => handlers.setVideoViews(mapDocs(snapshot)), emptyOnBlocked('video_views', handlers.setVideoViews))
+    onSnapshot(query(collection(db, COLLECTIONS.VIDEO_VIEWS), where('userId', '==', user.uid)), (snapshot) => handlers.setVideoViews(mapDocs(snapshot)), emptyOnBlocked('video_views', handlers.setVideoViews)),
+
+    onSnapshot(query(collection(db, COLLECTIONS.EXAM_ACCESS_OVERRIDES), where('studentId', '==', user.uid)), (snapshot) => handlers.setExamAccessOverrides?.(mapDocs(snapshot)), emptyOnBlocked('exam_access_overrides', handlers.setExamAccessOverrides || (() => {})))
   ];
 }

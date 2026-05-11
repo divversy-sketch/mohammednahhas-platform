@@ -115,6 +115,8 @@ export default function AdminDashboardTabs({ ctx }) {
     setReplyTexts,
     examBuilder,
     setExamBuilder,
+    examOverrideDraft,
+    setExamOverrideDraft,
     bulkText,
     setBulkText,
     viewingResult,
@@ -213,6 +215,8 @@ export default function AdminDashboardTabs({ ctx }) {
     handleUpdateUser,
     handleSendResetPassword,
     AdminPasswordResetRequestsPanel,
+    openExamAccessOverride,
+    revokeExamAccessOverride,
     approveGrade,
     rejectGrade,
     handleFileSelect,
@@ -235,6 +239,8 @@ export default function AdminDashboardTabs({ ctx }) {
     messagesList,
     examsList,
     examResults,
+    examAccessOverrides,
+    gatedExamsList,
     announcements,
     quotesList,
     smartHomeworks,
@@ -510,6 +516,47 @@ export default function AdminDashboardTabs({ ctx }) {
                               <label htmlFor="examVip" className="font-bold text-amber-800 text-sm flex items-center gap-1 cursor-pointer"><Crown size={16}/> امتحان VIP (مغلق لغير المشتركين)</label>
                           </div>
 
+                          <div className="md:col-span-4 bg-blue-50 border border-blue-200 rounded-2xl p-4 space-y-3">
+                              <label className="flex items-center gap-2 font-black text-blue-900 text-sm">
+                                  <input
+                                    type="checkbox"
+                                    className="w-5 h-5"
+                                    checked={!!examBuilder.accessRule?.enabled}
+                                    onChange={e=>setExamBuilder({...examBuilder, accessRule: {...(examBuilder.accessRule || {}), enabled: e.target.checked, visibilityWhenLocked: 'locked', allowAdminOverride: true}})}
+                                  />
+                                  شروط فتح الامتحان: يظهر مقفولًا حتى يجتاز الطالب امتحانًا سابقًا بالنسبة المطلوبة
+                              </label>
+                              {examBuilder.accessRule?.enabled && (
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                  <select
+                                    className="border p-2 rounded-xl bg-white"
+                                    value={examBuilder.accessRule?.requiredExamId || ''}
+                                    onChange={e=>setExamBuilder({...examBuilder, accessRule: {...(examBuilder.accessRule || {}), requiredExamId: e.target.value}})}
+                                  >
+                                    <option value="">اختر الامتحان السابق</option>
+                                    {examsList.map(prevExam => <option key={prevExam.id} value={prevExam.id}>{prevExam.title}</option>)}
+                                  </select>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    className="border p-2 rounded-xl"
+                                    placeholder="النسبة المطلوبة %"
+                                    value={examBuilder.accessRule?.requiredPercentage ?? 70}
+                                    onChange={e=>setExamBuilder({...examBuilder, accessRule: {...(examBuilder.accessRule || {}), requiredPercentage: Number(e.target.value)}})}
+                                  />
+                                  <label className="bg-white border rounded-xl p-2 text-sm font-bold text-slate-700 flex items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={examBuilder.accessRule?.useBestAttempt !== false}
+                                      onChange={e=>setExamBuilder({...examBuilder, accessRule: {...(examBuilder.accessRule || {}), useBestAttempt: e.target.checked}})}
+                                    />
+                                    اعتماد أفضل محاولة للطالب
+                                  </label>
+                                </div>
+                              )}
+                          </div>
+
                           <div className="md:col-span-2">
                               <label className="block text-xs font-bold mb-1">وقت البدء</label>
                               <input type="datetime-local" className="border p-2 rounded w-full" onChange={e=>setExamBuilder({...examBuilder, startTime:e.target.value})}/>
@@ -540,6 +587,11 @@ export default function AdminDashboardTabs({ ctx }) {
                                           </p>
                                           <p className="text-xs text-slate-500">من: {new Date(exam.startTime).toLocaleString('ar-EG')} | إلى: {new Date(exam.endTime).toLocaleString('ar-EG')}</p>
                                           <p className="text-xs text-slate-400">كود: {exam.accessCode}</p>
+                                          {exam.accessRule?.enabled && (
+                                            <p className="text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1 mt-1 inline-flex items-center gap-1 font-bold">
+                                              <Lock size={12}/> مقفول حتى اجتياز: {examsList.find(x => x.id === exam.accessRule?.requiredExamId)?.title || 'امتحان سابق'} بنسبة {exam.accessRule?.requiredPercentage || 70}%
+                                            </p>
+                                          )}
                                       </div>
                                       <div className="flex gap-2">
                                           <button onClick={() => openFullExamEditor(exam)} className="text-emerald-600 p-2 bg-emerald-100 rounded-lg hover:bg-emerald-200" title="تعديل كامل / نسخة جديدة"><Edit size={18}/></button>
@@ -550,6 +602,35 @@ export default function AdminDashboardTabs({ ctx }) {
                               ))}
                           </div>
                       </div>
+                  </div>
+
+                  <div className="glass-panel p-4 md:p-6 rounded-xl border border-blue-100">
+                    <h3 className="font-black text-blue-900 mb-2 flex items-center gap-2"><Unlock size={18}/> فتح امتحان استثنائي لطالب</h3>
+                    <p className="text-sm text-slate-500 mb-4">استخدمها لو الطالب لم يحقق النسبة المطلوبة، لكن تريد السماح له بدخول الامتحان يدويًا.</p>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                      <select className="border p-3 rounded-xl bg-white" value={examOverrideDraft.examId} onChange={e=>setExamOverrideDraft({...examOverrideDraft, examId: e.target.value})}>
+                        <option value="">اختر الامتحان المقفول</option>
+                        {(gatedExamsList || []).map(exam => <option key={exam.id} value={exam.id}>{exam.title}</option>)}
+                      </select>
+                      <select className="border p-3 rounded-xl bg-white" value={examOverrideDraft.studentId} onChange={e=>setExamOverrideDraft({...examOverrideDraft, studentId: e.target.value})}>
+                        <option value="">اختر الطالب</option>
+                        {activeUsersList.map(student => <option key={student.id} value={student.id}>{student.name || student.displayName || student.email}</option>)}
+                      </select>
+                      <input className="border p-3 rounded-xl" placeholder="سبب الاستثناء اختياري" value={examOverrideDraft.reason} onChange={e=>setExamOverrideDraft({...examOverrideDraft, reason: e.target.value})}/>
+                      <button onClick={openExamAccessOverride} className="bg-blue-700 text-white rounded-xl font-black px-4 py-3 hover:bg-blue-800 flex items-center justify-center gap-2"><Unlock size={16}/> فتح استثنائي</button>
+                    </div>
+                    <div className="mt-5 space-y-2">
+                      {(examAccessOverrides || []).filter(o => o.allowed).slice(0, 10).map(override => (
+                        <div key={override.id} className="flex flex-col md:flex-row md:items-center justify-between gap-2 bg-blue-50 border border-blue-100 rounded-xl p-3">
+                          <div className="text-sm">
+                            <p className="font-black text-blue-900">{override.studentName || override.studentEmail || override.studentId}</p>
+                            <p className="text-blue-700">{override.examTitle || examsList.find(e => e.id === override.examId)?.title || 'امتحان'} — {override.reason || 'فتح استثنائي'}</p>
+                          </div>
+                          <button onClick={() => revokeExamAccessOverride(override)} className="bg-white text-red-600 border border-red-200 px-3 py-2 rounded-xl font-bold hover:bg-red-50">إلغاء الاستثناء</button>
+                        </div>
+                      ))}
+                      {(!examAccessOverrides || examAccessOverrides.filter(o => o.allowed).length === 0) && <p className="text-sm text-slate-400 font-bold">لا توجد استثناءات مفتوحة حاليًا.</p>}
+                    </div>
                   </div>
               </div>
           )}

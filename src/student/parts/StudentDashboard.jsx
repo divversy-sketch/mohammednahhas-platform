@@ -111,7 +111,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
 
   const {
     content, exams, examResults, hwResults, assignments, assignmentSubmissions, videoViews,
-    mistakes, notifications, hasNewNotif, setContent, setExams, setExamResults, setHwResults,
+    mistakes, notifications, hasNewNotif, examAccessOverrides, setContent, setExams, setExamResults, setHwResults,
     setAssignments, setAssignmentSubmissions, setVideoViews, setMistakes, setNotifications, setHasNewNotif
   } = useStudentDashboardData({ user, userData, setScanningHwId, setEditFormData });
 
@@ -353,8 +353,50 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
       <div className="h-screen flex flex-col items-center justify-center bg-red-50 text-center p-6"><Ban size={80} className="text-red-600 mb-4" /><h2 className="text-3xl font-bold text-red-800 mb-2 font-arabic">تم حظر حسابك</h2><p className="text-red-600 mb-6 font-bold">يرجى التواصل مع الإدارة أو المستر لمعرفة السبب.</p><button onClick={()=>signOut(auth)} className="bg-white text-red-600 px-6 py-2 rounded-full font-bold shadow-md hover:bg-red-100">تسجيل الخروج</button></div>
   );
 
+  const getExamAccessState = (exam) => {
+    const rule = exam?.accessRule;
+    if (!rule?.enabled || !rule.requiredExamId) return { allowed: true, locked: false };
+
+    const override = (examAccessOverrides || []).find((item) => item.examId === exam.id && item.studentId === user.uid && item.allowed !== false);
+    if (override && rule.allowAdminOverride !== false) {
+      return { allowed: true, locked: false, override: true, message: 'مفتوح لك باستثناء من الإدارة.' };
+    }
+
+    const requiredExam = exams.find((item) => item.id === rule.requiredExamId);
+    const attempts = examResults.filter((result) => result.examId === rule.requiredExamId && result.status === 'completed');
+    const percentages = attempts.map((result) => {
+      if (result.percentage !== undefined) return safeNumber(result.percentage, 0);
+      return getResultPercentage(result);
+    });
+    const bestPercentage = percentages.length ? Math.max(...percentages) : null;
+    const requiredPercentage = Math.min(100, Math.max(0, safeNumber(rule.requiredPercentage, 70)));
+
+    if (bestPercentage !== null && bestPercentage >= requiredPercentage) {
+      return { allowed: true, locked: false, bestPercentage, requiredPercentage };
+    }
+
+    const requiredTitle = requiredExam?.title || 'الامتحان السابق';
+    const message = bestPercentage === null
+      ? `يجب حل ${requiredTitle} أولًا بنسبة ${requiredPercentage}% أو أكثر.`
+      : `يجب اجتياز ${requiredTitle} بنسبة ${requiredPercentage}% أو أكثر. درجتك الحالية: ${bestPercentage}%.`;
+
+    return {
+      allowed: false,
+      locked: true,
+      bestPercentage,
+      requiredPercentage,
+      requiredTitle,
+      message
+    };
+  };
+
   const startExamWithCode = async (exam, options = {}) => {
     if (isBannedExam) return platformNotify("أنت محظور من دخول الامتحانات.");
+    const accessState = getExamAccessState(exam);
+    if (!accessState.allowed && !options.skipCode) {
+      platformNotify(accessState.message || 'هذا الامتحان مقفول حاليًا.');
+      return;
+    }
 
     const previousAttempts = examResults.filter(r => r.examId === exam.id);
     const previousResult = previousAttempts.find(r => ['continue', 'restart'].includes(r.adminDecision))
@@ -753,6 +795,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
                   || examAttempts.find(r => r.status === 'completed')
                   || examAttempts[0];
                 const isExamTimeOver = Date.now() > new Date(e.endTime).getTime();
+                const accessState = getExamAccessState(e);
                 
                 let statusText = null; let statusClass = "";
                 const canResumeByAdmin = prevResult && prevResult.adminDecision === 'continue';
@@ -768,15 +811,29 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
                 }
 
                 return (
-                  <motion.div whileHover={{scale:1.01}} key={e.id} className={`glass-card p-4 md:p-6 rounded-2xl relative overflow-hidden flex flex-col ${e.isPremium && !isPremium ? 'opacity-70' : ''}`}>
+                  <motion.div whileHover={{scale:1.01}} key={e.id} className={`glass-card p-4 md:p-6 rounded-2xl relative overflow-hidden flex flex-col ${(e.isPremium && !isPremium) || accessState.locked ? 'opacity-80' : ''}`}>
                     {statusText && <div className={`absolute top-0 left-0 text-[10px] md:text-xs px-2 md:px-3 py-1 rounded-br-xl font-bold shadow-md ${statusClass}`}>{statusText}</div>}
                     {e.isPremium && <div className="absolute top-2 right-2 bg-amber-100 text-amber-700 text-[10px] px-2 py-1 rounded-full font-bold flex items-center gap-1"><Crown size={12}/> VIP</div>}
                     
                     <h3 className={`text-lg md:text-xl font-bold mb-2 mt-4 md:mt-0 ${e.isPremium && !isPremium ? 'text-slate-400' : 'text-slate-800'}`}>{e.title}</h3>
                     <div className="flex justify-between text-xs md:text-sm text-slate-500 mb-4"><span>⏳ {e.duration} دقيقة</span><span>📝 {e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0)} سؤال</span></div>
                     
+                    {accessState.locked && (
+                      <div className="mb-4 bg-blue-50 border border-blue-200 text-blue-800 rounded-xl p-3 text-sm font-bold flex items-start gap-2">
+                        <Lock size={16} className="mt-0.5 shrink-0"/>
+                        <span>{accessState.message}</span>
+                      </div>
+                    )}
+                    {accessState.override && (
+                      <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl p-3 text-sm font-bold flex items-center gap-2">
+                        <Unlock size={16}/> مفتوح لك باستثناء من الإدارة
+                      </div>
+                    )}
+
                     <div className="mt-auto">
-                        {canResumeByAdmin ? (
+                        {accessState.locked ? (
+                            <button disabled className="w-full bg-blue-100 text-blue-500 py-2 md:py-3 rounded-xl font-bold cursor-not-allowed flex items-center justify-center gap-2 text-sm"><Lock size={14}/> الامتحان مقفول بشرط سابق</button>
+                        ) : canResumeByAdmin ? (
                             <button onClick={() => startExamWithCode(e, { skipCode: true })} className="w-full bg-blue-600 text-white py-2 md:py-3 rounded-xl font-bold hover:bg-blue-700 flex items-center justify-center gap-2 shadow-lg transition text-sm">
                                 <Play size={14}/> استكمال الامتحان بموافقة الأدمن
                             </button>

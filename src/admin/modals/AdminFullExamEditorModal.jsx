@@ -9,7 +9,8 @@ export default function AdminFullExamEditorModal({
   recalculateAfterExamEdit, setRecalculateAfterExamEdit,
   examEditDraft, setExamEditDraft,
   examEditQuestionsPreview, updateQuestionInExamDraft,
-  saveFullExamEdit
+  saveFullExamEdit,
+  examsList = []
 }) {
   if (!editingFullExam) return null;
   return (
@@ -66,6 +67,47 @@ export default function AdminFullExamEditorModal({
         <input className="border p-3 rounded-xl" placeholder="كود الامتحان" value={examEditDraft.accessCode} onChange={e => setExamEditDraft({...examEditDraft, accessCode: e.target.value})} />
         <input type="datetime-local" className="border p-3 rounded-xl" value={examEditDraft.startTime} onChange={e => setExamEditDraft({...examEditDraft, startTime: e.target.value})} />
         <input type="datetime-local" className="border p-3 rounded-xl" value={examEditDraft.endTime} onChange={e => setExamEditDraft({...examEditDraft, endTime: e.target.value})} />
+      </div>
+
+      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 space-y-3">
+        <label className="flex items-center gap-2 font-black text-blue-900 text-sm">
+          <input
+            type="checkbox"
+            className="w-5 h-5"
+            checked={!!examEditDraft.accessRule?.enabled}
+            onChange={e => setExamEditDraft({...examEditDraft, accessRule: {...(examEditDraft.accessRule || {}), enabled: e.target.checked, visibilityWhenLocked: 'locked', allowAdminOverride: true}})}
+          />
+          شروط فتح الامتحان: يظهر مقفولًا للطالب حتى يجتاز امتحانًا سابقًا
+        </label>
+        {examEditDraft.accessRule?.enabled && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <select
+              className="border p-3 rounded-xl bg-white"
+              value={examEditDraft.accessRule?.requiredExamId || ''}
+              onChange={e => setExamEditDraft({...examEditDraft, accessRule: {...(examEditDraft.accessRule || {}), requiredExamId: e.target.value}})}
+            >
+              <option value="">اختر الامتحان السابق</option>
+              {examsList.filter(exam => exam.id !== editingFullExam.id).map(exam => <option key={exam.id} value={exam.id}>{exam.title}</option>)}
+            </select>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              className="border p-3 rounded-xl"
+              placeholder="النسبة المطلوبة %"
+              value={examEditDraft.accessRule?.requiredPercentage ?? 70}
+              onChange={e => setExamEditDraft({...examEditDraft, accessRule: {...(examEditDraft.accessRule || {}), requiredPercentage: Number(e.target.value)}})}
+            />
+            <label className="bg-white border rounded-xl p-3 text-sm font-bold text-slate-700 flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={examEditDraft.accessRule?.useBestAttempt !== false}
+                onChange={e => setExamEditDraft({...examEditDraft, accessRule: {...(examEditDraft.accessRule || {}), useBestAttempt: e.target.checked}})}
+              />
+              اعتماد أفضل محاولة للطالب
+            </label>
+          </div>
+        )}
       </div>
 
       <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">

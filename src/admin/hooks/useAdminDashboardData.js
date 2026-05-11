@@ -18,6 +18,7 @@ export function useAdminDashboardData() {
   const [mistakes, setMistakes] = useState([]);
   const [videoViews, setVideoViews] = useState([]);
   const [passwordResetRequests, setPasswordResetRequests] = useState([]);
+  const [examAccessOverrides, setExamAccessOverrides] = useState([]);
 
   useEffect(() => {
     const subscriptions = subscribeAdminDashboardData({
@@ -36,7 +37,8 @@ export function useAdminDashboardData() {
       setAssignmentSubmissions,
       setMistakes,
       setVideoViews,
-      setPasswordResetRequests
+      setPasswordResetRequests,
+      setExamAccessOverrides
     });
 
     return () => subscriptions.forEach((unsubscribe) => unsubscribe?.());
@@ -59,6 +61,7 @@ export function useAdminDashboardData() {
     mistakes,
     videoViews,
     passwordResetRequests,
+    examAccessOverrides,
     setPendingUsers,
     setActiveUsersList,
     setContentList,
@@ -74,6 +77,7 @@ export function useAdminDashboardData() {
     setAssignmentSubmissions,
     setMistakes,
     setVideoViews,
-    setPasswordResetRequests
+    setPasswordResetRequests,
+    setExamAccessOverrides
   };
 }

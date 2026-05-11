@@ -15,4 +15,5 @@ export const COLLECTIONS = Object.freeze({
   VIDEO_VIEWS: 'video_views',
   NOTIFICATIONS: 'notifications',
   PASSWORD_RESET_REQUESTS: 'password_reset_requests',
+  EXAM_ACCESS_OVERRIDES: 'exam_access_overrides',
 });

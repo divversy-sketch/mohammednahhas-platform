@@ -138,6 +138,11 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /exam_access_overrides/{docId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.studentId == request.auth.uid);
+      allow create, update, delete: if isAdmin();
+    }
+
     match /exam_results/{docId} {
       allow read: if isAdmin() || (signedIn() && resource.data.studentId == request.auth.uid);
       allow create: if ownStudentIdOnCreate();

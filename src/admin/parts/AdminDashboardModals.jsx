@@ -74,6 +74,7 @@ export default function AdminDashboardModals({ ctx }) {
         examEditQuestionsPreview={examEditQuestionsPreview}
         updateQuestionInExamDraft={updateQuestionInExamDraft}
         saveFullExamEdit={saveFullExamEdit}
+        examsList={examsList}
       />
 
       <AdminFullContentEditorModal
