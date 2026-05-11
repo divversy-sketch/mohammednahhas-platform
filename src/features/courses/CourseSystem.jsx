@@ -33,6 +33,9 @@ import {
 } from '../../shared/icons/lucide-shim.jsx';
 import { uploadToCloudinary } from '../../services/cloudinaryUpload';
 import { GradeOptions, getGradeLabel } from '../../shared/constants/grades.jsx';
+import { platformNotify, platformConfirm } from '../../shared/core/platformShared.jsx';
+import EmptyState from '../../shared/ui/EmptyState.jsx';
+import PageHeader from '../../shared/ui/PageHeader.jsx';
 
 const uploadMedia = async (file, kind = 'image') => {
   if (!file) return '';
@@ -79,7 +82,7 @@ function ImgInput({ label, value, onChange, kind = 'image' }) {
               setBusy(true);
               onChange(await uploadMedia(e.target.files?.[0], kind));
             } catch (err) {
-              alert(err.message || 'حدث خطأ أثناء الرفع');
+              platformNotify(err.message || 'حدث خطأ أثناء الرفع', 'error');
             } finally {
               setBusy(false);
               e.target.value = '';
@@ -242,7 +245,7 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
   };
   const deleteCourseDeep = async (courseId, silent = false) => {
     if (!courseId) return;
-    if (!silent && !window.confirm('سيتم حذف الكورس بكل وحداته ودروسه وأكواد فتحه واشتراكاته. هل أنت متأكد؟')) return;
+    if (!silent && !platformConfirm('سيتم حذف الكورس بكل وحداته ودروسه وأكواد فتحه واشتراكاته. هل أنت متأكد؟')) return;
     const refs = [];
     const modSnap = await getDocs(collection(db, 'courses', courseId, 'modules'));
     for (const m of modSnap.docs) {
@@ -257,27 +260,27 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
     refs.push(doc(db, 'courses', courseId));
     await deleteManyRefs(refs);
     if (editingCourseId === courseId) resetCourseForm();
-    if (!silent) alert('تم حذف الكورس بالكامل.');
+    if (!silent) platformNotify('تم حذف الكورس بالكامل.', 'success');
   };
   const deleteAllCourses = async () => {
-    if (!window.confirm('تحذير: سيتم حذف كل الكورسات والوحدات والدروس والأكواد والاشتراكات الخاصة بها. هل أنت متأكد؟')) return;
+    if (!platformConfirm('تحذير: سيتم حذف كل الكورسات والوحدات والدروس والأكواد والاشتراكات الخاصة بها. هل أنت متأكد؟')) return;
     for (const c of courses) await deleteCourseDeep(c.id, true);
-    alert('تم حذف كل الكورسات.');
+    platformNotify('تم حذف كل الكورسات.', 'success');
   };
   const saveCourse = async () => {
-    if (!cf.title.trim()) return alert('اكتب اسم الكورس');
+    if (!cf.title.trim()) return platformNotify('اكتب اسم الكورس', 'error');
     const payload = { ...cf, price: Number(cf.price || 0), defaultAccessDays: cf.defaultAccessDays === '' ? '' : Number(cf.defaultAccessDays || 0), updatedAt: serverTimestamp() };
-    if (editingCourseId) { await updateDoc(doc(db, 'courses', editingCourseId), payload); alert('تم تعديل الكورس.'); }
-    else { await addDoc(collection(db, 'courses'), { ...payload, createdAt: serverTimestamp() }); alert('تم حفظ الكورس.'); }
+    if (editingCourseId) { await updateDoc(doc(db, 'courses', editingCourseId), payload); platformNotify('تم تعديل الكورس.', 'success'); }
+    else { await addDoc(collection(db, 'courses'), { ...payload, createdAt: serverTimestamp() }); platformNotify('تم حفظ الكورس.', 'success'); }
     resetCourseForm();
   };
   const saveMod = async () => {
-    if (!course || !mf.title.trim()) return alert('اختار كورس واكتب الوحدة');
+    if (!course || !mf.title.trim()) return platformNotify('اختار كورس واكتب الوحدة', 'error');
     await addDoc(collection(db, 'courses', course, 'modules'), { ...mf, order: Number(mf.order || 1), createdAt: serverTimestamp() });
     setMf({ title: '', order: mods.length + 2 });
   };
   const saveLesson = async () => {
-    if (!course || !mod || !lf.title.trim()) return alert('اختار كورس ووحدة واكتب الدرس');
+    if (!course || !mod || !lf.title.trim()) return platformNotify('اختار كورس ووحدة واكتب الدرس', 'error');
     await addDoc(collection(db, 'courses', course, 'modules', mod, 'lessons'), {
       title: lf.title,
       videoUrl: lf.videoUrl,
@@ -297,13 +300,13 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
     setLf({ ...lf, title: '', videoUrl: '', pdfUrl: '', examUrl: '', examId: '', lessonImage: '', icon: '📘', order: lessons.length + 2 });
   };
   const saveOver = async () => {
-    if (!course || !mod || !of.userId || !of.lessonId) return alert('اختار الطالب والدرس');
+    if (!course || !mod || !of.userId || !of.lessonId) return platformNotify('اختار الطالب والدرس', 'error');
     await setDoc(doc(db, 'lessonUnlockOverrides', `${of.userId}_${course}_${of.lessonId}`), { userId: of.userId, courseId: course, moduleId: mod, lessonId: of.lessonId, reason: of.reason || 'استثناء من الإدارة', active: true, allowedBy: adminUser?.email || 'admin', createdAt: serverTimestamp() }, { merge: true });
     setOf({ userId: '', lessonId: '', reason: '' });
   };
   const enrollStudent = async () => {
     const targetCourseId = manual.courseId || course;
-    if (!manual.userId || !targetCourseId) return alert('اختار الطالب والكورس');
+    if (!manual.userId || !targetCourseId) return platformNotify('اختار الطالب والكورس', 'error');
     const days = manual.permanent ? 0 : Number(manual.expiresInDays || 0);
     const expiresAt = days > 0 ? new Date(Date.now() + days * 86400000).toISOString() : null;
     await setDoc(doc(db, 'enrollments', `${manual.userId}_${targetCourseId}`), {
@@ -318,11 +321,11 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
       permanentAccess: !expiresAt,
       expiresAt,
     }, { merge: true });
-    alert('تم فتح الكورس للطالب');
+    platformNotify('تم فتح الكورس للطالب', 'success');
   };
   const generateCodes = async () => {
     const targetCourseId = codeForm.courseId || course;
-    if (!targetCourseId) return alert('اختار الكورس');
+    if (!targetCourseId) return platformNotify('اختار الكورس', 'error');
     const count = Math.max(1, Math.min(50, Number(codeForm.count || 1)));
     for (let i = 0; i < count; i += 1) {
       const code = randomCode();
@@ -331,7 +334,7 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
       const expiresAt = days > 0 ? new Date(Date.now() + days * 86400000).toISOString() : null;
       await setDoc(doc(db, 'courseAccessCodes', code), { code, courseId: targetCourseId, isUsed: false, usedBy: null, usedAt: null, permanentAccess: !expiresAt, expiresAt, validityDays: days || null, createdBy: adminUser?.email || 'admin', createdAt: serverTimestamp() });
     }
-    alert(`تم توليد ${count} كود`);
+    platformNotify(`تم توليد ${count} كود`, 'success');
   };
 
 
@@ -550,38 +553,35 @@ export function StudentCoursesHub({ user, userData, exams = [], onStartExam }) {
   const saveP = (l, d) => setDoc(doc(db, 'lessonProgress', `${user.uid}_${course.id}_${l.id}`), { userId: user.uid, courseId: course.id, lessonId: l.id, ...d, updatedAt: serverTimestamp(), completed: d.watchPercent >= 95, completedAt: d.watchPercent >= 95 ? serverTimestamp() : null }, { merge: true });
   const openExam = (l) => {
     const needed = Number(l.unlockRules?.examRequiresWatchPercent || 75);
-    if (pct(pr(l.id).watchPercent) < needed && !over(l.id)) return alert(`الامتحان مغلق حتى مشاهدة ${needed}%. أنت شاهدت ${pct(pr(l.id).watchPercent)}%.`);
+    if (pct(pr(l.id).watchPercent) < needed && !over(l.id)) return platformNotify(`الامتحان مغلق حتى مشاهدة ${needed}%. أنت شاهدت ${pct(pr(l.id).watchPercent)}%.`, 'error');
     if (l.examId && onStartExam) {
       const x = exams.find((e) => e.id === l.examId);
       if (x) return onStartExam(x, { sourceCourseId: course.id, sourceLessonId: l.id });
     }
     if (l.examUrl) return window.open(l.examUrl, '_blank');
-    alert('لم يتم ربط امتحان بهذا الدرس بعد');
+    platformNotify('لم يتم ربط امتحان بهذا الدرس بعد', 'error');
   };
   const redeemCode = async () => {
     const code = clean(accessCode).toUpperCase();
-    if (!code) return alert('اكتب كود فتح الكورس');
+    if (!code) return platformNotify('اكتب كود فتح الكورس', 'error');
     const snap = await getDocs(query(collection(db, 'courseAccessCodes'), where('code', '==', code), limit(1)));
-    if (snap.empty) return alert('الكود غير صحيح');
+    if (snap.empty) return platformNotify('الكود غير صحيح', 'error');
     const d = snap.docs[0];
     const data = d.data();
-    if (data.isUsed) return alert('الكود مستخدم بالفعل');
-    if (data.expiresAt && new Date(data.expiresAt) < new Date()) return alert('انتهت صلاحية هذا الكود');
-    if (data.courseId !== course.id) return alert('الكود لا يخص هذا الكورس');
+    if (data.isUsed) return platformNotify('الكود مستخدم بالفعل', 'error');
+    if (data.expiresAt && new Date(data.expiresAt) < new Date()) return platformNotify('انتهت صلاحية هذا الكود', 'error');
+    if (data.courseId !== course.id) return platformNotify('الكود لا يخص هذا الكورس', 'error');
     const enrollmentExpiresAt = data.permanentAccess === false && data.validityDays ? new Date(Date.now() + Number(data.validityDays) * 86400000).toISOString() : null;
     await setDoc(doc(db, 'enrollments', `${user.uid}_${course.id}`), { userId: user.uid, courseId: course.id, status: 'active', paid: true, joinedAt: serverTimestamp(), progress: 0, openedBy: 'access-code', accessCode: code, permanentAccess: !enrollmentExpiresAt, expiresAt: enrollmentExpiresAt }, { merge: true });
     await updateDoc(doc(db, 'courseAccessCodes', d.id), { isUsed: true, usedBy: user.uid, usedAt: serverTimestamp() });
     setAccessCode('');
-    alert('تم فتح الكورس بنجاح');
+    platformNotify('تم فتح الكورس بنجاح', 'success');
   };
 
   if (!course) {
     return (
       <div className="space-y-6" dir="rtl">
-        <div className="bg-gradient-to-l from-amber-100 to-white rounded-3xl p-6 border">
-          <h2 className="text-3xl font-black flex gap-2"><Crown className="text-amber-600" /> الواجهة الرئيسية للكورسات</h2>
-          <p className="text-slate-600 font-bold mt-2">كل كورس جديد منشور يظهر هنا بصورة كبيرة وتفاصيل واضحة. اضغط على الكورس لطلب الفتح أو إدخال الكود.</p>
-        </div>
+        <PageHeader title="الواجهة الرئيسية للكورسات" description="كل كورس جديد منشور يظهر هنا بصورة كبيرة وتفاصيل واضحة. اضغط على الكورس لطلب الفتح أو إدخال الكود." icon={<Crown className="text-amber-600" />} />
         <div className="space-y-6">
           {courses.map((c) => (
             <button key={c.id} onClick={() => setCourse(c)} className="w-full bg-white rounded-[2rem] overflow-hidden border text-right hover:-translate-y-1 transition shadow-sm">
@@ -605,7 +605,7 @@ export function StudentCoursesHub({ user, userData, exams = [], onStartExam }) {
             </button>
           ))}
         </div>
-        {!courses.length && <p className="bg-white rounded-3xl p-8 text-center font-bold text-slate-500">لا توجد كورسات منشورة لمرحلتك الآن.</p>}
+        {!courses.length && <EmptyState title="لا توجد كورسات منشورة" description="أول كورس منشور لمرحلتك سيظهر هنا مباشرة." icon="📚" />}
       </div>
     );
   }
@@ -641,7 +641,7 @@ export function StudentCoursesHub({ user, userData, exams = [], onStartExam }) {
 
       <div className="bg-white rounded-3xl p-4 border">
         <h3 className="font-black mb-4 flex gap-2"><Layers /> دروس الكورس</h3>
-        {mods.map((m) => <div key={m.id} className="mb-6"><h4 className="font-black text-amber-800 mb-3">{m.order}. {m.title}</h4><div className="grid lg:grid-cols-2 gap-6">{(lbm[m.id] || []).map((l) => { const a = can(l); const p = pr(l.id); return <button key={l.id} onClick={() => { if (!a.ok) return alert(a.reason); setLesson(l); setTab('video'); }} className={`text-right rounded-3xl overflow-hidden border bg-white ${a.ok ? 'hover:-translate-y-1' : 'opacity-70'}`}><div className="relative"><img src={l.lessonImage || course.coverImage || 'https://placehold.co/600x340?text=Lesson'} className="h-72 lg:h-80 w-full object-cover" /><span className="absolute top-3 right-3 bg-white/90 rounded-full px-3 py-1 font-black">{l.icon || '📘'}</span><span className="absolute top-3 left-3 bg-white/90 rounded-full p-2">{a.ok ? <Unlock size={18} className="text-emerald-600" /> : <Lock size={18} className="text-red-600" />}</span></div><div className="p-4"><h5 className="font-black">{l.title}</h5><p className="text-xs text-slate-500 font-bold">مشاهدة: {pct(p.watchPercent)}%</p>{a.admin && <p className="text-xs text-emerald-700 font-black">متاح باستثناء من الإدارة</p>}{!a.ok && <p className="text-xs text-red-600 font-black">{a.reason}</p>}</div></button>; })}</div></div>)}
+        {mods.map((m) => <div key={m.id} className="mb-6"><h4 className="font-black text-amber-800 mb-3">{m.order}. {m.title}</h4><div className="grid lg:grid-cols-2 gap-6">{(lbm[m.id] || []).map((l) => { const a = can(l); const p = pr(l.id); return <button key={l.id} onClick={() => { if (!a.ok) return platformNotify(a.reason, 'error'); setLesson(l); setTab('video'); }} className={`text-right rounded-3xl overflow-hidden border bg-white ${a.ok ? 'hover:-translate-y-1' : 'opacity-70'}`}><div className="relative"><img src={l.lessonImage || course.coverImage || 'https://placehold.co/600x340?text=Lesson'} className="h-72 lg:h-80 w-full object-cover" /><span className="absolute top-3 right-3 bg-white/90 rounded-full px-3 py-1 font-black">{l.icon || '📘'}</span><span className="absolute top-3 left-3 bg-white/90 rounded-full p-2">{a.ok ? <Unlock size={18} className="text-emerald-600" /> : <Lock size={18} className="text-red-600" />}</span></div><div className="p-4"><h5 className="font-black">{l.title}</h5><p className="text-xs text-slate-500 font-bold">مشاهدة: {pct(p.watchPercent)}%</p>{a.admin && <p className="text-xs text-emerald-700 font-black">متاح باستثناء من الإدارة</p>}{!a.ok && <p className="text-xs text-red-600 font-black">{a.reason}</p>}</div></button>; })}</div></div>)}
       </div>
 
       {lesson && <div className="bg-white rounded-3xl p-5 border"><h3 className="text-2xl font-black mb-4">{lesson.icon || '📘'} {lesson.title}</h3><div className="grid md:grid-cols-3 gap-2 mb-5"><button onClick={() => setTab('video')} className={`p-3 rounded-2xl font-black ${tab === 'video' ? 'bg-amber-600 text-white' : 'bg-slate-100'}`}><PlayCircle className="inline ml-1" /> شرح الدرس</button><button onClick={() => setTab('pdf')} className={`p-3 rounded-2xl font-black ${tab === 'pdf' ? 'bg-blue-600 text-white' : 'bg-slate-100'}`}><FileText className="inline ml-1" /> PDF</button><button onClick={() => setTab('exam')} className={`p-3 rounded-2xl font-black ${tab === 'exam' ? 'bg-emerald-600 text-white' : 'bg-slate-100'}`}><ClipboardList className="inline ml-1" /> الامتحان</button></div>{tab === 'video' && <YouTubeLessonPlayer videoUrl={lesson.videoUrl} savedProgress={pr(lesson.id)} onProgress={(d) => saveP(lesson, d)} />} {tab === 'pdf' && <div className="bg-blue-50 rounded-3xl p-6 text-center">{lesson.pdfUrl ? <a href={lesson.pdfUrl} target="_blank" rel="noreferrer" className="bg-blue-600 text-white px-6 py-3 rounded-2xl font-black inline-flex gap-2"><FileText /> فتح PDF</a> : <p className="font-bold text-slate-500">لا يوجد PDF لهذا الدرس.</p>}</div>} {tab === 'exam' && <div className="bg-emerald-50 rounded-3xl p-6 text-center space-y-3"><p className="font-black">نسبة مشاهدتك: {pct(pr(lesson.id).watchPercent)}%</p><button onClick={() => openExam(lesson)} className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-black inline-flex gap-2"><ClipboardList /> بدء الامتحان</button><p className="text-xs text-slate-500 font-bold">لا يفتح إلا بعد مشاهدة {lesson.unlockRules?.examRequiresWatchPercent || 75}% إلا باستثناء من الأدمن.</p></div>}</div>}

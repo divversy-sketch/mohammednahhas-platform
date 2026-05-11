@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { addDoc, collection, deleteDoc, doc, getDoc, increment, onSnapshot, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { Settings as GearIcon, Maximize2, Minimize2, PenLine, Play, RefreshCw, Search, Shrink, Trash2, X } from '../../shared/icons/lucide-shim.jsx';
 import { db } from '../../services/firebase';
+import { platformNotify, platformConfirm } from '../../shared/core/platformShared.jsx';
 import { getYouTubeID, safeNumber } from '../../shared/utils/media';
 import './lecture-player.css';
 
@@ -207,11 +208,11 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
       videoRef.current.play();
       return;
     }
-    if (videoId) alert('عفواً، ميزة القفز للوقت المحدد تعمل مع الفيديوهات المرفوعة على المنصة فقط وليس يوتيوب.');
+    if (videoId) platformNotify('عفواً، ميزة القفز للوقت المحدد تعمل مع الفيديوهات المرفوعة على المنصة فقط وليس يوتيوب.', 'error');
   };
 
   const deleteNote = async (noteId) => {
-    if (window.confirm('حذف هذه الملاحظة؟')) await deleteDoc(doc(db, 'video_notes', noteId));
+    if (platformConfirm('حذف هذه الملاحظة؟')) await deleteDoc(doc(db, 'video_notes', noteId));
   };
 
   const formatMinSec = (seconds) => {

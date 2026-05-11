@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, doc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { CheckCircle, DownloadCloud, Feather, Quote, Megaphone, Trophy, Star, X } from '../../shared/icons/lucide-shim.jsx';
+import { platformNotify } from '../../shared/core/platformShared.jsx';
 
 const safeNumber = (value, fallback = 0) => {
   const num = Number(value);
@@ -38,7 +39,7 @@ const PWAInstallBox = ({ installPrompt }) => {
             installPrompt.prompt();
             await installPrompt.userChoice;
         } else {
-            alert('للتثبيت: من المتصفح اضغط القائمة ⋮ ثم Install app أو Add to Home Screen.');
+            platformNotify('للتثبيت: من المتصفح اضغط القائمة ⋮ ثم Install app أو Add to Home Screen.');
         }
     };
 

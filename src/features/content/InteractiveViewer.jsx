@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Code } from '../../shared/icons/lucide-shim.jsx';
+import { platformNotify } from '../../shared/core/platformShared.jsx';
 
 const InteractiveViewer = ({ content, user, onClose }) => {
     const handleContextMenu = (e) => e.preventDefault();
@@ -16,8 +17,8 @@ const InteractiveViewer = ({ content, user, onClose }) => {
         return () => { if (activeBlobUrl) { URL.revokeObjectURL(activeBlobUrl); } };
     }, [content.url, content.htmlContent]);
     useEffect(() => {
-        const handleKeyDown = (e) => { if (e.key === 'PrintScreen') { alert('غير مسموح بأخذ لقطات شاشة! المحتوى محمي.'); if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText('Screenshots are disabled'); } } };
-        const handleCopy = (e) => { e.preventDefault(); alert("النسخ غير مسموح!"); };
+        const handleKeyDown = (e) => { if (e.key === 'PrintScreen') { platformNotify('غير مسموح بأخذ لقطات شاشة! المحتوى محمي.', 'error'); if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText('Screenshots are disabled'); } } };
+        const handleCopy = (e) => { e.preventDefault(); platformNotify('النسخ غير مسموح!', 'error'); };
         window.addEventListener('keydown', handleKeyDown); document.addEventListener('copy', handleCopy); document.addEventListener('cut', handleCopy);
         return () => { window.removeEventListener('keydown', handleKeyDown); document.removeEventListener('copy', handleCopy); document.removeEventListener('cut', handleCopy); };
     }, []);

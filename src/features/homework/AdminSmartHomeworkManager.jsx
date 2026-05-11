@@ -3,6 +3,7 @@ import { addDoc, collection, deleteDoc, doc, getDocs, query, serverTimestamp, se
 import { db } from '../../services/firebase';
 import { BookOpen, ClipboardList, Download, QrCode, Trash2, BarChart3 } from '../../shared/icons/lucide-shim.jsx';
 import { GradeOptions, getGradeLabel } from '../../shared/constants/grades';
+import { platformConfirm } from '../../shared/core/platformShared.jsx';
 
 const defaultHw = {
   title: '', bookName: '', grade: '3sec', answerKey: '', instructions: '',
@@ -44,7 +45,7 @@ const AdminSmartHomeworkManager = ({ smartHomeworks = [], hwResults = [], adminG
   };
 
   const deleteHomework = async (hw) => {
-    if (!window.confirm('حذف واجب QR ونتائجه؟')) return;
+    if (!platformConfirm('حذف واجب QR ونتائجه؟')) return;
     const batch = writeBatch(db);
     batch.delete(doc(db, 'smart_homeworks', hw.id));
     batch.delete(doc(db, 'smart_homeworks', hw.id, 'private', 'answerKey'));
