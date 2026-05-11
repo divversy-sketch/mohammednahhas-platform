@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import { registerPWAUpdate } from './pwaUpdate.js';
+import { installGlobalErrorLogger } from './services/monitoring/errorLogger.js';
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
