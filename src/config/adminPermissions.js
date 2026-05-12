@@ -1,4 +1,4 @@
-export const OWNER_EMAIL = 'mido16280@gmail.com';
+export const OWNER_EMAIL = (import.meta.env.VITE_OWNER_EMAIL || '').trim().toLowerCase();
 
 export const ADMIN_ROLE_LABELS = Object.freeze({
   owner: 'مالك المنصة',
@@ -64,7 +64,7 @@ export const ROLE_PERMISSIONS = Object.freeze({
 export const getRolePermissions = (role = 'support') => ROLE_PERMISSIONS[role] || ROLE_PERMISSIONS.support;
 export const getRoleTabs = (role = 'support') => ROLE_TAB_ACCESS[role] || ROLE_TAB_ACCESS.support;
 
-export const isOwnerEmail = (email = '') => String(email || '').trim().toLowerCase() === OWNER_EMAIL;
+export const isOwnerEmail = (email = '') => Boolean(OWNER_EMAIL) && String(email || '').trim().toLowerCase() === OWNER_EMAIL;
 
 export const buildOwnerAdminProfile = (user = {}) => ({
   uid: user.uid,

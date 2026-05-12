@@ -196,9 +196,9 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
   useEffect(() => onSnapshot(query(collection(db, 'courses'), orderBy('title')), (s) => setCourses(s.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setCourses([])), []);
   useEffect(() => (course ? onSnapshot(query(collection(db, 'courses', course, 'modules'), orderBy('order')), (s) => setMods(s.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setMods([])) : setMods([])), [course]);
   useEffect(() => (course && mod ? onSnapshot(query(collection(db, 'courses', course, 'modules', mod, 'lessons'), orderBy('order')), (s) => setLessons(s.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setLessons([])) : setLessons([])), [course, mod]);
-  useEffect(() => onSnapshot(collection(db, 'lessonUnlockOverrides'), (s) => setOvers(s.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setOvers([])), []);
+  useEffect(() => onSnapshot(query(collection(db, 'lessonUnlockOverrides'), limit(300)), (s) => setOvers(s.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setOvers([])), []);
   useEffect(() => onSnapshot(query(collection(db, 'courseAccessCodes'), orderBy('createdAt')), (s) => setCodes(s.docs.map((d) => ({ id: d.id, ...d.data() })).reverse()), () => setCodes([])), []);
-  useEffect(() => onSnapshot(collection(db, 'enrollments'), (s) => setEnrollments(s.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setEnrollments([])), []);
+  useEffect(() => onSnapshot(query(collection(db, 'enrollments'), limit(500)), (s) => setEnrollments(s.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setEnrollments([])), []);
 
   const resetCourseForm = () => { setEditingCourseId(''); setCf(emptyCourseForm); };
   const editCourse = (c) => {

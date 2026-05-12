@@ -3,7 +3,7 @@ import { assertAdminRequest, getFirebaseAdmin, requirePost, requireString, sendA
 export default async function handler(req, res) {
   try {
     requirePost(req);
-    const adminUser = await assertAdminRequest(req);
+    const adminUser = await assertAdminRequest(req, 'manage_users');
     const firebaseAdmin = getFirebaseAdmin();
     const db = firebaseAdmin.firestore();
 

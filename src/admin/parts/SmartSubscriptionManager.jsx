@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 
-import { doc, collection, onSnapshot, deleteDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { doc, collection, onSnapshot, deleteDoc, serverTimestamp, writeBatch, query, orderBy, limit } from 'firebase/firestore';
 import { CreditCard } from '../../shared/icons/lucide-shim.jsx';
 
 import { db } from '../../services/firebase';
@@ -22,7 +22,7 @@ export const SmartSubscriptionManager = ({ users = [], adminGradeFilter = 'all' 
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'subscription_codes'), (snap) => {
+    const unsub = onSnapshot(query(collection(db, 'subscription_codes'), orderBy('createdAt', 'desc'), limit(250)), (snap) => {
       const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       rows.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
       setCodes(rows);

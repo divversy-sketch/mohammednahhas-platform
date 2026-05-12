@@ -25,7 +25,34 @@ export function getFirebaseAdmin() {
   return admin;
 }
 
-export async function assertAdminRequest(req) {
+const ADMIN_PERMISSION_ALIASES = {
+  all: ['all', 'owner', 'super_admin'],
+  manage_users: ['manage_users', 'users', 'students'],
+  manage_subscriptions: ['manage_subscriptions', 'subscriptions', 'payments', 'manage_payments'],
+  manage_payments: ['manage_payments', 'payments', 'manage_subscriptions'],
+  manage_exams: ['manage_exams', 'exams', 'results', 'question_bank'],
+  manage_content: ['manage_content', 'content', 'courses', 'lessons'],
+  manage_notifications: ['manage_notifications', 'notifications', 'messages'],
+  manage_support: ['manage_support', 'support', 'messages'],
+  manage_system: ['manage_system', 'system', 'migration', 'audit'],
+  manage_homework: ['manage_homework', 'homework', 'assignments']
+};
+
+function normalizePermissions(adminData) {
+  const raw = Array.isArray(adminData?.permissions) ? adminData.permissions : [];
+  const role = adminData?.role ? [adminData.role] : [];
+  const adminRole = adminData?.adminRole ? [adminData.adminRole] : [];
+  return new Set([...raw, ...role, ...adminRole].map((item) => String(item || '').trim()).filter(Boolean));
+}
+
+function hasAdminPermission(adminData, permission) {
+  const permissions = normalizePermissions(adminData);
+  if (ADMIN_PERMISSION_ALIASES.all.some((key) => permissions.has(key))) return true;
+  const aliases = ADMIN_PERMISSION_ALIASES[permission] || [permission];
+  return aliases.some((key) => permissions.has(key));
+}
+
+export async function assertAdminRequest(req, requiredPermission = null) {
   const authHeader = req.headers.authorization || req.headers.Authorization || '';
   const token = String(authHeader).startsWith('Bearer ') ? String(authHeader).slice(7) : '';
 
@@ -48,7 +75,17 @@ export async function assertAdminRequest(req) {
     throw error;
   }
 
-  return { uid, email: adminData.email || decoded.email || '' };
+  if (requiredPermission && !hasAdminPermission(adminData, requiredPermission)) {
+    const error = new Error('لا تملك الصلاحية المطلوبة لتنفيذ هذه العملية.');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  return {
+    uid,
+    email: adminData.email || decoded.email || '',
+    permissions: Array.from(normalizePermissions(adminData))
+  };
 }
 
 export function requirePost(req) {

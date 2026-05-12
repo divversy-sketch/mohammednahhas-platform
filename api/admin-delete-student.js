@@ -59,7 +59,7 @@ async function collectStudentRefs(db, studentId) {
 export default async function handler(req, res) {
   try {
     requirePost(req);
-    const adminUser = await assertAdminRequest(req);
+    const adminUser = await assertAdminRequest(req, 'manage_users');
     const firebaseAdmin = getFirebaseAdmin();
     const db = firebaseAdmin.firestore();
     const fieldValue = firebaseAdmin.firestore.FieldValue;

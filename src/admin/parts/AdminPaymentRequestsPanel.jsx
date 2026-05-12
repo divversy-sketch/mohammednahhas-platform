@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { WalletCards } from '../../shared/icons/lucide-shim.jsx';
 
 import { db } from '../../services/firebase';
@@ -19,7 +19,7 @@ export const AdminPaymentRequestsPanel = ({ users = [] }) => {
   const [filter, setFilter] = useState('pending');
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'payment_requests'), (snap) => {
+    const unsub = onSnapshot(query(collection(db, 'payment_requests'), orderBy('createdAt', 'desc'), limit(100)), (snap) => {
       const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       rows.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
       setRequests(rows);

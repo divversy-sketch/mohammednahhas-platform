@@ -49,8 +49,7 @@ export default function AdminPasswordResetRequestsPanel({ requests = [], users =
     setBusyId(request.id);
     try {
       await adminSecureFunctions.setStudentPassword(student.id, password, request.id);
-      try { await navigator.clipboard?.writeText(password); } catch (_) {}
-      platformNotify(`تم تغيير كلمة السر للطالب. الكلمة الجديدة: ${password} — تم نسخها إن أمكن.`, 'success');
+      platformNotify('تم تغيير كلمة السر للطالب بنجاح. شاركها من قناة آمنة ولا تحفظها داخل المنصة.', 'success');
     } catch (error) {
       platformNotify(error?.message || 'فشل تغيير كلمة السر من السيرفر.', 'error');
     } finally {

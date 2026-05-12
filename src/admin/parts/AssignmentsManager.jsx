@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-import { doc, collection, addDoc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, collection, addDoc, onSnapshot, updateDoc, serverTimestamp, query, orderBy, limit } from 'firebase/firestore';
 import { FileCheck } from '../../shared/icons/lucide-shim.jsx';
 
 import { db } from '../../services/firebase';
@@ -19,7 +19,7 @@ export const AssignmentsManager = ({ adminGradeFilter }) => {
   const [submissionFilter, setSubmissionFilter] = useState('pending');
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'assignments'), snap => {
+    const unsub = onSnapshot(query(collection(db, 'assignments'), orderBy('createdAt', 'desc'), limit(150)), snap => {
       const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       rows.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
       setAssignments(rows);
@@ -28,7 +28,7 @@ export const AssignmentsManager = ({ adminGradeFilter }) => {
   }, []);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'assignment_submissions'), snap => {
+    const unsub = onSnapshot(query(collection(db, 'assignment_submissions'), orderBy('submittedAt', 'desc'), limit(300)), snap => {
       const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       rows.sort((a, b) => (b.submittedAt?.seconds || 0) - (a.submittedAt?.seconds || 0));
       setSubmissions(rows);

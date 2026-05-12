@@ -3,7 +3,7 @@ import JSZip from 'jszip';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
-import { doc, collection, addDoc, onSnapshot, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { doc, collection, addDoc, onSnapshot, serverTimestamp, writeBatch, query, orderBy, limit } from 'firebase/firestore';
 import { UploadCloud, PenTool, Sparkles, FileCheck, Layers } from '../../shared/icons/lucide-shim.jsx';
 
 import { db } from '../../services/firebase';
@@ -253,7 +253,7 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-      const unsub = onSnapshot(collection(db, 'question_bank'), (snap) => {
+      const unsub = onSnapshot(query(collection(db, 'question_bank'), orderBy('createdAt', 'desc'), limit(300)), (snap) => {
           const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
           rows.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
           setQuestions(rows);

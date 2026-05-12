@@ -876,8 +876,7 @@ export const AdminDashboard = ({ user, adminProfile }) => {
       try {
           await adminSecureFunctions.setStudentPassword(student.id, newPassword, requestId);
           await audit('student_password_reset', { title: 'تغيير كلمة سر طالب', severity: 'critical', targetUserId: student.id, targetEmail: student.email || '', meta: { requestId: requestId || '' } });
-          try { await navigator.clipboard?.writeText(newPassword); } catch (_) {}
-          platformNotify(`تم تغيير كلمة السر. الكلمة الجديدة: ${newPassword} — تم نسخها إن أمكن.`, 'success');
+          platformNotify('تم تغيير كلمة السر بنجاح. شاركها مع الطالب من قناة آمنة ولا تحفظها داخل المنصة.', 'success');
       } catch (error) {
           platformNotify(error?.message || 'فشل تغيير كلمة السر من السيرفر.', 'error');
       }

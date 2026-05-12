@@ -26,24 +26,8 @@ const DesignSystemLoader = () => {
     document.addEventListener('visibilitychange', applyPerformanceMode);
     window.addEventListener('resize', applyPerformanceMode, { passive: true });
 
-    if (!document.getElementById('tailwind-script')) {
-      const script = document.createElement('script'); script.id = 'tailwind-script'; script.src = "https://cdn.tailwindcss.com";
-      script.defer = true;
-      script.onload = () => {
-        if(window.tailwind) {
-            window.tailwind.config = {
-              theme: {
-                extend: {
-                  fontFamily: { sans: ['Cairo', 'sans-serif'], arabic: ['Aref Ruqaa', 'serif'] },
-                  colors: { amber: { 50: '#fffbeb', 100: '#fef3c7', 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 700: '#b45309', 900: '#78350f' }, royal: { 900: '#0f172a', 800: '#1e293b' } },
-                  backgroundImage: { 'arabesque': "url('https://www.transparenttextures.com/patterns/arabesque.png')" }
-                }
-              }
-            }
-        }
-      };
-      document.head.appendChild(script);
-    }
+    // Tailwind is compiled locally by Vite/PostCSS; do not inject the browser CDN in production.
+
     if (!document.getElementById('cairo-font')) {
       const link = document.createElement('link'); link.id = 'cairo-font'; link.rel = 'stylesheet'; link.href = "https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Aref+Ruqaa:wght@400;700&display=swap"; document.head.appendChild(link);
     }

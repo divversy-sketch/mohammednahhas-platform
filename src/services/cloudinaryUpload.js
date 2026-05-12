@@ -1,5 +1,5 @@
-const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'df7wxvb0a';
-const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'nahhas-platform';
+const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
 export const CLOUDINARY_LIMITS = {
   image: 10 * 1024 * 1024,
@@ -22,7 +22,7 @@ export function validateCloudinaryFile(file, kind = 'auto') {
 
 export async function uploadToCloudinary(file, { kind = 'auto', folder = 'nahhas-platform' } = {}) {
   validateCloudinaryFile(file, kind);
-  if (!CLOUD_NAME || !UPLOAD_PRESET) throw new Error('بيانات Cloudinary غير موجودة في ملف .env');
+  if (!CLOUD_NAME || !UPLOAD_PRESET) throw new Error('بيانات Cloudinary غير موجودة في ملف .env. لا تستخدم قيم افتراضية مكشوفة في الإنتاج.');
 
   const resourceType = kind === 'pdf' ? 'raw' : kind === 'image' ? 'image' : 'auto';
   const formData = new FormData();

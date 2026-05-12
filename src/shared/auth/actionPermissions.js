@@ -1,3 +1,4 @@
+import { isOwnerEmail } from '../../config/adminPermissions';
 const ACTION_PERMISSION_MAP = Object.freeze({
   'students.read': ['all', 'read_users', 'manage_users'],
   'students.edit': ['all', 'manage_users'],
@@ -28,7 +29,7 @@ export function getAdminPermissions(admin = {}) {
 export function canPerformAdminAction(admin = {}, action) {
   if (!action) return false;
   const permissions = getAdminPermissions(admin);
-  if (admin.email === 'mido16280@gmail.com' || admin.isOwner === true || permissions.includes('all')) return true;
+  if (isOwnerEmail(admin.email) || admin.isOwner === true || permissions.includes('all')) return true;
   const needed = ACTION_PERMISSION_MAP[action] || [];
   return needed.some((permission) => permissions.includes(permission));
 }

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useEffect, useState } from 'react';
-import { doc, getDoc, collection, addDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, onSnapshot, serverTimestamp, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { X } from '../icons/lucide-shim.jsx';
 import { platformNotify } from './platformShared.jsx';
@@ -171,7 +171,7 @@ export const DebugPanel = ({ user }) => {
     if (!isDebugAdmin(user) || !db) return;
     let unsub = () => {};
     try {
-      unsub = onSnapshot(collection(db, 'debug_logs'), (snap) => {
+      unsub = onSnapshot(query(collection(db, 'debug_logs'), orderBy('createdAt', 'desc'), limit(100)), (snap) => {
       const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       rows.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
       setRemoteLogs(rows.slice(0, 100));

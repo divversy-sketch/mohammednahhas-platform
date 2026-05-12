@@ -146,7 +146,34 @@ exports.pingPushFunctions = functions
 // Secure admin-only operations
 // -----------------------------------------------------------------------------
 
-async function assertAdmin(context) {
+const ADMIN_PERMISSION_ALIASES = {
+  all: ["all", "owner", "super_admin"],
+  manage_users: ["manage_users", "users", "students"],
+  manage_subscriptions: ["manage_subscriptions", "subscriptions", "payments", "manage_payments"],
+  manage_payments: ["manage_payments", "payments", "manage_subscriptions"],
+  manage_exams: ["manage_exams", "exams", "results", "question_bank"],
+  manage_content: ["manage_content", "content", "courses", "lessons"],
+  manage_notifications: ["manage_notifications", "notifications", "messages"],
+  manage_support: ["manage_support", "support", "messages"],
+  manage_system: ["manage_system", "system", "migration", "audit"],
+  manage_homework: ["manage_homework", "homework", "assignments"]
+};
+
+function normalizePermissions(adminData) {
+  const raw = Array.isArray(adminData && adminData.permissions) ? adminData.permissions : [];
+  const role = adminData && adminData.role ? [adminData.role] : [];
+  const adminRole = adminData && adminData.adminRole ? [adminData.adminRole] : [];
+  return new Set([...raw, ...role, ...adminRole].map((item) => String(item || "").trim()).filter(Boolean));
+}
+
+function hasAdminPermission(adminData, permission) {
+  const permissions = normalizePermissions(adminData);
+  if (ADMIN_PERMISSION_ALIASES.all.some((key) => permissions.has(key))) return true;
+  const aliases = ADMIN_PERMISSION_ALIASES[permission] || [permission];
+  return aliases.some((key) => permissions.has(key));
+}
+
+async function assertAdmin(context, requiredPermission = null) {
   const uid = context.auth && context.auth.uid;
   if (!uid) {
     throw new functions.https.HttpsError("unauthenticated", "يجب تسجيل الدخول أولاً.");
@@ -159,7 +186,15 @@ async function assertAdmin(context) {
     throw new functions.https.HttpsError("permission-denied", "هذا الحساب لا يملك صلاحية الإدارة.");
   }
 
-  return { uid, email: adminData.email || (context.auth.token && context.auth.token.email) || "" };
+  if (requiredPermission && !hasAdminPermission(adminData, requiredPermission)) {
+    throw new functions.https.HttpsError("permission-denied", "لا تملك الصلاحية المطلوبة لتنفيذ هذه العملية.");
+  }
+
+  return {
+    uid,
+    email: adminData.email || (context.auth.token && context.auth.token.email) || "",
+    permissions: Array.from(normalizePermissions(adminData))
+  };
 }
 
 function requireString(value, fieldName) {
@@ -183,7 +218,7 @@ exports.deleteStudentAccount = functions
   .region("us-central1")
   .https
   .onCall(async (data, context) => {
-    const adminUser = await assertAdmin(context);
+    const adminUser = await assertAdmin(context, "manage_users");
     const studentId = requireString(data && data.studentId, "studentId");
 
     if (studentId === adminUser.uid) {
@@ -238,7 +273,7 @@ exports.setStudentStatus = functions
   .region("us-central1")
   .https
   .onCall(async (data, context) => {
-    const adminUser = await assertAdmin(context);
+    const adminUser = await assertAdmin(context, "manage_users");
     const studentId = requireString(data && data.studentId, "studentId");
     const status = requireString(data && data.status, "status");
     const allowed = ["pending", "active", "blocked", "banned", "suspended", "rejected", "banned_all", "banned_exam", "banned_content", "banned_cheating"];
@@ -269,7 +304,7 @@ exports.adminSetStudentPassword = functions
   .region("us-central1")
   .https
   .onCall(async (data, context) => {
-    const adminUser = await assertAdmin(context);
+    const adminUser = await assertAdmin(context, "manage_users");
     const studentId = requireString(data && data.studentId, "studentId");
     const newPassword = requireString(data && data.newPassword, "newPassword");
     const requestId = typeof (data && data.requestId) === "string" ? data.requestId.trim() : "";
@@ -291,7 +326,7 @@ exports.adminSetStudentPassword = functions
     await userRef.set({
       passwordLastChangedAt: admin.firestore.FieldValue.serverTimestamp(),
       passwordLastChangedBy: adminUser.uid,
-      passwordResetRequired: false,
+      passwordResetRequired: true,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedBy: adminUser.uid
     }, { merge: true });
@@ -321,7 +356,7 @@ exports.updatePasswordResetRequestStatus = functions
   .region("us-central1")
   .https
   .onCall(async (data, context) => {
-    const adminUser = await assertAdmin(context);
+    const adminUser = await assertAdmin(context, "manage_users");
     const requestId = requireString(data && data.requestId, "requestId");
     const status = requireString(data && data.status, "status");
     const allowed = ["pending", "reviewing", "completed", "rejected"];
@@ -351,7 +386,7 @@ exports.createSubscriptionCode = functions
   .region("us-central1")
   .https
   .onCall(async (data, context) => {
-    const adminUser = await assertAdmin(context);
+    const adminUser = await assertAdmin(context, "manage_subscriptions");
     const code = requireString(data && data.code, "code").toUpperCase();
     const payload = cleanObject(data || {}, ["grade", "durationDays", "type", "note", "value"]);
 
@@ -380,7 +415,7 @@ exports.approvePaymentRequest = functions
   .region("us-central1")
   .https
   .onCall(async (data, context) => {
-    const adminUser = await assertAdmin(context);
+    const adminUser = await assertAdmin(context, "manage_payments");
     const requestId = requireString(data && data.requestId, "requestId");
     const durationDays = Number(data && data.durationDays ? data.durationDays : 30);
 
@@ -435,7 +470,7 @@ exports.deleteExam = functions
   .region("us-central1")
   .https
   .onCall(async (data, context) => {
-    const adminUser = await assertAdmin(context);
+    const adminUser = await assertAdmin(context, "manage_exams");
     const examId = requireString(data && data.examId, "examId");
 
     const batch = db.batch();
@@ -463,7 +498,7 @@ exports.setExamPublishedState = functions
   .region("us-central1")
   .https
   .onCall(async (data, context) => {
-    const adminUser = await assertAdmin(context);
+    const adminUser = await assertAdmin(context, "manage_exams");
     const examId = requireString(data && data.examId, "examId");
     const isPublished = Boolean(data && data.isPublished);
 
@@ -489,7 +524,7 @@ exports.updateResultScore = functions
   .region("us-central1")
   .https
   .onCall(async (data, context) => {
-    const adminUser = await assertAdmin(context);
+    const adminUser = await assertAdmin(context, "manage_exams");
     const resultId = requireString(data && data.resultId, "resultId");
     const allowed = [
       "score", "totalScore", "percentage", "status", "teacherNote", "feedback",
@@ -525,7 +560,7 @@ exports.deleteAdminDocument = functions
   .region("us-central1")
   .https
   .onCall(async (data, context) => {
-    const adminUser = await assertAdmin(context);
+    const adminUser = await assertAdmin(context, "manage_content");
     const collectionName = requireString(data && data.collectionName, "collectionName");
     const docId = requireString(data && data.docId, "docId");
     const allowedCollections = [
@@ -553,7 +588,7 @@ exports.rejectPaymentRequest = functions
   .region("us-central1")
   .https
   .onCall(async (data, context) => {
-    const adminUser = await assertAdmin(context);
+    const adminUser = await assertAdmin(context, "manage_payments");
     const requestId = requireString(data && data.requestId, "requestId");
     const reason = typeof (data && data.reason) === "string" ? data.reason.trim() : "";
 
@@ -828,7 +863,7 @@ exports.updateStudentSubscription = functions
   .region("us-central1")
   .https
   .onCall(async (data, context) => {
-    const adminUser = await assertAdmin(context);
+    const adminUser = await assertAdmin(context, "manage_users");
     const studentId = requireString(data && data.studentId, "studentId");
     const status = requireString(data && data.subscriptionStatus, "subscriptionStatus");
     const allowed = ["free", "premium", "expired", "suspended"];
@@ -854,7 +889,7 @@ exports.banStudent = functions
   .region("us-central1")
   .https
   .onCall(async (data, context) => {
-    const adminUser = await assertAdmin(context);
+    const adminUser = await assertAdmin(context, "manage_users");
     const studentId = requireString(data && data.studentId, "studentId");
     const banType = requireString(data && data.banType, "banType");
     const allowed = ["banned_all", "banned_exam", "banned_content", "banned_cheating", "active"];
@@ -875,7 +910,7 @@ exports.sendInternalNotification = functions
   .region("us-central1")
   .https
   .onCall(async (data, context) => {
-    const adminUser = await assertAdmin(context);
+    const adminUser = await assertAdmin(context, "manage_notifications");
     const title = requireString(data && data.title, "title");
     const body = requireString(data && data.body, "body");
     const target = (data && data.target) || "all";
@@ -907,7 +942,7 @@ exports.replySupportTicket = functions
   .region("us-central1")
   .https
   .onCall(async (data, context) => {
-    const adminUser = await assertAdmin(context);
+    const adminUser = await assertAdmin(context, "manage_support");
     const ticketId = requireString(data && data.ticketId, "ticketId");
     const reply = requireString(data && data.reply, "reply");
     const status = (data && data.status) || "answered";
@@ -926,7 +961,7 @@ exports.recordSystemMigrationReport = functions
   .region("us-central1")
   .https
   .onCall(async (data, context) => {
-    const adminUser = await assertAdmin(context);
+    const adminUser = await assertAdmin(context, "manage_system");
     const title = requireString(data && data.title, "title");
     const report = data && typeof data.report === "object" ? data.report : {};
     const ref = await db.collection("migration_reports").add({

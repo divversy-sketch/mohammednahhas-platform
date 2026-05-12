@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { addDoc, collection, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where, limit } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { BarChart3, ClipboardList, CreditCard, Download, Lock, MessageSquare, PlayCircle, Save, Send, Shield, Sparkles, Target, Users, Wand2 } from '../../shared/icons/lucide-shim.jsx';
 import { GradeOptions, getGradeLabel } from '../../shared/constants/grades.jsx';
@@ -88,7 +88,7 @@ export function buildWeaknessMap({ exams = [], examResults = [], mistakes = [] }
 export function AdminSmartExamEngine({ adminGradeFilter = 'all', exams = [], examResults = [], userData }) {
   const [questions, setQuestions] = useState([]);
   const [form, setForm] = useState({ grade: adminGradeFilter === 'all' ? '3sec' : adminGradeFilter, branch: '', topics: '', difficulty: '', count: 20, duration: 40, title: '', mode: 'filters', shuffleOptions: true, publishDays: 7, accessCode: '' });
-  useEffect(() => onSnapshot(collection(db, 'question_bank'), (snap) => setQuestions(snap.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setQuestions([])), []);
+  useEffect(() => onSnapshot(query(collection(db, 'question_bank'), orderBy('createdAt', 'desc'), limit(300)), (snap) => setQuestions(snap.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setQuestions([])), []);
   const weaknessMap = useMemo(() => buildWeaknessMap({ exams, examResults }), [exams, examResults]);
   const topics = useMemo(() => Array.from(new Set(questions.map(topicOf))).filter(Boolean).sort(), [questions]);
   const selectedTopics = form.topics.split(',').map(clean).filter(Boolean);
@@ -228,7 +228,7 @@ export function AdminMessagingCenter({ users = [], userData }) {
   const [groups, setGroups] = useState([]);
   const [messages, setMessages] = useState([]);
   const [form, setForm] = useState({ audience: 'all', studentId: '', groupId: '', title: '', body: '' });
-  useEffect(() => onSnapshot(collection(db, 'student_groups'), (snap) => setGroups(snap.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setGroups([])), []);
+  useEffect(() => onSnapshot(query(collection(db, 'student_groups'), orderBy('createdAt', 'desc'), limit(100)), (snap) => setGroups(snap.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setGroups([])), []);
   useEffect(() => onSnapshot(query(collection(db, 'student_messages'), orderBy('createdAt')), (snap) => setMessages(snap.docs.map((d) => ({ id: d.id, ...d.data() })).reverse().slice(0, 50)), () => setMessages([])), []);
   const send = async (e) => {
     e.preventDefault();
@@ -271,8 +271,8 @@ export function AdminStudentReports({ users = [], exams = [], examResults = [], 
 export function AdminFinanceDashboard({ users = [], subscriptionCodes = [] }) {
   const [payments, setPayments] = useState([]);
   const [enrollments, setEnrollments] = useState([]);
-  useEffect(() => onSnapshot(collection(db, 'payment_requests'), (snap) => setPayments(snap.docs.map((d)=>({id:d.id,...d.data()}))), () => setPayments([])), []);
-  useEffect(() => onSnapshot(collection(db, 'enrollments'), (snap) => setEnrollments(snap.docs.map((d)=>({id:d.id,...d.data()}))), () => setEnrollments([])), []);
+  useEffect(() => onSnapshot(query(collection(db, 'payment_requests'), orderBy('createdAt', 'desc'), limit(100)), (snap) => setPayments(snap.docs.map((d)=>({id:d.id,...d.data()}))), () => setPayments([])), []);
+  useEffect(() => onSnapshot(query(collection(db, 'enrollments'), limit(300)), (snap) => setEnrollments(snap.docs.map((d)=>({id:d.id,...d.data()}))), () => setEnrollments([])), []);
   const pending = payments.filter((p)=>p.status==='pending').length;
   const accepted = payments.filter((p)=>['approved','completed','accepted'].includes(p.status)).length;
   const premium = users.filter((u)=>u.subscriptionStatus==='premium').length;
