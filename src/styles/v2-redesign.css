@@ -1014,3 +1014,43 @@ body,
     align-items: stretch;
   }
 }
+
+
+/* V2 readability fix: keep hero panels dark when global card glass styles are applied. */
+.v2-card.v2-admin-hero-card,
+.v2-admin-hero-card {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(245, 158, 11, 0.28), transparent 20rem),
+    linear-gradient(135deg, #0f172a 0%, #111827 54%, #78350f 100%) !important;
+  color: #ffffff !important;
+  border-color: rgba(245, 158, 11, 0.22) !important;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.18) !important;
+}
+
+.v2-admin-hero-card h1,
+.v2-admin-hero-card h2,
+.v2-admin-hero-card h3,
+.v2-admin-hero-card .text-white {
+  color: #ffffff !important;
+}
+
+.v2-admin-hero-card p,
+.v2-admin-hero-card .text-slate-200 {
+  color: #e2e8f0 !important;
+}
+
+.v2-admin-hero-kicker {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #fde68a !important;
+  border: 1px solid rgba(253, 230, 138, 0.24) !important;
+}
+
+.v2-admin-hero-card button {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+}
+
+.v2-admin-hero-card button:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+}

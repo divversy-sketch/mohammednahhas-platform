@@ -37,10 +37,10 @@ export default function AdminV2PageFrame({
     >
       {isDashboard && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-          <Card className="overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-amber-950 text-white">
+          <Card className="v2-admin-hero-card overflow-hidden text-white">
             <div className="relative z-10 flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
               <div>
-                <p className="mb-3 inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-black text-amber-100">لوحة قيادة جديدة</p>
+                <p className="v2-admin-hero-kicker mb-3 inline-flex rounded-full px-3 py-1 text-xs font-black">لوحة قيادة جديدة</p>
                 <h2 className="text-3xl font-black md:text-4xl">كل مؤشرات المنصة في مكان واحد</h2>
                 <p className="mt-3 max-w-2xl text-sm font-bold leading-7 text-slate-200">
                   نفس بيانات Firebase ونفس منطق التشغيل الحالي، لكن بواجهة أوضح وأسرع في القراءة واتخاذ القرار.
