@@ -7,8 +7,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // لا نعتمد على إيميل ثابت للمالك.
+    // مصدر الحقيقة هو مستند admins/{uid}.
     function adminEmail() {
-      return signedIn() && request.auth.token.email == 'mido16280@gmail.com';
+      return false;
     }
 
     function adminDoc() {
@@ -19,23 +21,25 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return adminEmail() || adminDoc();
-    }
-
-    function ownerAdmin() {
-      return adminEmail();
+      return adminDoc();
     }
 
     function adminPermissions() {
-      return adminEmail()
-        ? ['all']
-        : (adminDoc() && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.permissions is list
-          ? get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.permissions
-          : []);
+      return adminDoc() && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.permissions is list
+        ? get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.permissions
+        : [];
+    }
+
+    function ownerAdmin() {
+      return adminDoc()
+        && (
+          get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.adminRole == 'owner'
+          || adminPermissions().hasAny(['all'])
+        );
     }
 
     function hasAdminPermission(permission) {
-      return adminEmail() || adminPermissions().hasAny(['all', permission]);
+      return adminPermissions().hasAny(['all', permission]);
     }
 
     function canManageUsers() { return hasAdminPermission('manage_users'); }
