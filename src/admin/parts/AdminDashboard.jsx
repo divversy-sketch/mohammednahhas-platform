@@ -11,6 +11,7 @@ import { FloatingArabicBackground } from '../../features/home/HomeWidgets';
 
 
 import { uploadToFirebaseContent, detectContentType, readHtmlFileAsInlineContent } from '../../services/firebaseContentUpload';
+import { downloadXlsx } from '../../shared/utils/exportData.js';
 import { platformNotify, platformConfirm, platformPrompt, sendSystemNotification, safeNumber, VIDEO_EXAM_UNLOCK_PERCENT, getQuestionMaxScore, calculateDetailedExamMetrics } from '../../shared/core/platformShared.jsx';
 import { DebugPanel } from '../../shared/core/debugTools.jsx';
 
@@ -18,6 +19,7 @@ import { DebugPanel } from '../../shared/core/debugTools.jsx';
 import { useAdminDashboardData } from '../hooks/useAdminDashboardData.js';
 import AdminHeader from '../components/AdminHeader.jsx';
 import AdminSidebar from '../components/AdminSidebar.jsx';
+import AdminLazyFallback from '../dashboard/AdminLazyFallback.jsx';
 
 
 import { adminSecureFunctions } from '../services/adminSecureFunctions.js';
@@ -29,12 +31,6 @@ import { logAdminAction, confirmSensitiveAction } from '../services/adminAudit.j
 const AdminDashboardTabs = lazy(() => import('./AdminDashboardTabs.jsx'));
 const AdminDashboardModals = lazy(() => import('./AdminDashboardModals.jsx'));
 const AdminPasswordResetRequestsPanel = lazy(() => import('./AdminPasswordResetRequestsPanel.jsx'));
-
-const AdminLazyFallback = () => (
-  <div className="rounded-3xl border border-slate-200 bg-white p-6 text-center text-sm font-bold text-slate-600 shadow-sm">
-    جاري تحميل أدوات الإدارة...
-  </div>
-);
 
 export const AdminDashboard = ({ user, adminProfile }) => {
   const userData = { ...(user || {}), ...(adminProfile || {}) };
@@ -232,7 +228,7 @@ export const AdminDashboard = ({ user, adminProfile }) => {
       platformNotify('تم نسخ الأكواد غير المستخدمة.');
   };
 
-  const exportSubscriptionCodesCSV = () => {
+  const exportSubscriptionCodesCSV = async () => {
       const rows = [['code','days','status','usedBy','usedAt']];
       subscriptionCodes.forEach(c => {
           rows.push([
@@ -243,14 +239,8 @@ export const AdminDashboard = ({ user, adminProfile }) => {
               c.usedAt?.toDate ? c.usedAt.toDate().toLocaleString('ar-EG') : ''
           ]);
       });
-      const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `subscription_codes_${new Date().toISOString().slice(0,10)}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      await downloadXlsx(`subscription_codes_${new Date().toISOString().slice(0,10)}.xlsx`, rows);
+      platformNotify('تم تجهيز ملف Excel لأكواد الاشتراك.');
   };
 
   const extendPremiumForAll = async () => {

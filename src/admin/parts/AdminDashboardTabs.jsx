@@ -10,6 +10,9 @@ import { AdminCoursesManager } from '../../features/courses/CourseSystem';
 
 
 import { platformNotify, getQuestionsForExam, generatePDF, VIDEO_EXAM_UNLOCK_PERCENT, InlineTabs } from '../../shared/core/platformShared.jsx';
+import { usePagination } from '../../shared/hooks/usePagination.js';
+import PaginationBar from '../../shared/components/PaginationBar.jsx';
+import { downloadXlsx } from '../../shared/utils/exportData.js';
 
 
 import AdminPaymentRequestsPanel from './AdminPaymentRequestsPanel.jsx';
@@ -231,6 +234,8 @@ export default function AdminDashboardTabs({ ctx }) {
     });
   }, [filteredActiveUsers, studentSearchTerm, studentStatusFilter, studentSubscriptionFilter]);
 
+  const studentsPagination = usePagination(dailyFilteredActiveUsers, { pageSize: 25 });
+
   const dailyAdminStats = React.useMemo(() => {
     const users = filteredActiveUsers || [];
     const pendingGradeUpdates = users.filter((student) => student.gradeUpdateStatus === 'pending').length;
@@ -240,7 +245,7 @@ export default function AdminDashboardTabs({ ctx }) {
     return { total: users.length, vipUsers, bannedUsers, pendingGradeUpdates, securityHeldAttempts };
   }, [filteredActiveUsers, examResults]);
 
-  const exportStudentsCSV = () => {
+  const exportStudentsExcel = async () => {
     const header = ['name','email','phone','parentPhone','grade','status','subscriptionStatus','subscriptionExpiry'];
     const rows = dailyFilteredActiveUsers.map((student) => [
       student.name || '',
@@ -252,18 +257,8 @@ export default function AdminDashboardTabs({ ctx }) {
       student.subscriptionStatus || 'free',
       getDateText(student.subscriptionExpiry)
     ]);
-    const escapeCsv = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
-    const csv = [header, ...rows].map((row) => row.map(escapeCsv).join(',')).join('\n');
-    const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `students-${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    platformNotify('تم تجهيز ملف الطلاب CSV.');
+    await downloadXlsx(`students-${new Date().toISOString().slice(0, 10)}.xlsx`, [header, ...rows]);
+    platformNotify('تم تجهيز ملف Excel للطلاب.');
   };
 
   if (!canAccessAdminTab(adminProfile || userData, activeTab)) {
@@ -342,7 +337,7 @@ export default function AdminDashboardTabs({ ctx }) {
                               <option value="premium">VIP فقط</option>
                               <option value="free">مجاني فقط</option>
                           </select>
-                          <button onClick={exportStudentsCSV} className="bg-slate-900 text-white rounded-xl font-black flex items-center justify-center gap-2 px-4 py-3 hover:bg-slate-800"><Download size={16}/> تصدير الطلاب</button>
+                          <button onClick={exportStudentsExcel} className="bg-slate-900 text-white rounded-xl font-black flex items-center justify-center gap-2 px-4 py-3 hover:bg-slate-800"><Download size={16}/> تصدير الطلاب</button>
                       </div>
                   </div>
                   
@@ -363,7 +358,7 @@ export default function AdminDashboardTabs({ ctx }) {
                   )}
                   
                   <div className="grid gap-4">
-                      {dailyFilteredActiveUsers.map(u=> (
+                      {studentsPagination.pageItems.map(u=> (
                           <div key={u.id} className={`p-4 rounded-xl border flex flex-col justify-between gap-4 transition-all hover:shadow-lg ${u.status.startsWith('banned') ? 'bg-red-50 border-red-200' : 'bg-white/50 border-slate-100'}`}>
                               <div className="flex flex-col lg:flex-row justify-between w-full gap-4">
                                   <div className="flex-1">
@@ -413,6 +408,7 @@ export default function AdminDashboardTabs({ ctx }) {
                           </div>
                       ))}
                       {dailyFilteredActiveUsers.length === 0 && <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center font-bold text-slate-500">لا يوجد طلاب مطابقين للفلاتر الحالية.</div>}
+                      <PaginationBar page={studentsPagination.page} totalPages={studentsPagination.totalPages} totalItems={studentsPagination.totalItems} pageSize={studentsPagination.pageSize} onPageChange={studentsPagination.setPage} label="الطلاب" />
                   </div>
               </div>
           )}
@@ -452,11 +448,11 @@ export default function AdminDashboardTabs({ ctx }) {
                           <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-4">
                             <div>
                               <h2 className="text-xl font-bold flex items-center gap-2 text-amber-700"><Key/> نظام الاشتراكات وكروت الشحن</h2>
-                              <p className="text-sm text-slate-500 mt-1">ولّد أكواد، انسخها، صدّرها CSV، وراقب الطلاب المشتركين.</p>
+                              <p className="text-sm text-slate-500 mt-1">ولّد أكواد، انسخها، صدّرها Excel، وراقب الطلاب المشتركين.</p>
                             </div>
                             <div className="flex flex-col md:flex-row gap-2">
                               <button onClick={copyUnusedSubscriptionCodes} className="bg-blue-600 text-white px-4 py-2 rounded-xl font-bold flex items-center justify-center gap-2"><ClipboardList size={16}/> نسخ الأكواد الجديدة</button>
-                              <button onClick={exportSubscriptionCodesCSV} className="bg-slate-800 text-white px-4 py-2 rounded-xl font-bold flex items-center justify-center gap-2"><Download size={16}/> تصدير CSV</button>
+                              <button onClick={exportSubscriptionCodesCSV} className="bg-slate-800 text-white px-4 py-2 rounded-xl font-bold flex items-center justify-center gap-2"><Download size={16}/> تصدير Excel</button>
                               <button onClick={extendPremiumForAll} className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold flex items-center justify-center gap-2"><Crown size={16}/> تمديد VIP</button>
                             </div>
                           </div>

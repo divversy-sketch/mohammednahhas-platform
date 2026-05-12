@@ -4,6 +4,7 @@ import { db } from '../../services/firebase.js';
 import { platformNotify } from '../../shared/core/platformShared.jsx';
 import { Search, Video, Users, FileCheck, Download, QrCode, Trophy, Target, Bell, MessageCircle, BookOpen, CreditCard, ShieldAlert, BarChart3, PlayCircle } from '../../shared/icons/lucide-shim.jsx';
 import { getGradeLabel } from '../../shared/constants/grades';
+import { downloadXlsx } from '../../shared/utils/exportData.js';
 
 const asText = (value) => String(value ?? '').toLowerCase().trim();
 const dateText = (value) => {
@@ -17,19 +18,7 @@ const percentOf = (result) => {
   const total = Number(result?.total ?? result?.maxScore ?? result?.totalQuestions ?? 0);
   return total > 0 ? Math.round((score / total) * 100) : Math.round(score || 0);
 };
-const csvDownload = (filename, rows) => {
-  const escapeCsv = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
-  const csv = rows.map((row) => row.map(escapeCsv).join(',')).join('\n');
-  const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-};
+const excelDownload = (filename, rows) => downloadXlsx(filename.replace(/\.csv$/i, '.xlsx'), rows);
 const certificateCode = (userId, courseId = 'platform') => `NHS-${String(userId || 'student').slice(0, 6).toUpperCase()}-${String(courseId || 'course').slice(0, 5).toUpperCase()}-${new Date().getFullYear()}`;
 const fakeQrDataUri = (text) => {
   const safe = text || 'NAHHAS';
@@ -99,8 +88,8 @@ export function StudentCertificatePanel({ user, userData, examResults = [] }) {
 }
 export function AdminCertificatesPanel({ users = [], examResults = [] }) {
   const rows = users.map((u) => { const results = examResults.filter((r) => [u.uid, u.id, u.email].includes(r.studentId) || r.studentEmail === u.email || r.userId === u.uid); const average = results.length ? Math.round(results.reduce((s, r) => s + percentOf(r), 0) / results.length) : 0; return { user: u, results, average, eligible: average >= 60 && results.length >= 1 }; }).filter((row) => row.results.length).sort((a, b) => b.average - a.average).slice(0, 60);
-  const exportCsv = () => csvDownload(`certificates-${new Date().toISOString().slice(0,10)}.csv`, [['student','email','grade','average','eligible','code'], ...rows.map((r) => [r.user.name || r.user.displayName, r.user.email, getGradeLabel(r.user.grade), r.average, r.eligible ? 'yes' : 'no', certificateCode(r.user.uid || r.user.id, r.user.grade)])]);
-  return <Panel title="الشهادات القابلة للإصدار" subtitle="قائمة الطلاب المؤهلين للشهادات من داخل تقارير الطلاب." icon={<QrCode size={20} />} action={<button onClick={exportCsv} className="rounded-xl bg-emerald-600 text-white px-4 py-2 text-sm font-black flex items-center gap-1"><Download size={14}/> CSV</button>}><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-slate-500 border-b"><th className="text-right p-2">الطالب</th><th className="text-right p-2">المرحلة</th><th className="text-right p-2">المتوسط</th><th className="text-right p-2">الحالة</th><th className="text-right p-2">رمز التحقق</th></tr></thead><tbody>{rows.slice(0, 12).map((r) => <tr key={r.user.uid || r.user.id || r.user.email} className="border-b"><td className="p-2 font-black">{r.user.name || r.user.displayName || r.user.email}</td><td className="p-2">{getGradeLabel(r.user.grade)}</td><td className="p-2 font-black">{r.average}%</td><td className="p-2"><span className={`rounded-full px-3 py-1 text-xs font-black ${r.eligible ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{r.eligible ? 'مؤهل' : 'غير مؤهل'}</span></td><td className="p-2 text-xs">{certificateCode(r.user.uid || r.user.id, r.user.grade)}</td></tr>)}</tbody></table></div></Panel>;
+  const exportCsv = () => excelDownload(`certificates-${new Date().toISOString().slice(0,10)}.xlsx`, [['student','email','grade','average','eligible','code'], ...rows.map((r) => [r.user.name || r.user.displayName, r.user.email, getGradeLabel(r.user.grade), r.average, r.eligible ? 'yes' : 'no', certificateCode(r.user.uid || r.user.id, r.user.grade)])]);
+  return <Panel title="الشهادات القابلة للإصدار" subtitle="قائمة الطلاب المؤهلين للشهادات من داخل تقارير الطلاب." icon={<QrCode size={20} />} action={<button onClick={exportCsv} className="rounded-xl bg-emerald-600 text-white px-4 py-2 text-sm font-black flex items-center gap-1"><Download size={14}/> Excel</button>}><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-slate-500 border-b"><th className="text-right p-2">الطالب</th><th className="text-right p-2">المرحلة</th><th className="text-right p-2">المتوسط</th><th className="text-right p-2">الحالة</th><th className="text-right p-2">رمز التحقق</th></tr></thead><tbody>{rows.slice(0, 12).map((r) => <tr key={r.user.uid || r.user.id || r.user.email} className="border-b"><td className="p-2 font-black">{r.user.name || r.user.displayName || r.user.email}</td><td className="p-2">{getGradeLabel(r.user.grade)}</td><td className="p-2 font-black">{r.average}%</td><td className="p-2"><span className={`rounded-full px-3 py-1 text-xs font-black ${r.eligible ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{r.eligible ? 'مؤهل' : 'غير مؤهل'}</span></td><td className="p-2 text-xs">{certificateCode(r.user.uid || r.user.id, r.user.grade)}</td></tr>)}</tbody></table></div></Panel>;
 }
 export function AdminCommandQuickActions({ onNavigate }) {
   const actions = [{ label: 'راجع الدفعات', tab: 'payments', icon: <CreditCard size={16} /> }, { label: 'افتح الدعم', tab: 'messages_center', icon: <MessageCircle size={16} /> }, { label: 'أرسل إشعار', tab: 'notifications_admin', icon: <Bell size={16} /> }, { label: 'تابع الطلاب', tab: 'follow_up', icon: <Users size={16} /> }, { label: 'تقارير الطلاب', tab: 'student_reports', icon: <BarChart3 size={16} /> }, { label: 'أمان المحتوى', tab: 'video_security', icon: <ShieldAlert size={16} /> }];

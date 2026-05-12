@@ -10,6 +10,9 @@ import { GradeOptions, getGradeLabel } from '../../shared/constants/grades';
 
 
 import { platformNotify, platformConfirm, safeNumber } from '../../shared/core/platformShared.jsx';
+import { downloadXlsx } from '../../shared/utils/exportData.js';
+import { usePagination } from '../../shared/hooks/usePagination.js';
+import PaginationBar from '../../shared/components/PaginationBar.jsx';
 
 
 export const SmartSubscriptionManager = ({ users = [], adminGradeFilter = 'all' }) => {
@@ -97,16 +100,9 @@ export const SmartSubscriptionManager = ({ users = [], adminGradeFilter = 'all' 
     platformNotify(`تم نسخ ${available.length} كود متاح.`);
   };
 
-  const exportCSV = () => {
+  const exportExcel = () => {
     const header = ['code','grade','plan','durationDays','used','usedByName','usedByEmail'];
-    const rows = codes.map(c => header.map(h => `"${String(c[h] ?? '').replaceAll('"','""')}"`).join(','));
-    const blob = new Blob([[header.join(','), ...rows].join('\n')], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'subscription_codes.csv';
-    a.click();
-    URL.revokeObjectURL(url);
+    return downloadXlsx('subscription_codes.xlsx', [header, ...codes.map(c => header.map(h => c[h] ?? ''))]);
   };
 
   const stats = useMemo(() => {
@@ -116,6 +112,8 @@ export const SmartSubscriptionManager = ({ users = [], adminGradeFilter = 'all' 
     const disabled = codes.filter(c => c.active === false).length;
     return { total, used, available, disabled };
   }, [codes]);
+
+  const codesPagination = usePagination(codes, { pageSize: 30 });
 
   const vipUsers = useMemo(() => {
     return (users || []).filter(u => {
@@ -155,7 +153,7 @@ export const SmartSubscriptionManager = ({ users = [], adminGradeFilter = 'all' 
 
         <div className="flex flex-wrap gap-3 mb-4">
           <button onClick={copyAvailableCodes} className="bg-blue-100 text-blue-700 px-4 py-2 rounded-xl font-bold">نسخ الأكواد المتاحة</button>
-          <button onClick={exportCSV} className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl font-bold">تصدير CSV</button>
+          <button onClick={exportExcel} className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl font-bold">تصدير Excel</button>
         </div>
 
         <div className="overflow-x-auto">
@@ -164,7 +162,7 @@ export const SmartSubscriptionManager = ({ users = [], adminGradeFilter = 'all' 
               <th className="p-3 text-right">الكود</th><th className="p-3">الصف</th><th className="p-3">الخطة</th><th className="p-3">المدة</th><th className="p-3">الحالة</th><th className="p-3">استخدمه</th><th className="p-3">تحكم</th>
             </tr></thead>
             <tbody>
-              {codes.map(c => (
+              {codesPagination.pageItems.map(c => (
                 <tr key={c.id} className="border-b hover:bg-slate-50">
                   <td className="p-3 font-mono font-black">{c.code}</td>
                   <td className="p-3 text-center">{getGradeLabel(c.grade)}</td>
@@ -178,6 +176,7 @@ export const SmartSubscriptionManager = ({ users = [], adminGradeFilter = 'all' 
               {codes.length === 0 && <tr><td colSpan="7" className="p-8 text-center text-slate-400 font-bold">لا توجد أكواد بعد.</td></tr>}
             </tbody>
           </table>
+          <PaginationBar page={codesPagination.page} totalPages={codesPagination.totalPages} totalItems={codesPagination.totalItems} pageSize={codesPagination.pageSize} onPageChange={codesPagination.setPage} label="أكواد الاشتراك" />
         </div>
       </div>
     </div>

@@ -2,17 +2,33 @@
 import { X, Phone, Users, PlayCircle, ClipboardList, QrCode, Crown } from '../../shared/icons/lucide-shim.jsx';
 import { getGradeLabel } from '../../shared/constants/grades';
 import { formatWatchTime } from '../../shared/core/platformShared.jsx';
+import { downloadXlsx } from '../../shared/utils/exportData.js';
 
 export default function AdminStudentProfileModal({
   viewingStudentProfile, setViewingStudentProfile,
   studentHistoryData, examResults, examsList, hwResults
 }) {
   if (!viewingStudentProfile) return null;
+  const studentExams = examResults.filter(r => r.studentId === viewingStudentProfile.id || r.userId === viewingStudentProfile.id);
+  const studentHw = hwResults.filter(r => r.studentId === viewingStudentProfile.id || r.userId === viewingStudentProfile.id);
+  const completedExams = studentExams.filter(r => r.status === 'completed');
+  const average = completedExams.length ? Math.round(completedExams.reduce((sum, r) => sum + Number(r.percentage ?? r.scorePercentage ?? r.percent ?? r.score ?? 0), 0) / completedExams.length) : 0;
+  const totalWatchSeconds = studentHistoryData.reduce((sum, row) => sum + Number(row.watchedSeconds || 0), 0);
+  const exportStudentProfile = async () => downloadXlsx(`student-profile-${viewingStudentProfile.email || viewingStudentProfile.id}.xlsx`, [
+    ['section','title','value','date'],
+    ['profile','name', viewingStudentProfile.name || '', ''],
+    ['profile','email', viewingStudentProfile.email || '', ''],
+    ['profile','phone', viewingStudentProfile.phone || '', ''],
+    ['summary','average', average, ''],
+    ['summary','watchTime', formatWatchTime(totalWatchSeconds), ''],
+    ...studentExams.map((r) => ['exam', examsList.find(e => e.id === r.examId)?.title || r.examId || '', `${r.score ?? ''}/${r.total ?? ''}`, r.createdAt?.toDate?.().toLocaleString('ar-EG') || '']),
+    ...studentHw.map((r) => ['homework', r.homeworkTitle || '', `${r.score ?? ''}/${r.total ?? ''}`, r.submittedAt?.toDate?.().toLocaleString('ar-EG') || '']),
+  ]);
   return (
 <div className="fixed inset-0 z-[1000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 md:p-8">
     <div className="bg-slate-50 rounded-3xl w-full max-w-6xl h-full md:h-[90vh] shadow-2xl flex flex-col relative overflow-hidden border border-slate-300">
         <button onClick={() => setViewingStudentProfile(null)} className="absolute top-4 left-4 md:top-6 md:left-6 z-50 bg-red-100 p-2 md:p-3 rounded-full text-red-600 hover:bg-red-200 hover:text-red-700 transition shadow-md border border-red-200"><X size={24}/></button>
-        <div className="bg-white border-b border-slate-200 p-6 pt-16 md:pt-6 flex justify-between items-start flex-shrink-0">
+        <div className="bg-white border-b border-slate-200 p-6 pt-16 md:pt-6 flex flex-col lg:flex-row justify-between gap-4 lg:items-start flex-shrink-0">
             <div className="flex gap-4 items-center">
                 <div className="w-16 h-16 bg-blue-100 text-blue-700 rounded-2xl flex items-center justify-center font-bold text-2xl shadow-inner">
                     {viewingStudentProfile.name.charAt(0)}
@@ -28,6 +44,12 @@ export default function AdminStudentProfileModal({
                         <span className="flex items-center gap-1 text-amber-600"><Users size={14}/> ولي الأمر: {viewingStudentProfile.parentPhone}</span>
                     </div>
                 </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-center text-xs font-black">
+                <div className="rounded-2xl bg-blue-50 text-blue-700 p-3">متوسطه<br/><span className="text-xl">{average}%</span></div>
+                <div className="rounded-2xl bg-emerald-50 text-emerald-700 p-3">امتحانات<br/><span className="text-xl">{studentExams.length}</span></div>
+                <div className="rounded-2xl bg-amber-50 text-amber-700 p-3">واجبات<br/><span className="text-xl">{studentHw.length}</span></div>
+                <button onClick={exportStudentProfile} className="rounded-2xl bg-slate-900 text-white p-3">تصدير Excel</button>
             </div>
         </div>
 
@@ -53,7 +75,7 @@ export default function AdminStudentProfileModal({
                         <h3 className="font-bold text-lg mb-4 text-emerald-800 flex items-center gap-2 border-b pb-2"><ClipboardList/> نتائج الامتحانات</h3>
                         <div className="flex-1 overflow-y-auto space-y-3 pr-2">
                             {(() => {
-                                const sExams = examResults.filter(r => r.studentId === viewingStudentProfile.id);
+                                const sExams = studentExams;
                                 if (sExams.length === 0) return <p className="text-slate-400 text-center py-4">لم يقم بحل أي امتحان.</p>;
                                 return sExams.map(ex => (
                                     <div key={ex.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
@@ -69,7 +91,7 @@ export default function AdminStudentProfileModal({
                         <h3 className="font-bold text-lg mb-4 text-amber-800 flex items-center gap-2 border-b pb-2"><QrCode/> سجل الواجبات</h3>
                         <div className="flex-1 overflow-y-auto space-y-3 pr-2">
                             {(() => {
-                                const sHw = hwResults.filter(r => r.studentId === viewingStudentProfile.id);
+                                const sHw = studentHw;
                                 if (sHw.length === 0) return <p className="text-slate-400 text-center py-4">لم يقم بتسليم أي واجب QR.</p>;
                                 return sHw.map(hw => (
                                     <div key={hw.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">

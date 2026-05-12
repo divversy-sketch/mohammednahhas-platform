@@ -4,6 +4,9 @@ import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestor
 import { WalletCards, Download } from '../../shared/icons/lucide-shim.jsx';
 
 import { db } from '../../services/firebase';
+import { usePagination } from '../../shared/hooks/usePagination.js';
+import PaginationBar from '../../shared/components/PaginationBar.jsx';
+import { downloadXlsx } from '../../shared/utils/exportData.js';
 
 import { getGradeLabel } from '../../shared/constants/grades';
 
@@ -84,9 +87,10 @@ export const AdminPaymentRequestsPanel = ({ users = [] }) => {
     filteredAmount: filtered.reduce((s,r)=>s+safeNumber(r.amount,0),0)
   }), [requests, filtered]);
 
-  const exportPaymentRequestsCSV = () => {
+  const paymentPagination = usePagination(filtered, { pageSize: 25 });
+
+  const exportPaymentRequestsExcel = async () => {
     const header = ['studentName', 'studentEmail', 'grade', 'amount', 'method', 'transactionId', 'status', 'createdAt', 'note'];
-    const escapeCsv = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
     const rows = filtered.map((req) => [
       req.studentName || '',
       req.studentEmail || '',
@@ -98,17 +102,8 @@ export const AdminPaymentRequestsPanel = ({ users = [] }) => {
       getRequestTime(req) ? new Date(getRequestTime(req)).toLocaleString('ar-EG') : '',
       req.note || ''
     ]);
-    const csv = [header, ...rows].map((row) => row.map(escapeCsv).join(',')).join('\n');
-    const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `payment-requests-${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    platformNotify('تم تجهيز ملف طلبات الدفع CSV.');
+    await downloadXlsx(`payment-requests-${new Date().toISOString().slice(0, 10)}.xlsx`, [header, ...rows]);
+    platformNotify('تم تجهيز ملف Excel لطلبات الدفع.');
   };
 
   return (
@@ -118,7 +113,7 @@ export const AdminPaymentRequestsPanel = ({ users = [] }) => {
           <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2"><WalletCards className="text-emerald-600"/> طلبات الدفع والتفعيل</h2>
           <p className="text-sm text-slate-500">مراجعة مدفوعات الطلاب مع بحث وفلاتر وتصدير سريع.</p>
         </div>
-        <button onClick={exportPaymentRequestsCSV} className="bg-slate-900 text-white px-4 py-3 rounded-xl font-black flex items-center justify-center gap-2 hover:bg-slate-800"><Download size={16}/> تصدير الحالي</button>
+        <button onClick={exportPaymentRequestsExcel} className="bg-slate-900 text-white px-4 py-3 rounded-xl font-black flex items-center justify-center gap-2 hover:bg-slate-800"><Download size={16}/> تصدير الحالي</button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
@@ -152,7 +147,7 @@ export const AdminPaymentRequestsPanel = ({ users = [] }) => {
       </div>
 
       <div className="space-y-3">
-        {filtered.map(req => (
+        {paymentPagination.pageItems.map(req => (
           <div key={req.id} className="bg-white border rounded-2xl p-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div>
@@ -176,6 +171,7 @@ export const AdminPaymentRequestsPanel = ({ users = [] }) => {
           </div>
         ))}
         {filtered.length === 0 && <p className="text-center text-slate-400 py-10 font-bold">لا توجد طلبات مطابقة للفلاتر الحالية.</p>}
+      <PaginationBar page={paymentPagination.page} totalPages={paymentPagination.totalPages} totalItems={paymentPagination.totalItems} pageSize={paymentPagination.pageSize} onPageChange={paymentPagination.setPage} label="طلبات الدفع" />
       </div>
     </div>
   );

@@ -179,21 +179,26 @@ async function assertAdmin(context, requiredPermission = null) {
     throw new functions.https.HttpsError("unauthenticated", "يجب تسجيل الدخول أولاً.");
   }
 
-  const adminSnap = await db.collection("admins").doc(uid).get();
+  const [adminSnap, userSnap] = await Promise.all([
+    db.collection("admins").doc(uid).get(),
+    db.collection("users").doc(uid).get()
+  ]);
   const adminData = adminSnap.exists ? adminSnap.data() : null;
+  const userData = userSnap.exists ? userSnap.data() : null;
+  const mergedAdminData = Object.assign({}, userData || {}, adminData || {});
 
-  if (!adminData || adminData.active !== true || adminData.role !== "admin") {
+  if (!mergedAdminData || mergedAdminData.active !== true || mergedAdminData.role !== "admin") {
     throw new functions.https.HttpsError("permission-denied", "هذا الحساب لا يملك صلاحية الإدارة.");
   }
 
-  if (requiredPermission && !hasAdminPermission(adminData, requiredPermission)) {
+  if (requiredPermission && !hasAdminPermission(mergedAdminData, requiredPermission)) {
     throw new functions.https.HttpsError("permission-denied", "لا تملك الصلاحية المطلوبة لتنفيذ هذه العملية.");
   }
 
   return {
     uid,
-    email: adminData.email || (context.auth.token && context.auth.token.email) || "",
-    permissions: Array.from(normalizePermissions(adminData))
+    email: mergedAdminData.email || (context.auth.token && context.auth.token.email) || "",
+    permissions: Array.from(normalizePermissions(mergedAdminData))
   };
 }
 

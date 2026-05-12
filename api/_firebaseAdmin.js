@@ -66,16 +66,21 @@ export async function assertAdminRequest(req, requiredPermission = null) {
   const decoded = await firebaseAdmin.auth().verifyIdToken(token);
   const uid = decoded.uid;
 
-  const adminSnap = await firebaseAdmin.firestore().collection('admins').doc(uid).get();
+  const [adminSnap, userSnap] = await Promise.all([
+    firebaseAdmin.firestore().collection('admins').doc(uid).get(),
+    firebaseAdmin.firestore().collection('users').doc(uid).get()
+  ]);
   const adminData = adminSnap.exists ? adminSnap.data() : null;
+  const userData = userSnap.exists ? userSnap.data() : null;
+  const mergedAdminData = { ...(userData || {}), ...(adminData || {}) };
 
-  if (!adminData || adminData.active !== true || adminData.role !== 'admin') {
+  if (!mergedAdminData || mergedAdminData.active !== true || mergedAdminData.role !== 'admin') {
     const error = new Error('هذا الحساب لا يملك صلاحية الإدارة.');
     error.statusCode = 403;
     throw error;
   }
 
-  if (requiredPermission && !hasAdminPermission(adminData, requiredPermission)) {
+  if (requiredPermission && !hasAdminPermission(mergedAdminData, requiredPermission)) {
     const error = new Error('لا تملك الصلاحية المطلوبة لتنفيذ هذه العملية.');
     error.statusCode = 403;
     throw error;
@@ -83,8 +88,8 @@ export async function assertAdminRequest(req, requiredPermission = null) {
 
   return {
     uid,
-    email: adminData.email || decoded.email || '',
-    permissions: Array.from(normalizePermissions(adminData))
+    email: mergedAdminData.email || decoded.email || '',
+    permissions: Array.from(normalizePermissions(mergedAdminData))
   };
 }
 

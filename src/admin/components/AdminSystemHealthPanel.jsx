@@ -3,25 +3,16 @@ import { collection, limit, onSnapshot, orderBy, query } from 'firebase/firestor
 import { AlertTriangle, Activity, ClipboardList, Download, FileCheck, History, RefreshCw } from '../../shared/icons/lucide-shim.jsx';
 import { db } from '../../services/firebase.js';
 import { COLLECTIONS } from '../../config/collections.js';
+import { downloadXlsx } from '../../shared/utils/exportData.js';
 
 const dateText = (value) => {
   const d = value?.toDate ? value.toDate() : (value ? new Date(value) : null);
   return d && !Number.isNaN(d.getTime()) ? d.toLocaleString('ar-EG') : '—';
 };
 
-const exportCsv = (name, rows) => {
+const exportExcel = (name, rows) => {
   const header = Object.keys(rows[0] || { empty: '' });
-  const escape = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const csv = [header, ...rows.map((r) => header.map((h) => r[h]))].map((r) => r.map(escape).join(',')).join('\n');
-  const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${name}-${new Date().toISOString().slice(0, 10)}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  return downloadXlsx(`${name}-${new Date().toISOString().slice(0, 10)}.xlsx`, [header, ...rows.map((r) => header.map((h) => r[h]))]);
 };
 
 const qaRows = [
@@ -31,7 +22,7 @@ const qaRows = [
   ['مدفوعات', 'إرسال طلب دفع من الطالب ثم قبول الطلب من الأدمن'],
   ['إشعارات', 'إرسال إشعار من الأدمن واستلامه في حساب طالب مستهدف'],
   ['دعم', 'فتح تذكرة دعم والرد عليها وإغلاقها'],
-  ['أدمن', 'تصدير CSV للطلاب والمدفوعات والتقارير'],
+  ['أدمن', 'تصدير Excel للطلاب والمدفوعات والتقارير'],
   ['مراقبة', 'مراجعة أخطاء النظام وقياسات الأداء بعد التجربة'],
 ];
 
@@ -89,7 +80,7 @@ export default function AdminSystemHealthPanel() {
       <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between gap-3 mb-3">
           <h3 className="text-xl font-black text-slate-900 flex items-center gap-2"><ClipboardList className="text-emerald-600"/> قائمة اختبار ما بعد الرفع</h3>
-          <button onClick={() => exportCsv('post-deploy-qa', qaRows.map(([area, check]) => ({ area, check, status: 'pending' })))} className="px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-black flex items-center gap-2"><Download size={14}/> CSV</button>
+          <button onClick={() => exportExcel('post-deploy-qa', qaRows.map(([area, check]) => ({ area, check, status: 'pending' })))} className="px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-black flex items-center gap-2"><Download size={14}/> Excel</button>
         </div>
         <div className="grid md:grid-cols-2 gap-2">
           {qaRows.map(([area, check]) => <div key={`${area}-${check}`} className="rounded-2xl border border-slate-100 bg-slate-50 p-3"><p className="text-xs font-black text-slate-400">{area}</p><p className="font-black text-slate-800">{check}</p></div>)}
@@ -100,7 +91,7 @@ export default function AdminSystemHealthPanel() {
         <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between gap-3 mb-3">
             <h3 className="text-xl font-black text-slate-900 flex items-center gap-2"><AlertTriangle className="text-red-500"/> أخطاء النظام الحقيقية</h3>
-            <button onClick={() => exportCsv('system-errors', errors.map((e) => ({ area: e.area, message: e.message, page: e.page, userId: e.userId, createdAt: dateText(e.createdAt) })))} className="px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-black flex items-center gap-2"><Download size={14}/> CSV</button>
+            <button onClick={() => exportExcel('system-errors', errors.map((e) => ({ area: e.area, message: e.message, page: e.page, userId: e.userId, createdAt: dateText(e.createdAt) })))} className="px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-black flex items-center gap-2"><Download size={14}/> Excel</button>
           </div>
           <div className="space-y-2 max-h-80 overflow-auto">
             {errors.map((e) => <div key={e.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-3"><p className="font-black text-slate-900">{e.message}</p><p className="text-xs text-slate-500 mt-1" dir="ltr">{e.area} · {e.page} · {dateText(e.createdAt)}</p></div>)}
@@ -129,7 +120,7 @@ export default function AdminSystemHealthPanel() {
         <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between gap-3 mb-3">
             <h3 className="text-xl font-black text-slate-900 flex items-center gap-2"><Download className="text-emerald-600"/> Backup و Migration</h3>
-            <button onClick={() => exportCsv('backup-collections', backupCollections.map((name) => ({ collection: name, include: 'yes' })))} className="px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-black flex items-center gap-2"><Download size={14}/> CSV</button>
+            <button onClick={() => exportExcel('backup-collections', backupCollections.map((name) => ({ collection: name, include: 'yes' })))} className="px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-black flex items-center gap-2"><Download size={14}/> Excel</button>
           </div>
           <p className="text-sm font-bold text-slate-500 mb-3">شغّل قبل أي تعديل كبير: <code dir="ltr" className="bg-slate-100 px-2 py-1 rounded">npm run backup:plan</code> ثم <code dir="ltr" className="bg-slate-100 px-2 py-1 rounded">npm run migrate:plan</code></p>
           <div className="flex flex-wrap gap-2">

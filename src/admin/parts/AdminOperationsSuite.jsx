@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
+import { downloadXlsx } from '../../shared/utils/exportData.js';
+import { usePagination } from '../../shared/hooks/usePagination.js';
+import PaginationBar from '../../shared/components/PaginationBar.jsx';
 import { platformConfirm, platformNotify } from '../../shared/core/platformShared.jsx';
 import { Bell, ClipboardList, History, Save, Settings, Shield, Users } from '../../shared/icons/lucide-shim.jsx';
 import { GradeOptions, getGradeLabel } from '../../shared/constants/grades.jsx';
@@ -257,18 +260,7 @@ const parseCsvLine = (line) => {
   out.push(cur.trim());
   return out;
 };
-const csvDownload = (filename, rows) => {
-  const csv = rows.map((row) => row.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
-  const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-};
+const excelDownload = (filename, rows) => downloadXlsx(filename.replace(/\.csv$/i, '.xlsx'), rows);
 
 export function AdminGrowthSuite({ users = [], exams = [], examResults = [], content = [], assignments = [], assignmentSubmissions = [], subscriptionCodes = [], notifications = [], userData = {}, initialTab = 'payments', compact = false }) {
   const [tab, setTab] = useState(initialTab || 'payments');
@@ -352,7 +344,7 @@ export function AdminGrowthSuite({ users = [], exams = [], examResults = [], con
     platformNotify('تم حذف الباقة.');
   };
 
-  const exportPayments = () => csvDownload(`nahhas-payments-${new Date().toISOString().slice(0,10)}.csv`, [
+  const exportPayments = () => excelDownload(`nahhas-payments-${new Date().toISOString().slice(0,10)}.xlsx`, [
     ['studentName','email','phone','amount','method','status','days','createdAt','reviewedBy'],
     ...payments.map((p)=>[p.studentName || p.name || '', p.email || p.studentEmail || '', p.phone || '', p.amount || p.price || '', p.method || '', p.status || 'pending', p.days || p.planDays || '', toInputDate(p.createdAt), p.reviewedBy || ''])
   ]);
@@ -461,6 +453,8 @@ export function AdminGrowthSuite({ users = [], exams = [], examResults = [], con
     return matchesSearch && matchesGrade && matchesBranch && matchesDifficulty;
   }), [questions, questionFilter]);
 
+  const questionsPagination = usePagination(filteredQuestions, { pageSize: 30 });
+
   const deleteQuestion = async (q) => {
     if (!platformConfirm('حذف السؤال من بنك الأسئلة؟')) return;
     await deleteDoc(doc(db, 'question_bank', q.id));
@@ -468,7 +462,7 @@ export function AdminGrowthSuite({ users = [], exams = [], examResults = [], con
     platformNotify('تم حذف السؤال.');
   };
 
-  const exportQuestionBank = () => csvDownload(`nahhas-question-bank-${new Date().toISOString().slice(0,10)}.csv`, [
+  const exportQuestionBank = () => excelDownload(`nahhas-question-bank-${new Date().toISOString().slice(0,10)}.xlsx`, [
     ['text','grade','branch','topic','difficulty','options','correctIdx','explanation'],
     ...filteredQuestions.map((q)=>[q.text || '', q.grade || '', q.branch || '', q.topic || '', q.difficulty || '', (q.options || []).join('|'), q.correctIdx ?? 0, q.explanation || ''])
   ]);
@@ -564,7 +558,7 @@ export function AdminGrowthSuite({ users = [], exams = [], examResults = [], con
 
   const visibleStudentsAtRisk = useMemo(() => studentsAtRisk.filter((u) => analyticsGradeFilter === 'all' || u.grade === analyticsGradeFilter), [studentsAtRisk, analyticsGradeFilter]);
 
-  const exportAnalytics = () => csvDownload(`nahhas-students-risk-${new Date().toISOString().slice(0,10)}.csv`, [
+  const exportAnalytics = () => excelDownload(`nahhas-students-risk-${new Date().toISOString().slice(0,10)}.xlsx`, [
     ['name','email','phone','grade','average','resultsCount','assignmentsSubmitted','risk'],
     ...visibleStudentsAtRisk.map((u)=>[u.name || u.displayName || '', u.email || '', u.phone || '', u.grade || '', u.avg, u.resultsCount, u.submitted, u.risk])
   ]);
@@ -587,7 +581,7 @@ export function AdminGrowthSuite({ users = [], exams = [], examResults = [], con
     await writeLog('risk_followup_notifications_sent', 'إرسال تنبيهات للطلاب المتأخرين', { count: targets.length, grade: analyticsGradeFilter });
     platformNotify(`تم إرسال المتابعة إلى ${targets.length} طالب.`);
   };
-  const exportPlan = () => csvDownload(`nahhas-growth-suite-${new Date().toISOString().slice(0,10)}.csv`, [
+  const exportPlan = () => excelDownload(`nahhas-growth-suite-${new Date().toISOString().slice(0,10)}.xlsx`, [
     ['module','status','mainMetric'],
     ['payments','working',`${payments.length} payment requests / ${plans.length} plans`],
     ['courses','working',`${units.length} course units / ${content.length} content items`],
@@ -598,9 +592,10 @@ export function AdminGrowthSuite({ users = [], exams = [], examResults = [], con
     ['support','working',`${supportTickets.length} tickets`],
   ]);
 
-  const renderPayments = () => {
-    const visiblePayments = payments.filter((p) => paymentFilter === 'all' || (p.status || 'pending') === paymentFilter);
-    return <div className="space-y-5">
+  const visiblePayments = payments.filter((p) => paymentFilter === 'all' || (p.status || 'pending') === paymentFilter);
+  const paymentsPagination = usePagination(visiblePayments, { pageSize: 25 });
+
+  const renderPayments = () => <div className="space-y-5">
     <div className="grid md:grid-cols-4 gap-3"><StatBox title="طلبات دفع معلقة" value={dashboardStats.pendingPayments}/><StatBox title="باقات مفعلة" value={plans.filter((p)=>p.active !== false).length}/><StatBox title="طلاب VIP" value={dashboardStats.premium}/><StatBox title="أكواد غير مستخدمة" value={subscriptionCodes.filter((c)=>!c.used&&!c.isUsed).length}/></div>
     <section className="bg-white rounded-3xl border p-5 grid md:grid-cols-5 gap-3">
       <input className="border rounded-xl p-3" placeholder="اسم الباقة" value={planDraft.title} onChange={(e)=>setPlanDraft({...planDraft,title:e.target.value})}/>
@@ -625,11 +620,11 @@ export function AdminGrowthSuite({ users = [], exams = [], examResults = [], con
       </div>
     </section>
     <section className="bg-white rounded-3xl border p-5 overflow-x-auto">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3"><h3 className="font-black">طلبات الدفع</h3><div className="flex gap-2"><select className="border rounded-xl p-2" value={paymentFilter} onChange={(e)=>setPaymentFilter(e.target.value)}><option value="all">كل الطلبات</option><option value="pending">معلقة</option><option value="approved">مقبولة</option><option value="rejected">مرفوضة</option></select><button onClick={exportPayments} className="bg-slate-900 text-white rounded-xl px-4 py-2 font-black">تصدير CSV</button></div></div>
-      {visiblePayments.length ? visiblePayments.map((p)=><div key={p.id} className="min-w-[760px] grid grid-cols-7 gap-2 border-b py-3 text-sm items-center"><b>{p.studentName || p.name || p.email || p.userId}</b><span>{p.amount || p.price || '—'} جنيه</span><span>{p.method || '—'}</span><span>{statusLabel(p.status)}</span><span>{toInputDate(p.createdAt) || '—'}</span><button disabled={p.status==='approved'} onClick={()=>decidePayment(p,'approved')} className="bg-emerald-600 disabled:bg-slate-200 text-white rounded-lg px-3 py-2 font-bold">قبول</button><button onClick={()=>decidePayment(p,'rejected')} className="bg-red-50 text-red-700 rounded-lg px-3 py-2 font-bold">رفض</button></div>) : <p className="text-slate-500 font-bold">لا توجد طلبات دفع حسب الفلتر.</p>}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3"><h3 className="font-black">طلبات الدفع</h3><div className="flex gap-2"><select className="border rounded-xl p-2" value={paymentFilter} onChange={(e)=>setPaymentFilter(e.target.value)}><option value="all">كل الطلبات</option><option value="pending">معلقة</option><option value="approved">مقبولة</option><option value="rejected">مرفوضة</option></select><button onClick={exportPayments} className="bg-slate-900 text-white rounded-xl px-4 py-2 font-black">تصدير Excel</button></div></div>
+      {visiblePayments.length ? paymentsPagination.pageItems.map((p)=><div key={p.id} className="min-w-[760px] grid grid-cols-7 gap-2 border-b py-3 text-sm items-center"><b>{p.studentName || p.name || p.email || p.userId}</b><span>{p.amount || p.price || '—'} جنيه</span><span>{p.method || '—'}</span><span>{statusLabel(p.status)}</span><span>{toInputDate(p.createdAt) || '—'}</span><button disabled={p.status==='approved'} onClick={()=>decidePayment(p,'approved')} className="bg-emerald-600 disabled:bg-slate-200 text-white rounded-lg px-3 py-2 font-bold">قبول</button><button onClick={()=>decidePayment(p,'rejected')} className="bg-red-50 text-red-700 rounded-lg px-3 py-2 font-bold">رفض</button></div>) : <p className="text-slate-500 font-bold">لا توجد طلبات دفع حسب الفلتر.</p>}
+      <PaginationBar page={paymentsPagination.page} totalPages={paymentsPagination.totalPages} totalItems={paymentsPagination.totalItems} pageSize={paymentsPagination.pageSize} onPageChange={paymentsPagination.setPage} label="طلبات الدفع" />
     </section>
   </div>;
-  };
 
 
   const renderCourses = () => <div className="space-y-5">
@@ -671,10 +666,11 @@ export function AdminGrowthSuite({ users = [], exams = [], examResults = [], con
       <button onClick={buildExamFromBank} className="bg-indigo-700 text-white rounded-xl p-3 font-black md:col-span-5">إنشاء مسودة الامتحان</button>
     </section>
     <section className="bg-white rounded-3xl border p-5">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4"><h3 className="font-black">إدارة الأسئلة</h3><button onClick={exportQuestionBank} className="bg-slate-900 text-white rounded-xl px-4 py-2 font-black">تصدير CSV</button></div>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4"><h3 className="font-black">إدارة الأسئلة</h3><button onClick={exportQuestionBank} className="bg-slate-900 text-white rounded-xl px-4 py-2 font-black">تصدير Excel</button></div>
       <div className="grid md:grid-cols-5 gap-3 mb-4"><input className="border rounded-xl p-3 md:col-span-2" placeholder="بحث في السؤال/الشرح" value={questionFilter.search} onChange={(e)=>setQuestionFilter({...questionFilter,search:e.target.value})}/><select className="border rounded-xl p-3" value={questionFilter.grade} onChange={(e)=>setQuestionFilter({...questionFilter,grade:e.target.value})}><option value="all">كل المراحل</option><GradeOptions/></select><select className="border rounded-xl p-3" value={questionFilter.branch} onChange={(e)=>setQuestionFilter({...questionFilter,branch:e.target.value})}><option value="all">كل الفروع</option><option>النحو</option><option>البلاغة</option><option>الأدب</option><option>القصة</option><option>عام</option></select><select className="border rounded-xl p-3" value={questionFilter.difficulty} onChange={(e)=>setQuestionFilter({...questionFilter,difficulty:e.target.value})}><option value="all">كل الصعوبات</option><option value="easy">سهل</option><option value="medium">متوسط</option><option value="hard">صعب</option></select></div>
-      {filteredQuestions.slice(0,100).map((q)=><div key={q.id} className="border-b py-3 text-sm"><div className="flex justify-between gap-3"><b>{q.text}</b><button onClick={()=>deleteQuestion(q)} className="text-red-700 bg-red-50 rounded-lg px-3 py-1 font-bold">حذف</button></div><p className="text-xs text-slate-500 mt-1">{getGradeLabel(q.grade)} • {q.branch} • {q.topic} • {statusLabel(q.difficulty)}</p></div>)}
+      {questionsPagination.pageItems.map((q)=><div key={q.id} className="border-b py-3 text-sm"><div className="flex justify-between gap-3"><b>{q.text}</b><button onClick={()=>deleteQuestion(q)} className="text-red-700 bg-red-50 rounded-lg px-3 py-1 font-bold">حذف</button></div><p className="text-xs text-slate-500 mt-1">{getGradeLabel(q.grade)} • {q.branch} • {q.topic} • {statusLabel(q.difficulty)}</p></div>)}
       {!filteredQuestions.length && <p className="text-slate-500 font-bold">لا توجد أسئلة مطابقة.</p>}
+      <PaginationBar page={questionsPagination.page} totalPages={questionsPagination.totalPages} totalItems={questionsPagination.totalItems} pageSize={questionsPagination.pageSize} onPageChange={questionsPagination.setPage} label="بنك الأسئلة" />
     </section>
   </div>;
 
@@ -683,7 +679,7 @@ export function AdminGrowthSuite({ users = [], exams = [], examResults = [], con
     <div className="grid md:grid-cols-4 gap-3"><StatBox title="طلاب يحتاجون متابعة" value={visibleStudentsAtRisk.length}/><StatBox title="متوسط الامتحانات" value={`${dashboardStats.avg}%`}/><StatBox title="تسليمات واجب" value={assignmentSubmissions.length}/><StatBox title="نتائج مكتملة" value={examResults.filter((r)=>r.status==='completed').length}/></div>
     <div className="bg-white rounded-3xl border p-5 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
       <select className="border rounded-xl p-3" value={analyticsGradeFilter} onChange={(e)=>setAnalyticsGradeFilter(e.target.value)}><option value="all">كل المراحل</option><GradeOptions/></select>
-      <div className="flex flex-wrap gap-2"><button onClick={sendRiskFollowUp} className="bg-amber-600 text-white rounded-xl px-5 py-3 font-black">إرسال تنبيه متابعة</button><button onClick={exportAnalytics} className="bg-indigo-700 text-white rounded-xl px-5 py-3 font-black">تصدير CSV</button></div>
+      <div className="flex flex-wrap gap-2"><button onClick={sendRiskFollowUp} className="bg-amber-600 text-white rounded-xl px-5 py-3 font-black">إرسال تنبيه متابعة</button><button onClick={exportAnalytics} className="bg-indigo-700 text-white rounded-xl px-5 py-3 font-black">تصدير Excel</button></div>
     </div>
     <section className="bg-white rounded-3xl border p-5"><h3 className="font-black mb-3">أولوية المتابعة</h3>{visibleStudentsAtRisk.slice(0,50).map((u)=><div key={u.id || u.uid || u.email} className="grid md:grid-cols-6 gap-2 border-b py-3 text-sm"><b>{u.name || u.email}</b><span>{getGradeLabel(u.grade)}</span><span>متوسط {u.avg}%</span><span>{u.resultsCount} امتحان</span><span>{u.submitted} واجب</span><span className="font-black text-red-700">خطر {u.risk}%</span></div>)}{!visibleStudentsAtRisk.length && <p className="text-slate-500 font-bold">لا يوجد طلاب يحتاجون متابعة حسب الفلتر.</p>}</section>
   </div>;
@@ -711,7 +707,7 @@ export function AdminGrowthSuite({ users = [], exams = [], examResults = [], con
         <div className="bg-slate-950 text-white rounded-3xl p-6 shadow-sm">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div><h2 className="text-2xl md:text-3xl font-black">مركز التشغيل الشامل</h2><p className="text-slate-300 font-bold mt-2">الـ 7 أفكار هنا شغالة كأدوات فعلية: إنشاء، تعديل حالة، إرسال، استيراد، تصدير، وردود دعم.</p></div>
-            <button onClick={exportPlan} className="bg-amber-500 text-slate-950 rounded-2xl px-5 py-3 font-black hover:bg-amber-400">تصدير ملخص التشغيل CSV</button>
+            <button onClick={exportPlan} className="bg-amber-500 text-slate-950 rounded-2xl px-5 py-3 font-black hover:bg-amber-400">تصدير ملخص التشغيل Excel</button>
           </div>
         </div>
       )}
