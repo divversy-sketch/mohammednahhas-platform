@@ -1370,7 +1370,7 @@ export const AdminDashboard = ({ user, adminProfile }) => {
 
       <AdminHeader adminGradeFilter={adminGradeFilter} setAdminGradeFilter={setAdminGradeFilter} />
 
-      <div className="v2-admin-grid grid grid-cols-1 md:grid-cols-[280px_1fr] gap-6 p-4 md:p-6 relative z-10">
+      <div className="v2-admin-grid grid grid-cols-1 gap-5 p-4 md:p-6 relative z-10">
         <AdminSidebar activeTab={activeTab} setActiveTab={setActiveTab} adminProfile={adminProfile} />
 
         <Suspense fallback={<AdminLazyFallback />}>

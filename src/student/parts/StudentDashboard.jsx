@@ -616,7 +616,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
         isPremium={isPremium}
       />
 
-      <main className="v2-student-main p-4 md:p-10 relative z-10 min-h-screen md:pr-[21rem] w-full transition-all">
+      <main className="v2-student-main p-4 md:p-8 lg:p-10 relative z-10 min-h-screen w-full transition-all mx-auto">
         <StudentV2Topbar
           installPrompt={installPrompt}
           setShowFocusMode={setShowFocusMode}

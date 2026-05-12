@@ -1,18 +1,50 @@
-
 import { ADMIN_TABS, canAccessAdminTab } from '../../config/adminPermissions';
 
 export { ADMIN_TABS };
 
+const QUICK_TABS = new Set([
+  'dashboard',
+  'students',
+  'pending',
+  'payments',
+  'courses',
+  'exams',
+  'content',
+  'settings',
+]);
+
 export default function AdminSidebar({ activeTab, setActiveTab, adminProfile }) {
   const visibleTabs = ADMIN_TABS.filter(([tab]) => canAccessAdminTab(adminProfile, tab));
+  const priorityTabs = visibleTabs.filter(([tab]) => QUICK_TABS.has(tab));
+  const secondaryTabs = visibleTabs.filter(([tab]) => !QUICK_TABS.has(tab));
+  const orderedTabs = [...priorityTabs, ...secondaryTabs];
 
   return (
-    <div className="v2-sidebar-nav glass-panel p-4 rounded-3xl h-fit space-y-2 flex md:flex-col overflow-x-auto md:overflow-x-visible whitespace-nowrap scrollbar-hide sticky top-28">
-      {visibleTabs.map(([tab, label]) => (
-        <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-right p-3.5 rounded-2xl font-black flex gap-2 transition-all ${activeTab===tab?'bg-gradient-to-l from-amber-500 to-orange-500 text-white shadow-md border border-amber-400':'hover:bg-amber-50 text-slate-600'}`}>
-          {label}
-        </button>
-      ))}
-    </div>
+    <nav className="v2-admin-command-nav glass-panel rounded-3xl p-3 md:p-4 sticky top-[5.75rem] z-30" aria-label="أقسام لوحة الإدارة">
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div>
+          <p className="text-[11px] font-black text-slate-400 uppercase tracking-wider">أقسام الإدارة</p>
+          <h2 className="text-base md:text-lg font-black text-slate-950">تنقل سريع بدون Sidebar</h2>
+        </div>
+        <span className="hidden md:inline-flex rounded-full bg-amber-50 text-amber-700 border border-amber-100 px-3 py-1 text-xs font-black">
+          {orderedTabs.length} قسم
+        </span>
+      </div>
+
+      <div className="v2-admin-command-scroll" role="tablist" aria-label="تبويبات الإدارة">
+        {orderedTabs.map(([tab, label]) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setActiveTab(tab)}
+            className={`v2-admin-command-chip ${activeTab === tab ? 'is-active' : ''}`}
+            role="tab"
+            aria-selected={activeTab === tab}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </nav>
   );
 }

@@ -86,7 +86,6 @@ function getItemTone(item, active) {
 export function StudentV2Sidebar({
   activeTab,
   setActiveTab,
-  mobileMenu,
   setMobileMenu,
   setLearningHubTab,
   isBannedContent,
@@ -104,51 +103,48 @@ export function StudentV2Sidebar({
   const goTo = (item) => {
     if (item.action === 'learningHub') setLearningHubTab?.('assignments');
     setActiveTab(item.tab);
-    setMobileMenu(false);
+    setMobileMenu?.(false);
   };
 
+  const visibleGroups = navGroups.filter(canShowGroup);
+
   return (
-    <aside className={`v2-student-sidebar v2-student-nav fixed top-0 bottom-0 right-0 z-40 w-80 p-5 transition-transform duration-300 ${mobileMenu ? 'translate-x-0' : 'translate-x-full md:translate-x-0'} border-l border-white/70 flex flex-col`}>
-      <div className="flex items-center justify-between rounded-3xl bg-white/75 p-3 shadow-sm border border-white/70 mb-5">
-        <div className="flex items-center gap-3">
+    <nav className="v2-student-command-nav v2-card rounded-[2rem] p-3 md:p-4 mb-6 sticky top-3 z-30" aria-label="أقسام الطالب">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center gap-3 min-w-0">
           <ModernLogo />
-          <div>
-            <h1 className="text-xl font-black text-slate-950">منصة النحاس</h1>
-            <p className="text-xs font-bold text-slate-500">{studentName || 'طالب'} · {isPremium ? 'VIP' : 'Free'}</p>
+          <div className="min-w-0">
+            <h1 className="text-lg md:text-xl font-black text-slate-950 truncate">منصة النحاس</h1>
+            <p className="text-xs font-bold text-slate-500 truncate">{studentName || 'طالب'} · {isPremium ? 'VIP' : 'Free'}</p>
           </div>
         </div>
-        <button onClick={() => setMobileMenu(false)} className="md:hidden rounded-2xl bg-slate-100 p-2 text-slate-700"><X /></button>
-      </div>
 
-      <div className="flex-1 overflow-y-auto pr-1 space-y-5">
-        {navGroups.filter(canShowGroup).map((group) => (
-          <div key={group.label}>
-            <p className="mb-2 px-3 text-[11px] font-black uppercase tracking-wider text-slate-400">{group.label}</p>
-            <div className="space-y-1.5">
-              {group.items.map((item) => {
-                const Icon = item.icon;
-                const active = [item.tab, ...(item.alias || [])].includes(activeTab);
-                return (
-                  <button
-                    key={item.tab}
-                    type="button"
-                    onClick={() => goTo(item)}
-                    className={`v2-student-nav-item flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-black transition ${getItemTone(item, active)}`}
-                  >
-                    <Icon size={19} />
-                    <span>{item.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
+        <div className="v2-student-command-scroll" role="tablist" aria-label="تبويبات الطالب">
+          {visibleGroups.flatMap((group) => group.items.map((item) => ({ ...item, groupLabel: group.label }))).map((item) => {
+            const Icon = item.icon;
+            const active = [item.tab, ...(item.alias || [])].includes(activeTab);
+            return (
+              <button
+                key={item.tab}
+                type="button"
+                onClick={() => goTo(item)}
+                className={`v2-student-command-chip ${active ? 'is-active' : ''}`}
+                title={`${item.groupLabel} - ${item.label}`}
+                role="tab"
+                aria-selected={active}
+              >
+                <Icon size={18} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
 
-      <button onClick={() => signOut(auth)} className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 font-black text-red-600 transition hover:bg-red-100">
-        <LogOut size={18} /> خروج
-      </button>
-    </aside>
+        <button onClick={() => signOut(auth)} className="v2-student-logout-chip">
+          <LogOut size={17} /> خروج
+        </button>
+      </div>
+    </nav>
   );
 }
 
@@ -170,7 +166,7 @@ export function StudentV2Topbar({
           <h1 className="font-black text-lg text-slate-900">منصة النحاس</h1>
           <p className="text-xs font-bold text-slate-500">لوحة الطالب</p>
         </div>
-        <button onClick={() => setMobileMenu(true)} className="p-2 bg-slate-100 rounded-2xl"><Menu /></button>
+        <span className="rounded-2xl bg-teal-50 px-3 py-2 text-xs font-black text-teal-700 border border-teal-100">الأقسام بالأعلى</span>
       </div>
 
       <div className="v2-student-toolbar v2-card rounded-3xl p-3 md:p-4 flex flex-wrap justify-between items-center gap-3 mb-6 relative">
