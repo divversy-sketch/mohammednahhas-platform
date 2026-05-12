@@ -26,7 +26,33 @@ const DesignSystemLoader = () => {
     document.addEventListener('visibilitychange', applyPerformanceMode);
     window.addEventListener('resize', applyPerformanceMode, { passive: true });
 
-    // Tailwind is compiled locally by Vite/PostCSS; do not inject the browser CDN in production.
+    // Tailwind should be compiled locally by Vite/PostCSS.
+    // Safety fallback: if a deploy/build ships without Tailwind utilities, load the browser CDN
+    // so the UI does not degrade into an unstyled skeleton.
+    const ensureTailwindFallback = window.setTimeout(() => {
+      try {
+        const probe = document.createElement('div');
+        probe.className = 'hidden p-4 bg-amber-500 text-white rounded-xl';
+        probe.style.position = 'absolute';
+        probe.style.pointerEvents = 'none';
+        probe.style.opacity = '0';
+        document.body.appendChild(probe);
+        const computed = window.getComputedStyle(probe);
+        const tailwindUtilitiesMissing = computed.display !== 'none';
+        probe.remove();
+
+        if (tailwindUtilitiesMissing && !document.getElementById('tailwind-cdn-fallback')) {
+          const script = document.createElement('script');
+          script.id = 'tailwind-cdn-fallback';
+          script.src = 'https://cdn.tailwindcss.com';
+          script.defer = true;
+          document.head.appendChild(script);
+          console.warn('Tailwind local CSS was not detected; CDN fallback loaded to preserve UI styling.');
+        }
+      } catch (error) {
+        console.warn('Tailwind fallback check skipped:', error);
+      }
+    }, 450);
 
     if (!document.getElementById('cairo-font')) {
       const link = document.createElement('link'); link.id = 'cairo-font'; link.rel = 'stylesheet'; link.href = "https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Aref+Ruqaa:wght@400;700&display=swap"; document.head.appendChild(link);
@@ -42,6 +68,7 @@ const DesignSystemLoader = () => {
     }
 
     return () => {
+      window.clearTimeout(ensureTailwindFallback);
       document.removeEventListener('visibilitychange', applyPerformanceMode);
       window.removeEventListener('resize', applyPerformanceMode);
     };
