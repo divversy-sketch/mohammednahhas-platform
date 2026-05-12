@@ -88,6 +88,46 @@ export async function assertAdminRequest(req, requiredPermission = null) {
   };
 }
 
+
+export async function assertAuthenticatedRequest(req) {
+  const authHeader = req.headers.authorization || req.headers.Authorization || '';
+  const token = String(authHeader).startsWith('Bearer ') ? String(authHeader).slice(7) : '';
+
+  if (!token) {
+    const error = new Error('يجب تسجيل الدخول أولاً.');
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const firebaseAdmin = getFirebaseAdmin();
+  const decoded = await firebaseAdmin.auth().verifyIdToken(token);
+  const uid = decoded.uid;
+
+  const [userSnap, adminSnap] = await Promise.all([
+    firebaseAdmin.firestore().collection('users').doc(uid).get(),
+    firebaseAdmin.firestore().collection('admins').doc(uid).get()
+  ]);
+
+  const userData = userSnap.exists ? userSnap.data() : null;
+  const adminData = adminSnap.exists ? adminSnap.data() : null;
+  const isAdmin = !!adminData && adminData.active === true && adminData.role === 'admin';
+  const isActiveStudent = !!userData && userData.status !== 'blocked' && userData.status !== 'rejected' && !String(userData.status || '').startsWith('banned_all');
+
+  if (!isAdmin && !isActiveStudent) {
+    const error = new Error('هذا الحساب لا يملك صلاحية استخدام هذه الخدمة.');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  return {
+    uid,
+    email: decoded.email || adminData?.email || userData?.email || '',
+    role: isAdmin ? 'admin' : 'student',
+    admin: isAdmin ? adminData : null,
+    user: userData
+  };
+}
+
 export function requirePost(req) {
   if (req.method !== 'POST') {
     const error = new Error('Method not allowed');

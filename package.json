@@ -25,23 +25,26 @@
     "firestore:performance": "node scripts/firestore-performance-audit.mjs",
     "backup:plan": "node scripts/backup-export-plan.mjs",
     "e2e:real": "node scripts/e2e-real-smoke.mjs",
-    "production:ready": "npm run source:health && npm run cleanup:report && npm run firestore:performance && npm run e2e:smoke && npm run e2e:real && npm run backup:plan && npm run postdeploy:qa && npm run build && npm run security:smoke && npm run bundle:report"
+    "production:ready": "npm run source:health && npm run cleanup:report && npm run firestore:performance && npm run e2e:smoke && npm run e2e:real && npm run backup:plan && npm run postdeploy:qa && npm run build && npm run security:smoke && npm run bundle:report",
+    "e2e:playwright": "playwright test",
+    "e2e:playwright:report": "playwright show-report"
   },
   "dependencies": {
     "@capacitor/cli": "^8.3.1",
     "@capacitor/core": "^8.3.1",
     "firebase": "^12.12.0",
+    "firebase-admin": "^12.7.0",
     "framer-motion": "^12.38.0",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.562.0",
+    "pdfjs-dist": "^4.10.38",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "recharts": "^3.8.1",
-    "firebase-admin": "^12.7.0",
-    "jszip": "^3.10.1",
-    "pdfjs-dist": "^4.10.38"
+    "recharts": "^3.8.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@playwright/test": "^1.60.0",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",

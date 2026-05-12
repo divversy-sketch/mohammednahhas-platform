@@ -1,0 +1,6 @@
+src/admin/app/AdminApp.jsx
+src/admin/parts/*.jsx
+src/student/app/StudentApp.jsx
+src/student/parts/*.jsx
+FULL_COMPONENT_SPLIT_PHASE3_AR.md
+FILES_CHANGED_SPLIT_PHASE3.txt
