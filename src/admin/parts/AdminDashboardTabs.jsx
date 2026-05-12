@@ -37,6 +37,7 @@ import { AdminSmartExamEngine, AdminStudentReports, AdminGroupsManager, AdminMes
 import { canAccessAdminTab } from '../../config/adminPermissions';
 import AdminCommandCenter from '../components/AdminCommandCenter.jsx';
 import AdminSystemHealthPanel from '../components/AdminSystemHealthPanel.jsx';
+import AdminV2PageFrame from '../v2/AdminV2PageFrame.jsx';
 import AdminStudentSuccessSuite from '../../features/studentSuccess/StudentSuccessAdminSuite.jsx';
 import { AdminGlobalSearch, AdminLiveClassesPanel, AdminCertificatesPanel, AdminCommandQuickActions } from '../../features/product/ProductExperienceSuite.jsx';
 
@@ -245,6 +246,14 @@ export default function AdminDashboardTabs({ ctx }) {
     return { total: users.length, vipUsers, bannedUsers, pendingGradeUpdates, securityHeldAttempts };
   }, [filteredActiveUsers, examResults]);
 
+
+  const v2AdminStats = React.useMemo(() => ({
+    students: (activeUsersList || []).length,
+    exams: (examsList || []).length,
+    content: (contentList || []).length,
+    alerts: (pendingUsers || []).length + (passwordResetRequests || []).length + (examResults || []).filter((result) => ['security_hold', 'cheated', 'in_progress'].includes(result.status)).length,
+  }), [activeUsersList, examsList, contentList, pendingUsers, passwordResetRequests, examResults]);
+
   const exportStudentsExcel = async () => {
     const header = ['name','email','phone','parentPhone','grade','status','subscriptionStatus','subscriptionExpiry'];
     const rows = dailyFilteredActiveUsers.map((student) => [
@@ -274,6 +283,12 @@ export default function AdminDashboardTabs({ ctx }) {
 
   return (
         <div className="md:col-span-3 w-full overflow-hidden">
+          <AdminV2PageFrame
+            activeTab={activeTab}
+            onNavigate={setActiveTab}
+            stats={v2AdminStats}
+            adminName={adminProfile?.name || userData?.name || userData?.email}
+          >
           {activeTab === 'dashboard' && (
             <InlineTabs
               defaultTab="overview"
@@ -1069,6 +1084,7 @@ export default function AdminDashboardTabs({ ctx }) {
           )}
 
           {/* تم حذف صفحة الرد الآلي وإدارة الحكم من لوحة الأدمن */}
+          </AdminV2PageFrame>
         </div>
   );
 }

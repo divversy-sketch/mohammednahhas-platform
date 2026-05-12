@@ -22,6 +22,7 @@ import { useStudentDashboardData } from '../hooks/useStudentDashboardData.js';
 import { StudentContinueCard, StudentSmartDashboard, StudentCompactHome } from '../components/home/StudentHomeCards.jsx';
 import { StudentTopGreeting, LearningHubTabs } from '../components/layout/StudentLayoutParts.jsx';
 import StudentDailyCommandCenter from '../components/dashboard/StudentDailyCommandCenter.jsx';
+import { StudentV2Hero, StudentV2SectionTitle, StudentV2Sidebar, StudentV2Topbar } from '../v2/StudentV2Chrome.jsx';
 import StudentAssignmentsPanel from '../../admin/parts/StudentAssignmentsPanel.jsx';
 import StudentSuccessPanel from '../../features/studentSuccess/StudentSuccessPanel.jsx';
 import { StudentLiveClassesPanel, StudentExamReviewCenter, StudentCertificatePanel } from '../../features/product/ProductExperienceSuite.jsx';
@@ -584,7 +585,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
 
   return (
     <LazyPanel>
-    <div className="bg-slate-50 relative font-['Cairo'] min-h-screen block" dir="rtl">
+    <div className="v2-student-shell relative font-['Cairo'] min-h-screen block" dir="rtl">
 
       <MobileStudentBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
       {playingVideo && <LazyPanel><SecureVideoPlayer video={playingVideo} user={user} userName={userData?.name} onClose={() => setPlayingVideo(null)} onProgress={handleVideoProgress} /></LazyPanel>}
@@ -602,54 +603,40 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
         </div>
       )}
       
-      <aside className={`fixed top-0 bottom-0 right-0 z-40 bg-white/95 backdrop-blur-xl w-72 p-6 shadow-xl transition-transform duration-300 ${mobileMenu ? 'translate-x-0' : 'translate-x-full md:translate-x-0'} border-l border-slate-200 flex flex-col`}>
-        <div className="flex items-center justify-between mb-10 px-2">
-            <div className="flex items-center gap-3">
-                <ModernLogo />
-                <h1 className="text-2xl font-bold font-arabic text-amber-800">النحاس</h1>
-            </div>
-            <button onClick={() => setMobileMenu(false)} className="md:hidden"><X /></button>
-        </div>
-        <div className="space-y-2 flex-1 overflow-y-auto pr-2">
-          <button onClick={() => {setActiveTab('home'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='home'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><User/> الرئيسية</button>
-          
-          <button onClick={() => {setActiveTab('subscription'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${activeTab==='subscription'?'bg-red-100 text-red-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-red-600'}`}><Crown/> الباقة والاشتراك</button>
+      <StudentV2Sidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        mobileMenu={mobileMenu}
+        setMobileMenu={setMobileMenu}
+        setLearningHubTab={setLearningHubTab}
+        isBannedContent={isBannedContent}
+        isBannedExam={isBannedExam}
+        auth={auth}
+        studentName={userData?.name}
+        isPremium={isPremium}
+      />
 
-          {!isBannedContent && (
-              <>
-                <div onClick={() => {setActiveTab('courses'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='courses'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><BookOpen/> الكورسات التعليمية</div>
-                <div onClick={() => {setActiveTab('learning_path'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='learning_path'?'bg-blue-100 text-blue-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-blue-600'}`}><Target/> مساري التعليمي</div>
-                <div onClick={() => {setActiveTab('remediation'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='remediation'?'bg-red-100 text-red-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-red-600'}`}><BrainCircuit/> العلاج الذكي</div>
-                <div onClick={() => {setActiveTab('student_messages'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='student_messages'?'bg-emerald-100 text-emerald-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-emerald-600'}`}><MessageSquare/> رسائلي</div>
-                <div onClick={() => {setActiveTab('support'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='support'?'bg-sky-100 text-sky-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-sky-600'}`}><MessageSquare/> الدعم الفني</div>
-                <div onClick={() => {setActiveTab('videos'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='videos'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><PlayCircle/> المحاضرات</div>
-                <div onClick={() => {setActiveTab('files'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='files'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><FileText/> الملفات و الروابط</div>
-                <div onClick={() => {setActiveTab('htmls'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='htmls'?'bg-purple-100 text-purple-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-purple-600'}`}><Code/> محتوى تفاعلي</div>
-              </>
-          )}
-          {!isBannedExam && (
-              <>
-                <div onClick={() => {setActiveTab('exams'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${activeTab==='exams'?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><ClipboardList/> الامتحانات</div>
-                <div onClick={() => {setLearningHubTab('assignments'); setActiveTab('assignments'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition cursor-pointer ${['assignments','smart_hw_results','mistakes_bank'].includes(activeTab)?'bg-emerald-100 text-emerald-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-emerald-600'}`}><FileCheck/> الواجبات وبنك الأخطاء</div>
-              </>
-          )}
-          <button onClick={() => {setActiveTab('settings'); setMobileMenu(false)}} className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${['settings','performance'].includes(activeTab)?'bg-amber-100 text-amber-700 shadow-sm font-bold':'text-slate-600 hover:bg-slate-50 hover:text-amber-600'}`}><Settings/> ملفي الشخصي والأداء</button>
-        </div>
-        <div className="mt-auto pt-6"><button onClick={() => signOut(auth)} className="flex items-center gap-3 text-red-500 font-bold hover:bg-red-50 w-full p-4 rounded-xl transition"><LogOut/> خروج</button></div>
-      </aside>
+      <main className="v2-student-main p-4 md:p-10 relative z-10 min-h-screen md:pr-[21rem] w-full transition-all">
+        <StudentV2Topbar
+          installPrompt={installPrompt}
+          setShowFocusMode={setShowFocusMode}
+          setShowNotifications={setShowNotifications}
+          unseenNotificationCount={unseenNotificationCount}
+          isPremium={isPremium}
+          subscriptionExpiry={userData?.subscriptionExpiry}
+          setMobileMenu={setMobileMenu}
+        />
 
-      <main className="p-4 md:p-10 relative z-10 min-h-screen md:pr-72 w-full transition-all">
-        <div className="md:hidden flex justify-between items-center mb-6 glass-panel p-4 rounded-2xl shadow-sm"><h1 className="font-bold text-lg text-slate-800">منصة النحاس</h1><button onClick={() => setMobileMenu(true)} className="p-2 bg-slate-100 rounded-lg"><Menu /></button></div>
-        <div className="flex justify-between items-center mb-6 relative">
-            <div className="flex gap-2">
-                {installPrompt && ( <button onClick={installPrompt} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full font-bold shadow-lg shadow-green-500/30 transition flex items-center gap-2"><DownloadCloud size={18}/><span className="hidden md:inline">تثبيت التطبيق</span></button> )}
-                <button onClick={() => setShowFocusMode(true)} className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-full font-bold shadow-lg transition flex items-center gap-2"><Headphones size={18}/><span className="hidden md:inline">التركيز</span></button>
-                <button onClick={() => setShowNotifications(true)} className="relative bg-white hover:bg-amber-50 text-slate-800 px-4 py-2 rounded-full font-bold shadow border transition flex items-center gap-2"><Bell size={18}/><span className="hidden md:inline">الإشعارات</span>{unseenNotificationCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center">{unseenNotificationCount}</span>}</button>
-            </div>
-            <div className="flex items-center gap-3">
-                {isPremium && <span className="hidden md:flex bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-bold items-center gap-1 border border-amber-200"><Crown size={14}/> VIP صالح حتى: {userData?.subscriptionExpiry?.toDate().toLocaleDateString('ar-EG')}</span>}
-            </div>
-        </div>
+        <StudentV2Hero
+          userData={userData}
+          isPremium={isPremium}
+          videosCount={videos.length}
+          examsCount={exams.length}
+          averageScore={averageScore}
+          pendingAssignmentsCount={pendingAssignmentsCount}
+          completedVideoCount={completedVideoCount}
+          setActiveTab={setActiveTab}
+        />
 
         <StudentTopGreeting user={user} userData={userData} isPremium={isPremium} videos={videos} exams={exams} examResults={examResults} setActiveTab={setActiveTab} />
         {activeTab === 'home' && <div className="mb-6"><WisdomBox /></div>}
@@ -695,7 +682,9 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
         )}
 
         {activeTab === 'subscription' && (
-            <div className="glass-panel p-4 md:p-8 rounded-2xl max-w-4xl mx-auto">
+            <div className="space-y-6 page-soft-enter">
+              <StudentV2SectionTitle badge="الاشتراك" title="إدارة الباقة والدفع" description="اشحن كود الاشتراك أو أرسل طلب دفع للإدارة من نفس المكان." />
+              <div className="glass-panel p-4 md:p-8 rounded-2xl max-w-4xl mx-auto">
                 <div className="text-center mb-8">
                     <Crown size={64} className={`mx-auto mb-4 ${isPremium ? 'text-amber-500' : 'text-slate-300'}`} />
                     <h2 className="text-3xl font-bold font-arabic text-slate-800 mb-2">حالة اشتراكك</h2>
@@ -754,6 +743,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
                         </form>
                     </div>
                 </div>
+              </div>
             </div>
         )}
 
@@ -776,7 +766,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
             </div>
         )}
 
-          {activeTab === 'courses' && !isBannedContent && <div className="space-y-6"><StudentLiveClassesPanel userData={userData} /><LazyPanel><StudentCoursesHub user={user} userData={userData} exams={exams} onStartExam={startExamWithCode} /></LazyPanel></div>}
+          {activeTab === 'courses' && !isBannedContent && <div className="space-y-6 page-soft-enter"><StudentV2SectionTitle badge="الكورسات" title="مركز الكورسات التعليمية" description="كل الكورسات، المحاضرات المباشرة، والاختبارات المرتبطة في واجهة واحدة." /><StudentLiveClassesPanel userData={userData} /><LazyPanel><StudentCoursesHub user={user} userData={userData} exams={exams} onStartExam={startExamWithCode} /></LazyPanel></div>}
 
           {activeTab === 'learning_path' && !isBannedContent && (
             <StudentLearningPath
@@ -808,12 +798,8 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
           )}
 
           {activeTab === 'support' && (
-            <div className="glass-panel p-4 md:p-8 rounded-2xl max-w-4xl mx-auto">
-              <div className="mb-6">
-                <p className="text-sm font-black text-sky-700">الدعم الفني</p>
-                <h2 className="text-2xl md:text-3xl font-black text-slate-900">افتح تذكرة للإدارة</h2>
-                <p className="text-slate-500 font-bold mt-2">اكتب المشكلة مرة واحدة بوضوح، وهتظهر للأدمن في مركز الدعم والرسائل.</p>
-              </div>
+            <div className="glass-panel p-4 md:p-8 rounded-2xl max-w-4xl mx-auto page-soft-enter">
+              <StudentV2SectionTitle badge="الدعم الفني" title="افتح تذكرة للإدارة" description="اكتب المشكلة مرة واحدة بوضوح، وهتظهر للأدمن في مركز الدعم والرسائل." />
               <form onSubmit={handleSendSupportTicket} className="bg-white rounded-3xl border p-5 space-y-4">
                 <select className="w-full border p-3 rounded-xl font-bold" value={supportDraft.category} onChange={(e)=>setSupportDraft({...supportDraft, category:e.target.value})}>
                   <option value="exam">مشكلة امتحان</option>
@@ -831,7 +817,8 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
           )}
 
           {activeTab === 'videos' && !isBannedContent && (
-            <div className="space-y-6">
+            <div className="space-y-6 page-soft-enter">
+                <StudentV2SectionTitle badge="المحاضرات" title="مكتبة الفيديوهات" description="تابع الشرح وسجّل تقدمك وافتح الامتحانات المرتبطة بعد المشاهدة." />
                 <div className="bg-white rounded-3xl p-3 border border-slate-100 shadow-sm space-y-3">
                     <div className="grid grid-cols-2 gap-2">
                         <button onClick={() => setVideoSectionTab('recorded')} className={`px-6 py-3 rounded-2xl font-black whitespace-nowrap transition ${videoSectionTab === 'recorded' ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-50 text-slate-600'}`}>المحاضرات المسجلة</button>
@@ -894,7 +881,9 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
         )}
 
         {activeTab === 'files' && !isBannedContent && (
-            <div className="glass-panel rounded-xl overflow-hidden">
+            <div className="space-y-6 page-soft-enter">
+              <StudentV2SectionTitle badge="المرفقات" title="الملفات والروابط" description="كل ملفات المذاكرة والروابط المهمة مرتبة للتحميل أو الفتح المباشر." />
+              <div className="glass-panel rounded-xl overflow-hidden">
                 {filesAndLinks.map(f => (
                     <div key={f.id} className="p-4 flex flex-col md:flex-row justify-between md:items-center border-b last:border-0 hover:bg-white/50 transition gap-4">
                         <div className="flex items-center gap-4">
@@ -914,11 +903,14 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
                         )}
                     </div>
                 ))}
+              </div>
             </div>
         )}
         
         {activeTab === 'htmls' && !isBannedContent && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            <div className="space-y-6 page-soft-enter">
+              <StudentV2SectionTitle badge="تفاعلي" title="المحتوى التفاعلي" description="تجارب تعليمية تفاعلية جاهزة للفتح داخل المنصة." />
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                 {htmls.map(h => (
                     <motion.div whileHover={{y:-5}} key={h.id} className="glass-card rounded-xl overflow-hidden cursor-pointer relative" onClick={() => handlePremiumClick(() => setPlayingHtml(h))}>
                         <div className="h-48 bg-gradient-to-br from-purple-600 to-indigo-900 flex items-center justify-center relative group">
@@ -930,10 +922,13 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
                     </motion.div>
                 ))}
             </div>
+            </div>
         )}
 
         {activeTab === 'interactive_exams' && !isBannedExam && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            <div className="space-y-6 page-soft-enter">
+              <StudentV2SectionTitle badge="اختبارات تفاعلية" title="امتحانات المحتوى التفاعلي" description="اختبارات منشورة من الإدارة داخل واجهة حديثة." />
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 md:col-span-3 text-amber-800 font-bold">امتحان النظام المخصص متوقف مؤقتًا للطلاب. ستظل الامتحانات التفاعلية المنشورة من الأدمن متاحة هنا.</div>
                 
                 {interactiveExams.map(h => (
@@ -947,10 +942,13 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
                     </motion.div>
                 ))}
             </div>
+            </div>
         )}
         
         {activeTab === 'exams' && !isBannedExam && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-6 page-soft-enter">
+            <StudentV2SectionTitle badge="الامتحانات" title="مركز الاختبارات" description="اعرف حالة كل امتحان، المحاولات السابقة، والشهادات المتاحة بعد الانتهاء." />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
              {exams.map(e => {
                 const examAttempts = examResults.filter(r => r.examId === e.id);
                 const prevResult = examAttempts.find(r => ['continue', 'restart'].includes(r.adminDecision))
@@ -1035,6 +1033,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
                 )
              })}
           </div>
+            </div>
         )}
 
         {activeTab === 'assignments' && !isBannedExam && (
@@ -1082,7 +1081,8 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
         )}
 
         {activeTab === 'settings' && (
-              <div className="space-y-6 max-w-5xl">
+              <div className="space-y-6 max-w-5xl page-soft-enter">
+                <StudentV2SectionTitle badge="الحساب" title="ملفي الشخصي والأداء" description="بياناتك، شهاداتك، وتحليل أدائك في مكان واحد." />
                 <div className="glass-panel p-4 md:p-6 rounded-2xl"><PerformanceOverview examResults={examResults} content={content} /></div>
                 <StudentCertificatePanel user={user} userData={userData} examResults={examResults} />
                 <div className="glass-panel p-4 md:p-6 rounded-xl max-w-2xl">

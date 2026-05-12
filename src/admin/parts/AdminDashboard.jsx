@@ -1360,7 +1360,7 @@ export const AdminDashboard = ({ user, adminProfile }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 font-['Cairo'] relative overflow-x-hidden" dir="rtl">
+    <div className="v2-admin-shell font-['Cairo'] relative overflow-x-hidden" dir="rtl">
       <DebugPanel user={user} />
       <FloatingArabicBackground />
 
@@ -1370,7 +1370,7 @@ export const AdminDashboard = ({ user, adminProfile }) => {
 
       <AdminHeader adminGradeFilter={adminGradeFilter} setAdminGradeFilter={setAdminGradeFilter} />
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-4 md:p-6 relative z-10">
+      <div className="v2-admin-grid grid grid-cols-1 md:grid-cols-[280px_1fr] gap-6 p-4 md:p-6 relative z-10">
         <AdminSidebar activeTab={activeTab} setActiveTab={setActiveTab} adminProfile={adminProfile} />
 
         <Suspense fallback={<AdminLazyFallback />}>

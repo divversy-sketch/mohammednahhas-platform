@@ -1,6 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
+import './index.css';
+import './styles/v2-redesign.css';
 import { registerPWAUpdate } from './pwaUpdate.js';
 import { installGlobalErrorLogger } from './services/monitoring/errorLogger.js';
 

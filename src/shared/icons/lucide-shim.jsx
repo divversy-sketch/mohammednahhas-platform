@@ -81,10 +81,13 @@ export const DownloadCloud = makeIcon('DownloadCloud', downloadPath);
 export const Lock = makeIcon('Lock', lockPath);
 export const Unlock = makeIcon('Unlock', <><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 7-2.6" /></>);
 export const Menu = makeIcon('Menu', menuPath);
+export const MoreVertical = makeIcon('MoreVertical', <><circle cx="12" cy="5" r="1" fill="currentColor" /><circle cx="12" cy="12" r="1" fill="currentColor" /><circle cx="12" cy="19" r="1" fill="currentColor" /></>);
 export const ChevronRight = makeIcon('ChevronRight', chevronRightPath);
+export const ChevronLeft = makeIcon('ChevronLeft', <><path d="m15 18-6-6 6-6" /></>);
 export const Maximize2 = makeIcon('Maximize2', maxPath);
 export const Minimize2 = makeIcon('Minimize2', minPath);
 export const Search = makeIcon('Search', searchPath);
+export const Filter = makeIcon('Filter', <><path d="M22 3H2l8 9.5V20l4 2v-9.5Z" /></>);
 export const Shrink = makeIcon('Shrink', minPath);
 export const PenLine = makeIcon('PenLine', penPath);
 export const Edit = makeIcon('Edit', penPath);
@@ -151,5 +154,10 @@ export const Wand2 = makeIcon('Wand2');
 export const WalletCards = makeIcon('WalletCards');
 export const Smartphone = makeIcon('Smartphone');
 export const Lightbulb = makeIcon('Lightbulb');
+
+// Compatibility aliases for lucide icons used by V2 screens.
+// Keep these aliases here so feature files do not need per-page fixes.
+export const Clock3 = Clock;
+export const ShieldCheck = Shield;
 export default makeIcon('Icon');
 
