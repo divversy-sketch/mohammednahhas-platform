@@ -224,7 +224,27 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
       const watchedSeconds = Math.max(overrideSeconds ?? localSeconds, maxAllowedSeekRef.current || 0);
       const currentDuration = videoId ? safeNumber(youtubePlayerRef.current?.getDuration?.(), estimatedDuration) : safeNumber(videoRef.current?.duration, estimatedDuration);
       const watchedPercentValue = currentDuration > 0 ? Math.min(100, Math.round((watchedSeconds / currentDuration) * 100)) : watchedPercent;
-      onProgress?.(video.id, watchedPercentValue, watchedSeconds, { estimatedDuration: currentDuration, videoTitle: video.title, lastPositionSeconds: watchedSeconds });
+      const localProgressPayload = {
+        videoId: video.id,
+        title: video.title || 'محاضرة',
+        grade: video.grade || '',
+        watchedSeconds,
+        lastPositionSeconds: watchedSeconds,
+        maxWatchedSeconds: watchedSeconds,
+        watchedPercent: watchedPercentValue,
+        percent: watchedPercentValue,
+        estimatedDuration: currentDuration,
+        videoDuration: currentDuration,
+        updatedAt: Date.now()
+      };
+      try {
+        if (resumeStorageKey) {
+          localStorage.setItem(resumeStorageKey, String(Math.round(watchedSeconds || 0)));
+          localStorage.setItem(`nahhas-video-progress-${user.uid}-${video.id}`, JSON.stringify(localProgressPayload));
+          localStorage.setItem(`nahhas-latest-video-${user.uid}`, JSON.stringify(localProgressPayload));
+        }
+      } catch (e) {}
+      onProgress?.(video.id, watchedPercentValue, watchedSeconds, { estimatedDuration: currentDuration, videoDuration: currentDuration, videoTitle: video.title, lastPositionSeconds: watchedSeconds, maxWatchedSeconds: watchedSeconds });
       try {
         await setDoc(viewRef, {
           userId: user.uid,
@@ -264,8 +284,7 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
         const currentPercent = currentDuration > 0 ? pct((localSeconds / currentDuration) * 100) : 0;
         if (resumeStorageKey) {
           try {
-            localStorage.setItem(resumeStorageKey, String(localSeconds));
-            localStorage.setItem(`nahhas-latest-video-${user.uid}`, JSON.stringify({
+            const localProgressPayload = {
               videoId: video.id,
               title: video.title || 'محاضرة',
               grade: video.grade || '',
@@ -275,8 +294,12 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
               watchedPercent: currentPercent,
               percent: currentPercent,
               estimatedDuration: currentDuration,
+              videoDuration: currentDuration,
               updatedAt: Date.now()
-            }));
+            };
+            localStorage.setItem(resumeStorageKey, String(localSeconds));
+            localStorage.setItem(`nahhas-video-progress-${user.uid}-${video.id}`, JSON.stringify(localProgressPayload));
+            localStorage.setItem(`nahhas-latest-video-${user.uid}`, JSON.stringify(localProgressPayload));
           } catch (e) {}
         }
         setWatchedPercent(currentPercent);

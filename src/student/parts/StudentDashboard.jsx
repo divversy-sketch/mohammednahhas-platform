@@ -227,17 +227,49 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
       }
   };
 
+  const getStoredLocalVideoProgress = (videoId) => {
+      if (!user?.uid || !videoId) return null;
+      try {
+          const fullProgress = localStorage.getItem(`nahhas-video-progress-${user.uid}-${videoId}`);
+          if (fullProgress) return JSON.parse(fullProgress);
+          const resumeSeconds = safeNumber(localStorage.getItem(`nahhas-video-resume-${user.uid}-${videoId}`), 0);
+          const latestRaw = localStorage.getItem('nahhas-latest-video-' + user.uid);
+          const latest = latestRaw ? JSON.parse(latestRaw) : null;
+          if (latest?.videoId === videoId) {
+              return { ...latest, lastPositionSeconds: Math.max(resumeSeconds, safeNumber(latest.lastPositionSeconds, 0), safeNumber(latest.watchedSeconds, 0)) };
+          }
+          return resumeSeconds > 0 ? { videoId, lastPositionSeconds: resumeSeconds, watchedSeconds: resumeSeconds } : null;
+      } catch (e) {
+          return null;
+      }
+  };
+
   const getVideoWatchPercent = (videoItem) => {
-      const match = videoViews.find(v => v.videoId === videoItem.id);
-      if (!match) return 0;
-      const storedPercent = safeNumber(match.watchedPercent ?? match.watchPercent ?? match.percent, -1);
-      if (storedPercent >= 0) return Math.max(0, Math.min(100, Math.round(storedPercent)));
-      const watchedSeconds = safeNumber(match.lastPositionSeconds, safeNumber(match.maxWatchedSeconds, safeNumber(match.watchedSeconds, 0)));
-      const durationSeconds = safeNumber(
-          videoItem.durationSeconds,
-          safeNumber(videoItem.estimatedDurationMinutes, 0) * 60 || safeNumber(match.estimatedDuration, safeNumber(match.videoDuration, 0))
-      );
-      return durationSeconds > 0 ? Math.min(100, Math.round((watchedSeconds / durationSeconds) * 100)) : 0;
+      const candidates = [
+          videoViews.find(v => v.videoId === videoItem.id || v.id === videoItem.id),
+          getStoredLocalVideoProgress(videoItem.id)
+      ].filter(Boolean);
+
+      let bestPercent = 0;
+      candidates.forEach((match) => {
+          const storedPercent = safeNumber(match.watchedPercent ?? match.watchPercent ?? match.percent, -1);
+          if (storedPercent >= 0) bestPercent = Math.max(bestPercent, storedPercent);
+
+          const watchedSeconds = Math.max(
+              safeNumber(match.lastPositionSeconds, 0),
+              safeNumber(match.maxWatchedSeconds, 0),
+              safeNumber(match.watchedSeconds, 0)
+          );
+          const durationSeconds = safeNumber(
+              match.estimatedDuration,
+              safeNumber(match.videoDuration, safeNumber(videoItem.durationSeconds, safeNumber(videoItem.estimatedDurationMinutes, 0) * 60))
+          );
+          if (durationSeconds > 0 && watchedSeconds > 0) {
+              bestPercent = Math.max(bestPercent, (watchedSeconds / durationSeconds) * 100);
+          }
+      });
+
+      return Math.max(0, Math.min(100, Math.round(bestPercent)));
   };
 
   const canOpenLinkedExam = (videoItem) => {
@@ -262,15 +294,20 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
           const others = prev.filter(v => v.videoId !== videoId);
           const nextPercent = Math.max(safeNumber(existing.watchedPercent ?? existing.watchPercent ?? existing.percent, 0), safeNumber(percent, 0));
           const nextSeconds = Math.max(safeNumber(existing.lastPositionSeconds, safeNumber(existing.watchedSeconds, 0)), safeNumber(watchedSeconds, 0));
-          return [...others, {
+          const nextView = {
               ...existing,
               ...extra,
               videoId,
               watchedPercent: Math.min(100, Math.round(nextPercent)),
               watchedSeconds: Math.max(safeNumber(existing.watchedSeconds, 0), nextSeconds),
+              maxWatchedSeconds: Math.max(safeNumber(existing.maxWatchedSeconds, 0), nextSeconds),
               lastPositionSeconds: nextSeconds,
               updatedAt: { seconds: Math.floor(Date.now() / 1000) }
-          }];
+          };
+          try {
+              if (user?.uid) localStorage.setItem(`nahhas-video-progress-${user.uid}-${videoId}`, JSON.stringify({ ...nextView, updatedAt: Date.now() }));
+          } catch (e) {}
+          return [...others, nextView];
       });
   };
 
