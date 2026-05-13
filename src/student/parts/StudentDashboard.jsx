@@ -834,10 +834,12 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
                         const watchPercent = getVideoWatchPercent(v);
                         return (
                         <div key={v.id} className="glass-card rounded-xl overflow-hidden cursor-pointer relative group">
-                            <div className="h-48 bg-gradient-to-br from-slate-800 to-black flex items-center justify-center relative" onClick={() => handlePremiumClick(() => setPlayingVideo(v))}>
-                                {v.isPremium && !isPremium ? <Lock className="text-slate-400 w-16 h-16 opacity-80" /> : <PlayCircle className="text-white w-16 h-16 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/>}
-                                <span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(v.grade)}</span>
-                                {v.isPremium && <span className="absolute top-2 right-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-full font-bold flex items-center gap-1 shadow-md"><Crown size={12}/> VIP</span>}
+                            <div className="h-48 bg-gradient-to-br from-slate-800 to-black flex items-center justify-center relative overflow-hidden" onClick={() => handlePremiumClick(() => setPlayingVideo(v))}>
+                                {(v.thumbnailUrl || v.posterUrl || v.image) && <img src={v.thumbnailUrl || v.posterUrl || v.image} className="absolute inset-0 w-full h-full object-cover transition duration-500 group-hover:scale-105" alt={v.title || 'غلاف الفيديو'} />}
+                                <div className="absolute inset-0 bg-black/35" />
+                                {v.isPremium && !isPremium ? <Lock className="relative z-10 text-white w-16 h-16 opacity-90 drop-shadow-lg" /> : <PlayCircle className="relative z-10 text-white w-16 h-16 opacity-90 group-hover:scale-110 transition drop-shadow-lg"/>}
+                                <span className="absolute bottom-2 left-2 z-10 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(v.grade)}</span>
+                                {v.isPremium && <span className="absolute top-2 right-2 z-10 bg-amber-500 text-white text-xs px-2 py-1 rounded-full font-bold flex items-center gap-1 shadow-md"><Crown size={12}/> VIP</span>}
                             </div>
                             <div className="p-4 space-y-3">
                                 <h3 className={`font-bold text-lg ${v.isPremium && !isPremium ? 'text-slate-400' : 'text-slate-800'}`}>{v.title}</h3>

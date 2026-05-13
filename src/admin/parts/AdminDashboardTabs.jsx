@@ -170,6 +170,7 @@ export default function AdminDashboardTabs({ ctx }) {
     approveGrade,
     rejectGrade,
     handleFileSelect,
+    handleVideoThumbnailSelect,
     handleAddContent,
     handleDeleteContent,
     parseExam,
@@ -942,6 +943,22 @@ export default function AdminDashboardTabs({ ctx }) {
                   <form onSubmit={handleAddContent} className="grid gap-4 mb-6">
                       <input className="border p-3 rounded w-full" placeholder="العنوان" value={newContent.title} onChange={e=>setNewContent({...newContent, title:e.target.value})}/>
                       <input className="border p-3 rounded w-full" placeholder="الرابط (يفضل Google Drive للملفات الكبيرة)" value={newContent.url} onChange={e=>setNewContent({...newContent, url:e.target.value})}/>
+                      {newContent.type === 'video' && (
+                        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
+                          <div>
+                            <label className="block text-sm font-black text-amber-900 mb-1">صورة الفيديو / الغلاف الظاهر للطالب</label>
+                            <input className="border p-3 rounded-xl w-full bg-white" placeholder="رابط الصورة أو ارفع صورة من الزر" value={newContent.thumbnailUrl || ''} onChange={e=>setNewContent({...newContent, thumbnailUrl:e.target.value})}/>
+                            <p className="text-xs text-amber-800 font-bold mt-1">ستظهر بدل الخلفية السوداء في كارت الفيديو، وتظهر كغلاف قبل التشغيل للفيديوهات المرفوعة.</p>
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <label className="bg-amber-600 text-white px-5 py-3 rounded-xl font-black cursor-pointer text-center">
+                              رفع صورة
+                              <input type="file" accept="image/*" className="hidden" onChange={handleVideoThumbnailSelect} />
+                            </label>
+                            {newContent.thumbnailUrl && <img src={newContent.thumbnailUrl} className="h-24 w-40 object-cover rounded-xl border bg-white" />}
+                          </div>
+                        </div>
+                      )}
                       <div className="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center hover:bg-slate-50 transition relative">
                           <input type="file" onChange={handleFileSelect} className="absolute inset-0 opacity-0 cursor-pointer" />
                           <div className="flex flex-col items-center gap-2 text-slate-500">

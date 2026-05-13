@@ -74,13 +74,14 @@ function ImgInput({ label, value, onChange, kind = 'image' }) {
   );
 }
 
-export function YouTubeLessonPlayer({ videoUrl, savedProgress, onProgress }) {
+export function YouTubeLessonPlayer({ videoUrl, savedProgress, onProgress, posterImage = '' }) {
   const id = useMemo(() => `yt-${Math.random().toString(36).slice(2)}`, []);
   const player = useRef(null);
   const timer = useRef(null);
   const last = useRef({ p: 0, t: 0 });
   const max = useRef(Number(savedProgress?.maxWatchedSeconds || savedProgress?.watchTime || 0));
   const [state, setState] = useState({ p: pct(savedProgress?.watchPercent), anti: false });
+  const [started, setStarted] = useState(false);
   const vid = ytId(videoUrl);
 
   useEffect(() => {
@@ -157,8 +158,14 @@ export function YouTubeLessonPlayer({ videoUrl, savedProgress, onProgress }) {
 
   return (
     <div className="space-y-4">
-      <div className="aspect-video bg-slate-900 rounded-3xl overflow-hidden">
+      <div className="aspect-video bg-slate-900 rounded-3xl overflow-hidden relative">
         <div id={id} className="w-full h-full" />
+        {posterImage && !started && (
+          <button type="button" onClick={() => { setStarted(true); player.current?.playVideo?.(); }} className="absolute inset-0 z-20 group">
+            <img src={posterImage} className="w-full h-full object-cover" alt="غلاف الدرس" />
+            <span className="absolute inset-0 bg-black/35 flex items-center justify-center"><span className="w-20 h-20 rounded-full bg-amber-500 text-white flex items-center justify-center text-4xl shadow-2xl group-hover:scale-110 transition">▶</span></span>
+          </button>
+        )}
       </div>
       <div className="bg-white rounded-2xl p-4 border">
         <div className="flex justify-between font-black mb-2">
@@ -367,7 +374,7 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
             <input className="p-3 rounded-xl border" placeholder="عنوان الدرس" value={lf.title} onChange={(e) => setLf({ ...lf, title: e.target.value })} />
             <input className="p-3 rounded-xl border" placeholder="أيقونة" value={lf.icon} onChange={(e) => setLf({ ...lf, icon: e.target.value })} />
           </div>
-          <ImgInput label="صورة الدرس" value={lf.lessonImage} onChange={(v) => setLf({ ...lf, lessonImage: v })} />
+          <ImgInput label="صورة الفيديو داخل الكورس / غلاف الدرس" value={lf.lessonImage} onChange={(v) => setLf({ ...lf, lessonImage: v })} />
           <input className="w-full p-3 rounded-xl border" placeholder="رابط يوتيوب" value={lf.videoUrl} onChange={(e) => setLf({ ...lf, videoUrl: e.target.value })} />
           <ImgInput label="ملف PDF" kind="pdf" value={lf.pdfUrl} onChange={(v) => setLf({ ...lf, pdfUrl: v })} />
           <div className="grid grid-cols-2 gap-3">
@@ -612,10 +619,10 @@ export function StudentCoursesHub({ user, userData, exams = [], onStartExam }) {
 
       <div className="bg-white rounded-3xl p-4 border">
         <h3 className="font-black mb-4 flex gap-2"><Layers /> دروس الكورس</h3>
-        {mods.map((m) => <div key={m.id} className="mb-6"><h4 className="font-black text-amber-800 mb-3">{m.order}. {m.title}</h4><div className="grid lg:grid-cols-2 gap-6">{(lbm[m.id] || []).map((l) => { const a = can(l); const p = pr(l.id); return <button key={l.id} onClick={() => { if (!a.ok) return platformNotify(a.reason, 'error'); setLesson(l); setTab('video'); }} className={`text-right rounded-3xl overflow-hidden border bg-white ${a.ok ? 'hover:-translate-y-1' : 'opacity-70'}`}><div className="relative"><img src={l.lessonImage || course.coverImage || 'https://placehold.co/600x340?text=Lesson'} className="h-72 lg:h-80 w-full object-cover" /><span className="absolute top-3 right-3 bg-white/90 rounded-full px-3 py-1 font-black">{l.icon || '📘'}</span><span className="absolute top-3 left-3 bg-white/90 rounded-full p-2">{a.ok ? <Unlock size={18} className="text-emerald-600" /> : <Lock size={18} className="text-red-600" />}</span></div><div className="p-4"><h5 className="font-black">{l.title}</h5><p className="text-xs text-slate-500 font-bold">مشاهدة: {pct(p.watchPercent)}%</p>{a.admin && <p className="text-xs text-emerald-700 font-black">متاح باستثناء من الإدارة</p>}{!a.ok && <p className="text-xs text-red-600 font-black">{a.reason}</p>}</div></button>; })}</div></div>)}
+        {mods.map((m) => <div key={m.id} className="mb-6"><h4 className="font-black text-amber-800 mb-3">{m.order}. {m.title}</h4><div className="grid lg:grid-cols-2 gap-6">{(lbm[m.id] || []).map((l) => { const a = can(l); const p = pr(l.id); return <button key={l.id} onClick={() => { if (!a.ok) return platformNotify(a.reason, 'error'); setLesson(l); setTab('video'); }} className={`text-right rounded-3xl overflow-hidden border bg-white ${a.ok ? 'hover:-translate-y-1' : 'opacity-70'}`}><div className="relative"><img src={l.lessonImage || course.coverImage || (l.youtubeVideoId ? `https://img.youtube.com/vi/${l.youtubeVideoId}/hqdefault.jpg` : 'https://placehold.co/600x340?text=Lesson')} className="h-72 lg:h-80 w-full object-cover" /><span className="absolute top-3 right-3 bg-white/90 rounded-full px-3 py-1 font-black">{l.icon || '📘'}</span><span className="absolute top-3 left-3 bg-white/90 rounded-full p-2">{a.ok ? <Unlock size={18} className="text-emerald-600" /> : <Lock size={18} className="text-red-600" />}</span></div><div className="p-4"><h5 className="font-black">{l.title}</h5><p className="text-xs text-slate-500 font-bold">مشاهدة: {pct(p.watchPercent)}%</p>{a.admin && <p className="text-xs text-emerald-700 font-black">متاح باستثناء من الإدارة</p>}{!a.ok && <p className="text-xs text-red-600 font-black">{a.reason}</p>}</div></button>; })}</div></div>)}
       </div>
 
-      {lesson && <div className="bg-white rounded-3xl p-5 border"><h3 className="text-2xl font-black mb-4">{lesson.icon || '📘'} {lesson.title}</h3><div className="grid md:grid-cols-3 gap-2 mb-5"><button onClick={() => setTab('video')} className={`p-3 rounded-2xl font-black ${tab === 'video' ? 'bg-amber-600 text-white' : 'bg-slate-100'}`}><PlayCircle className="inline ml-1" /> شرح الدرس</button><button onClick={() => setTab('pdf')} className={`p-3 rounded-2xl font-black ${tab === 'pdf' ? 'bg-blue-600 text-white' : 'bg-slate-100'}`}><FileText className="inline ml-1" /> PDF</button><button onClick={() => setTab('exam')} className={`p-3 rounded-2xl font-black ${tab === 'exam' ? 'bg-emerald-600 text-white' : 'bg-slate-100'}`}><ClipboardList className="inline ml-1" /> الامتحان</button></div>{tab === 'video' && <YouTubeLessonPlayer videoUrl={lesson.videoUrl} savedProgress={pr(lesson.id)} onProgress={(d) => saveP(lesson, d)} />} {tab === 'pdf' && <div className="bg-blue-50 rounded-3xl p-6 text-center">{lesson.pdfUrl ? <a href={lesson.pdfUrl} target="_blank" rel="noreferrer" className="bg-blue-600 text-white px-6 py-3 rounded-2xl font-black inline-flex gap-2"><FileText /> فتح PDF</a> : <p className="font-bold text-slate-500">لا يوجد PDF لهذا الدرس.</p>}</div>} {tab === 'exam' && <div className="bg-emerald-50 rounded-3xl p-6 text-center space-y-3"><p className="font-black">نسبة مشاهدتك: {pct(pr(lesson.id).watchPercent)}%</p><button onClick={() => openExam(lesson)} className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-black inline-flex gap-2"><ClipboardList /> بدء الامتحان</button><p className="text-xs text-slate-500 font-bold">لا يفتح إلا بعد مشاهدة {lesson.unlockRules?.examRequiresWatchPercent || 75}% إلا باستثناء من الأدمن.</p></div>}</div>}
+      {lesson && <div className="bg-white rounded-3xl p-5 border"><h3 className="text-2xl font-black mb-4">{lesson.icon || '📘'} {lesson.title}</h3><div className="grid md:grid-cols-3 gap-2 mb-5"><button onClick={() => setTab('video')} className={`p-3 rounded-2xl font-black ${tab === 'video' ? 'bg-amber-600 text-white' : 'bg-slate-100'}`}><PlayCircle className="inline ml-1" /> شرح الدرس</button><button onClick={() => setTab('pdf')} className={`p-3 rounded-2xl font-black ${tab === 'pdf' ? 'bg-blue-600 text-white' : 'bg-slate-100'}`}><FileText className="inline ml-1" /> PDF</button><button onClick={() => setTab('exam')} className={`p-3 rounded-2xl font-black ${tab === 'exam' ? 'bg-emerald-600 text-white' : 'bg-slate-100'}`}><ClipboardList className="inline ml-1" /> الامتحان</button></div>{tab === 'video' && <YouTubeLessonPlayer videoUrl={lesson.videoUrl} posterImage={lesson.lessonImage || course.coverImage || (lesson.youtubeVideoId ? `https://img.youtube.com/vi/${lesson.youtubeVideoId}/hqdefault.jpg` : '')} savedProgress={pr(lesson.id)} onProgress={(d) => saveP(lesson, d)} />} {tab === 'pdf' && <div className="bg-blue-50 rounded-3xl p-6 text-center">{lesson.pdfUrl ? <a href={lesson.pdfUrl} target="_blank" rel="noreferrer" className="bg-blue-600 text-white px-6 py-3 rounded-2xl font-black inline-flex gap-2"><FileText /> فتح PDF</a> : <p className="font-bold text-slate-500">لا يوجد PDF لهذا الدرس.</p>}</div>} {tab === 'exam' && <div className="bg-emerald-50 rounded-3xl p-6 text-center space-y-3"><p className="font-black">نسبة مشاهدتك: {pct(pr(lesson.id).watchPercent)}%</p><button onClick={() => openExam(lesson)} className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-black inline-flex gap-2"><ClipboardList /> بدء الامتحان</button><p className="text-xs text-slate-500 font-bold">لا يفتح إلا بعد مشاهدة {lesson.unlockRules?.examRequiresWatchPercent || 75}% إلا باستثناء من الأدمن.</p></div>}</div>}
     </div>
   );
 }
