@@ -30,12 +30,14 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
   const finalUrl = video?.url || video?.file;
   const videoId = getYouTubeID(finalUrl);
   const youtubeDomId = useMemo(() => `yt-secure-${Math.random().toString(36).slice(2)}`, []);
-  const posterUrl = video?.thumbnailUrl || video?.posterUrl || video?.image || video?.lessonImage || '';
+  const posterUrl = video?.thumbnailUrl || video?.posterUrl || video?.image || video?.lessonImage || video?.coverImage || '';
   const resumeStorageKey = user?.uid && video?.id ? `nahhas-video-resume-${user.uid}-${video.id}` : '';
   const lastPositionRef = useRef(0);
   const maxAllowedSeekRef = useRef(0);
   const youtubePlayerRef = useRef(null);
   const youtubeTimerRef = useRef(null);
+  const pendingResumeSecondsRef = useRef(0);
+  const resumeAppliedRef = useRef(false);
 
   const watermarkText = useMemo(() => `${userName || 'طالب'} - ${video?.grade || ''} — منصة النحاس`, [userName, video?.grade]);
   
@@ -118,7 +120,16 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
         videoId,
         playerVars: { rel: 0, modestbranding: 1, playsinline: 1, enablejsapi: 1, controls: 1, disablekb: 1, fs: 1 },
         events: {
-          onReady: tickYouTube,
+          onReady: () => {
+            const saved = Math.round(pendingResumeSecondsRef.current || maxAllowedSeekRef.current || 0);
+            if (saved > 8 && !resumeAppliedRef.current) {
+              try { youtubePlayerRef.current?.seekTo?.(saved, true); } catch {}
+              resumeAppliedRef.current = true;
+              setResumeHint(`تم استكمال المحاضرة من الدقيقة ${formatMinSec(saved)}`);
+              setTimeout(() => setResumeHint(''), 4200);
+            }
+            tickYouTube();
+          },
           onStateChange: (event) => {
             clearInterval(youtubeTimerRef.current);
             if (event.data === YT_PLAYING) youtubeTimerRef.current = setInterval(tickYouTube, 1000);
@@ -157,15 +168,29 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
         const localValue = resumeStorageKey ? Number(localStorage.getItem(resumeStorageKey) || 0) : 0;
         savedSeconds = Number.isFinite(localValue) ? localValue : 0;
         const viewSnap = await getDoc(doc(db, 'video_views', `${user.uid}_${video.id}`));
-        const dbSeconds = safeNumber(viewSnap.data()?.lastPositionSeconds, 0);
+        const data = viewSnap.data() || {};
+        const dbSeconds = Math.max(
+          safeNumber(data.lastPositionSeconds, 0),
+          safeNumber(data.maxWatchedSeconds, 0),
+          safeNumber(data.watchedSeconds, 0)
+        );
         savedSeconds = Math.max(savedSeconds, dbSeconds);
+        const storedPercent = safeNumber(data.watchedPercent ?? data.watchPercent ?? data.percent, -1);
+        if (storedPercent >= 0) setWatchedPercent(pct(storedPercent));
       } catch (e) {
         // Firestore rules can block this on some installs; local resume still works.
       }
       if (!cancelled && videoId && savedSeconds > 8) {
+        pendingResumeSecondsRef.current = savedSeconds;
         maxAllowedSeekRef.current = savedSeconds;
         lastPositionRef.current = savedSeconds;
-        setResumeHint(`تم حفظ تقدمك السابق حتى الدقيقة ${formatMinSec(savedSeconds)}`);
+        if (youtubePlayerRef.current?.seekTo && !resumeAppliedRef.current) {
+          try { youtubePlayerRef.current.seekTo(savedSeconds, true); } catch {}
+          resumeAppliedRef.current = true;
+          setResumeHint(`تم استكمال المحاضرة من الدقيقة ${formatMinSec(savedSeconds)}`);
+        } else {
+          setResumeHint(`تم حفظ تقدمك السابق حتى الدقيقة ${formatMinSec(savedSeconds)}`);
+        }
         setTimeout(() => setResumeHint(''), 4200);
       }
       if (!cancelled && !videoId && videoRef.current && savedSeconds > 8) {
@@ -196,10 +221,10 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
     const estimatedDuration = safeNumber(video.durationSeconds, safeNumber(video.estimatedDurationMinutes, 0) * 60);
 
     const syncToDatabase = async (secondsToAdd, overrideSeconds = null) => {
-      const watchedSeconds = overrideSeconds ?? localSeconds;
+      const watchedSeconds = Math.max(overrideSeconds ?? localSeconds, maxAllowedSeekRef.current || 0);
       const currentDuration = videoId ? safeNumber(youtubePlayerRef.current?.getDuration?.(), estimatedDuration) : safeNumber(videoRef.current?.duration, estimatedDuration);
-      const watchedPercentValue = currentDuration > 0 ? Math.min(100, Math.round((watchedSeconds / currentDuration) * 100)) : 0;
-      onProgress?.(video.id, watchedPercentValue, watchedSeconds);
+      const watchedPercentValue = currentDuration > 0 ? Math.min(100, Math.round((watchedSeconds / currentDuration) * 100)) : watchedPercent;
+      onProgress?.(video.id, watchedPercentValue, watchedSeconds, { estimatedDuration: currentDuration, videoTitle: video.title, lastPositionSeconds: watchedSeconds });
       try {
         await setDoc(viewRef, {
           userId: user.uid,
@@ -207,8 +232,9 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
           videoId: video.id,
           videoTitle: video.title,
           viewedAt: serverTimestamp(),
-          watchedSeconds: increment(secondsToAdd),
-          lastPositionSeconds: Math.round((videoId ? youtubePlayerRef.current?.getCurrentTime?.() : videoRef.current?.currentTime) || watchedSeconds || 0),
+          watchedSeconds: increment(Math.max(0, secondsToAdd)),
+          lastPositionSeconds: Math.round(watchedSeconds || 0),
+          maxWatchedSeconds: Math.round(watchedSeconds || 0),
           estimatedDuration: currentDuration,
           watchedPercent: watchedPercentValue,
           linkedExamId: video.linkedExamId || null
@@ -218,7 +244,6 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
       }
     };
 
-    syncToDatabase(0, 0);
     timerInterval = setInterval(() => {
       let isPlaying = true;
       if (videoId) isPlaying = youtubePlayerRef.current?.getPlayerState?.() === YT_PLAYING;
@@ -235,11 +260,11 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
         maxAllowedSeekRef.current = Math.max(maxAllowedSeekRef.current, actualSecond, localSeconds + 1);
         localSeconds = maxAllowedSeekRef.current;
         lastPositionRef.current = localSeconds;
-        if (resumeStorageKey) { try { localStorage.setItem(resumeStorageKey, String(localSeconds)); localStorage.setItem(`nahhas-latest-video-${user.uid}`, JSON.stringify({ videoId: video.id, title: video.title || 'محاضرة', grade: video.grade || '', watchedSeconds: localSeconds, updatedAt: Date.now() })); } catch (e) {} }
+        if (resumeStorageKey) { try { localStorage.setItem(resumeStorageKey, String(localSeconds)); localStorage.setItem(`nahhas-latest-video-${user.uid}`, JSON.stringify({ videoId: video.id, title: video.title || 'محاضرة', grade: video.grade || '', watchedSeconds: localSeconds, lastPositionSeconds: localSeconds, updatedAt: Date.now() })); } catch (e) {} }
         const currentDuration = videoId ? safeNumber(youtubePlayerRef.current?.getDuration?.(), estimatedDuration) : safeNumber(videoRef.current?.duration, estimatedDuration);
         const currentPercent = currentDuration > 0 ? pct((localSeconds / currentDuration) * 100) : 0;
         setWatchedPercent(currentPercent);
-        onProgress?.(video.id, currentPercent, localSeconds);
+        onProgress?.(video.id, currentPercent, localSeconds, { estimatedDuration: currentDuration, videoTitle: video.title, lastPositionSeconds: localSeconds });
         if (localSeconds - lastSyncedSeconds >= 15) {
           syncToDatabase(localSeconds - lastSyncedSeconds);
           lastSyncedSeconds = localSeconds;
@@ -370,7 +395,15 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
               <div className="relative w-full h-full">
                 <div id={youtubeDomId} className="w-full h-full video-smooth-frame" />
                 {posterUrl && !youtubeStarted && (
-                  <button type="button" onClick={() => { setYoutubeStarted(true); youtubePlayerRef.current?.playVideo?.(); }} className="absolute inset-0 z-50 group">
+                  <button type="button" onClick={() => {
+                      const saved = Math.round(pendingResumeSecondsRef.current || maxAllowedSeekRef.current || 0);
+                      if (saved > 8 && youtubePlayerRef.current?.seekTo && !resumeAppliedRef.current) {
+                        try { youtubePlayerRef.current.seekTo(saved, true); } catch {}
+                        resumeAppliedRef.current = true;
+                      }
+                      setYoutubeStarted(true);
+                      youtubePlayerRef.current?.playVideo?.();
+                    }} className="absolute inset-0 z-50 group">
                     <img src={posterUrl} className="w-full h-full object-cover" alt={video?.title || 'غلاف الفيديو'} />
                     <span className="absolute inset-0 bg-black/35 flex items-center justify-center"><span className="w-20 h-20 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-2xl group-hover:scale-110 transition"><Play size={38}/></span></span>
                   </button>
@@ -406,11 +439,20 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
                   if (duration > 0) setWatchedPercent(pct((maxAllowedSeekRef.current / duration) * 100));
                   if (current > 0 && Math.abs(current - lastPositionRef.current) >= 4) {
                     lastPositionRef.current = current;
-                    if (resumeStorageKey) { try { localStorage.setItem(resumeStorageKey, String(current)); localStorage.setItem(`nahhas-latest-video-${user.uid}`, JSON.stringify({ videoId: video.id, title: video.title || 'محاضرة', grade: video.grade || '', watchedSeconds: current, updatedAt: Date.now() })); } catch (e) {} }
+                    if (resumeStorageKey) { try { localStorage.setItem(resumeStorageKey, String(current)); localStorage.setItem(`nahhas-latest-video-${user.uid}`, JSON.stringify({ videoId: video.id, title: video.title || 'محاضرة', grade: video.grade || '', watchedSeconds: current, lastPositionSeconds: current, updatedAt: Date.now() })); } catch (e) {} }
                   }
                 }}
               >المتصفح لا يدعم هذا الفيديو.</video>
             )}
+          </div>
+          <div className="absolute left-4 right-4 bottom-4 z-[70] rounded-2xl border border-white/10 bg-black/55 p-3 text-white backdrop-blur-md">
+            <div className="mb-2 flex items-center justify-between text-xs font-black">
+              <span>نسبة المشاهدة</span>
+              <span className={watchedPercent >= 75 ? 'text-emerald-300' : 'text-amber-300'}>{watchedPercent}%</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-white/20">
+              <div className="h-full rounded-full bg-amber-400 transition-all" style={{ width: `${Math.min(100, watchedPercent)}%` }} />
+            </div>
           </div>
         </div>
       </div>

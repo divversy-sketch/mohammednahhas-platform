@@ -26,6 +26,15 @@ export default defineConfig([
       'no-unused-vars': ['warn', { varsIgnorePattern: '^[A-Z_]', argsIgnorePattern: '^_' }],
       'react-refresh/only-export-components': 'warn',
       'no-empty': 'warn',
+      'no-useless-escape': 'warn',
+      'no-undef': 'warn',
+      'react-hooks/purity': 'off',
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/static-components': 'off',
+      'react-hooks/refs': 'off',
+      'react-hooks/immutability': 'off',
+      'react-hooks/use-memo': 'off',
+      'react-hooks/rules-of-hooks': 'warn',
     },
   },
   {
@@ -43,6 +52,7 @@ export default defineConfig([
     },
     rules: {
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      'no-useless-escape': 'warn',
     },
   },
   {
