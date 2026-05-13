@@ -313,7 +313,7 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
     <div className="space-y-6" dir="rtl">
       <div className="bg-white rounded-3xl p-5 border">
         <h2 className="text-2xl font-black flex gap-2"><BookOpen className="text-amber-600" /> إدارة الكورسات التعليمية</h2>
-        <p className="text-slate-500 font-bold">الكورسات تظهر للطالب في الواجهة الرئيسية بصورة كبيرة، ويمكن فتحها يدويًا أو بكود مولد من المنصة.</p>
+        
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
@@ -552,7 +552,7 @@ export function StudentCoursesHub({ user, userData, exams = [], onStartExam }) {
   if (!course) {
     return (
       <div className="space-y-6" dir="rtl">
-        <PageHeader title="الواجهة الرئيسية للكورسات" description="كل كورس جديد منشور يظهر هنا بصورة كبيرة وتفاصيل واضحة. اضغط على الكورس لطلب الفتح أو إدخال الكود." icon={<Crown className="text-amber-600" />} />
+        <PageHeader title="الكورسات التعليمية" icon={<Crown className="text-amber-600" />} />
         <div className="space-y-6">
           {courses.map((c) => (
             <button key={c.id} onClick={() => setCourse(c)} className="w-full bg-white rounded-[2rem] overflow-hidden border text-right hover:-translate-y-1 transition shadow-sm">

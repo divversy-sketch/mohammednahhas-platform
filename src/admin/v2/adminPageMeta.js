@@ -1,13 +1,13 @@
 export const adminPageMeta = {
   dashboard: {
-    eyebrow: 'V2 Admin Command Center',
+    eyebrow: 'مركز التحكم',
     title: 'مركز قيادة المنصة',
-    description: 'نظرة تشغيلية موحدة على الطلاب، الامتحانات، المحتوى، المتابعة، والتحليلات بدون تغيير أي منطق داخلي.',
+    description: 'نظرة تشغيلية موحدة على الطلاب، الامتحانات، المحتوى، المتابعة، والتحليلات.',
   },
   users: {
     eyebrow: 'Admissions',
     title: 'طلبات التسجيل',
-    description: 'مراجعة الطلاب الجدد وقبولهم أو رفضهم بسرعة مع الحفاظ على نفس صلاحيات الإدارة.',
+    description: 'مراجعة الطلاب الجدد وقبولهم أو رفضهم بسرعة.',
   },
   all_users: {
     eyebrow: 'Students CRM',
@@ -22,7 +22,7 @@ export const adminPageMeta = {
   payments: {
     eyebrow: 'Revenue Operations',
     title: 'المدفوعات والاشتراكات',
-    description: 'طلبات الدفع، الاشتراكات، الأكواد، ولوحات النمو في واجهة أوضح للأدمن.',
+    description: 'طلبات الدفع، الاشتراكات، الأكواد، ولوحات النمو في لوحة الإدارة.',
   },
   subscriptions_legacy: {
     eyebrow: 'Subscriptions',
@@ -32,7 +32,7 @@ export const adminPageMeta = {
   courses: {
     eyebrow: 'Learning Content',
     title: 'الكورسات والحصص',
-    description: 'إدارة الكورسات، الحصص المباشرة، وربط المحتوى بتجربة الطالب.',
+    description: 'إدارة الكورسات، الحصص المباشرة، وربط المحتوى بالطالب.',
   },
   content: {
     eyebrow: 'Content Library',
@@ -100,6 +100,6 @@ export function getAdminPageMeta(activeTab) {
   return adminPageMeta[activeTab] || {
     eyebrow: 'Admin Workspace',
     title: 'مساحة الإدارة',
-    description: 'صفحة إدارية ضمن نظام V2 الجديد.',
+    description: '',
   };
 }

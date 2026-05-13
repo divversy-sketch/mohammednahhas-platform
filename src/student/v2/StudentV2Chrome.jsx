@@ -210,10 +210,10 @@ export function StudentV2Hero({
       <div className="relative z-10 grid gap-6 lg:grid-cols-[1.2fr_.8fr] items-end">
         <div>
           <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-black text-teal-100 backdrop-blur">
-            <Sparkles size={14}/> تجربة الطالب V2
+            <Sparkles size={14}/> لوحة الطالب
           </span>
           <h2 className="mt-5 text-3xl md:text-5xl font-black leading-tight">أهلًا {userData?.name || 'يا بطل'}، خلّي يومك الدراسي منظم.</h2>
-          <p className="mt-4 max-w-2xl text-sm md:text-base leading-8 text-slate-200">تابع محاضراتك، امتحاناتك، واجباتك، واشتراكك من واجهة واحدة حديثة بدون تغيير أي منطق في المنصة.</p>
+          <p className="mt-4 max-w-2xl text-sm md:text-base leading-8 text-slate-200">تابع محاضراتك وامتحاناتك وواجباتك من مكان واحد.</p>
           <div className="mt-6 flex flex-wrap gap-3">
             <button onClick={() => setActiveTab('courses')} className="rounded-2xl bg-white px-5 py-3 font-black text-slate-950 shadow-lg transition hover:-translate-y-0.5">ابدأ التعلم</button>
             <button onClick={() => setActiveTab('exams')} className="rounded-2xl border border-white/20 bg-white/10 px-5 py-3 font-black text-white backdrop-blur transition hover:bg-white/15">افتح الامتحانات</button>
@@ -250,13 +250,12 @@ function HeroMetric({ icon, label, value }) {
   );
 }
 
-export function StudentV2SectionTitle({ badge, title, description, action }) {
+export function StudentV2SectionTitle({ badge, title, action }) {
   return (
     <div className="v2-student-section-title mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
       <div>
         {badge && <span className="v2-kicker">{badge}</span>}
         <h2 className="mt-3 text-2xl md:text-3xl font-black text-slate-950">{title}</h2>
-        {description && <p className="mt-2 text-sm font-bold leading-7 text-slate-500">{description}</p>}
       </div>
       {action}
     </div>

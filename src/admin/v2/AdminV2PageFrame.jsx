@@ -27,10 +27,9 @@ export default function AdminV2PageFrame({
     <PageShell
       eyebrow={meta.eyebrow}
       title={meta.title}
-      description={meta.description}
+      description=""
       actions={(
         <>
-          <StatusBadge tone="success">V2 UI</StatusBadge>
           {adminName ? <StatusBadge tone="warning">{adminName}</StatusBadge> : null}
         </>
       )}
@@ -40,10 +39,10 @@ export default function AdminV2PageFrame({
           <Card className="v2-admin-hero-card overflow-hidden text-white">
             <div className="relative z-10 flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
               <div>
-                <p className="v2-admin-hero-kicker mb-3 inline-flex rounded-full px-3 py-1 text-xs font-black">لوحة قيادة جديدة</p>
+                <p className="v2-admin-hero-kicker mb-3 inline-flex rounded-full px-3 py-1 text-xs font-black">لوحة القيادة</p>
                 <h2 className="text-3xl font-black md:text-4xl">كل مؤشرات المنصة في مكان واحد</h2>
                 <p className="mt-3 max-w-2xl text-sm font-bold leading-7 text-slate-200">
-                  نفس بيانات Firebase ونفس منطق التشغيل الحالي، لكن بواجهة أوضح وأسرع في القراءة واتخاذ القرار.
+
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-2 text-sm font-black">
@@ -72,8 +71,7 @@ export default function AdminV2PageFrame({
             </div>
             <div className="space-y-3 text-sm font-bold text-slate-600">
               <div className="flex items-center justify-between rounded-2xl bg-slate-50 p-3"><span>صلاحيات الأدمن</span><StatusBadge tone="success">مفعلة</StatusBadge></div>
-              <div className="flex items-center justify-between rounded-2xl bg-slate-50 p-3"><span>واجهة V2</span><StatusBadge tone="info">قيد التحديث</StatusBadge></div>
-              <div className="flex items-center justify-between rounded-2xl bg-slate-50 p-3"><span>المنطق الحالي</span><StatusBadge tone="neutral">بدون تغيير</StatusBadge></div>
+              
             </div>
           </Card>
         </div>
@@ -90,7 +88,7 @@ export default function AdminV2PageFrame({
         <div className="mb-4 flex flex-col gap-3 border-b border-slate-100 pb-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-xl font-black text-slate-950">{meta.title}</h2>
-            <p className="mt-1 text-sm font-bold text-slate-500">تم إعادة تغليف الصفحة بتصميم V2 مع الإبقاء على نفس الوظائف.</p>
+            
           </div>
           {activeTab !== 'dashboard' && (
             <Button type="button" variant="soft" className="px-4 py-2" onClick={() => onNavigate?.('dashboard')}>

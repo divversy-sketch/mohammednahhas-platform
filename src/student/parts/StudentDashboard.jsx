@@ -627,19 +627,22 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
           setMobileMenu={setMobileMenu}
         />
 
-        <StudentV2Hero
-          userData={userData}
-          isPremium={isPremium}
-          videosCount={videos.length}
-          examsCount={exams.length}
-          averageScore={averageScore}
-          pendingAssignmentsCount={pendingAssignmentsCount}
-          completedVideoCount={completedVideoCount}
-          setActiveTab={setActiveTab}
-        />
-
-        <StudentTopGreeting user={user} userData={userData} isPremium={isPremium} videos={videos} exams={exams} examResults={examResults} setActiveTab={setActiveTab} />
-        {activeTab === 'home' && <div className="mb-6"><WisdomBox /></div>}
+        {activeTab === 'home' && (
+          <>
+            <StudentV2Hero
+              userData={userData}
+              isPremium={isPremium}
+              videosCount={videos.length}
+              examsCount={exams.length}
+              averageScore={averageScore}
+              pendingAssignmentsCount={pendingAssignmentsCount}
+              completedVideoCount={completedVideoCount}
+              setActiveTab={setActiveTab}
+            />
+            <StudentTopGreeting user={user} userData={userData} isPremium={isPremium} videos={videos} exams={exams} examResults={examResults} setActiveTab={setActiveTab} />
+            <div className="mb-6"><WisdomBox /></div>
+          </>
+        )}
 
         {activeTab === 'home' && (
             <div className="space-y-8 page-soft-enter">

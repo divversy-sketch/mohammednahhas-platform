@@ -20,11 +20,11 @@ export default function AdminSidebar({ activeTab, setActiveTab, adminProfile }) 
   const orderedTabs = [...priorityTabs, ...secondaryTabs];
 
   return (
-    <nav className="v2-admin-command-nav glass-panel rounded-3xl p-3 md:p-4 sticky top-[5.75rem] z-30" aria-label="أقسام لوحة الإدارة">
+    <nav className="v2-admin-command-nav glass-panel rounded-3xl p-3 md:p-4 sticky top-3 z-40" aria-label="أقسام لوحة الإدارة">
       <div className="flex items-center justify-between gap-3 mb-3">
         <div>
           <p className="text-[11px] font-black text-slate-400 uppercase tracking-wider">أقسام الإدارة</p>
-          <h2 className="text-base md:text-lg font-black text-slate-950">تنقل سريع بدون Sidebar</h2>
+          <h2 className="text-base md:text-lg font-black text-slate-950">تنقل سريع</h2>
         </div>
         <span className="hidden md:inline-flex rounded-full bg-amber-50 text-amber-700 border border-amber-100 px-3 py-1 text-xs font-black">
           {orderedTabs.length} قسم

@@ -1054,3 +1054,185 @@ body,
 .v2-admin-hero-card button:hover {
   background: rgba(255, 255, 255, 0.2) !important;
 }
+
+/* Final mobile/tablet polish requested: no clipping, readable cards, working top navigation. */
+.v2-admin-shell,
+.v2-student-shell,
+.v2-admin-grid,
+.v2-student-main,
+.v2-admin-workspace,
+.v2-card,
+.glass-panel,
+.v2-admin-command-nav,
+.v2-student-command-nav {
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.v2-admin-command-nav,
+.v2-student-command-nav {
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.v2-admin-command-scroll,
+.v2-student-command-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-inline: contain;
+  scroll-padding-inline: .75rem;
+}
+
+.v2-admin-command-chip,
+.v2-student-command-chip,
+.v2-student-logout-chip {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.v2-admin-workspace,
+.v2-card,
+.glass-panel {
+  overflow-wrap: anywhere;
+}
+
+.v2-admin-workspace img,
+.v2-card img,
+.glass-panel img,
+.v2-student-main img {
+  max-width: 100%;
+  height: auto;
+}
+
+@media (max-width: 1366px) {
+  .v2-admin-grid,
+  .v2-student-main {
+    max-width: 100%;
+    padding-inline: 1.25rem !important;
+  }
+
+  .v2-admin-command-scroll,
+  .v2-student-command-scroll {
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1366px) {
+  .v2-admin-grid,
+  .v2-student-main {
+    padding-inline: 1.5rem !important;
+  }
+
+  .v2-admin-command-chip,
+  .v2-student-command-chip,
+  .v2-student-logout-chip {
+    min-height: 2.7rem;
+    padding-inline: 1rem;
+  }
+}
+
+@media (max-width: 1023px) {
+  .v2-admin-grid,
+  .v2-student-main {
+    padding-inline: 1rem !important;
+  }
+
+  .v2-topbar {
+    margin-inline: 0 !important;
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: .9rem;
+  }
+
+  .v2-topbar > div {
+    width: 100%;
+    justify-content: space-between;
+    min-width: 0;
+  }
+
+  .v2-admin-command-nav,
+  .v2-student-command-nav {
+    top: .5rem !important;
+    margin-bottom: 1rem;
+  }
+
+  .v2-admin-command-scroll,
+  .v2-student-command-scroll {
+    padding-bottom: .65rem;
+  }
+}
+
+@media (max-width: 767px) {
+  html,
+  body,
+  #root {
+    overflow-x: hidden;
+  }
+
+  .v2-admin-grid,
+  .v2-student-main {
+    padding: .75rem !important;
+  }
+
+  .v2-admin-command-nav,
+  .v2-student-command-nav,
+  .v2-topbar,
+  .v2-student-toolbar,
+  .v2-student-hero,
+  .v2-admin-workspace,
+  .v2-card,
+  .glass-panel {
+    border-radius: 1.15rem !important;
+  }
+
+  .v2-admin-command-nav .flex.items-center.justify-between,
+  .v2-student-command-nav .flex.items-center.justify-between {
+    align-items: flex-start;
+  }
+
+  .v2-admin-command-scroll,
+  .v2-student-command-scroll {
+    gap: .45rem;
+    margin-inline: -.25rem;
+    padding-inline: .25rem;
+  }
+
+  .v2-admin-command-chip,
+  .v2-student-command-chip,
+  .v2-student-logout-chip {
+    min-height: 2.55rem;
+    padding: .65rem .85rem;
+    font-size: .78rem;
+    white-space: nowrap !important;
+  }
+
+  .v2-student-command-chip svg,
+  .v2-admin-command-chip svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .v2-admin-workspace,
+  .v2-card,
+  .glass-panel {
+    padding: .9rem !important;
+  }
+
+  .v2-page-title,
+  .v2-student-hero h2,
+  .v2-admin-hero-card h2 {
+    font-size: clamp(1.45rem, 7vw, 2.1rem) !important;
+    line-height: 1.25 !important;
+  }
+
+  .v2-admin-hero-card,
+  .v2-student-hero {
+    min-height: auto;
+  }
+
+  .v2-admin-hero-card .grid,
+  .v2-student-hero .grid {
+    grid-template-columns: 1fr !important;
+  }
+}
