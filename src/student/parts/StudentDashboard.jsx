@@ -276,28 +276,48 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
 
 
   const latestVideoActivity = (() => {
+      const normalizeActivityTime = (item) => {
+          const raw = safeNumber(
+              item?.viewedAt?.seconds,
+              safeNumber(item?.updatedAt?.seconds, safeNumber(item?.updatedAt, safeNumber(item?.lastSeenAt, 0)))
+          );
+          return raw > 1000000000000 ? raw : raw * 1000;
+      };
       const views = Array.isArray(videoViews) ? videoViews : [];
-      const byView = [...views].sort((a, b) => {
-          const bTime = safeNumber(b?.viewedAt?.seconds, safeNumber(b?.updatedAt?.seconds, safeNumber(b?.updatedAt, safeNumber(b?.lastPositionSeconds, safeNumber(b?.watchedSeconds, 0)))));
-          const aTime = safeNumber(a?.viewedAt?.seconds, safeNumber(a?.updatedAt?.seconds, safeNumber(a?.updatedAt, safeNumber(a?.lastPositionSeconds, safeNumber(a?.watchedSeconds, 0)))));
-          return bTime - aTime;
-      })[0];
+      const byView = [...views].sort((a, b) => normalizeActivityTime(b) - normalizeActivityTime(a))[0] || null;
       let localActivity = null;
       try {
           const raw = user?.uid ? localStorage.getItem('nahhas-latest-video-' + user.uid) : '';
           localActivity = raw ? JSON.parse(raw) : null;
       } catch (e) {}
-      const picked = byView || localActivity;
+
+      const picked = normalizeActivityTime(localActivity) > normalizeActivityTime(byView) ? localActivity : byView;
       if (!picked) return null;
-      const videoId = picked.videoId;
-      const videoItem = videos.find(v => v.id === videoId) || (localActivity?.videoId === videoId ? videos.find(v => v.id === localActivity.videoId) : null);
+
+      const videoId = picked.videoId || picked.id;
+      const videoItem = videos.find(v => v.id === videoId);
       if (!videoItem) return null;
+
       const watchedSeconds = Math.max(
           safeNumber(picked.lastPositionSeconds, 0),
           safeNumber(picked.maxWatchedSeconds, 0),
-          safeNumber(localActivity?.watchedSeconds, 0)
+          safeNumber(picked.watchedSeconds, 0),
+          safeNumber(localActivity?.videoId === videoId ? localActivity?.lastPositionSeconds : 0, 0),
+          safeNumber(localActivity?.videoId === videoId ? localActivity?.watchedSeconds : 0, 0)
       );
-      const percent = Math.max(0, Math.min(100, getVideoWatchPercent(videoItem)));
+
+      const storedPercent = Math.max(
+          safeNumber(picked.watchedPercent ?? picked.watchPercent ?? picked.percent, -1),
+          safeNumber(localActivity?.videoId === videoId ? (localActivity?.watchedPercent ?? localActivity?.watchPercent ?? localActivity?.percent) : -1, -1),
+          getVideoWatchPercent(videoItem)
+      );
+      const durationSeconds = safeNumber(
+          picked.estimatedDuration,
+          safeNumber(picked.videoDuration, safeNumber(videoItem.durationSeconds, safeNumber(videoItem.estimatedDurationMinutes, 0) * 60))
+      );
+      const computedPercent = durationSeconds > 0 && watchedSeconds > 0 ? Math.round((watchedSeconds / durationSeconds) * 100) : 0;
+      const percent = Math.max(0, Math.min(100, Math.round(Math.max(storedPercent, computedPercent))));
+
       return {
           video: videoItem,
           watchedSeconds,

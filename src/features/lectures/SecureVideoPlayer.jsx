@@ -260,9 +260,25 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
         maxAllowedSeekRef.current = Math.max(maxAllowedSeekRef.current, actualSecond, localSeconds + 1);
         localSeconds = maxAllowedSeekRef.current;
         lastPositionRef.current = localSeconds;
-        if (resumeStorageKey) { try { localStorage.setItem(resumeStorageKey, String(localSeconds)); localStorage.setItem(`nahhas-latest-video-${user.uid}`, JSON.stringify({ videoId: video.id, title: video.title || 'محاضرة', grade: video.grade || '', watchedSeconds: localSeconds, lastPositionSeconds: localSeconds, updatedAt: Date.now() })); } catch (e) {} }
         const currentDuration = videoId ? safeNumber(youtubePlayerRef.current?.getDuration?.(), estimatedDuration) : safeNumber(videoRef.current?.duration, estimatedDuration);
         const currentPercent = currentDuration > 0 ? pct((localSeconds / currentDuration) * 100) : 0;
+        if (resumeStorageKey) {
+          try {
+            localStorage.setItem(resumeStorageKey, String(localSeconds));
+            localStorage.setItem(`nahhas-latest-video-${user.uid}`, JSON.stringify({
+              videoId: video.id,
+              title: video.title || 'محاضرة',
+              grade: video.grade || '',
+              watchedSeconds: localSeconds,
+              lastPositionSeconds: localSeconds,
+              maxWatchedSeconds: localSeconds,
+              watchedPercent: currentPercent,
+              percent: currentPercent,
+              estimatedDuration: currentDuration,
+              updatedAt: Date.now()
+            }));
+          } catch (e) {}
+        }
         setWatchedPercent(currentPercent);
         onProgress?.(video.id, currentPercent, localSeconds, { estimatedDuration: currentDuration, videoTitle: video.title, lastPositionSeconds: localSeconds });
         if (localSeconds - lastSyncedSeconds >= 15) {
@@ -436,10 +452,27 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
                   }
                   maxAllowedSeekRef.current = Math.max(maxAllowedSeekRef.current, current);
                   const duration = safeNumber(videoRef.current?.duration, safeNumber(video.durationSeconds, safeNumber(video.estimatedDurationMinutes, 0) * 60));
-                  if (duration > 0) setWatchedPercent(pct((maxAllowedSeekRef.current / duration) * 100));
+                  const instantPercent = duration > 0 ? pct((maxAllowedSeekRef.current / duration) * 100) : watchedPercent;
+                  if (duration > 0) setWatchedPercent(instantPercent);
                   if (current > 0 && Math.abs(current - lastPositionRef.current) >= 4) {
                     lastPositionRef.current = current;
-                    if (resumeStorageKey) { try { localStorage.setItem(resumeStorageKey, String(current)); localStorage.setItem(`nahhas-latest-video-${user.uid}`, JSON.stringify({ videoId: video.id, title: video.title || 'محاضرة', grade: video.grade || '', watchedSeconds: current, lastPositionSeconds: current, updatedAt: Date.now() })); } catch (e) {} }
+                    if (resumeStorageKey) {
+                      try {
+                        localStorage.setItem(resumeStorageKey, String(current));
+                        localStorage.setItem(`nahhas-latest-video-${user.uid}`, JSON.stringify({
+                          videoId: video.id,
+                          title: video.title || 'محاضرة',
+                          grade: video.grade || '',
+                          watchedSeconds: current,
+                          lastPositionSeconds: current,
+                          maxWatchedSeconds: Math.max(maxAllowedSeekRef.current, current),
+                          watchedPercent: instantPercent,
+                          percent: instantPercent,
+                          estimatedDuration: duration,
+                          updatedAt: Date.now()
+                        }));
+                      } catch (e) {}
+                    }
                   }
                 }}
               >المتصفح لا يدعم هذا الفيديو.</video>
