@@ -3,13 +3,12 @@ import { Crown } from '../../../shared/icons/lucide-shim.jsx';
 import { getGradeLabel } from '../../../shared/constants/grades';
 
 export function StudentTopGreeting({ user, userData, isPremium, videos, exams, examResults, setActiveTab }) {
-  const studentFirstName = String(userData?.name || user?.displayName || 'طالب').split(' ')[0];
   return (
     <section className="student-sticky-hero bg-white/95 backdrop-blur-xl border border-amber-100 rounded-3xl shadow-xl p-4 md:p-5 mb-6 overflow-hidden relative">
       <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl md:text-3xl font-black text-slate-900 font-arabic flex flex-wrap items-center gap-2">
-            منور يا <span className="text-amber-600">{studentFirstName}</span> 👋
+            لوحة الطالب الرئيسية
             <span className="text-sm font-normal text-slate-500 bg-slate-100 px-3 py-1 rounded-full font-sans">{getGradeLabel(userData?.grade)}</span>
             {isPremium ? (
               <span className="bg-amber-100 text-amber-700 text-xs px-3 py-1 rounded-full font-bold flex items-center gap-1 shadow-sm"><Crown size={14}/> حساب VIP</span>

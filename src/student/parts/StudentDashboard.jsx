@@ -10,7 +10,7 @@ import MobileStudentBottomNav from '../../features/student/MobileStudentBottomNa
 
 import { GradeOptions, getGradeLabel } from '../../shared/constants/grades';
 import { normalizeEgyptPhone, isValidEgyptPhone } from '../../shared/utils/phone';
-import { PWAInstallBox, ModernLogo, FloatingArabicBackground, Announcements, Leaderboard } from '../../features/home/HomeWidgets';
+import { PWAInstallBox, ModernLogo, FloatingArabicBackground } from '../../features/home/HomeWidgets';
 import PomodoroFocusMode from '../../features/study/PomodoroFocusMode';
 
 
@@ -19,10 +19,9 @@ import { platformNotify, platformPrompt, generatePDF, safeNumber, getResultPerce
 
 import PerformanceOverview from './PerformanceOverview.jsx';
 import { useStudentDashboardData } from '../hooks/useStudentDashboardData.js';
-import { StudentContinueCard, StudentSmartDashboard, StudentCompactHome } from '../components/home/StudentHomeCards.jsx';
+import { StudentUnifiedHomeDashboard } from '../components/home/StudentHomeCards.jsx';
 import { LearningHubTabs } from '../components/layout/StudentLayoutParts.jsx';
-import StudentDailyCommandCenter from '../components/dashboard/StudentDailyCommandCenter.jsx';
-import { StudentV2Hero, StudentV2SectionTitle, StudentV2Sidebar, StudentV2Topbar } from '../v2/StudentV2Chrome.jsx';
+import { StudentV2SectionTitle, StudentV2Sidebar, StudentV2Topbar } from '../v2/StudentV2Chrome.jsx';
 import StudentAssignmentsPanel from '../../admin/parts/StudentAssignmentsPanel.jsx';
 import StudentSuccessPanel from '../../features/studentSuccess/StudentSuccessPanel.jsx';
 import { StudentLiveClassesPanel, StudentExamReviewCenter, StudentCertificatePanel } from '../../features/product/ProductExperienceSuite.jsx';
@@ -629,50 +628,34 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
         />
 
         {activeTab === 'home' && (
-          <>
-            <StudentV2Hero
-              userData={userData}
-              isPremium={isPremium}
-              videosCount={videos.length}
-              examsCount={exams.length}
-              averageScore={averageScore}
-              pendingAssignmentsCount={pendingAssignmentsCount}
-              completedVideoCount={completedVideoCount}
-              setActiveTab={setActiveTab}
-            />
-            <StudentDailyCommandCenter
-              userData={userData}
-              isPremium={isPremium}
-              nextStudyAction={nextStudyAction}
-              inProgressExam={inProgressExam}
-              nextOpenExam={nextOpenExam}
-              pendingAssignmentsCount={pendingAssignmentsCount}
-              averageScore={averageScore}
-              videoCompletionPercent={videoCompletionPercent}
-              subscriptionDaysLeft={subscriptionDaysLeft}
-              setActiveTab={setActiveTab}
-            />
-          </>
-        )}
-
-        {activeTab === 'home' && (
-            <div className="space-y-8 page-soft-enter">
-                <StudentContinueCard latestVideoActivity={latestVideoActivity} inProgressExam={inProgressExam} pendingAssignments={pendingAssignments} nextStudyAction={nextStudyAction} setActiveTab={setActiveTab} completedExamResults={completedExamResults} averageScore={averageScore} latestCompletedResult={latestCompletedResult} pendingAssignmentsCount={pendingAssignmentsCount} />
-                <StudentSmartDashboard setActiveTab={setActiveTab} videoCompletionPercent={videoCompletionPercent} completedVideoCount={completedVideoCount} videos={videos} completedExamResults={completedExamResults} averageScore={averageScore} pendingAssignmentsCount={pendingAssignmentsCount} examResults={examResults} nextStudyAction={nextStudyAction} smartWeakBranches={smartWeakBranches} />
-                <StudentExamReviewCenter exams={exams} examResults={examResults} content={content} mistakes={mistakes} setActiveTab={setActiveTab} />
-                <StudentCompactHome setActiveTab={setActiveTab} isBannedContent={isBannedContent} isBannedExam={isBannedExam} videos={videos} exams={exams} examResults={examResults} />
-                <Announcements />
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <motion.div whileHover={{ scale: 1.01 }} onClick={()=> !isBannedContent && setActiveTab('videos')} className={`bg-gradient-to-br from-blue-950 via-blue-800 to-sky-700 text-white p-7 rounded-[2rem] relative overflow-hidden cursor-pointer shadow-xl group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}>
-                        <div className="relative z-10"><p className="text-sky-200 font-black text-sm mb-2">مركز المحاضرات</p><h3 className="text-3xl font-black mb-3">المحاضرات والمساحات الأونلاين</h3><div className="flex gap-3 mt-5"><span className="bg-white/15 px-4 py-2 rounded-2xl font-bold">{videos.length} فيديو</span></div></div><PlayCircle className="absolute -bottom-8 -left-8 text-white/10 w-52 h-52 group-hover:scale-110 transition"/>
-                    </motion.div>
-                    <motion.div whileHover={{ scale: 1.01 }} onClick={()=> setActiveTab('settings')} className="bg-gradient-to-br from-emerald-950 via-emerald-800 to-teal-700 text-white p-7 rounded-[2rem] relative overflow-hidden cursor-pointer shadow-xl group">
-                        <div className="relative z-10"><p className="text-emerald-200 font-black text-sm mb-2">النتائج والتطور</p><h3 className="text-3xl font-black mb-3">نتائجك وتحليل أدائك</h3><div className="flex gap-3 mt-5"><span className="bg-white/15 px-4 py-2 rounded-2xl font-bold">{examResults.length} نتيجة</span><span className="bg-white/15 px-4 py-2 rounded-2xl font-bold">{completedExamResults.length ? averageScore + '%' : '—'} متوسط</span></div></div><BarChart3 className="absolute -bottom-8 -left-8 text-white/10 w-52 h-52 group-hover:scale-110 transition"/>
-                    </motion.div>
-                </div>
-                <Leaderboard />
-                <PerformanceOverview examResults={examResults} content={content} />
-            </div>
+          <StudentUnifiedHomeDashboard
+            userData={userData}
+            isPremium={isPremium}
+            nextStudyAction={nextStudyAction}
+            latestVideoActivity={latestVideoActivity}
+            inProgressExam={inProgressExam}
+            nextOpenExam={nextOpenExam}
+            pendingAssignments={pendingAssignments}
+            pendingAssignmentsCount={pendingAssignmentsCount}
+            videoCompletionPercent={videoCompletionPercent}
+            completedVideoCount={completedVideoCount}
+            videos={videos}
+            exams={exams}
+            filesAndLinks={filesAndLinks}
+            htmls={htmls}
+            completedExamResults={completedExamResults}
+            averageScore={averageScore}
+            examResults={examResults}
+            subscriptionDaysLeft={subscriptionDaysLeft}
+            smartWeakBranches={smartWeakBranches}
+            recentNotificationItems={recentNotificationItems}
+            unseenNotificationCount={unseenNotificationCount}
+            setActiveTab={setActiveTab}
+            setShowNotifications={setShowNotifications}
+            setHasNewNotif={setHasNewNotif}
+            isBannedContent={isBannedContent}
+            isBannedExam={isBannedExam}
+          />
         )}
 
 
