@@ -24,14 +24,7 @@ const PWAInstallBox = ({ installPrompt }) => {
         window.matchMedia?.('(display-mode: standalone)').addEventListener?.('change', checkStandalone);
     }, []);
 
-    if (isStandalone) {
-        return (
-            <div className="glass-panel p-5 rounded-2xl border border-emerald-100 bg-emerald-50/70">
-                <h3 className="font-bold text-emerald-800 flex items-center gap-2 mb-1"><CheckCircle size={18}/> المنصة مثبتة كتطبيق</h3>
-                <p className="text-sm text-emerald-700">تقدر تفتحها من أيقونة الهاتف أو الكمبيوتر مباشرة.</p>
-            </div>
-        );
-    }
+    if (isStandalone) return null;
 
     const handleInstall = async () => {
         if (typeof installPrompt === 'function') {
@@ -45,11 +38,15 @@ const PWAInstallBox = ({ installPrompt }) => {
     };
 
     return (
-        <div className="glass-panel p-5 rounded-2xl border border-amber-100 bg-amber-50/70">
-            <h3 className="font-bold text-amber-800 flex items-center gap-2 mb-2"><DownloadCloud size={18}/> تثبيت المنصة كتطبيق</h3>
-            <p className="text-sm text-amber-700 mb-3">يمكن تثبيت المنصة على الهاتف أو الكمبيوتر لتفتح كأنها تطبيق مستقل.</p>
-            <button onClick={handleInstall} className="bg-amber-600 text-white px-5 py-2 rounded-xl font-bold shadow hover:bg-amber-700 transition">تثبيت الآن</button>
-        </div>
+        <button
+            type="button"
+            onClick={handleInstall}
+            className="fixed bottom-24 right-4 md:bottom-6 md:right-6 z-40 max-w-[230px] rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-400 via-orange-500 to-amber-700 p-3 md:p-4 text-right text-white shadow-2xl transition hover:-translate-y-1 focus:outline-none focus:ring-4 focus:ring-amber-200 animate-pulse"
+            aria-label="تثبيت المنصة كتطبيق"
+        >
+            <span className="flex items-center gap-2 font-black text-sm md:text-base"><DownloadCloud size={20}/> ثبّت المنصة</span>
+            <span className="mt-1 block text-[11px] md:text-xs font-bold text-amber-50">افتحها كتطبيق مباشر من جهازك</span>
+        </button>
     );
 };
 

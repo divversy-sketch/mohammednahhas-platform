@@ -10,7 +10,7 @@ import MobileStudentBottomNav from '../../features/student/MobileStudentBottomNa
 
 import { GradeOptions, getGradeLabel } from '../../shared/constants/grades';
 import { normalizeEgyptPhone, isValidEgyptPhone } from '../../shared/utils/phone';
-import { PWAInstallBox, ModernLogo, FloatingArabicBackground, WisdomBox, Announcements, Leaderboard } from '../../features/home/HomeWidgets';
+import { PWAInstallBox, ModernLogo, FloatingArabicBackground, Announcements, Leaderboard } from '../../features/home/HomeWidgets';
 import PomodoroFocusMode from '../../features/study/PomodoroFocusMode';
 
 
@@ -20,7 +20,7 @@ import { platformNotify, platformPrompt, generatePDF, safeNumber, getResultPerce
 import PerformanceOverview from './PerformanceOverview.jsx';
 import { useStudentDashboardData } from '../hooks/useStudentDashboardData.js';
 import { StudentContinueCard, StudentSmartDashboard, StudentCompactHome } from '../components/home/StudentHomeCards.jsx';
-import { StudentTopGreeting, LearningHubTabs } from '../components/layout/StudentLayoutParts.jsx';
+import { LearningHubTabs } from '../components/layout/StudentLayoutParts.jsx';
 import StudentDailyCommandCenter from '../components/dashboard/StudentDailyCommandCenter.jsx';
 import { StudentV2Hero, StudentV2SectionTitle, StudentV2Sidebar, StudentV2Topbar } from '../v2/StudentV2Chrome.jsx';
 import StudentAssignmentsPanel from '../../admin/parts/StudentAssignmentsPanel.jsx';
@@ -592,6 +592,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
       {playingHtml && <LazyPanel><InteractiveViewer content={playingHtml} user={userData} onClose={() => setPlayingHtml(null)} /></LazyPanel>}
       {/* النظام امتحانات الطلاب متوقفة مؤقتًا  */}
       <FloatingArabicBackground />
+      <PWAInstallBox installPrompt={installPrompt} />
       {showNotifications && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setShowNotifications(false)}>
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-auto p-5" onClick={(e)=>e.stopPropagation()}>
@@ -639,8 +640,18 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
               completedVideoCount={completedVideoCount}
               setActiveTab={setActiveTab}
             />
-            <StudentTopGreeting user={user} userData={userData} isPremium={isPremium} videos={videos} exams={exams} examResults={examResults} setActiveTab={setActiveTab} />
-            <div className="mb-6"><WisdomBox /></div>
+            <StudentDailyCommandCenter
+              userData={userData}
+              isPremium={isPremium}
+              nextStudyAction={nextStudyAction}
+              inProgressExam={inProgressExam}
+              nextOpenExam={nextOpenExam}
+              pendingAssignmentsCount={pendingAssignmentsCount}
+              averageScore={averageScore}
+              videoCompletionPercent={videoCompletionPercent}
+              subscriptionDaysLeft={subscriptionDaysLeft}
+              setActiveTab={setActiveTab}
+            />
           </>
         )}
 
@@ -648,18 +659,15 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
             <div className="space-y-8 page-soft-enter">
                 <StudentContinueCard latestVideoActivity={latestVideoActivity} inProgressExam={inProgressExam} pendingAssignments={pendingAssignments} nextStudyAction={nextStudyAction} setActiveTab={setActiveTab} completedExamResults={completedExamResults} averageScore={averageScore} latestCompletedResult={latestCompletedResult} pendingAssignmentsCount={pendingAssignmentsCount} />
                 <StudentSmartDashboard setActiveTab={setActiveTab} videoCompletionPercent={videoCompletionPercent} completedVideoCount={completedVideoCount} videos={videos} completedExamResults={completedExamResults} averageScore={averageScore} pendingAssignmentsCount={pendingAssignmentsCount} examResults={examResults} nextStudyAction={nextStudyAction} smartWeakBranches={smartWeakBranches} />
-                <StudentSuccessPanel userData={userData} videos={videos} exams={exams} examResults={examResults} assignments={assignments} assignmentSubmissions={assignmentSubmissions} videoViews={videoViews} setActiveTab={setActiveTab} />
                 <StudentExamReviewCenter exams={exams} examResults={examResults} content={content} mistakes={mistakes} setActiveTab={setActiveTab} />
-                <StudentLiveClassesPanel userData={userData} />
                 <StudentCompactHome setActiveTab={setActiveTab} isBannedContent={isBannedContent} isBannedExam={isBannedExam} videos={videos} exams={exams} examResults={examResults} />
-                                <Announcements />
-                <PWAInstallBox installPrompt={installPrompt} />
+                <Announcements />
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <motion.div whileHover={{ scale: 1.01 }} onClick={()=> !isBannedContent && setActiveTab('videos')} className={`bg-gradient-to-br from-blue-950 via-blue-800 to-sky-700 text-white p-7 rounded-[2rem] relative overflow-hidden cursor-pointer shadow-xl group ${isBannedContent ? 'opacity-50 grayscale' : ''}`}>
-                        <div className="relative z-10"><p className="text-sky-200 font-black text-sm mb-2">مركز المحاضرات</p><h3 className="text-3xl font-black mb-3">المحاضرات والمساحات الأونلاين</h3><p className="text-blue-100 leading-relaxed text-sm">كل الشرح، التدريبات، المراجعات، والمحاضرات المباشرة داخل تبويبات منظمة.</p><div className="flex gap-3 mt-5"><span className="bg-white/15 px-4 py-2 rounded-2xl font-bold">{videos.length} فيديو</span></div></div><PlayCircle className="absolute -bottom-8 -left-8 text-white/10 w-52 h-52 group-hover:scale-110 transition"/>
+                        <div className="relative z-10"><p className="text-sky-200 font-black text-sm mb-2">مركز المحاضرات</p><h3 className="text-3xl font-black mb-3">المحاضرات والمساحات الأونلاين</h3><div className="flex gap-3 mt-5"><span className="bg-white/15 px-4 py-2 rounded-2xl font-bold">{videos.length} فيديو</span></div></div><PlayCircle className="absolute -bottom-8 -left-8 text-white/10 w-52 h-52 group-hover:scale-110 transition"/>
                     </motion.div>
                     <motion.div whileHover={{ scale: 1.01 }} onClick={()=> setActiveTab('settings')} className="bg-gradient-to-br from-emerald-950 via-emerald-800 to-teal-700 text-white p-7 rounded-[2rem] relative overflow-hidden cursor-pointer shadow-xl group">
-                        <div className="relative z-10"><p className="text-emerald-200 font-black text-sm mb-2">النتائج والتطور</p><h3 className="text-3xl font-black mb-3">نتائجك وتحليل أدائك</h3><p className="text-emerald-100 leading-relaxed text-sm">تابع متوسطك، سجل امتحاناتك، ونقاط الضعف من مكان واحد داخل ملفك.</p><div className="flex gap-3 mt-5"><span className="bg-white/15 px-4 py-2 rounded-2xl font-bold">{examResults.length} نتيجة</span><span className="bg-white/15 px-4 py-2 rounded-2xl font-bold">{completedExamResults.length ? averageScore + '%' : '—'} متوسط</span></div></div><BarChart3 className="absolute -bottom-8 -left-8 text-white/10 w-52 h-52 group-hover:scale-110 transition"/>
+                        <div className="relative z-10"><p className="text-emerald-200 font-black text-sm mb-2">النتائج والتطور</p><h3 className="text-3xl font-black mb-3">نتائجك وتحليل أدائك</h3><div className="flex gap-3 mt-5"><span className="bg-white/15 px-4 py-2 rounded-2xl font-bold">{examResults.length} نتيجة</span><span className="bg-white/15 px-4 py-2 rounded-2xl font-bold">{completedExamResults.length ? averageScore + '%' : '—'} متوسط</span></div></div><BarChart3 className="absolute -bottom-8 -left-8 text-white/10 w-52 h-52 group-hover:scale-110 transition"/>
                     </motion.div>
                 </div>
                 <Leaderboard />

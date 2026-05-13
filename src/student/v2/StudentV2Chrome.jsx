@@ -6,7 +6,6 @@ import {
   ClipboardList,
   Code,
   Crown,
-  DownloadCloud,
   FileCheck,
   FileText,
   Headphones,
@@ -149,7 +148,6 @@ export function StudentV2Sidebar({
 }
 
 export function StudentV2Topbar({
-  installPrompt,
   setShowFocusMode,
   setShowNotifications,
   unseenNotificationCount,
@@ -171,11 +169,6 @@ export function StudentV2Topbar({
 
       <div className="v2-student-toolbar v2-card rounded-3xl p-3 md:p-4 flex flex-wrap justify-between items-center gap-3 mb-6 relative">
         <div className="flex flex-wrap gap-2">
-          {installPrompt && (
-            <button onClick={installPrompt} className="v2-toolbar-btn bg-emerald-600 hover:bg-emerald-700 text-white">
-              <DownloadCloud size={18}/><span className="hidden md:inline">تثبيت التطبيق</span>
-            </button>
-          )}
           <button onClick={() => setShowFocusMode(true)} className="v2-toolbar-btn bg-slate-900 hover:bg-slate-950 text-white">
             <Headphones size={18}/><span className="hidden md:inline">وضع التركيز</span>
           </button>
