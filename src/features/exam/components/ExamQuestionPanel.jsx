@@ -146,71 +146,94 @@ function QuickReviewTemplate({
   const questionLocked = isSubmitted || answer !== undefined;
   const totalQuestions = displayQuestions?.length || 1;
 
+  const cleanedOption = (value) => String(value || '')
+    .replace(/^\s*[*•✔✓]+\s*/u, '')
+    .replace(/^\s*[أابجدهـو]\s*[\):：\-\.،]\s*/u, '')
+    .trim();
+
   return (
-    <div className="w-full h-full overflow-y-auto bg-[#05070d] p-3 md:p-6">
-      <div className="mx-auto max-w-[1200px]">
+    <div className="w-full h-full overflow-y-auto overflow-x-hidden bg-[#05070d] px-2 py-3 md:px-4 md:py-5">
+      <div className="mx-auto w-full max-w-[1536px]">
         <div className="mb-3 flex items-center justify-center">
-          <div className="rounded-full border border-amber-400/40 bg-black/55 px-5 py-2 text-amber-100 font-black shadow-lg" style={{ fontFamily: 'Cairo, sans-serif' }}>
+          <div className="rounded-full border border-amber-400/50 bg-black/70 px-5 py-2 text-amber-100 font-black shadow-lg" style={{ fontFamily: 'Cairo, sans-serif' }}>
             سؤال {currentQIndex + 1} من {totalQuestions}
           </div>
         </div>
-        <div className="relative w-full aspect-[4/3] bg-center bg-contain bg-no-repeat" style={{ backgroundImage: `url(${templateBg})` }}>
+
+        <div
+          className="relative w-full aspect-[3/2] bg-center bg-contain bg-no-repeat"
+          style={{ backgroundImage: `url(${templateBg})` }}
+        >
           <div className="absolute inset-0">
-            <div className="absolute left-[31.5%] right-[4.8%] top-[23.7%] h-[24.8%] flex items-center justify-center px-[6.2%] text-center">
-              <div className="w-full leading-[1.18] text-[#9b3e36] font-black [text-shadow:0_1px_0_rgba(255,255,255,0.85)]" style={{ fontFamily: 'Cairo, sans-serif', fontSize: 'clamp(16px, 2.35vw, 30px)' }}>
+            <div className="absolute left-[31.3%] right-[6.2%] top-[31.2%] h-[21.2%] flex items-center justify-center px-[5.5%] text-center overflow-hidden">
+              <div className="w-full leading-[1.25] text-[#9b3e36] font-black [text-shadow:0_1px_0_rgba(255,255,255,0.85)]" style={{ fontFamily: 'Cairo, sans-serif', fontSize: 'clamp(14px, 2.05vw, 34px)' }}>
                 <div>{renderBracketHighlightedText(promptText)}</div>
-                {introText ? <div className="mt-2">مقدمة: {renderBracketHighlightedText(introText)}</div> : null}
+                {introText ? <div className="mt-2 text-[0.78em]">{renderBracketHighlightedText(introText)}</div> : null}
               </div>
             </div>
 
-            <div className="absolute left-[9.8%] top-[39.2%] w-[12.5%] rotate-[-1deg] rounded-[14px] border-2 border-[#6d7b8c] bg-[#e9eef7] px-2 py-3 text-center text-[#0d2341] shadow-[0_5px_14px_rgba(0,0,0,0.18)] font-black" style={{ fontFamily: 'Cairo, sans-serif', fontSize: 'clamp(10px, 1.1vw, 15px)' }}>
-              {sourceLabel}
-            </div>
+            {sourceLabel ? (
+              <div className="absolute left-[8.3%] top-[28.3%] w-[16.5%] rounded-[12px] border border-[#8d9caf] bg-[#eef3fb] px-2 py-3 text-center text-[#0d2341] shadow-[0_5px_14px_rgba(0,0,0,0.18)] font-black" style={{ fontFamily: 'Cairo, sans-serif', fontSize: 'clamp(10px, 1.05vw, 16px)' }}>
+                {sourceLabel}
+              </div>
+            ) : null}
 
-            {options.map((option, idx) => {
-              const topBase = 57.2 + idx * 8.55;
+            {options.slice(0, 4).map((option, idx) => {
+              const topBase = 56.1 + idx * 7.45;
               const isSelected = answer === idx;
               const isCorrect = idx === question.correctIdx;
-              let badge = null;
               let lineBg = 'transparent';
               let lineBorder = 'transparent';
-              let lineText = '#30261e';
-              let circleBg = '#bb3c2b';
+              let circleBg = 'transparent';
+              let circleBorder = 'transparent';
+              let badge = null;
+
               if (!questionLocked && isSelected) {
                 lineBg = 'rgba(255,199,67,0.22)';
-                lineBorder = 'rgba(214,140,0,0.65)';
+                lineBorder = 'rgba(214,140,0,0.45)';
               }
+
               if (questionLocked) {
                 if (isCorrect) {
-                  lineBg = 'rgba(34,197,94,0.18)';
-                  lineBorder = 'rgba(22,163,74,0.65)';
-                  circleBg = '#128c3a';
+                  lineBg = 'rgba(34,197,94,0.20)';
+                  lineBorder = 'rgba(22,163,74,0.60)';
+                  circleBg = '#15803d';
+                  circleBorder = '#dcfce7';
                   badge = <Check className="w-[58%] h-[58%] text-white" />;
                 } else if (isSelected) {
-                  lineBg = 'rgba(239,68,68,0.14)';
+                  lineBg = 'rgba(239,68,68,0.18)';
                   lineBorder = 'rgba(220,38,38,0.55)';
-                  circleBg = '#bb3c2b';
+                  circleBg = '#b91c1c';
+                  circleBorder = '#fee2e2';
                   badge = <X className="w-[58%] h-[58%] text-white" />;
                 }
               }
+
               return (
                 <button
                   key={idx}
                   type="button"
                   onClick={() => !questionLocked && onAnswer(question.id, idx)}
-                  className="absolute left-[32%] right-[4.5%] h-[7.2%] rounded-full transition-all duration-200 text-right"
+                  className="absolute left-[31.4%] right-[6.5%] h-[5.75%] rounded-full transition-all duration-200 text-right"
                   style={{ top: `${topBase}%`, background: lineBg, border: `2px solid ${lineBorder}` }}
                   disabled={questionLocked}
                 >
                   <div className="relative h-full w-full">
-                    <div className="absolute inset-y-0 right-[8.5%] left-[3%] flex items-center justify-end">
-                      <span className="font-black leading-none" style={{ fontFamily: 'Cairo, sans-serif', color: lineText, fontSize: 'clamp(14px, 2vw, 28px)' }}>
-                        {option}
+                    <div className="absolute inset-y-0 right-[8.8%] left-[4%] flex items-center justify-end overflow-hidden">
+                      <span className="font-black leading-none truncate" style={{ fontFamily: 'Cairo, sans-serif', color: '#30261e', fontSize: 'clamp(13px, 1.65vw, 28px)' }}>
+                        {letters[idx]}) {cleanedOption(option)}
                       </span>
                     </div>
-                    <div className="absolute top-1/2 right-[0.8%] -translate-y-1/2 flex items-center justify-center rounded-full border-[3px] border-[#f4dac1] shadow-md"
-                      style={{ width: 'clamp(24px, 3.2vw, 42px)', height: 'clamp(24px, 3.2vw, 42px)', background: circleBg }}>
-                      {badge || <span className="text-white font-black" style={{ fontFamily: 'Cairo, sans-serif', fontSize: 'clamp(11px, 1.2vw, 16px)' }}>{letters[idx] || idx + 1}</span>}
+                    <div
+                      className="absolute top-1/2 right-[0.15%] -translate-y-1/2 flex items-center justify-center rounded-full shadow-md"
+                      style={{
+                        width: 'clamp(18px, 2.45vw, 40px)',
+                        height: 'clamp(18px, 2.45vw, 40px)',
+                        background: circleBg,
+                        border: circleBorder === 'transparent' ? '0 solid transparent' : `3px solid ${circleBorder}`,
+                      }}
+                    >
+                      {badge}
                     </div>
                   </div>
                 </button>
@@ -220,7 +243,7 @@ function QuickReviewTemplate({
         </div>
 
         {questionLocked && question?.explanation ? (
-          <div className="mt-6 rounded-[28px] border border-amber-200 bg-[#fff7ea] p-5 md:p-6 shadow-lg">
+          <div className="mt-5 rounded-[28px] border border-amber-200 bg-[#fff7ea] p-5 md:p-6 shadow-lg">
             <div className="flex items-center gap-2 text-amber-700 font-black text-lg mb-2" style={{ fontFamily: 'Cairo, sans-serif' }}>
               <HelpCircle className="w-5 h-5" /> شرح الإجابة
             </div>
@@ -228,9 +251,7 @@ function QuickReviewTemplate({
           </div>
         ) : null}
 
-
-
-        <div className="mt-6 flex items-center justify-center gap-3">
+        <div className="mt-5 flex items-center justify-center gap-3">
           <button
             disabled={currentQIndex === displayQuestions.length - 1}
             onClick={onNext}
