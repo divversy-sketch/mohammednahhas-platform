@@ -288,22 +288,20 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
   }, [isReviewMode, mcqQuestions.length, exam.attemptId, exam.id, exam.duration, startTime, user.uid, user.displayName, showAntiCheatChoice]);
 
   useEffect(() => {
-    if (isReviewMode || isSubmitted) return;
+    if (isReviewMode || isSubmitted || exam?.quickReview || exam?.paperStyle) return;
     if (timeLeft > 0 && !isCheating) {
       const timer = setInterval(() => setTimeLeft((p) => p - 1), 1000);
       return () => clearInterval(timer);
     } else if (timeLeft === 0) {
       handleSubmit(true);
     }
-  }, [timeLeft, isSubmitted, isCheating, isReviewMode]);
+  }, [timeLeft, isSubmitted, isCheating, isReviewMode, exam?.quickReview, exam?.paperStyle]);
 
   const handleAnswer = (qId, value) => {
-    const targetQuestion = flatQuestions.find((q) => q.id === qId);
-    const shouldLockAfterFirstAnswer = targetQuestion?.template === 'paper-style' || targetQuestion?.questionTemplate === 'paper-style' || targetQuestion?.lockAfterAnswer;
-    if (shouldLockAfterFirstAnswer && answers?.[qId] !== undefined) return;
     if (!isReviewMode && !isSubmitted && !showAntiCheatChoice) {
+      const targetQuestion = flatQuestions.find((q) => q.id === qId);
+      if ((targetQuestion?.template === 'paper-style' || exam?.paperStyle || exam?.quickReview) && answers[qId] !== undefined) return;
       setAnswers((prev) => {
-        if (shouldLockAfterFirstAnswer && prev?.[qId] !== undefined) return prev;
         const nextAnswers = { ...prev, [qId]: value };
         writeLocalExamBackup(nextAnswers);
         if (exam.attemptId && exam.id !== 'custom_mistakes_exam') {

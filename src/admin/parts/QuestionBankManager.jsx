@@ -4,7 +4,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 import { doc, collection, addDoc, onSnapshot, serverTimestamp, writeBatch, query, orderBy, limit } from 'firebase/firestore';
-import { UploadCloud, PenTool, Sparkles, FileCheck, Layers } from '../../shared/icons/lucide-shim.jsx';
+import { UploadCloud, PenTool, Sparkles, FileCheck, Layers, ClipboardList, Wand2 } from '../../shared/icons/lucide-shim.jsx';
 
 import { db } from '../../services/firebase';
 
@@ -57,11 +57,14 @@ const parseMetaLine = (line = '') => {
 
 const parseOptionLine = (line = '') => {
   const text = cleanImportedLine(line);
-  const match = text.match(/^([أابجدهـهوA-Da-d])\s*[\)\].\-:：،]\s*(.+)$/u);
+  const leadingStar = /^\*\s*/.test(text);
+  const withoutLeadingStar = text.replace(/^\*\s*/, '');
+  const match = withoutLeadingStar.match(/^([أابجدهـهوA-Fa-f])\s*[\)\].\-:：،]\s*(.+)$/u);
   if (!match) return null;
   const rawLabel = match[1].toUpperCase();
   const label = rawLabel === 'ا' ? 'أ' : rawLabel;
-  return { label, text: cleanImportedLine(match[2]) };
+  const optionText = cleanImportedLine(match[2]);
+  return { label, text: optionText.replace(/^\*\s*/, ''), correctByMarker: leadingStar || /^\*\s*/.test(optionText) || /\*\s*$/.test(optionText) };
 };
 
 const labelToIndex = (label = '') => {
@@ -212,7 +215,7 @@ const parseQuestionBankLines = (lines, settings) => {
     if (!question) return;
 
     if (option) {
-      const correctByMarker = /\*/.test(option.text) || highlighted;
+      const correctByMarker = Boolean(option.correctByMarker) || /\*/.test(option.text) || highlighted;
       const nextIndex = question.options.length;
       question.options.push({ ...option, text: option.text.replace(/\*/g, '').trim(), correctByMarker, highlighted });
       if (correctByMarker) question.correctIdx = nextIndex;
@@ -245,8 +248,12 @@ const parseQuestionBankLines = (lines, settings) => {
 export const QuestionBankManager = ({ adminGradeFilter }) => {
   const [questions, setQuestions] = useState([]);
   const [filters, setFilters] = useState({ grade: adminGradeFilter === 'all' ? '' : adminGradeFilter, branch: '', type: '', topic: '', search: '' });
-  const [form, setForm] = useState({ text: '', grade: adminGradeFilter === 'all' ? '3sec' : adminGradeFilter, branch: 'النحو', topic: '', type: 'mcq', difficulty: 'medium', optionsText: '', correctIdx: 0, explanation: '', mark: 1, tags: '', template: 'default', paperTitle: 'أسئلة ثانوية عامة واسترشادي', sourceLabel: '', introText: '', scopeType: 'curriculum', sourceYear: '' });
-  const [importSettings, setImportSettings] = useState({ grade: adminGradeFilter === 'all' ? '3sec' : adminGradeFilter, branchMode: 'auto', branch: 'النحو', difficulty: 'medium', tags: 'استيراد' });
+  const [form, setForm] = useState({ text: '', grade: adminGradeFilter === 'all' ? '3sec' : adminGradeFilter, branch: 'النحو', topic: '', type: 'mcq', difficulty: 'medium', optionsText: '', correctIdx: 0, explanation: '', mark: 1, tags: '' });
+  const [bulkText, setBulkText] = useState('');
+  const [quickTitle, setQuickTitle] = useState('مراجعة في السريع');
+  const [bulkPreview, setBulkPreview] = useState([]);
+  const [bulkWarnings, setBulkWarnings] = useState([]);
+  const [importSettings, setImportSettings] = useState({ grade: adminGradeFilter === 'all' ? '3sec' : adminGradeFilter, branchMode: 'auto', branch: 'النحو', difficulty: 'medium', tags: 'مراجعة في السريع' });
   const [importPreview, setImportPreview] = useState([]);
   const [importWarnings, setImportWarnings] = useState([]);
   const [importBusy, setImportBusy] = useState(false);
@@ -280,20 +287,11 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
       options,
       correctIdx: safeNumber(form.correctIdx, 0),
       explanation: form.explanation,
-      template: form.template,
-      questionTemplate: form.template,
-      paperTitle: form.paperTitle,
-      sourceLabel: form.sourceLabel,
-      introText: form.introText,
-      scopeType: form.scopeType,
-      sourceYear: form.sourceYear,
-      lockAfterAnswer: form.template === 'paper-style',
-      showExplanationAfterAnswer: form.template === 'paper-style',
       mark: safeNumber(form.mark, form.type === 'essay' ? 10 : 1),
       tags: form.tags.split(',').map(t => t.trim()).filter(Boolean),
       createdAt: serverTimestamp()
     });
-    setForm(prev => ({ ...prev, text: '', optionsText: '', explanation: '', tags: '', topic: '', sourceLabel: '', introText: '', sourceYear: '' }));
+    setForm(prev => ({ ...prev, text: '', optionsText: '', explanation: '', tags: '', topic: '' }));
   };
 
   const handleImportFile = async (event) => {
@@ -332,6 +330,97 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
     }
   };
 
+
+  const buildExamPayloadFromQuestions = (questionRows, title = 'مراجعة في السريع') => {
+    const selected = (questionRows || []).filter(Boolean);
+    const grouped = {};
+    selected.forEach((q) => {
+      const branch = q.branch || 'مراجعة في السريع';
+      grouped[branch] = grouped[branch] || { text: branch, subQuestions: [] };
+      grouped[branch].subQuestions.push({
+        id: `qb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        text: q.text,
+        options: q.options || [],
+        correctIdx: q.correctIdx ?? 0,
+        branch,
+        topic: q.topic || q.lesson || 'عام',
+        type: q.type || 'mcq',
+        explanation: q.explanation || '',
+        maxScore: getQuestionMaxScore(q),
+        modelAnswer: q.modelAnswer || '',
+        template: q.template || 'paper-style',
+        sourceLabel: q.sourceLabel || title,
+        title: q.title || title,
+      });
+    });
+    const grade = filters.grade || selected[0]?.grade || importSettings.grade || (adminGradeFilter === 'all' ? '3sec' : adminGradeFilter);
+    return {
+      title,
+      grade,
+      duration: Math.max(5, selected.length * 2),
+      startTime: new Date().toISOString().slice(0,16),
+      endTime: new Date(Date.now() + 30*24*60*60*1000).toISOString().slice(0,16),
+      accessCode: '',
+      isPremium: false,
+      quickReview: true,
+      paperStyle: true,
+      questions: Object.values(grouped),
+      createdAt: serverTimestamp(),
+      source: 'quick_question_review'
+    };
+  };
+
+  const createQuickExamFromRows = async (rows, title = quickTitle || 'مراجعة في السريع') => {
+    if (!rows?.length) return platformNotify('لا توجد أسئلة لإنشاء المراجعة');
+    await addDoc(collection(db, 'exams'), buildExamPayloadFromQuestions(rows, title));
+    platformNotify(`تم إنشاء ${title} وظهورها للطالب داخل خانة الامتحانات`);
+  };
+
+  const parseBulkQuestions = () => {
+    const parsed = parseQuestionBankLines(bulkText.split(/\r?\n/).map((text) => ({ text, highlighted: false })), {
+      ...importSettings,
+      tags: importSettings.tags.split(',').map((tag) => tag.trim()).filter(Boolean),
+    });
+    const rows = parsed.questions.map((q) => ({
+      ...q,
+      template: 'paper-style',
+      sourceLabel: quickTitle || 'مراجعة في السريع',
+      title: quickTitle || 'مراجعة في السريع',
+    }));
+    setBulkPreview(rows);
+    setBulkWarnings(parsed.warnings);
+    platformNotify(`تم تجهيز ${rows.length} سؤال من النص`);
+  };
+
+  const saveBulkQuestionsToBank = async () => {
+    if (bulkPreview.length === 0) parseBulkQuestions();
+    const rows = bulkPreview.length ? bulkPreview : parseQuestionBankLines(bulkText.split(/\r?\n/).map((text) => ({ text, highlighted: false })), {
+      ...importSettings,
+      tags: importSettings.tags.split(',').map((tag) => tag.trim()).filter(Boolean),
+    }).questions;
+    if (!rows.length) return platformNotify('لا توجد أسئلة مفهومة في النص');
+    let batch = writeBatch(db);
+    rows.forEach((q) => {
+      const ref = doc(collection(db, 'question_bank'));
+      batch.set(ref, { ...q, template: 'paper-style', sourceLabel: quickTitle || 'مراجعة في السريع', createdAt: serverTimestamp(), importedAt: serverTimestamp(), source: 'bulk_quick_review' });
+    });
+    await batch.commit();
+    platformNotify(`تم حفظ ${rows.length} سؤال في بنك الأسئلة`);
+  };
+
+  const saveBulkAndCreateQuickExam = async () => {
+    const rows = bulkPreview.length ? bulkPreview : parseQuestionBankLines(bulkText.split(/\r?\n/).map((text) => ({ text, highlighted: false })), {
+      ...importSettings,
+      tags: importSettings.tags.split(',').map((tag) => tag.trim()).filter(Boolean),
+    }).questions.map((q) => ({ ...q, template: 'paper-style', sourceLabel: quickTitle || 'مراجعة في السريع', title: quickTitle || 'مراجعة في السريع' }));
+    if (!rows.length) return platformNotify('لا توجد أسئلة مفهومة في النص');
+    await saveBulkQuestionsToBank();
+    await createQuickExamFromRows(rows, quickTitle || 'مراجعة في السريع');
+    setBulkText('');
+    setBulkPreview([]);
+    setBulkWarnings([]);
+  };
+
   const saveImportedQuestions = async () => {
     if (importPreview.length === 0) return platformNotify('لا توجد أسئلة جاهزة للحفظ');
     const ok = await platformConfirm(`سيتم حفظ ${importPreview.length} سؤال في بنك الأسئلة. هل نكمل؟`);
@@ -362,6 +451,13 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
     }
   };
 
+
+  const createQuickExamFromImportPreview = async () => {
+    if (importPreview.length === 0) return platformNotify('اقرأ ملف الأسئلة أولاً');
+    await saveImportedQuestions();
+    await createQuickExamFromRows(importPreview.map((q) => ({ ...q, template: 'paper-style', sourceLabel: quickTitle || 'مراجعة في السريع', title: quickTitle || 'مراجعة في السريع' })), quickTitle || 'مراجعة في السريع');
+  };
+
   const createExamFromBank = async () => {
     const pool = questions.filter(q => (!filters.grade || q.grade === filters.grade) && (!filters.branch || q.branch === filters.branch) && (!filters.type || q.type === filters.type) && (!filters.topic || (q.topic || q.lesson || '').includes(filters.topic)) && (!filters.search || `${q.text} ${(q.tags || []).join(' ')} ${q.explanation || ''}`.includes(filters.search)));
     if (pool.length === 0) return platformNotify('لا توجد أسئلة مطابقة للفلاتر الحالية');
@@ -378,21 +474,15 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
         topic: q.topic || q.lesson || 'عام',
         type: q.type || 'mcq',
         explanation: q.explanation || '',
-        template: q.template || q.questionTemplate || 'default',
-        questionTemplate: q.questionTemplate || q.template || 'default',
-        paperTitle: q.paperTitle || '',
-        sourceLabel: q.sourceLabel || '',
-        introText: q.introText || '',
-        scopeType: q.scopeType || '',
-        sourceYear: q.sourceYear || '',
-        lockAfterAnswer: q.lockAfterAnswer || q.template === 'paper-style',
-        showExplanationAfterAnswer: q.showExplanationAfterAnswer || q.template === 'paper-style',
         maxScore: getQuestionMaxScore(q),
-        modelAnswer: q.modelAnswer || ''
+        modelAnswer: q.modelAnswer || '',
+        template: q.template || 'paper-style',
+        sourceLabel: q.sourceLabel || quickTitle || 'مراجعة في السريع',
+        title: q.title || quickTitle || 'مراجعة في السريع'
       });
     });
     await addDoc(collection(db, 'exams'), {
-      title: `امتحان مُولَّد من بنك الأسئلة - ${getGradeLabel(filters.grade || selected[0].grade)}`,
+      title: `${quickTitle || 'مراجعة في السريع'} - ${getGradeLabel(filters.grade || selected[0].grade)}`,
       grade: filters.grade || selected[0].grade,
       duration: Math.max(15, selected.length * 2),
       startTime: new Date().toISOString().slice(0,16),
@@ -401,6 +491,8 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
       isPremium: false,
       questions: Object.values(grouped),
       createdAt: serverTimestamp(),
+      quickReview: true,
+      paperStyle: true,
       source: 'question_bank'
     });
     platformNotify('تم إنشاء امتحان جديد من بنك الأسئلة بنجاح');
@@ -421,6 +513,10 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
 
         <div className="bg-white/80 border border-dashed border-indigo-200 rounded-2xl p-4 mb-5">
           <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-3"><UploadCloud className="w-5 h-5"/> استيراد أسئلة من ملف</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+            <input className="border p-3 rounded-xl font-bold" placeholder="اسم الامتحان الظاهر للطالب: مراجعة في السريع" value={quickTitle} onChange={e=>setQuickTitle(e.target.value)} />
+            <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-xs text-indigo-800 font-bold leading-6">الاسم الأفضل: مراجعة في السريع، لأنها أوضح وأهدأ من امتحان في السريع وتناسب التدريب بدون رهبة.</div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-3">
             <select className="border p-3 rounded" value={importSettings.grade} onChange={e=>setImportSettings({...importSettings, grade:e.target.value})}><GradeOptions/></select>
             <select className="border p-3 rounded" value={importSettings.branchMode} onChange={e=>setImportSettings({...importSettings, branchMode:e.target.value})}>
@@ -438,7 +534,8 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
           </div>
           <div className="flex flex-col md:flex-row gap-3 md:items-center">
             <input ref={fileInputRef} type="file" accept=".txt,.docx,.pdf,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleImportFile} className="block w-full text-sm text-slate-600 file:ml-3 file:rounded-xl file:border-0 file:bg-indigo-600 file:px-4 file:py-3 file:font-bold file:text-white hover:file:bg-indigo-700" />
-            <button type="button" disabled={importBusy || importPreview.length === 0} onClick={saveImportedQuestions} className="bg-emerald-600 disabled:bg-slate-300 text-white py-3 px-6 rounded-xl font-bold whitespace-nowrap flex items-center justify-center gap-2"><FileCheck className="w-5 h-5"/> حفظ المعاينة</button>
+            <button type="button" disabled={importBusy || importPreview.length === 0} onClick={saveImportedQuestions} className="bg-emerald-600 disabled:bg-slate-300 text-white py-3 px-6 rounded-xl font-bold whitespace-nowrap flex items-center justify-center gap-2"><FileCheck className="w-5 h-5"/> حفظ في البنك</button>
+            <button type="button" disabled={importBusy || importPreview.length === 0} onClick={createQuickExamFromImportPreview} className="bg-slate-900 disabled:bg-slate-300 text-white py-3 px-6 rounded-xl font-bold whitespace-nowrap flex items-center justify-center gap-2"><ClipboardList className="w-5 h-5"/> حفظ وظهور في الامتحانات</button>
           </div>
           <div className="mt-3 text-xs text-slate-600 leading-6 bg-slate-50 rounded-xl p-3">
             <b>الصيغ المدعومة:</b> TXT و DOCX و PDF نصي. ضع <b>*</b> بجانب الإجابة الصحيحة أو ظلّل سطر الإجابة في Word. اكتب عناوين مثل <b># النحو</b> ثم <b>## المنادى</b> أو <b># البلاغة</b> ثم <b>## التشبيه</b> عشان يتخزن الفرع والموضوع تلقائيًا.
@@ -454,8 +551,40 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
           </div>}
         </div>
 
+
+        <div className="bg-white border border-amber-200 rounded-2xl p-4 mb-5 shadow-sm">
+          <h3 className="font-black text-slate-900 flex items-center gap-2 mb-2"><Wand2 className="w-5 h-5 text-amber-600"/> إضافة مجموعة أسئلة مرة واحدة</h3>
+          <p className="text-sm text-slate-500 mb-3 leading-7">اكتب الأسئلة كلها في مربع واحد. حط علامة <b>*</b> قبل الاختيار الصحيح، والشرح اختياري تحت كل سؤال. بعدها تقدر تحفظها في البنك أو تخليها تظهر فورًا للطالب في خانة الامتحانات باسم <b>{quickTitle || 'مراجعة في السريع'}</b>.</p>
+          <textarea className="border-2 border-amber-100 focus:border-amber-400 outline-none rounded-2xl p-4 min-h-[260px] w-full font-['Cairo'] leading-8" value={bulkText} onChange={e=>setBulkText(e.target.value)} placeholder={`س1: بيّن الصياغة الصحيحة عند تحويل المصدر المؤول إلى مصدر صريح.
+أ: تشاور أصدقاءك.
+ب: مشورة أصدقائك.
+*ج: مشاورة أصدقائك.
+د: استشارة أصدقائك.
+شرح: المصدر المؤول "أن تشاور" يتحول إلى مصدر صريح هو "مشاورة".
+
+س2: اكتب السؤال الثاني هنا...
+أ: اختيار
+*ب: اختيار صحيح
+ج: اختيار
+د: اختيار`} />
+          <div className="mt-3 flex flex-col md:flex-row gap-3">
+            <button type="button" onClick={parseBulkQuestions} className="bg-amber-500 text-white py-3 px-6 rounded-xl font-black shadow-lg hover:bg-amber-600">معاينة الأسئلة</button>
+            <button type="button" onClick={saveBulkQuestionsToBank} className="bg-indigo-600 text-white py-3 px-6 rounded-xl font-black shadow-lg hover:bg-indigo-700">حفظ في بنك الأسئلة</button>
+            <button type="button" onClick={saveBulkAndCreateQuickExam} className="bg-slate-950 text-white py-3 px-6 rounded-xl font-black shadow-xl hover:bg-slate-800">حفظ + ظهور في خانة الامتحانات</button>
+          </div>
+          {bulkWarnings.length > 0 && <div className="mt-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-3 text-sm space-y-1">{bulkWarnings.slice(0, 6).map((warning, idx) => <p key={idx}>• {warning}</p>)}</div>}
+          {bulkPreview.length > 0 && <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 max-h-80 overflow-y-auto">
+            {bulkPreview.map((q, idx) => <div key={`${q.text}_${idx}`} className="rounded-2xl border bg-slate-50 p-4">
+              <p className="text-xs font-black text-amber-700 mb-1">سؤال {idx + 1} • {q.topic || 'عام'}</p>
+              <p className="font-black text-slate-800 leading-7">{q.text}</p>
+              {q.options?.length > 0 && <div className="mt-2 space-y-1 text-sm">{q.options.map((option, optionIdx) => <p key={optionIdx} className={optionIdx === q.correctIdx ? 'font-black text-emerald-700' : 'text-slate-600'}>{OPTION_LABELS[optionIdx]}) {option}</p>)}</div>}
+              {q.explanation && <p className="mt-2 text-xs text-blue-700 bg-blue-50 rounded-xl p-2">شرح: {q.explanation}</p>}
+            </div>)}
+          </div>}
+        </div>
+
         <form onSubmit={handleAddQuestion} className="grid gap-4">
-          <h3 className="font-bold text-slate-800 flex items-center gap-2"><PenTool className="w-5 h-5"/> إضافة سؤال يدويًا</h3>
+          <h3 className="font-bold text-slate-800 flex items-center gap-2"><PenTool className="w-5 h-5"/> إضافة سؤال يدويًا (اختياري)</h3>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <select className="border p-3 rounded" value={form.grade} onChange={e=>setForm({...form, grade:e.target.value})}><GradeOptions/></select>
             <select className="border p-3 rounded" value={form.branch} onChange={e=>setForm({...form, branch:e.target.value})}><option value="النحو">النحو</option><option value="البلاغة">البلاغة</option></select>
@@ -467,42 +596,17 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
               <option value="easy">سهل</option><option value="medium">متوسط</option><option value="hard">صعب</option>
             </select>
           </div>
-          <div className="rounded-3xl border-2 border-amber-200 bg-gradient-to-l from-amber-50 via-white to-rose-50 p-4 shadow-sm">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h4 className="font-black text-slate-900">قالب الورقة التعليمية المبهر</h4>
-                <p className="text-xs font-bold text-slate-500">لأسئلة الاسترشادي، سنوات سابقة، والامتحانات الشاملة. الطالب يجاوب مرة واحدة فقط ثم يظهر التصحيح والشرح.</p>
-              </div>
-              <select className="rounded-2xl border border-amber-300 bg-white p-3 font-bold" value={form.template} onChange={e=>setForm({...form, template:e.target.value})}>
-                <option value="default">الشكل العادي</option>
-                <option value="paper-style">شكل الورقة التعليمية</option>
-              </select>
-            </div>
-            {form.template === 'paper-style' && <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-              <input className="border p-3 rounded-xl md:col-span-2" placeholder="عنوان الورقة: أسئلة ثانوية عامة واسترشادي" value={form.paperTitle} onChange={e=>setForm({...form, paperTitle:e.target.value})}/>
-              <input className="border p-3 rounded-xl" placeholder="المصدر: استرشادي ثامن" value={form.sourceLabel} onChange={e=>setForm({...form, sourceLabel:e.target.value})}/>
-              <input className="border p-3 rounded-xl" placeholder="السنة: 2025" value={form.sourceYear} onChange={e=>setForm({...form, sourceYear:e.target.value})}/>
-              <select className="border p-3 rounded-xl" value={form.scopeType} onChange={e=>setForm({...form, scopeType:e.target.value})}>
-                <option value="curriculum">عام على المنهج</option>
-                <option value="course">كورس معين</option>
-                <option value="unit">وحدة معينة</option>
-                <option value="lesson">درس معين</option>
-                <option value="comprehensive">امتحان شامل</option>
-              </select>
-              <textarea className="border p-3 rounded-xl md:col-span-5 h-20" placeholder="الجملة / المقدمة التي تظهر أعلى السؤال" value={form.introText} onChange={e=>setForm({...form, introText:e.target.value})}/>
-            </div>}
-          </div>
           <textarea className="border p-3 rounded h-24" placeholder="نص السؤال" value={form.text} onChange={e=>setForm({...form, text:e.target.value})}/>
           {form.type === 'mcq' && <textarea className="border p-3 rounded h-28 font-mono" placeholder={'كل اختيار في سطر منفصل\nمثال:\nنكرة مقصودة\nمضاف\nشبيه بالمضاف'} value={form.optionsText} onChange={e=>setForm({...form, optionsText:e.target.value})}/>}          
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {form.type === 'mcq' && <input type="number" min="0" className="border p-3 rounded" placeholder="رقم الإجابة الصحيحة يبدأ من 0" value={form.correctIdx} onChange={e=>setForm({...form, correctIdx:e.target.value})}/>}            
+            {form.type === 'mcq' && <input type="number" min="0" className="border p-3 rounded" placeholder="رقم الإجابة الصحيحة: أ=0، ب=1، ج=2، د=3" value={form.correctIdx} onChange={e=>setForm({...form, correctIdx:e.target.value})}/>}            
             <input type="number" min="1" className="border p-3 rounded" placeholder="درجة السؤال" value={form.mark} onChange={e=>setForm({...form, mark:e.target.value})}/>
             <input className="border p-3 rounded" placeholder="tags مفصولة بفاصلة" value={form.tags} onChange={e=>setForm({...form, tags:e.target.value})}/>
           </div>
           <textarea className="border p-3 rounded h-20" placeholder="شرح الإجابة / قاعدة المراجعة الذكية" value={form.explanation} onChange={e=>setForm({...form, explanation:e.target.value})}/>
           <div className="flex flex-col md:flex-row gap-3">
             <button className="bg-indigo-600 text-white py-3 px-6 rounded-xl font-bold">إضافة للسجل</button>
-            <button type="button" onClick={createExamFromBank} className="bg-emerald-600 text-white py-3 px-6 rounded-xl font-bold">توليد امتحان من الفلاتر الحالية</button>
+            <button type="button" onClick={createExamFromBank} className="bg-emerald-600 text-white py-3 px-6 rounded-xl font-bold">إنشاء مراجعة في السريع من الفلاتر</button>
           </div>
         </form>
       </div>
@@ -516,7 +620,7 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
         </div>
         <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between mb-4">
           <p className="text-sm text-slate-500">المعروض الآن: <b>{visible.length}</b> سؤال</p>
-          <button type="button" onClick={createExamFromBank} className="bg-emerald-600 text-white py-2 px-5 rounded-xl font-bold">توليد امتحان من النحو/البلاغة حسب الفلاتر</button>
+          <button type="button" onClick={createExamFromBank} className="bg-emerald-600 text-white py-2 px-5 rounded-xl font-bold">إنشاء مراجعة في السريع من الفلاتر</button>
         </div>
         <div className="space-y-3 max-h-[500px] overflow-y-auto">
           {visible.map(q => <div key={q.id} className="bg-white border rounded-xl p-4">
@@ -526,7 +630,6 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
               <span className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded">{q.topic || q.lesson || 'عام'}</span>
               <span className="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded">{q.type === 'essay' ? 'مقالي' : 'اختياري'}</span>
               <span className="bg-emerald-100 text-emerald-700 text-xs px-2 py-1 rounded">{getQuestionMaxScore(q)} درجة</span>
-              {(q.template === 'paper-style' || q.questionTemplate === 'paper-style') && <span className="bg-rose-100 text-rose-700 text-xs px-2 py-1 rounded">قالب الورقة: {q.sourceLabel || 'بدون مصدر'}</span>}
             </div>
             <p className="font-bold text-slate-800">{q.text}</p>
             {q.options?.length > 0 && <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3 text-sm">{q.options.map((option, idx) => <div key={idx} className={`border rounded-lg p-2 ${idx === q.correctIdx ? 'bg-emerald-50 border-emerald-200 text-emerald-800 font-bold' : 'bg-slate-50'}`}>{OPTION_LABELS[idx] || idx + 1}) {option}</div>)}</div>}
