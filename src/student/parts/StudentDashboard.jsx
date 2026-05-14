@@ -24,6 +24,7 @@ import { LearningHubTabs } from '../components/layout/StudentLayoutParts.jsx';
 import { StudentV2SectionTitle, StudentV2Sidebar, StudentV2Topbar } from '../v2/StudentV2Chrome.jsx';
 import StudentAssignmentsPanel from '../../admin/parts/StudentAssignmentsPanel.jsx';
 import StudentSuccessPanel from '../../features/studentSuccess/StudentSuccessPanel.jsx';
+import { imagePlacementStyle } from '../../shared/utils/imagePlacement.js';
 import { StudentLiveClassesPanel, StudentExamReviewCenter, StudentCertificatePanel } from '../../features/product/ProductExperienceSuite.jsx';
 
 
@@ -912,7 +913,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
                         return (
                         <div key={v.id} className="glass-card rounded-xl overflow-hidden cursor-pointer relative group">
                             <div className="h-48 bg-gradient-to-br from-slate-800 to-black flex items-center justify-center relative overflow-hidden" onClick={() => handlePremiumClick(() => setPlayingVideo(v))}>
-                                {(v.thumbnailUrl || v.posterUrl || v.image) && <img src={v.thumbnailUrl || v.posterUrl || v.image} className="absolute inset-0 w-full h-full object-cover transition duration-500 group-hover:scale-105" alt={v.title || 'غلاف الفيديو'} />}
+                                {(v.thumbnailUrl || v.posterUrl || v.image) && <img src={v.thumbnailUrl || v.posterUrl || v.image} className="absolute inset-0 w-full h-full transition duration-500 group-hover:scale-105" style={imagePlacementStyle(v.imagePlacement)} alt={v.title || 'غلاف الفيديو'} />}
                                 <div className="absolute inset-0 bg-black/35" />
                                 {v.isPremium && !isPremium ? <Lock className="relative z-10 text-white w-16 h-16 opacity-90 drop-shadow-lg" /> : <PlayCircle className="relative z-10 text-white w-16 h-16 opacity-90 group-hover:scale-110 transition drop-shadow-lg"/>}
                                 <span className="absolute bottom-2 left-2 z-10 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(v.grade)}</span>
@@ -960,7 +961,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
                 {filesAndLinks.map(f => (
                     <div key={f.id} className="p-4 flex flex-col md:flex-row justify-between md:items-center border-b last:border-0 hover:bg-white/50 transition gap-4">
                         <div className="flex items-center gap-4">
-                            {f.type === 'link' ? (<div className="bg-blue-100 text-blue-600 p-3 rounded-lg font-bold text-xs shadow-sm flex items-center justify-center"><LinkIcon size={16}/></div>) : (<div className="bg-red-100 text-red-600 p-3 rounded-lg font-bold text-xs shadow-sm">PDF</div>)}
+                            {(f.thumbnailUrl || f.image || f.posterUrl) ? (<div className="w-24 h-16 rounded-xl bg-slate-100 overflow-hidden border shrink-0"><img src={f.thumbnailUrl || f.image || f.posterUrl} className="w-full h-full" style={imagePlacementStyle(f.imagePlacement)} alt={f.title || 'غلاف الملف'} /></div>) : f.type === 'link' ? (<div className="bg-blue-100 text-blue-600 p-3 rounded-lg font-bold text-xs shadow-sm flex items-center justify-center"><LinkIcon size={16}/></div>) : (<div className="bg-red-100 text-red-600 p-3 rounded-lg font-bold text-xs shadow-sm">PDF</div>)}
                             <div>
                                 <h4 className={`font-bold text-lg ${f.isPremium && !isPremium ? 'text-slate-400' : 'text-slate-800'} flex items-center gap-2`}>
                                     {f.title}
@@ -987,7 +988,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
                 {htmls.map(h => (
                     <motion.div whileHover={{y:-5}} key={h.id} className="glass-card rounded-xl overflow-hidden cursor-pointer relative" onClick={() => handlePremiumClick(() => setPlayingHtml(h))}>
                         <div className="h-48 bg-gradient-to-br from-purple-600 to-indigo-900 flex items-center justify-center relative group">
-                            {h.isPremium && !isPremium ? <Lock className="text-slate-400 w-20 h-20 opacity-80" /> : <Code className="text-white w-20 h-20 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/>}
+                            {(h.thumbnailUrl || h.image || h.posterUrl) && <img src={h.thumbnailUrl || h.image || h.posterUrl} className="absolute inset-0 w-full h-full" style={imagePlacementStyle(h.imagePlacement)} alt={h.title || 'غلاف المحتوى'} />}<div className="absolute inset-0 bg-black/25" />{h.isPremium && !isPremium ? <Lock className="relative z-10 text-slate-200 w-20 h-20 opacity-80" /> : <Code className="relative z-10 text-white w-20 h-20 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/>}
                             <span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(h.grade)}</span>
                             {h.isPremium && <span className="absolute top-2 right-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-full font-bold flex items-center gap-1 shadow-md"><Crown size={12}/> VIP</span>}
                         </div>
@@ -1007,7 +1008,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
                 {interactiveExams.map(h => (
                     <motion.div whileHover={{y:-5}} key={h.id} className="glass-card rounded-xl overflow-hidden cursor-pointer relative" onClick={() => handlePremiumClick(() => setPlayingHtml(h))}>
                         <div className="h-48 bg-gradient-to-br from-emerald-600 to-teal-900 flex items-center justify-center relative group">
-                            {h.isPremium && !isPremium ? <Lock className="text-slate-400 w-20 h-20 opacity-80" /> : <Sparkles className="text-white w-20 h-20 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/>}
+                            {(h.thumbnailUrl || h.image || h.posterUrl) && <img src={h.thumbnailUrl || h.image || h.posterUrl} className="absolute inset-0 w-full h-full" style={imagePlacementStyle(h.imagePlacement)} alt={h.title || 'غلاف الامتحان'} />}<div className="absolute inset-0 bg-black/25" />{h.isPremium && !isPremium ? <Lock className="relative z-10 text-slate-200 w-20 h-20 opacity-80" /> : <Sparkles className="relative z-10 text-white w-20 h-20 opacity-80 group-hover:scale-110 transition drop-shadow-lg"/>}
                             <span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(h.grade)}</span>
                             {h.isPremium && <span className="absolute top-2 right-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-full font-bold flex items-center gap-1 shadow-md"><Crown size={12}/> VIP</span>}
                         </div>
@@ -1048,6 +1049,11 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
                   <motion.div whileHover={{scale:1.01}} key={e.id} className={`glass-card p-4 md:p-6 rounded-2xl relative overflow-hidden flex flex-col ${(e.isPremium && !isPremium) || accessState.locked ? 'opacity-80' : ''}`}>
                     {statusText && <div className={`absolute top-0 left-0 text-[10px] md:text-xs px-2 md:px-3 py-1 rounded-br-xl font-bold shadow-md ${statusClass}`}>{statusText}</div>}
                     {e.isPremium && <div className="absolute top-2 right-2 bg-amber-100 text-amber-700 text-[10px] px-2 py-1 rounded-full font-bold flex items-center gap-1"><Crown size={12}/> VIP</div>}
+                    {(e.examImageUrl || e.thumbnailUrl || e.image) && (
+                      <div className="h-40 rounded-2xl bg-slate-100 overflow-hidden border mb-4 mt-4">
+                        <img src={e.examImageUrl || e.thumbnailUrl || e.image} className="w-full h-full" style={imagePlacementStyle(e.imagePlacement)} alt={e.title || 'غلاف الامتحان'} />
+                      </div>
+                    )}
                     
                     <h3 className={`text-lg md:text-xl font-bold mb-2 mt-4 md:mt-0 ${e.isPremium && !isPremium ? 'text-slate-400' : 'text-slate-800'}`}>{e.title}</h3>
                     <div className="flex justify-between text-xs md:text-sm text-slate-500 mb-4"><span>⏳ {e.duration} دقيقة</span><span>📝 {e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0)} سؤال</span></div>

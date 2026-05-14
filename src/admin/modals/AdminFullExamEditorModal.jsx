@@ -1,7 +1,10 @@
 
-import { Edit, X } from '../../shared/icons/lucide-shim.jsx';
+import { useState } from 'react';
+import { Edit, UploadCloud, X } from '../../shared/icons/lucide-shim.jsx';
 import { GradeOptions } from '../../shared/constants/grades';
-import { safeNumber } from '../../shared/core/platformShared.jsx';
+import { platformNotify, safeNumber } from '../../shared/core/platformShared.jsx';
+import { uploadToCloudinary } from '../../services/cloudinaryUpload';
+import ImageFitControls from '../../shared/ui/ImageFitControls.jsx';
 
 export default function AdminFullExamEditorModal({
   editingFullExam, setEditingFullExam,
@@ -12,6 +15,20 @@ export default function AdminFullExamEditorModal({
   saveFullExamEdit,
   examsList = []
 }) {
+  const [imageBusy, setImageBusy] = useState(false);
+  const uploadExamImage = async (file) => {
+    if (!file) return;
+    try {
+      setImageBusy(true);
+      const uploaded = await uploadToCloudinary(file, { kind: 'image', folder: 'nahhas-platform/exam-images' });
+      setExamEditDraft({ ...examEditDraft, examImageUrl: uploaded.url });
+      platformNotify('تم رفع صورة الامتحان بنجاح.');
+    } catch (err) {
+      platformNotify(err?.message || 'فشل رفع صورة الامتحان.');
+    } finally {
+      setImageBusy(false);
+    }
+  };
   if (!editingFullExam) return null;
   return (
 <div className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -67,6 +84,18 @@ export default function AdminFullExamEditorModal({
         <input className="border p-3 rounded-xl" placeholder="كود الامتحان" value={examEditDraft.accessCode} onChange={e => setExamEditDraft({...examEditDraft, accessCode: e.target.value})} />
         <input type="datetime-local" className="border p-3 rounded-xl" value={examEditDraft.startTime} onChange={e => setExamEditDraft({...examEditDraft, startTime: e.target.value})} />
         <input type="datetime-local" className="border p-3 rounded-xl" value={examEditDraft.endTime} onChange={e => setExamEditDraft({...examEditDraft, endTime: e.target.value})} />
+      </div>
+
+      <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 space-y-3">
+        <label className="block text-sm font-black text-emerald-900">صورة الامتحان / الغلاف</label>
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
+          <input className="border p-3 rounded-xl bg-white" placeholder="رابط الصورة أو ارفع صورة" value={examEditDraft.examImageUrl || ''} onChange={e => setExamEditDraft({...examEditDraft, examImageUrl: e.target.value})} />
+          <label className="inline-flex items-center justify-center gap-2 bg-emerald-600 text-white px-5 py-3 rounded-xl font-black cursor-pointer">
+            <UploadCloud size={16}/> {imageBusy ? 'جاري الرفع...' : 'رفع صورة'}
+            <input type="file" accept="image/*" className="hidden" disabled={imageBusy} onChange={(e) => uploadExamImage(e.target.files?.[0])} />
+          </label>
+        </div>
+        <ImageFitControls imageUrl={examEditDraft.examImageUrl} value={examEditDraft.imagePlacement} onChange={(v) => setExamEditDraft({...examEditDraft, imagePlacement: v})} title="تظبيط صورة الامتحان داخل الإطار" />
       </div>
 
       <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 space-y-3">

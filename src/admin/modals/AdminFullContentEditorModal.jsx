@@ -4,6 +4,7 @@ import { Edit, UploadCloud, X } from '../../shared/icons/lucide-shim.jsx';
 import { GradeOptions } from '../../shared/constants/grades';
 import { uploadToCloudinary } from '../../services/cloudinaryUpload';
 import { platformNotify } from '../../shared/core/platformShared.jsx';
+import ImageFitControls from '../../shared/ui/ImageFitControls.jsx';
 
 export default function AdminFullContentEditorModal({
   editingFullContent, setEditingFullContent,
@@ -16,11 +17,11 @@ export default function AdminFullContentEditorModal({
     if (!file) return;
     try {
       setThumbBusy(true);
-      const uploaded = await uploadToCloudinary(file, { kind: 'image', folder: 'nahhas-platform/video-thumbnails' });
+      const uploaded = await uploadToCloudinary(file, { kind: 'image', folder: 'nahhas-platform/images' });
       setContentEditDraft({ ...contentEditDraft, thumbnailUrl: uploaded.url });
-      platformNotify('تم رفع صورة الفيديو بنجاح.');
+      platformNotify('تم رفع صورة المحتوى بنجاح.');
     } catch (err) {
-      platformNotify(err?.message || 'فشل رفع صورة الفيديو.');
+      platformNotify(err?.message || 'فشل رفع صورة المحتوى.');
     } finally {
       setThumbBusy(false);
     }
@@ -53,22 +54,22 @@ export default function AdminFullContentEditorModal({
       <input className="border p-3 rounded-xl" placeholder="العنوان" value={contentEditDraft.title} onChange={e => setContentEditDraft({...contentEditDraft, title: e.target.value})} />
       <input className="border p-3 rounded-xl" placeholder="الرابط / رابط الفيديو / رابط الملف" value={contentEditDraft.url} onChange={e => setContentEditDraft({...contentEditDraft, url: e.target.value})} />
 
-      {contentEditDraft.type === 'video' && (
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4">
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4">
           <div>
-            <label className="block text-sm font-black text-amber-900 mb-1">صورة الفيديو / الغلاف</label>
+            <label className="block text-sm font-black text-amber-900 mb-1">صورة المحتوى / الغلاف</label>
             <input className="border p-3 rounded-xl w-full bg-white" placeholder="رابط الصورة أو ارفع صورة" value={contentEditDraft.thumbnailUrl || ''} onChange={e => setContentEditDraft({...contentEditDraft, thumbnailUrl: e.target.value})} />
-            <p className="text-xs text-amber-800 font-bold mt-1">تظهر بدل السواد في كارت الفيديو وكغلاف قبل التشغيل للفيديوهات المرفوعة.</p>
+            <p className="text-xs text-amber-800 font-bold mt-1">تظهر مع الفيديو، PDF، المحتوى التفاعلي، الامتحان التفاعلي، والروابط.</p>
           </div>
           <div className="flex flex-col gap-2">
             <label className="inline-flex items-center justify-center gap-2 bg-amber-600 text-white px-5 py-3 rounded-xl font-black cursor-pointer">
               <UploadCloud size={16}/> {thumbBusy ? 'جاري الرفع...' : 'رفع صورة'}
               <input type="file" accept="image/*" className="hidden" disabled={thumbBusy} onChange={(e) => uploadThumb(e.target.files?.[0])} />
             </label>
-            {contentEditDraft.thumbnailUrl && <img src={contentEditDraft.thumbnailUrl} className="h-24 w-40 object-cover rounded-xl border bg-white" />}
+          </div>
+          <div className="md:col-span-2">
+            <ImageFitControls imageUrl={contentEditDraft.thumbnailUrl} value={contentEditDraft.imagePlacement} onChange={(v) => setContentEditDraft({...contentEditDraft, imagePlacement: v})} />
           </div>
         </div>
-      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <select className="border p-3 rounded-xl" value={contentEditDraft.type} onChange={e => setContentEditDraft({...contentEditDraft, type: e.target.value})}>

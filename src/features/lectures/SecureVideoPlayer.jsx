@@ -5,6 +5,7 @@ import { Settings as GearIcon, Maximize2, Minimize2, PenLine, Play, RefreshCw, S
 import { db } from '../../services/firebase';
 import { platformNotify, platformConfirm } from '../../shared/core/platformShared.jsx';
 import { getYouTubeID, safeNumber } from '../../shared/utils/media';
+import { imagePlacementStyle } from '../../shared/utils/imagePlacement.js';
 import './lecture-player.css';
 
 const PLAYBACK_RATES = [0.75, 1, 1.25, 1.5, 2];
@@ -443,7 +444,7 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
                       setYoutubeStarted(true);
                       youtubePlayerRef.current?.playVideo?.();
                     }} className="absolute inset-0 z-50 group">
-                    <img src={posterUrl} className="w-full h-full object-cover" alt={video?.title || 'غلاف الفيديو'} />
+                    <img src={posterUrl} className="w-full h-full" style={imagePlacementStyle(video?.imagePlacement)} alt={video?.title || 'غلاف الفيديو'} />
                     <span className="absolute inset-0 bg-black/35 flex items-center justify-center"><span className="w-20 h-20 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-2xl group-hover:scale-110 transition"><Play size={38}/></span></span>
                   </button>
                 )}

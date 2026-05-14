@@ -14,6 +14,7 @@ import { uploadToFirebaseContent, detectContentType, readHtmlFileAsInlineContent
 import { uploadToCloudinary } from '../../services/cloudinaryUpload';
 import { downloadXlsx } from '../../shared/utils/exportData.js';
 import { platformNotify, platformConfirm, platformPrompt, sendSystemNotification, safeNumber, VIDEO_EXAM_UNLOCK_PERCENT, getQuestionMaxScore, calculateDetailedExamMetrics } from '../../shared/core/platformShared.jsx';
+import { normalizeImagePlacement, defaultImagePlacement } from '../../shared/utils/imagePlacement.js';
 import { DebugPanel } from '../../shared/core/debugTools.jsx';
 
 
@@ -40,11 +41,11 @@ export const AdminDashboard = ({ user, adminProfile }) => {
   const [activeTab, setActiveTab] = useState('dashboard'); 
   const [adminExamView, setAdminExamView] = useState('manage');
   const [adminGradeFilter, setAdminGradeFilter] = useState('all'); 
-  const [newContent, setNewContent] = useState({ title: '', url: '', thumbnailUrl: '', type: 'video', videoSection: 'explanation', isPublic: false, grade: '3sec', allowedEmails: '', isPremium: false, linkedExamId: '', estimatedDurationMinutes: '', branch: '' });
+  const [newContent, setNewContent] = useState({ title: '', url: '', thumbnailUrl: '', imagePlacement: defaultImagePlacement, type: 'video', videoSection: 'explanation', isPublic: false, grade: '3sec', allowedEmails: '', isPremium: false, linkedExamId: '', estimatedDurationMinutes: '', branch: '' });
   const [editingUser, setEditingUser] = useState(null);
   const [replyTexts, setReplyTexts] = useState({});
   const [examBuilder, setExamBuilder] = useState({
-    title: '', grade: '3sec', duration: 60, startTime: '', endTime: '', questions: [], accessCode: '', isPremium: false,
+    title: '', grade: '3sec', duration: 60, startTime: '', endTime: '', questions: [], accessCode: '', isPremium: false, examImageUrl: '', imagePlacement: defaultImagePlacement,
     accessRule: { enabled: false, requiredExamId: '', requiredPercentage: 70, visibilityWhenLocked: 'locked', useBestAttempt: true, allowAdminOverride: true }
   });
   const [bulkText, setBulkText] = useState('');
@@ -74,7 +75,7 @@ export const AdminDashboard = ({ user, adminProfile }) => {
   const [recalculateAfterExamEdit, setRecalculateAfterExamEdit] = useState(true);
   const [examEditDraft, setExamEditDraft] = useState({
     title: '', grade: '3sec', duration: 60, startTime: '', endTime: '',
-    accessCode: '', isPremium: false, questionsText: '',
+    accessCode: '', isPremium: false, questionsText: '', examImageUrl: '', imagePlacement: defaultImagePlacement,
     accessRule: { enabled: false, requiredExamId: '', requiredPercentage: 70, visibilityWhenLocked: 'locked', useBestAttempt: true, allowAdminOverride: true }
   });
   const [examOverrideDraft, setExamOverrideDraft] = useState({ examId: '', studentId: '', reason: '' });
@@ -118,7 +119,7 @@ export const AdminDashboard = ({ user, adminProfile }) => {
   const [contentEditDraft, setContentEditDraft] = useState({
     title: '', url: '', type: 'video', videoSection: 'explanation',
     grade: '3sec', isPremium: false, isPublic: false, allowedEmailsText: '',
-    linkedExamId: '', estimatedDurationMinutes: '', branch: ''
+    linkedExamId: '', estimatedDurationMinutes: '', branch: '', thumbnailUrl: '', imagePlacement: defaultImagePlacement
   });
 
   const [newSmartHw, setNewSmartHw] = useState({ title: '', answerKey: '', grade: '3sec', bookName: '' });
@@ -357,6 +358,8 @@ export const AdminDashboard = ({ user, adminProfile }) => {
       endTime: exam.endTime || '',
       accessCode: exam.accessCode || '',
       isPremium: !!exam.isPremium,
+      examImageUrl: exam.examImageUrl || exam.thumbnailUrl || exam.image || '',
+      imagePlacement: normalizeImagePlacement(exam.imagePlacement),
       questionsText: JSON.stringify(exam.questions || [], null, 2),
       accessRule: {
         enabled: !!exam.accessRule?.enabled,
@@ -469,6 +472,8 @@ export const AdminDashboard = ({ user, adminProfile }) => {
       endTime: examEditDraft.endTime,
       accessCode: examEditDraft.accessCode.trim(),
       isPremium: !!examEditDraft.isPremium,
+      examImageUrl: examEditDraft.examImageUrl || '',
+      imagePlacement: normalizeImagePlacement(examEditDraft.imagePlacement),
       accessRule: {
         enabled: !!examEditDraft.accessRule?.enabled && !!examEditDraft.accessRule?.requiredExamId,
         requiredExamId: examEditDraft.accessRule?.requiredExamId || '',
@@ -529,7 +534,8 @@ export const AdminDashboard = ({ user, adminProfile }) => {
       linkedExamId: item.linkedExamId || '',
       estimatedDurationMinutes: item.estimatedDurationMinutes || '',
       branch: item.branch || '',
-      thumbnailUrl: item.thumbnailUrl || item.posterUrl || item.image || ''
+      thumbnailUrl: item.thumbnailUrl || item.posterUrl || item.image || '',
+      imagePlacement: normalizeImagePlacement(item.imagePlacement)
     });
   };
 
@@ -557,8 +563,10 @@ export const AdminDashboard = ({ user, adminProfile }) => {
       isPublic: !!contentEditDraft.isPublic,
       allowedEmails,
       branch: contentEditDraft.branch || '',
-      thumbnailUrl: contentEditDraft.type === 'video' ? (contentEditDraft.thumbnailUrl || '') : '',
-      posterUrl: contentEditDraft.type === 'video' ? (contentEditDraft.thumbnailUrl || '') : '',
+      thumbnailUrl: contentEditDraft.thumbnailUrl || '',
+      posterUrl: contentEditDraft.thumbnailUrl || '',
+      image: contentEditDraft.thumbnailUrl || '',
+      imagePlacement: normalizeImagePlacement(contentEditDraft.imagePlacement),
       linkedExamId: contentEditDraft.type === 'video' ? (contentEditDraft.linkedExamId || '') : '',
       estimatedDurationMinutes: contentEditDraft.type === 'video' ? safeNumber(contentEditDraft.estimatedDurationMinutes, 0) : 0,
       videoExamUnlockPercent: contentEditDraft.type === 'video' && contentEditDraft.linkedExamId ? VIDEO_EXAM_UNLOCK_PERCENT : 0,
@@ -889,23 +897,35 @@ export const AdminDashboard = ({ user, adminProfile }) => {
       platformNotify(`تم رفض طلب تغيير المرحلة للطالب ${user.name}.`);
   };
 
-  const handleVideoThumbnailSelect = async (e) => {
-      const file = e.target.files?.[0];
+  const handleImageUpload = async (file, onUploaded, successMessage = 'تم رفع الصورة بنجاح.') => {
       if (!file) return;
       try {
           setIsUploading(true);
           setUploadProgress(10);
-          const uploaded = await uploadToCloudinary(file, { kind: 'image', folder: 'nahhas-platform/video-thumbnails' });
-          setNewContent((prev) => ({ ...prev, thumbnailUrl: uploaded.url }));
+          const uploaded = await uploadToCloudinary(file, { kind: 'image', folder: 'nahhas-platform/images' });
+          onUploaded(uploaded.url);
           setUploadProgress(100);
-          platformNotify('تم رفع صورة الفيديو بنجاح.');
+          platformNotify(successMessage);
           setTimeout(() => setUploadProgress(0), 1200);
       } catch (err) {
-          platformNotify(err?.message || 'فشل رفع صورة الفيديو.');
+          platformNotify(err?.message || 'فشل رفع الصورة.');
       } finally {
           setIsUploading(false);
-          e.target.value = null;
       }
+  };
+
+  const handleVideoThumbnailSelect = async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      await handleImageUpload(file, (url) => setNewContent((prev) => ({ ...prev, thumbnailUrl: url })), 'تم رفع صورة المحتوى بنجاح.');
+      e.target.value = null;
+  };
+
+  const handleExamImageSelect = async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      await handleImageUpload(file, (url) => setExamBuilder((prev) => ({ ...prev, examImageUrl: url })), 'تم رفع صورة الامتحان بنجاح.');
+      e.target.value = null;
   };
 
   const handleFileSelect = async (e) => {
@@ -963,8 +983,10 @@ export const AdminDashboard = ({ user, adminProfile }) => {
           url: newContent.url.trim(),
           file: newContent.url.trim(), 
           allowedEmails: allowedEmailsArray,
-          thumbnailUrl: newContent.type === 'video' ? (newContent.thumbnailUrl || '') : '',
-          posterUrl: newContent.type === 'video' ? (newContent.thumbnailUrl || '') : '',
+          thumbnailUrl: newContent.thumbnailUrl || '',
+          posterUrl: newContent.thumbnailUrl || '',
+          image: newContent.thumbnailUrl || '',
+          imagePlacement: normalizeImagePlacement(newContent.imagePlacement),
           linkedExamId: newContent.type === 'video' ? (newContent.linkedExamId || '') : '',
           estimatedDurationMinutes: newContent.type === 'video' ? safeNumber(newContent.estimatedDurationMinutes, 0) : 0,
           videoExamUnlockPercent: newContent.type === 'video' && newContent.linkedExamId ? VIDEO_EXAM_UNLOCK_PERCENT : 0,
@@ -985,7 +1007,7 @@ export const AdminDashboard = ({ user, adminProfile }) => {
       } 
       
       platformNotify("تم النشر!"); 
-      setNewContent({ title: '', url: '', thumbnailUrl: '', type: 'video', videoSection: 'explanation', isPublic: false, grade: '3sec', allowedEmails: '', isPremium: false, linkedExamId: '', estimatedDurationMinutes: '', branch: '', storageProvider: '', firebaseStoragePath: '', mimeType: '', fileName: '', fileSize: 0, htmlContent: '' });
+      setNewContent({ title: '', url: '', thumbnailUrl: '', imagePlacement: defaultImagePlacement, type: 'video', videoSection: 'explanation', isPublic: false, grade: '3sec', allowedEmails: '', isPremium: false, linkedExamId: '', estimatedDurationMinutes: '', branch: '', storageProvider: '', firebaseStoragePath: '', mimeType: '', fileName: '', fileSize: 0, htmlContent: '' });
   }; 
   
   const handleDeleteContent = async (id) => { 
@@ -1134,6 +1156,8 @@ export const AdminDashboard = ({ user, adminProfile }) => {
         title: examBuilder.title, grade: examBuilder.grade, duration: examBuilder.duration, 
         startTime: examBuilder.startTime, endTime: examBuilder.endTime, accessCode: examBuilder.accessCode, 
         isPremium: examBuilder.isPremium,
+        examImageUrl: examBuilder.examImageUrl || '',
+        imagePlacement: normalizeImagePlacement(examBuilder.imagePlacement),
         accessRule: {
           enabled: !!examBuilder.accessRule?.enabled && !!examBuilder.accessRule?.requiredExamId,
           requiredExamId: examBuilder.accessRule?.requiredExamId || '',
@@ -1339,6 +1363,7 @@ export const AdminDashboard = ({ user, adminProfile }) => {
     rejectGrade,
     handleFileSelect,
     handleVideoThumbnailSelect,
+    handleExamImageSelect,
     handleAddContent,
     handleDeleteContent,
     parseExam,

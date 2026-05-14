@@ -12,6 +12,7 @@ import { AdminCoursesManager } from '../../features/courses/CourseSystem';
 import { platformNotify, getQuestionsForExam, generatePDF, VIDEO_EXAM_UNLOCK_PERCENT, InlineTabs } from '../../shared/core/platformShared.jsx';
 import { usePagination } from '../../shared/hooks/usePagination.js';
 import PaginationBar from '../../shared/components/PaginationBar.jsx';
+import ImageFitControls from '../../shared/ui/ImageFitControls.jsx';
 import { downloadXlsx } from '../../shared/utils/exportData.js';
 
 
@@ -171,6 +172,7 @@ export default function AdminDashboardTabs({ ctx }) {
     rejectGrade,
     handleFileSelect,
     handleVideoThumbnailSelect,
+    handleExamImageSelect,
     handleAddContent,
     handleDeleteContent,
     parseExam,
@@ -601,6 +603,18 @@ export default function AdminDashboardTabs({ ctx }) {
                               <label htmlFor="examVip" className="font-bold text-amber-800 text-sm flex items-center gap-1 cursor-pointer"><Crown size={16}/> امتحان VIP (مغلق لغير المشتركين)</label>
                           </div>
 
+                          <div className="md:col-span-4 bg-emerald-50 border border-emerald-200 rounded-2xl p-4 space-y-3">
+                              <label className="block text-sm font-black text-emerald-900">صورة الامتحان / الغلاف</label>
+                              <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
+                                  <input className="border p-3 rounded-xl bg-white" placeholder="رابط الصورة أو ارفع صورة" value={examBuilder.examImageUrl || ''} onChange={e=>setExamBuilder({...examBuilder, examImageUrl:e.target.value})}/>
+                                  <label className="bg-emerald-600 text-white px-5 py-3 rounded-xl font-black cursor-pointer text-center">
+                                      رفع صورة
+                                      <input type="file" accept="image/*" className="hidden" onChange={handleExamImageSelect} />
+                                  </label>
+                              </div>
+                              <ImageFitControls imageUrl={examBuilder.examImageUrl} value={examBuilder.imagePlacement} onChange={(v)=>setExamBuilder({...examBuilder, imagePlacement:v})} title="تظبيط صورة الامتحان داخل الكارت" />
+                          </div>
+
                           <div className="md:col-span-4 bg-blue-50 border border-blue-200 rounded-2xl p-4 space-y-3">
                               <label className="flex items-center gap-2 font-black text-blue-900 text-sm">
                                   <input
@@ -943,22 +957,22 @@ export default function AdminDashboardTabs({ ctx }) {
                   <form onSubmit={handleAddContent} className="grid gap-4 mb-6">
                       <input className="border p-3 rounded w-full" placeholder="العنوان" value={newContent.title} onChange={e=>setNewContent({...newContent, title:e.target.value})}/>
                       <input className="border p-3 rounded w-full" placeholder="الرابط (يفضل Google Drive للملفات الكبيرة)" value={newContent.url} onChange={e=>setNewContent({...newContent, url:e.target.value})}/>
-                      {newContent.type === 'video' && (
-                        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
+                      <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
                           <div>
-                            <label className="block text-sm font-black text-amber-900 mb-1">صورة الفيديو / الغلاف الظاهر للطالب</label>
+                            <label className="block text-sm font-black text-amber-900 mb-1">صورة المحتوى / الغلاف الظاهر للطالب</label>
                             <input className="border p-3 rounded-xl w-full bg-white" placeholder="رابط الصورة أو ارفع صورة من الزر" value={newContent.thumbnailUrl || ''} onChange={e=>setNewContent({...newContent, thumbnailUrl:e.target.value})}/>
-                            <p className="text-xs text-amber-800 font-bold mt-1">ستظهر بدل الخلفية السوداء في كارت الفيديو، وتظهر كغلاف قبل التشغيل للفيديوهات المرفوعة.</p>
+                            <p className="text-xs text-amber-800 font-bold mt-1">تعمل مع الفيديو، PDF، المحتوى التفاعلي، الامتحان التفاعلي، والروابط.</p>
                           </div>
                           <div className="flex flex-col gap-2">
                             <label className="bg-amber-600 text-white px-5 py-3 rounded-xl font-black cursor-pointer text-center">
                               رفع صورة
                               <input type="file" accept="image/*" className="hidden" onChange={handleVideoThumbnailSelect} />
                             </label>
-                            {newContent.thumbnailUrl && <img src={newContent.thumbnailUrl} className="h-24 w-40 object-cover rounded-xl border bg-white" />}
+                          </div>
+                          <div className="md:col-span-2">
+                            <ImageFitControls imageUrl={newContent.thumbnailUrl} value={newContent.imagePlacement} onChange={(v)=>setNewContent({...newContent, imagePlacement:v})} title="تظبيط صورة المحتوى داخل الإطار" />
                           </div>
                         </div>
-                      )}
                       <div className="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center hover:bg-slate-50 transition relative">
                           <input type="file" onChange={handleFileSelect} className="absolute inset-0 opacity-0 cursor-pointer" />
                           <div className="flex flex-col items-center gap-2 text-slate-500">

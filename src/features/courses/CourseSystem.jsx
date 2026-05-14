@@ -7,6 +7,8 @@ import { GradeOptions, getGradeLabel } from '../../shared/constants/grades.jsx';
 import { platformNotify, platformConfirm } from '../../shared/core/platformShared.jsx';
 import EmptyState from '../../shared/ui/EmptyState.jsx';
 import PageHeader from '../../shared/ui/PageHeader.jsx';
+import ImageFitControls from '../../shared/ui/ImageFitControls.jsx';
+import { defaultImagePlacement, imagePlacementStyle, normalizeImagePlacement } from '../../shared/utils/imagePlacement.js';
 
 const uploadMedia = async (file, kind = 'image') => {
   if (!file) return '';
@@ -26,7 +28,7 @@ const randomCode = () => `NH-${Math.random().toString(36).slice(2, 6).toUpperCas
 const userLabel = (u) => u?.name || u?.displayName || u?.email || u?.id || 'طالب';
 const userIdOf = (u) => u?.id || u?.uid || u?.userId || '';
 
-function ImgInput({ label, value, onChange, kind = 'image' }) {
+function ImgInput({ label, value, onChange, kind = 'image', placement, onPlacementChange }) {
   const [busy, setBusy] = useState(false);
   const isPdf = kind === 'pdf';
   return (
@@ -68,8 +70,11 @@ function ImgInput({ label, value, onChange, kind = 'image' }) {
             فتح ملف PDF
           </a>
         ) : (
-          <img src={value} className="h-28 w-full object-cover rounded-2xl border" />
+          <div className="h-28 w-full rounded-2xl border bg-slate-100 overflow-hidden"><img src={value} className="w-full h-full" style={imagePlacementStyle(placement)} /></div>
         ))}
+      {!isPdf && onPlacementChange && (
+        <ImageFitControls imageUrl={value} value={placement} onChange={onPlacementChange} />
+      )}
     </div>
   );
 }
@@ -191,10 +196,10 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
   const [enrollments, setEnrollments] = useState([]);
   const [course, setCourse] = useState('');
   const [mod, setMod] = useState('');
-  const emptyCourseForm = { title: '', description: '', price: '', teacher: 'مستر النحاس', coverImage: '', grade: '3sec', isPublished: false, unlockMode: 'sequential', visibleFrom: '', visibleUntil: '', defaultAccessDays: '', permanentAccess: true };
+  const emptyCourseForm = { title: '', description: '', price: '', teacher: 'مستر النحاس', coverImage: '', coverImagePlacement: defaultImagePlacement, grade: '3sec', isPublished: false, unlockMode: 'sequential', visibleFrom: '', visibleUntil: '', defaultAccessDays: '', permanentAccess: true };
   const [cf, setCf] = useState(emptyCourseForm);
   const [mf, setMf] = useState({ title: '', order: 1 });
-  const [lf, setLf] = useState({ title: '', videoUrl: '', pdfUrl: '', examUrl: '', examId: '', lessonImage: '', icon: '📘', order: 1, isFree: false, unlockAt: '', requiredPreviousLessonId: '', examRequiresWatchPercent: 75, nextLessonRequiresExamScore: 60 });
+  const [lf, setLf] = useState({ title: '', videoUrl: '', pdfUrl: '', pdfImage: '', examUrl: '', examId: '', examImage: '', lessonImage: '', lessonImagePlacement: defaultImagePlacement, pdfImagePlacement: defaultImagePlacement, examImagePlacement: defaultImagePlacement, icon: '📘', order: 1, isFree: false, unlockAt: '', requiredPreviousLessonId: '', examRequiresWatchPercent: 75, nextLessonRequiresExamScore: 60 });
   const [of, setOf] = useState({ userId: '', lessonId: '', reason: '' });
   const [manual, setManual] = useState({ userId: '', courseId: '', expiresInDays: '', permanent: true });
   const [codeForm, setCodeForm] = useState({ courseId: '', count: 1, expiresInDays: '', permanent: true });
@@ -210,7 +215,7 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
   const resetCourseForm = () => { setEditingCourseId(''); setCf(emptyCourseForm); };
   const editCourse = (c) => {
     setEditingCourseId(c.id);
-    setCf({ title: c.title || '', description: c.description || '', price: c.price ?? '', teacher: c.teacher || 'مستر النحاس', coverImage: c.coverImage || '', grade: c.grade || '3sec', isPublished: !!c.isPublished, unlockMode: c.unlockMode || 'sequential', visibleFrom: c.visibleFrom || '', visibleUntil: c.visibleUntil || '', defaultAccessDays: c.defaultAccessDays ?? '', permanentAccess: c.permanentAccess !== false });
+    setCf({ title: c.title || '', description: c.description || '', price: c.price ?? '', teacher: c.teacher || 'مستر النحاس', coverImage: c.coverImage || '', coverImagePlacement: normalizeImagePlacement(c.coverImagePlacement), grade: c.grade || '3sec', isPublished: !!c.isPublished, unlockMode: c.unlockMode || 'sequential', visibleFrom: c.visibleFrom || '', visibleUntil: c.visibleUntil || '', defaultAccessDays: c.defaultAccessDays ?? '', permanentAccess: c.permanentAccess !== false });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   const deleteManyRefs = async (refs) => {
@@ -247,7 +252,7 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
   };
   const saveCourse = async () => {
     if (!cf.title.trim()) return platformNotify('اكتب اسم الكورس', 'error');
-    const payload = { ...cf, price: Number(cf.price || 0), defaultAccessDays: cf.defaultAccessDays === '' ? '' : Number(cf.defaultAccessDays || 0), updatedAt: serverTimestamp() };
+    const payload = { ...cf, coverImagePlacement: normalizeImagePlacement(cf.coverImagePlacement), price: Number(cf.price || 0), defaultAccessDays: cf.defaultAccessDays === '' ? '' : Number(cf.defaultAccessDays || 0), updatedAt: serverTimestamp() };
     if (editingCourseId) { await updateDoc(doc(db, 'courses', editingCourseId), payload); platformNotify('تم تعديل الكورس.', 'success'); }
     else { await addDoc(collection(db, 'courses'), { ...payload, createdAt: serverTimestamp() }); platformNotify('تم حفظ الكورس.', 'success'); }
     resetCourseForm();
@@ -267,6 +272,11 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
       examUrl: lf.examUrl,
       examId: lf.examId,
       lessonImage: lf.lessonImage,
+      lessonImagePlacement: normalizeImagePlacement(lf.lessonImagePlacement),
+      pdfImage: lf.pdfImage || '',
+      pdfImagePlacement: normalizeImagePlacement(lf.pdfImagePlacement),
+      examImage: lf.examImage || '',
+      examImagePlacement: normalizeImagePlacement(lf.examImagePlacement),
       icon: lf.icon,
       order: Number(lf.order || 1),
       isFree: !!lf.isFree,
@@ -275,7 +285,7 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
       unlockRules: { examRequiresWatchPercent: Number(lf.examRequiresWatchPercent || 75), nextLessonRequiresWatchPercent: 75, nextLessonRequiresExamScore: Number(lf.nextLessonRequiresExamScore || 60) },
       createdAt: serverTimestamp(),
     });
-    setLf({ ...lf, title: '', videoUrl: '', pdfUrl: '', examUrl: '', examId: '', lessonImage: '', icon: '📘', order: lessons.length + 2 });
+    setLf({ ...lf, title: '', videoUrl: '', pdfUrl: '', pdfImage: '', examUrl: '', examId: '', examImage: '', lessonImage: '', icon: '📘', order: lessons.length + 2 });
   };
   const saveOver = async () => {
     if (!course || !mod || !of.userId || !of.lessonId) return platformNotify('اختار الطالب والدرس', 'error');
@@ -339,7 +349,7 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
             <label className="md:col-span-2 font-bold flex gap-2 items-center"><input type="checkbox" checked={cf.permanentAccess !== false} onChange={(e) => setCf({ ...cf, permanentAccess: e.target.checked })} /> فتح الكورس دائم عند التفعيل</label>
             {cf.permanentAccess === false && <input className="md:col-span-2 p-3 rounded-xl border" placeholder="مدة فتح الكورس الافتراضية بالأيام" value={cf.defaultAccessDays || ''} onChange={(e) => setCf({ ...cf, defaultAccessDays: e.target.value })} />}
           </div>
-          <ImgInput label="صورة الكورس الكبيرة" value={cf.coverImage} onChange={(v) => setCf({ ...cf, coverImage: v })} />
+          <ImgInput label="صورة الكورس الكبيرة" value={cf.coverImage} onChange={(v) => setCf({ ...cf, coverImage: v })} placement={cf.coverImagePlacement} onPlacementChange={(v) => setCf({ ...cf, coverImagePlacement: v })} />
           <div className="grid grid-cols-2 gap-3">
             <select className="p-3 rounded-xl border" value={cf.unlockMode} onChange={(e) => setCf({ ...cf, unlockMode: e.target.value })}>
               <option value="sequential">ترتيبي بشروط</option>
@@ -374,9 +384,11 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
             <input className="p-3 rounded-xl border" placeholder="عنوان الدرس" value={lf.title} onChange={(e) => setLf({ ...lf, title: e.target.value })} />
             <input className="p-3 rounded-xl border" placeholder="أيقونة" value={lf.icon} onChange={(e) => setLf({ ...lf, icon: e.target.value })} />
           </div>
-          <ImgInput label="صورة الفيديو داخل الكورس / غلاف الدرس" value={lf.lessonImage} onChange={(v) => setLf({ ...lf, lessonImage: v })} />
+          <ImgInput label="صورة الفيديو داخل الكورس / غلاف الدرس" value={lf.lessonImage} onChange={(v) => setLf({ ...lf, lessonImage: v })} placement={lf.lessonImagePlacement} onPlacementChange={(v) => setLf({ ...lf, lessonImagePlacement: v })} />
           <input className="w-full p-3 rounded-xl border" placeholder="رابط يوتيوب" value={lf.videoUrl} onChange={(e) => setLf({ ...lf, videoUrl: e.target.value })} />
           <ImgInput label="ملف PDF" kind="pdf" value={lf.pdfUrl} onChange={(v) => setLf({ ...lf, pdfUrl: v })} />
+          <ImgInput label="صورة ملف PDF / غلافه" value={lf.pdfImage} onChange={(v) => setLf({ ...lf, pdfImage: v })} placement={lf.pdfImagePlacement} onPlacementChange={(v) => setLf({ ...lf, pdfImagePlacement: v })} />
+          <ImgInput label="صورة الامتحان داخل الدرس" value={lf.examImage} onChange={(v) => setLf({ ...lf, examImage: v })} placement={lf.examImagePlacement} onPlacementChange={(v) => setLf({ ...lf, examImagePlacement: v })} />
           <div className="grid grid-cols-2 gap-3">
             <input className="p-3 rounded-xl border" placeholder="رابط امتحان خارجي" value={lf.examUrl} onChange={(e) => setLf({ ...lf, examUrl: e.target.value })} />
             <select className="p-3 rounded-xl border" value={lf.examId} onChange={(e) => setLf({ ...lf, examId: e.target.value })}>
@@ -457,7 +469,7 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
       <section className="bg-white rounded-3xl p-5 border">
         <h3 className="font-black mb-3">الكورسات الحالية</h3>
         <div className="grid md:grid-cols-3 gap-4">
-          {courses.map((c) => <div key={c.id} className="border rounded-2xl p-3"><img src={c.coverImage || 'https://placehold.co/900x420?text=Course'} className="h-36 w-full rounded-xl object-cover" /><p className="font-black mt-2">{c.title}</p><p className="text-xs text-slate-500">{c.isPublished ? 'منشور' : 'غير منشور'} • {getGradeLabel(c.grade || 'كل المراحل')} • {c.unlockMode}</p><p className="text-[11px] text-slate-400 mt-1">{c.visibleFrom ? `من ${new Date(c.visibleFrom).toLocaleString('ar-EG')}` : 'بدون بداية'} — {c.visibleUntil ? `حتى ${new Date(c.visibleUntil).toLocaleString('ar-EG')}` : 'بدون اختفاء'}</p><div className="flex flex-wrap gap-2 mt-2"><button onClick={() => updateDoc(doc(db, 'courses', c.id), { isPublished: !c.isPublished })} className="text-xs bg-slate-100 px-3 py-1 rounded-lg font-bold">{c.isPublished ? 'إخفاء' : 'نشر'}</button><button onClick={() => editCourse(c)} className="text-xs bg-emerald-50 text-emerald-700 px-3 py-1 rounded-lg font-bold">تعديل</button><button onClick={() => deleteCourseDeep(c.id)} className="text-xs bg-red-50 text-red-700 px-3 py-1 rounded-lg font-bold">حذف</button></div></div>)}
+          {courses.map((c) => <div key={c.id} className="border rounded-2xl p-3"><div className="h-36 w-full rounded-xl bg-slate-100 overflow-hidden"><img src={c.coverImage || 'https://placehold.co/900x420?text=Course'} className="w-full h-full" style={imagePlacementStyle(c.coverImagePlacement)} /></div><p className="font-black mt-2">{c.title}</p><p className="text-xs text-slate-500">{c.isPublished ? 'منشور' : 'غير منشور'} • {getGradeLabel(c.grade || 'كل المراحل')} • {c.unlockMode}</p><p className="text-[11px] text-slate-400 mt-1">{c.visibleFrom ? `من ${new Date(c.visibleFrom).toLocaleString('ar-EG')}` : 'بدون بداية'} — {c.visibleUntil ? `حتى ${new Date(c.visibleUntil).toLocaleString('ar-EG')}` : 'بدون اختفاء'}</p><div className="flex flex-wrap gap-2 mt-2"><button onClick={() => updateDoc(doc(db, 'courses', c.id), { isPublished: !c.isPublished })} className="text-xs bg-slate-100 px-3 py-1 rounded-lg font-bold">{c.isPublished ? 'إخفاء' : 'نشر'}</button><button onClick={() => editCourse(c)} className="text-xs bg-emerald-50 text-emerald-700 px-3 py-1 rounded-lg font-bold">تعديل</button><button onClick={() => deleteCourseDeep(c.id)} className="text-xs bg-red-50 text-red-700 px-3 py-1 rounded-lg font-bold">حذف</button></div></div>)}
         </div>
       </section>
     </div>
@@ -564,7 +576,7 @@ export function StudentCoursesHub({ user, userData, exams = [], onStartExam }) {
           {courses.map((c) => (
             <button key={c.id} onClick={() => setCourse(c)} className="w-full bg-white rounded-[2rem] overflow-hidden border text-right hover:-translate-y-1 transition shadow-sm">
               <div className="grid lg:grid-cols-2 gap-0">
-                <img src={c.coverImage || 'https://placehold.co/1200x640?text=Course'} className="h-72 lg:h-96 w-full object-cover" />
+                <div className="h-72 lg:h-96 w-full bg-slate-100 overflow-hidden"><img src={c.coverImage || 'https://placehold.co/1200x640?text=Course'} className="w-full h-full" style={imagePlacementStyle(c.coverImagePlacement)} /></div>
                 <div className="p-6 lg:p-8 flex flex-col justify-center gap-3">
                   <div className="flex gap-2 flex-wrap">
                     <span className="bg-amber-50 text-amber-700 px-3 py-1 rounded-full font-black text-xs">{getGradeLabel(c.grade)}</span>
@@ -594,7 +606,7 @@ export function StudentCoursesHub({ user, userData, exams = [], onStartExam }) {
     <div className="space-y-5" dir="rtl">
       <button onClick={() => { setCourse(null); setLesson(null); }} className="bg-white px-4 py-2 rounded-xl font-black border">رجوع للكورسات</button>
       <div className="bg-white rounded-[2rem] overflow-hidden border shadow-sm">
-        <img src={course.coverImage || 'https://placehold.co/1200x520?text=Course'} className="h-72 lg:h-[420px] w-full object-cover" />
+        <div className="h-72 lg:h-[420px] w-full bg-slate-100 overflow-hidden"><img src={course.coverImage || 'https://placehold.co/1200x520?text=Course'} className="w-full h-full" style={imagePlacementStyle(course.coverImagePlacement)} /></div>
         <div className="p-6 lg:p-8 space-y-3">
           <div className="flex gap-2 flex-wrap">
             <span className="bg-amber-50 text-amber-700 px-3 py-1 rounded-full font-black text-xs">{getGradeLabel(course.grade)}</span>
@@ -619,10 +631,10 @@ export function StudentCoursesHub({ user, userData, exams = [], onStartExam }) {
 
       <div className="bg-white rounded-3xl p-4 border">
         <h3 className="font-black mb-4 flex gap-2"><Layers /> دروس الكورس</h3>
-        {mods.map((m) => <div key={m.id} className="mb-6"><h4 className="font-black text-amber-800 mb-3">{m.order}. {m.title}</h4><div className="grid lg:grid-cols-2 gap-6">{(lbm[m.id] || []).map((l) => { const a = can(l); const p = pr(l.id); return <button key={l.id} onClick={() => { if (!a.ok) return platformNotify(a.reason, 'error'); setLesson(l); setTab('video'); }} className={`text-right rounded-3xl overflow-hidden border bg-white ${a.ok ? 'hover:-translate-y-1' : 'opacity-70'}`}><div className="relative"><img src={l.lessonImage || course.coverImage || (l.youtubeVideoId ? `https://img.youtube.com/vi/${l.youtubeVideoId}/hqdefault.jpg` : 'https://placehold.co/600x340?text=Lesson')} className="h-72 lg:h-80 w-full object-cover" /><span className="absolute top-3 right-3 bg-white/90 rounded-full px-3 py-1 font-black">{l.icon || '📘'}</span><span className="absolute top-3 left-3 bg-white/90 rounded-full p-2">{a.ok ? <Unlock size={18} className="text-emerald-600" /> : <Lock size={18} className="text-red-600" />}</span></div><div className="p-4"><h5 className="font-black">{l.title}</h5><p className="text-xs text-slate-500 font-bold">مشاهدة: {pct(p.watchPercent)}%</p>{a.admin && <p className="text-xs text-emerald-700 font-black">متاح باستثناء من الإدارة</p>}{!a.ok && <p className="text-xs text-red-600 font-black">{a.reason}</p>}</div></button>; })}</div></div>)}
+        {mods.map((m) => <div key={m.id} className="mb-6"><h4 className="font-black text-amber-800 mb-3">{m.order}. {m.title}</h4><div className="grid lg:grid-cols-2 gap-6">{(lbm[m.id] || []).map((l) => { const a = can(l); const p = pr(l.id); return <button key={l.id} onClick={() => { if (!a.ok) return platformNotify(a.reason, 'error'); setLesson(l); setTab('video'); }} className={`text-right rounded-3xl overflow-hidden border bg-white ${a.ok ? 'hover:-translate-y-1' : 'opacity-70'}`}><div className="relative"><div className="h-72 lg:h-80 w-full bg-slate-100 overflow-hidden"><img src={l.lessonImage || course.coverImage || (l.youtubeVideoId ? `https://img.youtube.com/vi/${l.youtubeVideoId}/hqdefault.jpg` : 'https://placehold.co/600x340?text=Lesson')} className="w-full h-full" style={imagePlacementStyle(l.lessonImage ? l.lessonImagePlacement : course.coverImagePlacement)} /></div><span className="absolute top-3 right-3 bg-white/90 rounded-full px-3 py-1 font-black">{l.icon || '📘'}</span><span className="absolute top-3 left-3 bg-white/90 rounded-full p-2">{a.ok ? <Unlock size={18} className="text-emerald-600" /> : <Lock size={18} className="text-red-600" />}</span></div><div className="p-4"><h5 className="font-black">{l.title}</h5><p className="text-xs text-slate-500 font-bold">مشاهدة: {pct(p.watchPercent)}%</p>{a.admin && <p className="text-xs text-emerald-700 font-black">متاح باستثناء من الإدارة</p>}{!a.ok && <p className="text-xs text-red-600 font-black">{a.reason}</p>}</div></button>; })}</div></div>)}
       </div>
 
-      {lesson && <div className="bg-white rounded-3xl p-5 border"><h3 className="text-2xl font-black mb-4">{lesson.icon || '📘'} {lesson.title}</h3><div className="grid md:grid-cols-3 gap-2 mb-5"><button onClick={() => setTab('video')} className={`p-3 rounded-2xl font-black ${tab === 'video' ? 'bg-amber-600 text-white' : 'bg-slate-100'}`}><PlayCircle className="inline ml-1" /> شرح الدرس</button><button onClick={() => setTab('pdf')} className={`p-3 rounded-2xl font-black ${tab === 'pdf' ? 'bg-blue-600 text-white' : 'bg-slate-100'}`}><FileText className="inline ml-1" /> PDF</button><button onClick={() => setTab('exam')} className={`p-3 rounded-2xl font-black ${tab === 'exam' ? 'bg-emerald-600 text-white' : 'bg-slate-100'}`}><ClipboardList className="inline ml-1" /> الامتحان</button></div>{tab === 'video' && <YouTubeLessonPlayer videoUrl={lesson.videoUrl} posterImage={lesson.lessonImage || course.coverImage || (lesson.youtubeVideoId ? `https://img.youtube.com/vi/${lesson.youtubeVideoId}/hqdefault.jpg` : '')} savedProgress={pr(lesson.id)} onProgress={(d) => saveP(lesson, d)} />} {tab === 'pdf' && <div className="bg-blue-50 rounded-3xl p-6 text-center">{lesson.pdfUrl ? <a href={lesson.pdfUrl} target="_blank" rel="noreferrer" className="bg-blue-600 text-white px-6 py-3 rounded-2xl font-black inline-flex gap-2"><FileText /> فتح PDF</a> : <p className="font-bold text-slate-500">لا يوجد PDF لهذا الدرس.</p>}</div>} {tab === 'exam' && <div className="bg-emerald-50 rounded-3xl p-6 text-center space-y-3"><p className="font-black">نسبة مشاهدتك: {pct(pr(lesson.id).watchPercent)}%</p><button onClick={() => openExam(lesson)} className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-black inline-flex gap-2"><ClipboardList /> بدء الامتحان</button><p className="text-xs text-slate-500 font-bold">لا يفتح إلا بعد مشاهدة {lesson.unlockRules?.examRequiresWatchPercent || 75}% إلا باستثناء من الأدمن.</p></div>}</div>}
+      {lesson && <div className="bg-white rounded-3xl p-5 border"><h3 className="text-2xl font-black mb-4">{lesson.icon || '📘'} {lesson.title}</h3><div className="grid md:grid-cols-3 gap-2 mb-5"><button onClick={() => setTab('video')} className={`p-3 rounded-2xl font-black ${tab === 'video' ? 'bg-amber-600 text-white' : 'bg-slate-100'}`}><PlayCircle className="inline ml-1" /> شرح الدرس</button><button onClick={() => setTab('pdf')} className={`p-3 rounded-2xl font-black ${tab === 'pdf' ? 'bg-blue-600 text-white' : 'bg-slate-100'}`}><FileText className="inline ml-1" /> PDF</button><button onClick={() => setTab('exam')} className={`p-3 rounded-2xl font-black ${tab === 'exam' ? 'bg-emerald-600 text-white' : 'bg-slate-100'}`}><ClipboardList className="inline ml-1" /> الامتحان</button></div>{tab === 'video' && <YouTubeLessonPlayer videoUrl={lesson.videoUrl} posterImage={lesson.lessonImage || course.coverImage || (lesson.youtubeVideoId ? `https://img.youtube.com/vi/${lesson.youtubeVideoId}/hqdefault.jpg` : '')} savedProgress={pr(lesson.id)} onProgress={(d) => saveP(lesson, d)} />} {tab === 'pdf' && <div className="bg-blue-50 rounded-3xl p-6 text-center space-y-4">{lesson.pdfImage && <div className="h-56 rounded-3xl bg-white border overflow-hidden"><img src={lesson.pdfImage} className="w-full h-full" style={imagePlacementStyle(lesson.pdfImagePlacement)} /></div>}{lesson.pdfUrl ? <a href={lesson.pdfUrl} target="_blank" rel="noreferrer" className="bg-blue-600 text-white px-6 py-3 rounded-2xl font-black inline-flex gap-2"><FileText /> فتح PDF</a> : <p className="font-bold text-slate-500">لا يوجد PDF لهذا الدرس.</p>}</div>} {tab === 'exam' && <div className="bg-emerald-50 rounded-3xl p-6 text-center space-y-3">{lesson.examImage && <div className="h-56 rounded-3xl bg-white border overflow-hidden"><img src={lesson.examImage} className="w-full h-full" style={imagePlacementStyle(lesson.examImagePlacement)} /></div>}<p className="font-black">نسبة مشاهدتك: {pct(pr(lesson.id).watchPercent)}%</p><button onClick={() => openExam(lesson)} className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-black inline-flex gap-2"><ClipboardList /> بدء الامتحان</button><p className="text-xs text-slate-500 font-bold">لا يفتح إلا بعد مشاهدة {lesson.unlockRules?.examRequiresWatchPercent || 75}% إلا باستثناء من الأدمن.</p></div>}</div>}
     </div>
   );
 }
