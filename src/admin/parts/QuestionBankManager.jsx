@@ -4,7 +4,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 import { doc, collection, addDoc, onSnapshot, serverTimestamp, writeBatch, query, orderBy, limit } from 'firebase/firestore';
-import { UploadCloud, PenTool, Sparkles, FileCheck, Layers } from '../../shared/icons/lucide-shim.jsx';
+import { UploadCloud, PenTool, Sparkles, Layers, BookOpen } from '../../shared/icons/lucide-shim.jsx';
 
 import { db } from '../../services/firebase';
 
@@ -163,6 +163,7 @@ const parseQuestionBankLines = (lines, settings) => {
       options,
       correctIdx: hasOptions ? Math.max(0, Math.min(options.length - 1, safeNumber(correctIdx, 0))) : 0,
       explanation: question.explanation.trim(),
+      introText: question.introText || '',
       mark: hasOptions ? 1 : 10,
       tags: Array.from(new Set([branch, topic, ...(settings.tags || [])].filter(Boolean))),
       source: 'question_bank_import',
@@ -225,6 +226,7 @@ const parseQuestionBankLines = (lines, settings) => {
         options: [],
         correctIdx: null,
         explanation: '',
+        introText: '',
         branch: branchFromQuestion || currentBranch,
         topic: currentTopic,
         grade: currentGrade,
@@ -278,6 +280,7 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
   const [importBusy, setImportBusy] = useState(false);
   const [bulkText, setBulkText] = useState('');
   const [examTabName, setExamTabName] = useState(QUICK_REVIEW_TITLE);
+  const [managerTab, setManagerTab] = useState('quick-review');
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -381,6 +384,7 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
         topic: q.topic || q.lesson || 'عام',
         type: q.type || 'mcq',
         explanation: q.explanation || '',
+        introText: q.introText || '',
         maxScore: getQuestionMaxScore(q),
         modelAnswer: q.modelAnswer || '',
         template: 'paper-style',
@@ -454,6 +458,7 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
         topic: q.topic || q.lesson || 'عام',
         type: q.type || 'mcq',
         explanation: q.explanation || '',
+        introText: q.introText || '',
         maxScore: getQuestionMaxScore(q),
         modelAnswer: q.modelAnswer || '',
         template: q.template || 'paper-style',
@@ -481,17 +486,29 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
   const visible = questions.filter(q => (!filters.grade || q.grade === filters.grade) && (!filters.branch || q.branch === filters.branch) && (!filters.type || q.type === filters.type) && (!filters.topic || (q.topic || q.lesson || '').includes(filters.topic)) && (!filters.search || `${q.text} ${(q.tags || []).join(' ')} ${q.explanation || ''}`.includes(filters.search)));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" dir="rtl">
+      <div className="rounded-[2rem] border border-slate-200 bg-white p-3 shadow-sm">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <button type="button" onClick={() => setManagerTab('quick-review')} className={`rounded-2xl px-5 py-4 font-black transition flex items-center justify-center gap-2 ${managerTab === 'quick-review' ? 'bg-gradient-to-l from-amber-500 via-orange-500 to-rose-600 text-white shadow-xl shadow-amber-200' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>
+            <Sparkles className="w-5 h-5" /> مراجعة ع السريع
+          </button>
+          <button type="button" onClick={() => setManagerTab('bank')} className={`rounded-2xl px-5 py-4 font-black transition flex items-center justify-center gap-2 ${managerTab === 'bank' ? 'bg-indigo-700 text-white shadow-xl shadow-indigo-200' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>
+            <BookOpen className="w-5 h-5" /> بنك الأسئلة الشامل
+          </button>
+        </div>
+      </div>
+
       <div className="glass-panel p-4 md:p-6 rounded-xl border border-indigo-100 bg-gradient-to-br from-white to-indigo-50/40">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
           <div>
-            <h2 className="text-xl font-bold text-indigo-700 flex items-center gap-2"><Layers/> بنك الأسئلة الشامل</h2>
-            <p className="text-sm text-slate-500 mt-1">ارفع ملفات نحو وبلاغة كاملة، والنظام يفرز الأسئلة حسب الفرع والموضوع، مع دعم علامة * والتظليل في Word.</p>
+            <h2 className={`text-xl font-bold flex items-center gap-2 ${managerTab === 'quick-review' ? 'text-orange-700' : 'text-indigo-700'}`}>{managerTab === 'quick-review' ? <Sparkles/> : <Layers/>} {managerTab === 'quick-review' ? 'مراجعة ع السريع - نظام مستقل' : 'بنك الأسئلة الشامل'}</h2>
+            <p className="text-sm text-slate-500 mt-1">{managerTab === 'quick-review' ? 'هنا فقط تضيف مجموعات مراجعة سريعة تظهر للطالب في تبويب منفصل بدون كلمة سر، ولا تختلط ببنك الأسئلة.' : 'هنا بنك الأسئلة التقليدي: إضافة يدوية، فلترة، وتوليد امتحان من الفلاتر.'}</p>
           </div>
-          <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold">{questions.length} سؤال محفوظ</span>
+          <span className={`px-3 py-1 rounded-full text-xs font-bold ${managerTab === 'quick-review' ? 'bg-orange-100 text-orange-700' : 'bg-indigo-100 text-indigo-700'}`}>{managerTab === 'quick-review' ? 'منفصل عن بنك الأسئلة' : `${questions.length} سؤال محفوظ`}</span>
         </div>
 
-        <div className="bg-white/80 border border-dashed border-indigo-200 rounded-2xl p-4 mb-5">
+        {managerTab === 'quick-review' && (
+        <div className="bg-white/90 border border-dashed border-orange-200 rounded-2xl p-4 mb-5">
           <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-3"><UploadCloud className="w-5 h-5"/> استيراد أسئلة من ملف</h3>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-3">
             <select className="border p-3 rounded" value={importSettings.grade} onChange={e=>setImportSettings({...importSettings, grade:e.target.value})}><GradeOptions/></select>
@@ -525,23 +542,25 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
             <button type="button" onClick={()=>createQuickReviewExam()} disabled={importPreview.length === 0} className="bg-amber-500 disabled:bg-slate-300 text-white py-3 px-6 rounded-xl font-black shadow-lg">حفظ + ظهور في تبويب مراجعة ف السريع</button>
           </div>
           <div className="flex flex-col md:flex-row gap-3 md:items-center">
-            <input ref={fileInputRef} type="file" accept=".txt,.docx,.pdf,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleImportFile} className="block w-full text-sm text-slate-600 file:ml-3 file:rounded-xl file:border-0 file:bg-indigo-600 file:px-4 file:py-3 file:font-bold file:text-white hover:file:bg-indigo-700" />
-            <button type="button" disabled={importBusy || importPreview.length === 0} onClick={saveImportedQuestions} className="bg-emerald-600 disabled:bg-slate-300 text-white py-3 px-6 rounded-xl font-bold whitespace-nowrap flex items-center justify-center gap-2"><FileCheck className="w-5 h-5"/> حفظ المعاينة</button>
+            <input ref={fileInputRef} type="file" accept=".txt,.docx,.pdf,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleImportFile} className="block w-full text-sm text-slate-600 file:ml-3 file:rounded-xl file:border-0 file:bg-orange-600 file:px-4 file:py-3 file:font-bold file:text-white hover:file:bg-orange-700" />
+            <span className="rounded-xl bg-orange-50 px-4 py-3 text-xs font-bold text-orange-700">هذا التبويب لا يحفظ في بنك الأسئلة؛ ينشئ مراجعة مستقلة فقط.</span>
           </div>
           <div className="mt-3 text-xs text-slate-600 leading-6 bg-slate-50 rounded-xl p-3">
             <b>الصيغ المدعومة:</b> TXT و DOCX و PDF نصي. ضع <b>*</b> بجانب الإجابة الصحيحة أو ظلّل سطر الإجابة في Word. اكتب عناوين مثل <b># النحو</b> ثم <b>## المنادى</b> أو <b># البلاغة</b> ثم <b>## التشبيه</b> عشان يتخزن الفرع والموضوع تلقائيًا.
           </div>
           {importWarnings.length > 0 && <div className="mt-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-3 text-sm space-y-1">{importWarnings.slice(0, 6).map((warning, idx) => <p key={idx}>• {warning}</p>)}</div>}
           {importPreview.length > 0 && <div className="mt-4 bg-slate-50 rounded-xl p-3 max-h-72 overflow-y-auto space-y-2">
-            <div className="font-bold text-slate-700 flex items-center gap-2"><Sparkles className="w-4 h-4"/> معاينة {importPreview.length} سؤال قبل الحفظ</div>
+            <div className="font-bold text-slate-700 flex items-center gap-2"><Sparkles className="w-4 h-4"/> معاينة {importPreview.length} سؤال قبل إنشاء المراجعة</div>
             {importPreview.slice(0, 20).map((q, idx) => <div key={`${q.text}_${idx}`} className="bg-white border rounded-xl p-3">
-              <div className="flex flex-wrap gap-2 mb-1 text-[11px]"><span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">{q.branch}</span><span className="bg-purple-100 text-purple-700 px-2 py-1 rounded">{q.topic}</span><span className="bg-slate-100 text-slate-700 px-2 py-1 rounded">{q.type === 'mcq' ? 'اختياري' : 'مقالي'}</span></div>
+              <div className="flex flex-wrap gap-2 mb-1 text-[11px]"><span className="bg-orange-100 text-orange-700 px-2 py-1 rounded">{q.sourceLabel || 'سؤال عادي'}</span><span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">{q.branch}</span><span className="bg-purple-100 text-purple-700 px-2 py-1 rounded">{q.topic}</span><span className="bg-slate-100 text-slate-700 px-2 py-1 rounded">{q.type === 'mcq' ? 'اختياري' : 'مقالي'}</span></div>
               <p className="font-bold text-sm text-slate-800">{idx + 1}. {q.text}</p>
               {q.options?.length > 0 && <p className="text-xs text-emerald-700 mt-1">الإجابة: {OPTION_LABELS[q.correctIdx] || q.correctIdx + 1}) {q.options[q.correctIdx]}</p>}
             </div>)}
           </div>}
         </div>
+        )}
 
+        {managerTab === 'bank' && (
         <form onSubmit={handleAddQuestion} className="grid gap-4">
           <h3 className="font-bold text-slate-800 flex items-center gap-2"><PenTool className="w-5 h-5"/> إضافة سؤال يدويًا</h3>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -572,8 +591,9 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
             <button type="button" onClick={createExamFromBank} className="bg-emerald-600 text-white py-3 px-6 rounded-xl font-bold">توليد امتحان من الفلاتر الحالية</button>
           </div>
         </form>
+        )}
       </div>
-      <div className="glass-panel p-4 md:p-6 rounded-xl">
+      {managerTab === 'bank' && <div className="glass-panel p-4 md:p-6 rounded-xl">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
           <select className="border p-3 rounded" value={filters.grade} onChange={e=>setFilters({...filters, grade:e.target.value})}><option value="">كل المراحل</option><GradeOptions/></select>
           <select className="border p-3 rounded" value={filters.branch} onChange={e=>setFilters({...filters, branch:e.target.value})}><option value="">النحو والبلاغة</option><option value="النحو">النحو</option><option value="البلاغة">البلاغة</option></select>
@@ -600,7 +620,7 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
           </div>)}
           {visible.length === 0 && <p className="text-slate-500 text-center py-8">لا توجد أسئلة مطابقة.</p>}
         </div>
-      </div>
+      </div>}
     </div>
   );
 };
