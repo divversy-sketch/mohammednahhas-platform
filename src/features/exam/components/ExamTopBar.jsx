@@ -11,9 +11,8 @@ export default function ExamTopBar({
   onSubmit,
   onBranchChange,
   onFullscreen,
+  hideTimer = false,
 }) {
-  const isQuickReview = exam?.quickReview || exam?.paperStyle;
-
   return (
     <div className="bg-slate-900 text-white p-4 flex flex-col md:flex-row justify-between items-center shadow-md relative z-50 gap-4">
       <div className="flex items-center gap-4 w-full md:w-auto justify-between">
@@ -22,12 +21,14 @@ export default function ExamTopBar({
             <Layout size={16} /> العودة للنتيجة
           </button>
         )}
-        <h2 className="font-bold text-lg font-sans text-amber-400 truncate hidden md:block">{exam?.title} {isQuickReview && !isSubmitted ? '(بدون مؤقت)' : ''} {isSubmitted ? '(مراجعة الإجابات)' : ''}</h2>
+        <h2 className="font-bold text-lg font-sans text-amber-400 truncate hidden md:block">{exam?.title} {isSubmitted ? '(مراجعة الإجابات)' : ''}</h2>
         {!isSubmitted && (
           <div className="flex items-center gap-2 md:gap-3 flex-wrap justify-end">
-            {!isQuickReview && <div className="bg-slate-800 px-4 md:px-6 py-2 rounded-full font-mono shadow-inner border border-slate-700 font-bold text-amber-400 text-base md:text-lg flex items-center gap-2">
-              <Timer size={18} /> {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
-            </div>}
+            {!hideTimer && (
+              <div className="bg-slate-800 px-4 md:px-6 py-2 rounded-full font-mono shadow-inner border border-slate-700 font-bold text-amber-400 text-base md:text-lg flex items-center gap-2">
+                <Timer size={18} /> {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+              </div>
+            )}
             <button
               onClick={onFullscreen}
               className="bg-amber-500 hover:bg-amber-600 text-slate-900 px-3 md:px-4 py-2 rounded-xl font-black transition whitespace-nowrap flex items-center gap-2 shadow-lg"
@@ -36,7 +37,7 @@ export default function ExamTopBar({
               <Layout size={18} /> ملء الشاشة
             </button>
             <button onClick={onSubmit} className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-xl font-bold transition whitespace-nowrap flex items-center gap-2 shadow-lg">
-              <CheckCircle size={18} /> {isQuickReview ? 'إنهاء المراجعة' : 'تسليم'}
+              <CheckCircle size={18} /> تسليم
             </button>
           </div>
         )}

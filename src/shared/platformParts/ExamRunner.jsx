@@ -46,6 +46,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
   const [securityLockReason, setSecurityLockReason] = useState('');
   const [lastLocalSaveAt, setLastLocalSaveAt] = useState('');
   const isOnline = useOnlineStatus();
+  const isQuickReviewExam = exam.quickReview || exam.source === 'quick_review' || exam.noAccessCode;
 
   const fileDialogBypassRef = useRef(false);
   const antiCheatWarningsRef = useRef(existingResult?.antiCheatWarnings || exam.resumeData?.antiCheatWarnings || 0);
@@ -288,19 +289,17 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
   }, [isReviewMode, mcqQuestions.length, exam.attemptId, exam.id, exam.duration, startTime, user.uid, user.displayName, showAntiCheatChoice]);
 
   useEffect(() => {
-    if (isReviewMode || isSubmitted || exam?.quickReview || exam?.paperStyle) return;
+    if (isReviewMode || isSubmitted || isQuickReviewExam) return;
     if (timeLeft > 0 && !isCheating) {
       const timer = setInterval(() => setTimeLeft((p) => p - 1), 1000);
       return () => clearInterval(timer);
     } else if (timeLeft === 0) {
       handleSubmit(true);
     }
-  }, [timeLeft, isSubmitted, isCheating, isReviewMode, exam?.quickReview, exam?.paperStyle]);
+  }, [timeLeft, isSubmitted, isCheating, isReviewMode, isQuickReviewExam]);
 
   const handleAnswer = (qId, value) => {
     if (!isReviewMode && !isSubmitted && !showAntiCheatChoice) {
-      const targetQuestion = flatQuestions.find((q) => q.id === qId);
-      if ((targetQuestion?.template === 'paper-style' || exam?.paperStyle || exam?.quickReview) && answers[qId] !== undefined) return;
       setAnswers((prev) => {
         const nextAnswers = { ...prev, [qId]: value };
         writeLocalExamBackup(nextAnswers);
@@ -577,6 +576,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
         onSubmit={confirmSubmit}
         onBranchChange={setActiveBranchTab}
         onFullscreen={() => document.documentElement.requestFullscreen?.().catch(() => platformNotify('لو ملء الشاشة لم يعمل، افتح المنصة من المتصفح مباشرة وليس داخل تطبيق خارجي.'))}
+        hideTimer={isQuickReviewExam}
       />
 
       <div className="flex-1 flex overflow-hidden relative z-50">
