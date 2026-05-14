@@ -8,6 +8,10 @@ export function AdminQuestionBankPage({ adminGradeFilter }) {
   return <InlineTabs tabs={[{ key: 'bank', label: 'إدارة بنك الأسئلة', content: <QuestionBankManager adminGradeFilter={adminGradeFilter} /> }]} />;
 }
 
+export function AdminQuickReviewPage({ adminGradeFilter }) {
+  return <InlineTabs tabs={[{ key: 'quick_review', label: 'مراجعة في السريع', content: <QuestionBankManager adminGradeFilter={adminGradeFilter} quickReviewMode /> }]} />;
+}
+
 export function AdminAssignmentsPage({ adminGradeFilter, handleDeleteAllHomework }) {
   return (
     <div className="space-y-4">

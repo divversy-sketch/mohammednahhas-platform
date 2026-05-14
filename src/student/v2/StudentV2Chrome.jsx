@@ -57,6 +57,7 @@ const navGroups = [
     permission: 'exam',
     items: [
       { tab: 'exams', label: 'الامتحانات', icon: ClipboardList },
+      { tab: 'quick_review', label: 'مراجعة في السريع', icon: Sparkles, tone: 'purple' },
       { tab: 'assignments', label: 'الواجبات وبنك الأخطاء', icon: FileCheck, alias: ['assignments', 'smart_hw_results', 'mistakes_bank'], action: 'learningHub' },
     ],
   },

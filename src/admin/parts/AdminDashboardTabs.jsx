@@ -29,7 +29,7 @@ import SmartSubscriptionManager from './SmartSubscriptionManager.jsx';
 
 
 import AdminPendingUsersPage from '../pages/AdminPendingUsersPage.jsx';
-import { AdminAssignmentsPage, AdminExamViewTabs, AdminQuestionBankPage } from '../pages/AdminUtilityPages.jsx';
+import { AdminAssignmentsPage, AdminExamViewTabs, AdminQuestionBankPage, AdminQuickReviewPage } from '../pages/AdminUtilityPages.jsx';
 
 import AdminFollowUpPanel from '../../features/insights/AdminFollowUpPanel.jsx';
 import AdminSmartHomeworkManager from '../../features/homework/AdminSmartHomeworkManager.jsx';
@@ -548,6 +548,12 @@ export default function AdminDashboardTabs({ ctx }) {
               onNotify={platformNotify}
               onDeleteAll={handleDeleteAllHomework}
             />
+          )}
+
+          {activeTab === 'quick_review' && (
+            <div className="space-y-6">
+              <AdminQuickReviewPage adminGradeFilter={adminGradeFilter} />
+            </div>
           )}
 
           {activeTab === 'question_bank' && (

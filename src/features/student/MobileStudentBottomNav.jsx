@@ -11,7 +11,7 @@ const MobileStudentBottomNav = ({ activeTab, setActiveTab }) => {
 
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 z-[9990] bg-white border-t border-slate-200 shadow-[0_-8px_24px_rgba(0,0,0,0.08)] px-2 py-2 safe-bottom-nav">
-      <div className="grid grid-cols-4 gap-1">
+      <div className="grid grid-cols-5 gap-1">
         {MOBILE_STUDENT_NAV_ITEMS.map(item => {
           const Icon = item.icon;
           const active = activeTab === item.key;
