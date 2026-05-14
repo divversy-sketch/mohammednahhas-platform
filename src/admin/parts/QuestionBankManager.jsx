@@ -245,7 +245,7 @@ const parseQuestionBankLines = (lines, settings) => {
 export const QuestionBankManager = ({ adminGradeFilter }) => {
   const [questions, setQuestions] = useState([]);
   const [filters, setFilters] = useState({ grade: adminGradeFilter === 'all' ? '' : adminGradeFilter, branch: '', type: '', topic: '', search: '' });
-  const [form, setForm] = useState({ text: '', grade: adminGradeFilter === 'all' ? '3sec' : adminGradeFilter, branch: 'النحو', topic: '', type: 'mcq', difficulty: 'medium', optionsText: '', correctIdx: 0, explanation: '', mark: 1, tags: '' });
+  const [form, setForm] = useState({ text: '', grade: adminGradeFilter === 'all' ? '3sec' : adminGradeFilter, branch: 'النحو', topic: '', type: 'mcq', difficulty: 'medium', optionsText: '', correctIdx: 0, explanation: '', mark: 1, tags: '', template: 'default', paperTitle: 'أسئلة ثانوية عامة واسترشادي', sourceLabel: '', introText: '', scopeType: 'curriculum', sourceYear: '' });
   const [importSettings, setImportSettings] = useState({ grade: adminGradeFilter === 'all' ? '3sec' : adminGradeFilter, branchMode: 'auto', branch: 'النحو', difficulty: 'medium', tags: 'استيراد' });
   const [importPreview, setImportPreview] = useState([]);
   const [importWarnings, setImportWarnings] = useState([]);
@@ -280,11 +280,20 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
       options,
       correctIdx: safeNumber(form.correctIdx, 0),
       explanation: form.explanation,
+      template: form.template,
+      questionTemplate: form.template,
+      paperTitle: form.paperTitle,
+      sourceLabel: form.sourceLabel,
+      introText: form.introText,
+      scopeType: form.scopeType,
+      sourceYear: form.sourceYear,
+      lockAfterAnswer: form.template === 'paper-style',
+      showExplanationAfterAnswer: form.template === 'paper-style',
       mark: safeNumber(form.mark, form.type === 'essay' ? 10 : 1),
       tags: form.tags.split(',').map(t => t.trim()).filter(Boolean),
       createdAt: serverTimestamp()
     });
-    setForm(prev => ({ ...prev, text: '', optionsText: '', explanation: '', tags: '', topic: '' }));
+    setForm(prev => ({ ...prev, text: '', optionsText: '', explanation: '', tags: '', topic: '', sourceLabel: '', introText: '', sourceYear: '' }));
   };
 
   const handleImportFile = async (event) => {
@@ -369,6 +378,15 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
         topic: q.topic || q.lesson || 'عام',
         type: q.type || 'mcq',
         explanation: q.explanation || '',
+        template: q.template || q.questionTemplate || 'default',
+        questionTemplate: q.questionTemplate || q.template || 'default',
+        paperTitle: q.paperTitle || '',
+        sourceLabel: q.sourceLabel || '',
+        introText: q.introText || '',
+        scopeType: q.scopeType || '',
+        sourceYear: q.sourceYear || '',
+        lockAfterAnswer: q.lockAfterAnswer || q.template === 'paper-style',
+        showExplanationAfterAnswer: q.showExplanationAfterAnswer || q.template === 'paper-style',
         maxScore: getQuestionMaxScore(q),
         modelAnswer: q.modelAnswer || ''
       });
@@ -449,6 +467,31 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
               <option value="easy">سهل</option><option value="medium">متوسط</option><option value="hard">صعب</option>
             </select>
           </div>
+          <div className="rounded-3xl border-2 border-amber-200 bg-gradient-to-l from-amber-50 via-white to-rose-50 p-4 shadow-sm">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h4 className="font-black text-slate-900">قالب الورقة التعليمية المبهر</h4>
+                <p className="text-xs font-bold text-slate-500">لأسئلة الاسترشادي، سنوات سابقة، والامتحانات الشاملة. الطالب يجاوب مرة واحدة فقط ثم يظهر التصحيح والشرح.</p>
+              </div>
+              <select className="rounded-2xl border border-amber-300 bg-white p-3 font-bold" value={form.template} onChange={e=>setForm({...form, template:e.target.value})}>
+                <option value="default">الشكل العادي</option>
+                <option value="paper-style">شكل الورقة التعليمية</option>
+              </select>
+            </div>
+            {form.template === 'paper-style' && <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+              <input className="border p-3 rounded-xl md:col-span-2" placeholder="عنوان الورقة: أسئلة ثانوية عامة واسترشادي" value={form.paperTitle} onChange={e=>setForm({...form, paperTitle:e.target.value})}/>
+              <input className="border p-3 rounded-xl" placeholder="المصدر: استرشادي ثامن" value={form.sourceLabel} onChange={e=>setForm({...form, sourceLabel:e.target.value})}/>
+              <input className="border p-3 rounded-xl" placeholder="السنة: 2025" value={form.sourceYear} onChange={e=>setForm({...form, sourceYear:e.target.value})}/>
+              <select className="border p-3 rounded-xl" value={form.scopeType} onChange={e=>setForm({...form, scopeType:e.target.value})}>
+                <option value="curriculum">عام على المنهج</option>
+                <option value="course">كورس معين</option>
+                <option value="unit">وحدة معينة</option>
+                <option value="lesson">درس معين</option>
+                <option value="comprehensive">امتحان شامل</option>
+              </select>
+              <textarea className="border p-3 rounded-xl md:col-span-5 h-20" placeholder="الجملة / المقدمة التي تظهر أعلى السؤال" value={form.introText} onChange={e=>setForm({...form, introText:e.target.value})}/>
+            </div>}
+          </div>
           <textarea className="border p-3 rounded h-24" placeholder="نص السؤال" value={form.text} onChange={e=>setForm({...form, text:e.target.value})}/>
           {form.type === 'mcq' && <textarea className="border p-3 rounded h-28 font-mono" placeholder={'كل اختيار في سطر منفصل\nمثال:\nنكرة مقصودة\nمضاف\nشبيه بالمضاف'} value={form.optionsText} onChange={e=>setForm({...form, optionsText:e.target.value})}/>}          
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -483,6 +526,7 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
               <span className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded">{q.topic || q.lesson || 'عام'}</span>
               <span className="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded">{q.type === 'essay' ? 'مقالي' : 'اختياري'}</span>
               <span className="bg-emerald-100 text-emerald-700 text-xs px-2 py-1 rounded">{getQuestionMaxScore(q)} درجة</span>
+              {(q.template === 'paper-style' || q.questionTemplate === 'paper-style') && <span className="bg-rose-100 text-rose-700 text-xs px-2 py-1 rounded">قالب الورقة: {q.sourceLabel || 'بدون مصدر'}</span>}
             </div>
             <p className="font-bold text-slate-800">{q.text}</p>
             {q.options?.length > 0 && <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3 text-sm">{q.options.map((option, idx) => <div key={idx} className={`border rounded-lg p-2 ${idx === q.correctIdx ? 'bg-emerald-50 border-emerald-200 text-emerald-800 font-bold' : 'bg-slate-50'}`}>{OPTION_LABELS[idx] || idx + 1}) {option}</div>)}</div>}

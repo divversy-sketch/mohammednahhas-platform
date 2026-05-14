@@ -2,6 +2,126 @@ import React from 'react';
 import { Check, ChevronRight, FileText, Flag, HelpCircle, Layers, PenTool, UploadCloud, X } from '../../../shared/icons/lucide-shim.jsx';
 import { LocalEssayReviewBox, LocalQuestionExplanation, renderBracketHighlightedText } from '../../../shared/core/platformShared.jsx';
 
+
+const PAPER_OPTION_LABELS = ['أ', 'ب', 'ج', 'د', 'هـ', 'و'];
+
+function PaperQuestionTemplate({
+  question,
+  answer,
+  questionNumber,
+  isSubmitted,
+  currentQIndex,
+  displayQuestions,
+  onAnswer,
+  onPrevious,
+  onNext,
+}) {
+  const hasAnswered = answer !== undefined && answer !== null;
+  const showFeedback = hasAnswered || isSubmitted;
+  const isCorrect = answer === question.correctIdx;
+  const sourceLabel = question.sourceLabel || question.paperSourceLabel || question.sourceTitle || question.year || 'تدريب';
+  const title = question.paperTitle || question.title || 'أسئلة ثانوية عامة واسترشادي';
+  const introText = question.introText || question.contextText || question.promptText || '';
+  const options = Array.isArray(question.options) ? question.options : [];
+
+  return (
+    <div dir="rtl" className="flex-1 min-h-full overflow-y-auto bg-[#130f22] p-3 md:p-8 font-['Cairo']">
+      <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[2rem] border border-[#d8b35d]/40 bg-[#fbf6e9] shadow-2xl">
+        <div className="absolute inset-0 pointer-events-none opacity-70" style={{ background: 'radial-gradient(circle at 92% 8%, rgba(216,179,93,.22), transparent 25%), radial-gradient(circle at 8% 90%, rgba(105,33,48,.14), transparent 22%)' }} />
+        <div className="relative p-4 md:p-8 lg:p-10">
+          <div className="mx-auto mb-6 md:mb-8 max-w-3xl text-center">
+            <div className="relative inline-block px-6 py-2">
+              <div className="absolute inset-x-0 top-1/2 h-10 -translate-y-1/2 -rotate-1 rounded-full bg-[#1f1722] shadow-[0_10px_0_rgba(216,179,93,.24)]" />
+              <h2 className="relative text-3xl md:text-5xl font-black tracking-tight text-[#b87442] drop-shadow-[0_3px_0_rgba(75,35,25,.25)]">
+                {title}
+              </h2>
+            </div>
+            <div className="mx-auto mt-4 h-1 w-28 rounded-full bg-gradient-to-l from-[#d8b35d] via-[#8f2f46] to-[#d8b35d]" />
+          </div>
+
+          <div className="rounded-[1.7rem] border-2 border-[#b63858] bg-white/66 p-4 md:p-7 shadow-inner backdrop-blur">
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+              <span className="rounded-2xl bg-[#1f1722] px-4 py-2 text-sm font-black text-white shadow-lg">سؤال {questionNumber}</span>
+              <span className="rounded-xl border-2 border-[#74879a] bg-[#e8f2fb] px-4 py-2 text-sm md:text-base font-black text-[#17324a] -rotate-2 shadow-md">
+                {sourceLabel}
+              </span>
+            </div>
+
+            {introText && (
+              <p className="mb-4 text-center text-xl md:text-3xl font-black leading-loose text-[#1f1722]">
+                {renderBracketHighlightedText(introText)}
+              </p>
+            )}
+
+            <div className="mb-5 rounded-full border-2 border-[#152030] bg-[#eef4ef] px-5 py-4 shadow-sm">
+              <p className="text-center text-xl md:text-2xl font-black leading-relaxed text-[#a43145]">
+                {renderBracketHighlightedText(question.text || '')}
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {options.map((option, idx) => {
+                const selected = answer === idx;
+                const correct = idx === question.correctIdx;
+                let cls = 'border-[#b5aa9a] bg-[#f8f4eb] text-[#1f1722] hover:border-[#d8b35d] hover:bg-white cursor-pointer';
+                if (showFeedback) {
+                  if (correct) cls = 'border-emerald-500 bg-emerald-50 text-emerald-950 ring-2 ring-emerald-200';
+                  else if (selected) cls = 'border-red-500 bg-red-50 text-red-950 ring-2 ring-red-200';
+                  else cls = 'border-[#d7d0c4] bg-[#f2eee5] text-slate-500 opacity-70';
+                }
+                return (
+                  <button
+                    type="button"
+                    key={idx}
+                    disabled={showFeedback}
+                    onClick={() => onAnswer(question.id, idx)}
+                    className={`group flex w-full items-center gap-3 rounded-full border-2 px-3 py-3 text-right transition-all duration-200 ${cls}`}
+                  >
+                    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg font-black text-white shadow-md ${showFeedback && correct ? 'bg-emerald-600' : showFeedback && selected ? 'bg-red-600' : 'bg-[#a44a3f]'}`}>
+                      {showFeedback && correct ? <Check size={20} /> : showFeedback && selected ? <X size={20} /> : (PAPER_OPTION_LABELS[idx] || idx + 1)}
+                    </span>
+                    <span className="flex-1 text-lg md:text-2xl font-black leading-relaxed">{option}</span>
+                    {showFeedback && correct && <span className="hidden md:inline rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700">الإجابة الصحيحة</span>}
+                    {showFeedback && selected && !correct && <span className="hidden md:inline rounded-full bg-red-100 px-3 py-1 text-xs font-black text-red-700">اختيارك</span>}
+                  </button>
+                );
+              })}
+            </div>
+
+            {showFeedback && (
+              <div className={`mt-6 rounded-3xl border-2 p-5 shadow-lg ${isCorrect ? 'border-emerald-300 bg-emerald-50' : 'border-red-200 bg-red-50'}`}>
+                <p className={`mb-2 text-xl md:text-2xl font-black ${isCorrect ? 'text-emerald-800' : 'text-red-800'}`}>
+                  {isCorrect ? 'إجابة صحيحة — ممتاز!' : 'إجابة غير صحيحة'}
+                </p>
+                {!isCorrect && (
+                  <p className="mb-3 text-base md:text-lg font-bold text-slate-800">
+                    الإجابة الصحيحة: <span className="text-emerald-700">{options[question.correctIdx]}</span>
+                  </p>
+                )}
+                {question.explanation && (
+                  <div className="rounded-2xl bg-white/80 p-4 text-slate-800">
+                    <p className="mb-1 font-black text-[#17324a]">سبب الإجابة</p>
+                    <p className="whitespace-pre-wrap leading-loose font-bold">{question.explanation}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="mt-8 flex flex-col-reverse gap-3 md:flex-row md:items-center md:justify-between">
+            <button disabled={currentQIndex === 0} onClick={onPrevious} className="rounded-2xl border border-[#d8b35d]/50 bg-white/70 px-7 py-4 font-black text-[#1f1722] shadow-md transition hover:bg-white disabled:opacity-40">
+              السابق
+            </button>
+            <button disabled={!showFeedback || currentQIndex === displayQuestions.length - 1} onClick={onNext} className="relative overflow-hidden rounded-2xl bg-gradient-to-l from-[#7a2036] via-[#b87442] to-[#d8b35d] px-10 py-4 text-lg font-black text-white shadow-[0_14px_30px_rgba(122,32,54,.35)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(122,32,54,.45)] disabled:from-slate-300 disabled:via-slate-300 disabled:to-slate-300 disabled:shadow-none disabled:hover:translate-y-0">
+              <span className="relative z-10">{currentQIndex === displayQuestions.length - 1 ? 'انتهت الأسئلة' : 'انتقل للسؤال التالي ←'}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EssayAnswerEditor({ question, answer, isSubmitted, onAnswer, onImageUpload, onFileDialogOpen }) {
   if (isSubmitted) {
     return (
@@ -116,6 +236,23 @@ export default function ExamQuestionPanel({
   const answer = answers?.[question.id];
   const questionNumber = flatQuestions.findIndex((origQ) => origQ.id === question.id) + 1;
   const hasBlockText = question?.blockText && question.blockText.trim().length > 0;
+  const isPaperStyle = question?.template === 'paper-style' || question?.questionTemplate === 'paper-style';
+
+  if (isPaperStyle && question.type !== 'essay') {
+    return (
+      <PaperQuestionTemplate
+        question={question}
+        answer={answer}
+        questionNumber={questionNumber}
+        isSubmitted={isSubmitted}
+        currentQIndex={currentQIndex}
+        displayQuestions={displayQuestions}
+        onAnswer={onAnswer}
+        onPrevious={onPrevious}
+        onNext={onNext}
+      />
+    );
+  }
 
   return (
     <div className={`flex-1 flex flex-col ${hasBlockText ? 'md:flex-row' : 'items-center'} h-full overflow-hidden bg-slate-100 w-full p-4 md:p-8 gap-6`}>

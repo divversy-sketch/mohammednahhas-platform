@@ -298,8 +298,12 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
   }, [timeLeft, isSubmitted, isCheating, isReviewMode]);
 
   const handleAnswer = (qId, value) => {
+    const targetQuestion = flatQuestions.find((q) => q.id === qId);
+    const shouldLockAfterFirstAnswer = targetQuestion?.template === 'paper-style' || targetQuestion?.questionTemplate === 'paper-style' || targetQuestion?.lockAfterAnswer;
+    if (shouldLockAfterFirstAnswer && answers?.[qId] !== undefined) return;
     if (!isReviewMode && !isSubmitted && !showAntiCheatChoice) {
       setAnswers((prev) => {
+        if (shouldLockAfterFirstAnswer && prev?.[qId] !== undefined) return prev;
         const nextAnswers = { ...prev, [qId]: value };
         writeLocalExamBackup(nextAnswers);
         if (exam.attemptId && exam.id !== 'custom_mistakes_exam') {
