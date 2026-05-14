@@ -81,7 +81,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
   }, [isSubmitted, showSubmitConfirm, isCheating, showAntiCheatChoice]);
 
   useEffect(() => {
-    if (isReviewMode) return;
+    if (isReviewMode || isQuickReviewExam) return;
 
     const updatePositions = () => {
       const newPos = [...Array(6)].map(() => ({
@@ -94,7 +94,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
     updatePositions();
     const interval = setInterval(updatePositions, 6000);
     return () => clearInterval(interval);
-  }, [isReviewMode]);
+  }, [isReviewMode, isQuickReviewExam]);
 
   useEffect(() => {
     const restoreBypass = () => {
@@ -292,17 +292,17 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
       document.removeEventListener('keydown', handleExamKeyDown);
       document.removeEventListener('fullscreenchange', handleFullScreenExit);
     };
-  }, [isReviewMode, mcqQuestions.length, exam.attemptId, exam.id, exam.duration, startTime, user.uid, user.displayName, showAntiCheatChoice]);
+  }, [isReviewMode, isQuickReviewExam, mcqQuestions.length, exam.attemptId, exam.id, exam.duration, startTime, user.uid, user.displayName, showAntiCheatChoice]);
 
   useEffect(() => {
-    if (isReviewMode || isSubmitted) return;
+    if (isReviewMode || isQuickReviewExam || isSubmitted) return;
     if (timeLeft > 0 && !isCheating) {
       const timer = setInterval(() => setTimeLeft((p) => p - 1), 1000);
       return () => clearInterval(timer);
     } else if (timeLeft === 0) {
       handleSubmit(true);
     }
-  }, [timeLeft, isSubmitted, isCheating, isReviewMode]);
+  }, [timeLeft, isSubmitted, isCheating, isReviewMode, isQuickReviewExam]);
 
   const handleAnswer = (qId, value) => {
     if (!isReviewMode && !isSubmitted && !showAntiCheatChoice) {
@@ -560,8 +560,8 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-100 flex flex-col font-['Cairo'] no-select" dir="rtl">
-      {!isSubmitted && <ExamWatermarkLayer positions={wmPositions} user={user} />}
-      {!isSubmitted && <ConnectionStatusBanner isOnline={isOnline} lastLocalSaveAt={lastLocalSaveAt} />}
+      {!isQuickReviewExam && !isSubmitted && <ExamWatermarkLayer positions={wmPositions} user={user} />}
+      {!isQuickReviewExam && !isSubmitted && <ConnectionStatusBanner isOnline={isOnline} lastLocalSaveAt={lastLocalSaveAt} />}
 
       {showAntiCheatChoice && <ExamSecurityHoldOverlay onClose={onClose} />}
 
@@ -572,19 +572,21 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
         />
       )}
 
-      <ExamTopBar
-        exam={exam}
-        isSubmitted={isSubmitted}
-        timeLeft={timeLeft}
-        activeBranchTab={activeBranchTab}
-        uniqueBranches={uniqueBranches}
-        onDashboard={() => setActiveView('dashboard')}
-        onSubmit={confirmSubmit}
-        onBranchChange={setActiveBranchTab}
-        onFullscreen={() => document.documentElement.requestFullscreen?.().catch(() => platformNotify('لو ملء الشاشة لم يعمل، افتح المنصة من المتصفح مباشرة وليس داخل تطبيق خارجي.'))}
-      />
+      {!isQuickReviewExam && (
+        <ExamTopBar
+          exam={exam}
+          isSubmitted={isSubmitted}
+          timeLeft={timeLeft}
+          activeBranchTab={activeBranchTab}
+          uniqueBranches={uniqueBranches}
+          onDashboard={() => setActiveView('dashboard')}
+          onSubmit={confirmSubmit}
+          onBranchChange={setActiveBranchTab}
+          onFullscreen={() => document.documentElement.requestFullscreen?.().catch(() => platformNotify('لو ملء الشاشة لم يعمل، افتح المنصة من المتصفح مباشرة وليس داخل تطبيق خارجي.'))}
+        />
+      )}
 
-      <div className="flex-1 flex overflow-hidden relative z-50">
+      <div className={isQuickReviewExam ? "flex-1 flex overflow-hidden relative z-50 bg-[#05070d]" : "flex-1 flex overflow-hidden relative z-50"}>
         {!isQuickReviewExam && (
           <ExamQuestionNavigator
             displayQuestions={displayQuestions}

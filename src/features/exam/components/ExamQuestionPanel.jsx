@@ -283,7 +283,7 @@ export default function ExamQuestionPanel({
     )
   );
 
-  if (useReferenceTemplate && question?.type !== 'essay' && !hasBlockText) {
+  if (useReferenceTemplate && question?.type !== 'essay') {
     return (
       <QuickReviewTemplate
         question={question}
