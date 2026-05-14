@@ -3,8 +3,8 @@ import JSZip from 'jszip';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
-import { doc, collection, addDoc, onSnapshot, serverTimestamp, writeBatch, query, orderBy, limit, deleteDoc } from 'firebase/firestore';
-import { UploadCloud, PenTool, Sparkles, Layers, BookOpen } from '../../shared/icons/lucide-shim.jsx';
+import { doc, collection, addDoc, onSnapshot, serverTimestamp, writeBatch, query, orderBy, limit } from 'firebase/firestore';
+import { UploadCloud, PenTool, Sparkles, FileCheck, Layers } from '../../shared/icons/lucide-shim.jsx';
 
 import { db } from '../../services/firebase';
 
@@ -20,19 +20,6 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 
 const QUESTION_BRANCHES = ['النحو', 'البلاغة'];
 const OPTION_LABELS = ['أ', 'ب', 'ج', 'د', 'هـ', 'و'];
-const QUICK_REVIEW_TITLE = 'مراجعة ف السريع';
-const DEFAULT_PAPER_TITLE = 'أسئلة ثانوية عامة واسترشادي';
-
-const looksLikeQuestionSource = (value = '') => /(استرشادي|ثانوية|سنوات|سابق|شامل|عادي|مراجعة|امتحان|نموذج|تدريب)/i.test(String(value));
-
-const extractQuestionSource = (value = '') => {
-  const text = cleanImportedLine(value);
-  const bracket = text.match(/^\[([^\]]{2,60})\]\s*(.+)$/u);
-  if (bracket) return { sourceLabel: cleanImportedLine(bracket[1]), text: cleanImportedLine(bracket[2]) };
-  const colon = text.match(/^([^:：|]{2,45})\s*[:：|]\s*(.+)$/u);
-  if (colon && looksLikeQuestionSource(colon[1])) return { sourceLabel: cleanImportedLine(colon[1]), text: cleanImportedLine(colon[2]) };
-  return { sourceLabel: '', text };
-};
 
 const cleanImportedLine = (value = '') => String(value)
   .replace(/\u00a0/g, ' ')
@@ -64,19 +51,17 @@ const stripMetaWrapper = (line = '') => cleanImportedLine(line).replace(/^\[/, '
 
 const parseMetaLine = (line = '') => {
   const cleaned = stripMetaWrapper(line);
-  const match = cleaned.match(/^(المادة|الفرع|الباب|الدرس|الموضوع|الصعوبة|الصف|الدرجة|عنوان الورقة|العنوان|مصدر السؤال|المصدر|نوع السؤال|النموذج|السنة)\s*[:：]\s*(.+)$/i);
+  const match = cleaned.match(/^(المادة|الفرع|الباب|الدرس|الموضوع|الصعوبة|الصف|الدرجة)\s*[:：]\s*(.+)$/i);
   return match ? { key: match[1], value: cleanImportedLine(match[2]) } : null;
 };
 
 const parseOptionLine = (line = '') => {
   const text = cleanImportedLine(line);
-  const match = text.match(/^(\*)?\s*([أابجدهـهوA-Fa-f])\s*[\)\].\-:：،]\s*(.+)$/u);
+  const match = text.match(/^([أابجدهـهوA-Da-d])\s*[\)\].\-:：،]\s*(.+)$/u);
   if (!match) return null;
-  const rawLabel = match[2].toUpperCase();
+  const rawLabel = match[1].toUpperCase();
   const label = rawLabel === 'ا' ? 'أ' : rawLabel;
-  const rawOptionText = cleanImportedLine(match[3]);
-  const correctByMarker = Boolean(match[1]) || rawOptionText.startsWith('*') || rawOptionText.endsWith('*');
-  return { label, text: cleanImportedLine(rawOptionText.replace(/^\*+|\*+$/g, '')), correctByMarker };
+  return { label, text: cleanImportedLine(match[2]) };
 };
 
 const labelToIndex = (label = '') => {
@@ -134,8 +119,6 @@ const parseQuestionBankLines = (lines, settings) => {
   let currentTopic = 'عام';
   let currentDifficulty = settings.difficulty || 'medium';
   let currentGrade = settings.grade || '3sec';
-  let currentPaperTitle = settings.paperTitle || DEFAULT_PAPER_TITLE;
-  let currentSourceLabel = settings.sourceLabel || '';
   let question = null;
 
   const finalizeQuestion = () => {
@@ -165,16 +148,9 @@ const parseQuestionBankLines = (lines, settings) => {
       options,
       correctIdx: hasOptions ? Math.max(0, Math.min(options.length - 1, safeNumber(correctIdx, 0))) : 0,
       explanation: question.explanation.trim(),
-      introText: question.introText || '',
       mark: hasOptions ? 1 : 10,
       tags: Array.from(new Set([branch, topic, ...(settings.tags || [])].filter(Boolean))),
-      source: settings.importTarget === 'quick_review' ? 'quick_review_import' : 'question_bank_import',
-      template: 'paper-style',
-      paperTitle: question.paperTitle || currentPaperTitle || DEFAULT_PAPER_TITLE,
-      sourceLabel: question.sourceLabel || currentSourceLabel || '',
-      year: question.year || settings.year || '',
-      lockAfterAnswer: true,
-      showExplanationAfterAnswer: true,
+      source: 'question_bank_import',
     });
     question = null;
   };
@@ -191,8 +167,6 @@ const parseQuestionBankLines = (lines, settings) => {
       if (key.includes('درس') || key.includes('موضوع')) currentTopic = meta.value;
       if (key.includes('صعوبه')) currentDifficulty = meta.value;
       if (key.includes('صف')) currentGrade = meta.value;
-      if (key.includes('عنوان')) currentPaperTitle = meta.value;
-      if (key.includes('مصدر') || key.includes('نوعالسؤال') || key.includes('نموذج') || key.includes('سنه')) currentSourceLabel = meta.value;
       return;
     }
 
@@ -222,19 +196,15 @@ const parseQuestionBankLines = (lines, settings) => {
     if (startsQuestion) {
       finalizeQuestion();
       const branchFromQuestion = settings.branchMode === 'auto' ? detectBranchFromText(rawText) : '';
-      const strippedQuestion = extractQuestionSource(stripQuestionPrefix(rawText));
       question = {
-        text: strippedQuestion.text,
+        text: stripQuestionPrefix(rawText),
         options: [],
         correctIdx: null,
         explanation: '',
-        introText: '',
         branch: branchFromQuestion || currentBranch,
         topic: currentTopic,
         grade: currentGrade,
         difficulty: currentDifficulty,
-        paperTitle: currentPaperTitle,
-        sourceLabel: strippedQuestion.sourceLabel || currentSourceLabel,
       };
       return;
     }
@@ -242,7 +212,7 @@ const parseQuestionBankLines = (lines, settings) => {
     if (!question) return;
 
     if (option) {
-      const correctByMarker = option.correctByMarker || /\*/.test(option.text) || highlighted;
+      const correctByMarker = /\*/.test(option.text) || highlighted;
       const nextIndex = question.options.length;
       question.options.push({ ...option, text: option.text.replace(/\*/g, '').trim(), correctByMarker, highlighted });
       if (correctByMarker) question.correctIdx = nextIndex;
@@ -274,16 +244,12 @@ const parseQuestionBankLines = (lines, settings) => {
 
 export const QuestionBankManager = ({ adminGradeFilter }) => {
   const [questions, setQuestions] = useState([]);
-  const [quickReviews, setQuickReviews] = useState([]);
   const [filters, setFilters] = useState({ grade: adminGradeFilter === 'all' ? '' : adminGradeFilter, branch: '', type: '', topic: '', search: '' });
-  const [form, setForm] = useState({ text: '', grade: adminGradeFilter === 'all' ? '3sec' : adminGradeFilter, branch: 'النحو', topic: '', type: 'mcq', difficulty: 'medium', optionsText: '', correctIdx: 0, explanation: '', mark: 1, tags: '', paperTitle: DEFAULT_PAPER_TITLE, sourceLabel: '' });
-  const [importSettings, setImportSettings] = useState({ grade: adminGradeFilter === 'all' ? '3sec' : adminGradeFilter, branchMode: 'auto', branch: 'النحو', difficulty: 'medium', tags: 'استيراد', paperTitle: DEFAULT_PAPER_TITLE, sourceLabel: '' });
+  const [form, setForm] = useState({ text: '', grade: adminGradeFilter === 'all' ? '3sec' : adminGradeFilter, branch: 'النحو', topic: '', type: 'mcq', difficulty: 'medium', optionsText: '', correctIdx: 0, explanation: '', mark: 1, tags: '' });
+  const [importSettings, setImportSettings] = useState({ grade: adminGradeFilter === 'all' ? '3sec' : adminGradeFilter, branchMode: 'auto', branch: 'النحو', difficulty: 'medium', tags: 'استيراد' });
   const [importPreview, setImportPreview] = useState([]);
   const [importWarnings, setImportWarnings] = useState([]);
   const [importBusy, setImportBusy] = useState(false);
-  const [bulkText, setBulkText] = useState('');
-  const [examTabName, setExamTabName] = useState(QUICK_REVIEW_TITLE);
-  const [managerTab, setManagerTab] = useState('quick-review');
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -297,33 +263,6 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
       });
       return () => unsub();
   }, []);
-
-
-  useEffect(() => {
-      const unsub = onSnapshot(query(collection(db, 'exams'), orderBy('createdAt', 'desc'), limit(80)), (snap) => {
-          const rows = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((exam) => exam.quickReview || exam.source === 'quick_review');
-          rows.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-          setQuickReviews(rows);
-      }, (error) => {
-          console.warn('quick review exams listener blocked:', error?.message);
-          setQuickReviews([]);
-      });
-      return () => unsub();
-  }, []);
-
-  const deleteQuickReviewExam = async (examId) => {
-    const ok = await platformConfirm('هل تريد حذف مراجعة ع السريع من صفحة الطالب؟');
-    if (!ok) return;
-    await deleteDoc(doc(db, 'exams', examId));
-    platformNotify('تم حذف المراجعة من صفحة الطالب');
-  };
-
-  const deleteQuestionFromBank = async (questionId) => {
-    const ok = await platformConfirm('هل تريد حذف هذا السؤال من بنك الأسئلة؟');
-    if (!ok) return;
-    await deleteDoc(doc(db, 'question_bank', questionId));
-    platformNotify('تم حذف السؤال');
-  };
 
   const handleAddQuestion = async (e) => {
     e.preventDefault();
@@ -339,15 +278,10 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
       type: form.type,
       difficulty: form.difficulty,
       options,
-      correctIdx: markerCorrectIndex >= 0 ? markerCorrectIndex : safeNumber(form.correctIdx, 0),
+      correctIdx: safeNumber(form.correctIdx, 0),
       explanation: form.explanation,
       mark: safeNumber(form.mark, form.type === 'essay' ? 10 : 1),
       tags: form.tags.split(',').map(t => t.trim()).filter(Boolean),
-      template: 'paper-style',
-      paperTitle: form.paperTitle.trim() || DEFAULT_PAPER_TITLE,
-      sourceLabel: form.sourceLabel.trim(),
-      lockAfterAnswer: true,
-      showExplanationAfterAnswer: true,
       createdAt: serverTimestamp()
     });
     setForm(prev => ({ ...prev, text: '', optionsText: '', explanation: '', tags: '', topic: '' }));
@@ -375,7 +309,6 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
       }
       const parsed = parseQuestionBankLines(lines, {
         ...importSettings,
-        importTarget: managerTab === 'quick-review' ? 'quick_review' : 'question_bank',
         tags: importSettings.tags.split(',').map((tag) => tag.trim()).filter(Boolean),
       });
       setImportPreview(parsed.questions);
@@ -388,63 +321,6 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
       setImportBusy(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
-  };
-
-  const previewBulkQuestions = () => {
-    const parsed = parseQuestionBankLines(bulkText.split(/\r?\n/).map((text) => ({ text, highlighted: false })), {
-      ...importSettings,
-      importTarget: managerTab === 'quick-review' ? 'quick_review' : 'question_bank',
-      tags: importSettings.tags.split(',').map((tag) => tag.trim()).filter(Boolean),
-    });
-    setImportPreview(parsed.questions);
-    setImportWarnings(parsed.warnings);
-    platformNotify(`تم تجهيز ${parsed.questions.length} سؤال للمعاينة`);
-  };
-
-  const createQuickReviewExam = async (questionList = importPreview) => {
-    if (!questionList.length) return platformNotify('لا توجد أسئلة جاهزة لعمل مراجعة ف السريع');
-    const grouped = {};
-    questionList.forEach((q) => {
-      const branch = q.branch || 'مراجعة';
-      grouped[branch] = grouped[branch] || { text: branch, subQuestions: [] };
-      grouped[branch].subQuestions.push({
-        id: `quick_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        text: q.text,
-        options: q.options || [],
-        correctIdx: q.correctIdx ?? 0,
-        branch,
-        topic: q.topic || q.lesson || 'عام',
-        type: q.type || 'mcq',
-        explanation: q.explanation || '',
-        introText: q.introText || '',
-        maxScore: getQuestionMaxScore(q),
-        modelAnswer: q.modelAnswer || '',
-        template: 'paper-style',
-        paperTitle: q.paperTitle || importSettings.paperTitle || DEFAULT_PAPER_TITLE,
-        sourceLabel: q.sourceLabel || importSettings.sourceLabel || '',
-        lockAfterAnswer: true,
-        showExplanationAfterAnswer: true,
-      });
-    });
-    await addDoc(collection(db, 'exams'), {
-      title: examTabName.trim() || QUICK_REVIEW_TITLE,
-      grade: importSettings.grade,
-      duration: 0,
-      startTime: new Date(Date.now() - 60 * 1000).toISOString().slice(0,16),
-      endTime: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0,16),
-      accessCode: '',
-      noAccessCode: true,
-      quickReview: true,
-      reviewTabTitle: examTabName.trim() || QUICK_REVIEW_TITLE,
-      isPremium: false,
-      questions: Object.values(grouped),
-      createdAt: serverTimestamp(),
-      source: 'quick_review',
-    });
-    setImportPreview([]);
-    setImportWarnings([]);
-    setBulkText('');
-    platformNotify('تم إنشاء مراجعة ف السريع وظهورها في صفحة الامتحانات بدون كلمة سر');
   };
 
   const saveImportedQuestions = async () => {
@@ -493,14 +369,8 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
         topic: q.topic || q.lesson || 'عام',
         type: q.type || 'mcq',
         explanation: q.explanation || '',
-        introText: q.introText || '',
         maxScore: getQuestionMaxScore(q),
-        modelAnswer: q.modelAnswer || '',
-        template: q.template || 'paper-style',
-        paperTitle: q.paperTitle || DEFAULT_PAPER_TITLE,
-        sourceLabel: q.sourceLabel || '',
-        lockAfterAnswer: true,
-        showExplanationAfterAnswer: true
+        modelAnswer: q.modelAnswer || ''
       });
     });
     await addDoc(collection(db, 'exams'), {
@@ -521,30 +391,18 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
   const visible = questions.filter(q => (!filters.grade || q.grade === filters.grade) && (!filters.branch || q.branch === filters.branch) && (!filters.type || q.type === filters.type) && (!filters.topic || (q.topic || q.lesson || '').includes(filters.topic)) && (!filters.search || `${q.text} ${(q.tags || []).join(' ')} ${q.explanation || ''}`.includes(filters.search)));
 
   return (
-    <div className="space-y-6" dir="rtl">
-      <div className="rounded-[2rem] border border-slate-200 bg-white p-3 shadow-sm">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <button type="button" onClick={() => setManagerTab('quick-review')} className={`rounded-2xl px-5 py-4 font-black transition flex items-center justify-center gap-2 ${managerTab === 'quick-review' ? 'bg-gradient-to-l from-amber-500 via-orange-500 to-rose-600 text-white shadow-xl shadow-amber-200' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>
-            <Sparkles className="w-5 h-5" /> مراجعة ع السريع
-          </button>
-          <button type="button" onClick={() => setManagerTab('bank')} className={`rounded-2xl px-5 py-4 font-black transition flex items-center justify-center gap-2 ${managerTab === 'bank' ? 'bg-indigo-700 text-white shadow-xl shadow-indigo-200' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>
-            <BookOpen className="w-5 h-5" /> بنك الأسئلة الشامل
-          </button>
-        </div>
-      </div>
-
+    <div className="space-y-6">
       <div className="glass-panel p-4 md:p-6 rounded-xl border border-indigo-100 bg-gradient-to-br from-white to-indigo-50/40">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
           <div>
-            <h2 className={`text-xl font-bold flex items-center gap-2 ${managerTab === 'quick-review' ? 'text-orange-700' : 'text-indigo-700'}`}>{managerTab === 'quick-review' ? <Sparkles/> : <Layers/>} {managerTab === 'quick-review' ? 'مراجعة ع السريع - نظام مستقل' : 'بنك الأسئلة الشامل'}</h2>
-            <p className="text-sm text-slate-500 mt-1">{managerTab === 'quick-review' ? 'هنا فقط تضيف مجموعات مراجعة سريعة تظهر للطالب في تبويب منفصل بدون كلمة سر، ولا تختلط ببنك الأسئلة.' : 'هنا بنك الأسئلة التقليدي: إضافة يدوية، فلترة، وتوليد امتحان من الفلاتر.'}</p>
+            <h2 className="text-xl font-bold text-indigo-700 flex items-center gap-2"><Layers/> بنك الأسئلة الشامل</h2>
+            <p className="text-sm text-slate-500 mt-1">ارفع ملفات نحو وبلاغة كاملة، والنظام يفرز الأسئلة حسب الفرع والموضوع، مع دعم علامة * والتظليل في Word.</p>
           </div>
-          <span className={`px-3 py-1 rounded-full text-xs font-bold ${managerTab === 'quick-review' ? 'bg-orange-100 text-orange-700' : 'bg-indigo-100 text-indigo-700'}`}>{managerTab === 'quick-review' ? 'منفصل عن بنك الأسئلة' : `${questions.length} سؤال محفوظ`}</span>
+          <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold">{questions.length} سؤال محفوظ</span>
         </div>
 
-        {managerTab === 'quick-review' && (
-        <div className="bg-white/90 border border-dashed border-orange-200 rounded-2xl p-4 mb-5">
-          <h3 className="font-black text-slate-900 flex items-center gap-2 mb-3"><UploadCloud className="w-5 h-5 text-orange-600"/> إضافة مراجعة ع السريع: اكتب مجموعة أو ارفع ملف</h3>
+        <div className="bg-white/80 border border-dashed border-indigo-200 rounded-2xl p-4 mb-5">
+          <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-3"><UploadCloud className="w-5 h-5"/> استيراد أسئلة من ملف</h3>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-3">
             <select className="border p-3 rounded" value={importSettings.grade} onChange={e=>setImportSettings({...importSettings, grade:e.target.value})}><GradeOptions/></select>
             <select className="border p-3 rounded" value={importSettings.branchMode} onChange={e=>setImportSettings({...importSettings, branchMode:e.target.value})}>
@@ -560,52 +418,24 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
             </select>
             <input className="border p-3 rounded" placeholder="وسوم عامة: نحو,بلاغة" value={importSettings.tags} onChange={e=>setImportSettings({...importSettings, tags:e.target.value})}/>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-            <input className="border p-3 rounded" placeholder="العنوان الثابت أعلى كل سؤال" value={importSettings.paperTitle} onChange={e=>setImportSettings({...importSettings, paperTitle:e.target.value})}/>
-            <input className="border p-3 rounded" placeholder="مصدر افتراضي: استرشادي ثامن / شامل 2025" value={importSettings.sourceLabel} onChange={e=>setImportSettings({...importSettings, sourceLabel:e.target.value})}/>
-            <input className="border p-3 rounded" placeholder="اسم تبويب الطالب" value={examTabName} onChange={e=>setExamTabName(e.target.value)}/>
-          </div>
-          <textarea className="w-full border border-indigo-100 rounded-2xl p-4 min-h-[180px] mb-3 font-['Cairo']" placeholder={`إضافة مجموعة أسئلة مرة واحدة:
-س1: استرشادي ثامن: نص السؤال
-أ: اختيار
-*ب: اختيار صحيح
-شرح: الشرح اختياري
-
-س2: سؤال عادي...`} value={bulkText} onChange={(e)=>setBulkText(e.target.value)} />
-          <div className="flex flex-col md:flex-row gap-3 mb-3">
-            <button type="button" onClick={previewBulkQuestions} disabled={!bulkText.trim()} className="bg-violet-600 disabled:bg-slate-300 text-white py-3 px-6 rounded-xl font-bold">معاينة مجموعة الأسئلة</button>
-            <button type="button" onClick={()=>createQuickReviewExam()} disabled={importPreview.length === 0} className="bg-amber-500 disabled:bg-slate-300 text-white py-3 px-6 rounded-xl font-black shadow-lg">حفظ وظهور للطالب</button>
-          </div>
           <div className="flex flex-col md:flex-row gap-3 md:items-center">
-            <input ref={fileInputRef} type="file" accept=".txt,.docx,.pdf,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleImportFile} className="block w-full text-sm text-slate-600 file:ml-3 file:rounded-xl file:border-0 file:bg-orange-600 file:px-4 file:py-3 file:font-bold file:text-white hover:file:bg-orange-700" />
-            <span className="rounded-xl bg-orange-50 px-4 py-3 text-xs font-bold text-orange-700">منطقة مراجعة ع السريع مستقلة نهائيًا عن بنك الأسئلة.</span>
+            <input ref={fileInputRef} type="file" accept=".txt,.docx,.pdf,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleImportFile} className="block w-full text-sm text-slate-600 file:ml-3 file:rounded-xl file:border-0 file:bg-indigo-600 file:px-4 file:py-3 file:font-bold file:text-white hover:file:bg-indigo-700" />
+            <button type="button" disabled={importBusy || importPreview.length === 0} onClick={saveImportedQuestions} className="bg-emerald-600 disabled:bg-slate-300 text-white py-3 px-6 rounded-xl font-bold whitespace-nowrap flex items-center justify-center gap-2"><FileCheck className="w-5 h-5"/> حفظ المعاينة</button>
           </div>
           <div className="mt-3 text-xs text-slate-600 leading-6 bg-slate-50 rounded-xl p-3">
             <b>الصيغ المدعومة:</b> TXT و DOCX و PDF نصي. ضع <b>*</b> بجانب الإجابة الصحيحة أو ظلّل سطر الإجابة في Word. اكتب عناوين مثل <b># النحو</b> ثم <b>## المنادى</b> أو <b># البلاغة</b> ثم <b>## التشبيه</b> عشان يتخزن الفرع والموضوع تلقائيًا.
           </div>
           {importWarnings.length > 0 && <div className="mt-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-3 text-sm space-y-1">{importWarnings.slice(0, 6).map((warning, idx) => <p key={idx}>• {warning}</p>)}</div>}
-          {managerTab === 'quick-review' && importPreview.length > 0 && <div className="mt-4 bg-slate-50 rounded-xl p-3 max-h-72 overflow-y-auto space-y-2">
-            <div className="font-bold text-slate-700 flex items-center gap-2"><Sparkles className="w-4 h-4"/> معاينة {importPreview.length} سؤال قبل إنشاء المراجعة</div>
+          {importPreview.length > 0 && <div className="mt-4 bg-slate-50 rounded-xl p-3 max-h-72 overflow-y-auto space-y-2">
+            <div className="font-bold text-slate-700 flex items-center gap-2"><Sparkles className="w-4 h-4"/> معاينة {importPreview.length} سؤال قبل الحفظ</div>
             {importPreview.slice(0, 20).map((q, idx) => <div key={`${q.text}_${idx}`} className="bg-white border rounded-xl p-3">
-              <div className="flex flex-wrap gap-2 mb-1 text-[11px]"><span className="bg-orange-100 text-orange-700 px-2 py-1 rounded">{q.sourceLabel || 'سؤال عادي'}</span><span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">{q.branch}</span><span className="bg-purple-100 text-purple-700 px-2 py-1 rounded">{q.topic}</span><span className="bg-slate-100 text-slate-700 px-2 py-1 rounded">{q.type === 'mcq' ? 'اختياري' : 'مقالي'}</span></div>
+              <div className="flex flex-wrap gap-2 mb-1 text-[11px]"><span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">{q.branch}</span><span className="bg-purple-100 text-purple-700 px-2 py-1 rounded">{q.topic}</span><span className="bg-slate-100 text-slate-700 px-2 py-1 rounded">{q.type === 'mcq' ? 'اختياري' : 'مقالي'}</span></div>
               <p className="font-bold text-sm text-slate-800">{idx + 1}. {q.text}</p>
               {q.options?.length > 0 && <p className="text-xs text-emerald-700 mt-1">الإجابة: {OPTION_LABELS[q.correctIdx] || q.correctIdx + 1}) {q.options[q.correctIdx]}</p>}
             </div>)}
           </div>}
-
-          {quickReviews.length > 0 && <div className="mt-5 rounded-2xl border border-orange-100 bg-orange-50/50 p-4">
-            <h4 className="font-black text-orange-800 mb-3">المراجعات المنشورة للطالب</h4>
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {quickReviews.map((exam) => <div key={exam.id} className="flex flex-col md:flex-row md:items-center justify-between gap-3 rounded-xl bg-white border border-orange-100 p-3">
-                <div><p className="font-black text-slate-800">{exam.title || 'مراجعة ع السريع'}</p><p className="text-xs text-slate-500">{exam.questions?.reduce((acc,g)=>acc+(g.subQuestions?.length || 0),0) || 0} سؤال • بدون وقت • بدون كلمة سر</p></div>
-                <button type="button" onClick={() => deleteQuickReviewExam(exam.id)} className="rounded-xl bg-red-50 text-red-700 px-4 py-2 font-black border border-red-100 hover:bg-red-100">حذف من صفحة الطالب</button>
-              </div>)}
-            </div>
-          </div>}
         </div>
-        )}
 
-        {managerTab === 'bank' && (
         <form onSubmit={handleAddQuestion} className="grid gap-4">
           <h3 className="font-bold text-slate-800 flex items-center gap-2"><PenTool className="w-5 h-5"/> إضافة سؤال يدويًا</h3>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -619,42 +449,21 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
               <option value="easy">سهل</option><option value="medium">متوسط</option><option value="hard">صعب</option>
             </select>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input className="border p-3 rounded" placeholder="عنوان الورقة الثابت" value={form.paperTitle} onChange={e=>setForm({...form, paperTitle:e.target.value})}/>
-            <input className="border p-3 rounded" placeholder="مصدر السؤال: استرشادي ثامن / ثانوية عامة / سؤال عادي" value={form.sourceLabel} onChange={e=>setForm({...form, sourceLabel:e.target.value})}/>
-          </div>
           <textarea className="border p-3 rounded h-24" placeholder="نص السؤال" value={form.text} onChange={e=>setForm({...form, text:e.target.value})}/>
-          {form.type === 'mcq' && <textarea className="border p-3 rounded h-28 font-mono" placeholder={'كل اختيار في سطر منفصل، وتقدر تحط * قبل الإجابة الصحيحة\nمثال:\nنكرة مقصودة\n*مضاف\nشبيه بالمضاف'} value={form.optionsText} onChange={e=>setForm({...form, optionsText:e.target.value})}/>}          
+          {form.type === 'mcq' && <textarea className="border p-3 rounded h-28 font-mono" placeholder={'كل اختيار في سطر منفصل\nمثال:\nنكرة مقصودة\nمضاف\nشبيه بالمضاف'} value={form.optionsText} onChange={e=>setForm({...form, optionsText:e.target.value})}/>}          
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {form.type === 'mcq' && <select className="border p-3 rounded" value={form.correctIdx} onChange={e=>setForm({...form, correctIdx:e.target.value})}><option value={0}>الإجابة الصحيحة: أ</option><option value={1}>الإجابة الصحيحة: ب</option><option value={2}>الإجابة الصحيحة: ج</option><option value={3}>الإجابة الصحيحة: د</option><option value={4}>الإجابة الصحيحة: هـ</option><option value={5}>الإجابة الصحيحة: و</option></select>}            
+            {form.type === 'mcq' && <input type="number" min="0" className="border p-3 rounded" placeholder="رقم الإجابة الصحيحة يبدأ من 0" value={form.correctIdx} onChange={e=>setForm({...form, correctIdx:e.target.value})}/>}            
             <input type="number" min="1" className="border p-3 rounded" placeholder="درجة السؤال" value={form.mark} onChange={e=>setForm({...form, mark:e.target.value})}/>
             <input className="border p-3 rounded" placeholder="tags مفصولة بفاصلة" value={form.tags} onChange={e=>setForm({...form, tags:e.target.value})}/>
           </div>
           <textarea className="border p-3 rounded h-20" placeholder="شرح الإجابة / قاعدة المراجعة الذكية" value={form.explanation} onChange={e=>setForm({...form, explanation:e.target.value})}/>
           <div className="flex flex-col md:flex-row gap-3">
-            <button className="bg-indigo-600 text-white py-3 px-6 rounded-xl font-bold">حفظ السؤال اليدوي</button>
+            <button className="bg-indigo-600 text-white py-3 px-6 rounded-xl font-bold">إضافة للسجل</button>
+            <button type="button" onClick={createExamFromBank} className="bg-emerald-600 text-white py-3 px-6 rounded-xl font-bold">توليد امتحان من الفلاتر الحالية</button>
           </div>
         </form>
-        )}
       </div>
-
-      {managerTab === 'bank' && <div className="glass-panel p-4 md:p-6 rounded-xl border border-indigo-100 bg-white">
-        <h3 className="font-black text-slate-900 flex items-center gap-2 mb-3"><UploadCloud className="w-5 h-5 text-indigo-600"/> رفع مجموعة أسئلة إلى بنك الأسئلة</h3>
-        <p className="text-sm text-slate-500 mb-3">اكتب مجموعة أسئلة أو ارفع TXT / DOCX / PDF. علامة * قبل الاختيار أو تظليل الاختيار في Word = إجابة صحيحة.</p>
-        <textarea className="w-full border border-slate-200 rounded-2xl p-4 min-h-[160px] mb-3" placeholder={`س1: استرشادي ثامن: نص السؤال
-أ: اختيار
-*ب: اختيار صحيح
-شرح: الشرح اختياري`} value={bulkText} onChange={(e)=>setBulkText(e.target.value)} />
-        <div className="flex flex-col md:flex-row gap-3 mb-3">
-          <button type="button" onClick={previewBulkQuestions} disabled={!bulkText.trim()} className="bg-indigo-600 disabled:bg-slate-300 text-white py-3 px-6 rounded-xl font-bold">معاينة المجموعة</button>
-          <button type="button" onClick={saveImportedQuestions} disabled={importPreview.length === 0} className="bg-emerald-600 disabled:bg-slate-300 text-white py-3 px-6 rounded-xl font-black">حفظ المجموعة في بنك الأسئلة</button>
-        </div>
-        <input ref={managerTab === 'bank' ? fileInputRef : null} type="file" accept=".txt,.docx,.pdf,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleImportFile} className="block w-full text-sm text-slate-600 file:ml-3 file:rounded-xl file:border-0 file:bg-indigo-600 file:px-4 file:py-3 file:font-bold file:text-white hover:file:bg-indigo-700" />
-        {managerTab === 'bank' && importWarnings.length > 0 && <div className="mt-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-3 text-sm space-y-1">{importWarnings.slice(0, 6).map((warning, idx) => <p key={idx}>• {warning}</p>)}</div>}
-        {managerTab === 'bank' && importPreview.length > 0 && <div className="mt-4 bg-slate-50 rounded-xl p-3 max-h-72 overflow-y-auto space-y-2"><div className="font-bold text-slate-700">معاينة {importPreview.length} سؤال</div>{importPreview.slice(0, 20).map((q, idx) => <div key={`${q.text}_${idx}`} className="bg-white border rounded-xl p-3"><p className="font-bold text-sm text-slate-800">{idx + 1}. {q.text}</p>{q.options?.length > 0 && <p className="text-xs text-emerald-700 mt-1">الإجابة: {OPTION_LABELS[q.correctIdx] || q.correctIdx + 1}) {q.options[q.correctIdx]}</p>}</div>)}</div>}
-      </div>}
-
-      {managerTab === 'bank' && <div className="glass-panel p-4 md:p-6 rounded-xl">
+      <div className="glass-panel p-4 md:p-6 rounded-xl">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
           <select className="border p-3 rounded" value={filters.grade} onChange={e=>setFilters({...filters, grade:e.target.value})}><option value="">كل المراحل</option><GradeOptions/></select>
           <select className="border p-3 rounded" value={filters.branch} onChange={e=>setFilters({...filters, branch:e.target.value})}><option value="">النحو والبلاغة</option><option value="النحو">النحو</option><option value="البلاغة">البلاغة</option></select>
@@ -673,16 +482,15 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
               <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded">{q.branch}</span>
               <span className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded">{q.topic || q.lesson || 'عام'}</span>
               <span className="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded">{q.type === 'essay' ? 'مقالي' : 'اختياري'}</span>
-              <span className="bg-emerald-100 text-emerald-700 text-xs px-2 py-1 rounded">{getQuestionMaxScore(q)} درجة</span>{q.sourceLabel && <span className="bg-orange-100 text-orange-700 text-xs px-2 py-1 rounded">{q.sourceLabel}</span>}
+              <span className="bg-emerald-100 text-emerald-700 text-xs px-2 py-1 rounded">{getQuestionMaxScore(q)} درجة</span>
             </div>
             <p className="font-bold text-slate-800">{q.text}</p>
             {q.options?.length > 0 && <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3 text-sm">{q.options.map((option, idx) => <div key={idx} className={`border rounded-lg p-2 ${idx === q.correctIdx ? 'bg-emerald-50 border-emerald-200 text-emerald-800 font-bold' : 'bg-slate-50'}`}>{OPTION_LABELS[idx] || idx + 1}) {option}</div>)}</div>}
             {q.explanation && <p className="text-xs text-slate-500 mt-2">شرح: {q.explanation}</p>}
-            <div className="mt-3 flex justify-end"><button type="button" onClick={() => deleteQuestionFromBank(q.id)} className="rounded-xl bg-red-50 text-red-700 px-4 py-2 text-xs font-black border border-red-100 hover:bg-red-100">حذف السؤال</button></div>
           </div>)}
           {visible.length === 0 && <p className="text-slate-500 text-center py-8">لا توجد أسئلة مطابقة.</p>}
         </div>
-      </div>}
+      </div>
     </div>
   );
 };

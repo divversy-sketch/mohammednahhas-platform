@@ -1,4 +1,5 @@
 import React from 'react';
+import templateBg from '../../../assets/quick-review-template.png';
 import { Check, ChevronRight, FileText, Flag, HelpCircle, Layers, PenTool, UploadCloud, X } from '../../../shared/icons/lucide-shim.jsx';
 import { LocalEssayReviewBox, LocalQuestionExplanation, renderBracketHighlightedText } from '../../../shared/core/platformShared.jsx';
 
@@ -68,15 +69,13 @@ function EssayAnswerEditor({ question, answer, isSubmitted, onAnswer, onImageUpl
 }
 
 function McqAnswerOptions({ question, answer, isSubmitted, onAnswer }) {
-  const locked = !isSubmitted && question.lockAfterAnswer && answer !== undefined && answer !== null;
-  const feedbackMode = isSubmitted || locked;
   return (
     <div className="space-y-4">
       {(Array.isArray(question.options) ? question.options : []).map((option, idx) => {
         let optionClass = 'border-slate-200 hover:bg-slate-50 bg-white text-slate-700';
         const isSelected = answer === idx;
 
-        if (feedbackMode) {
+        if (isSubmitted) {
           if (idx === question.correctIdx) optionClass = 'border-green-500 bg-green-50 text-green-900 shadow-md ring-2 ring-green-200';
           else if (isSelected) optionClass = 'border-red-500 bg-red-50 text-red-900 shadow-md';
           else optionClass = 'border-slate-200 bg-slate-50 opacity-50';
@@ -85,14 +84,14 @@ function McqAnswerOptions({ question, answer, isSubmitted, onAnswer }) {
         }
 
         return (
-          <div key={idx} onClick={() => { if (!locked) onAnswer(question.id, idx); }} className={`p-5 rounded-2xl border-2 ${locked ? 'cursor-not-allowed' : 'cursor-pointer'} transition-all duration-200 flex items-center gap-4 ${optionClass}`}>
-            <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${isSelected || (feedbackMode && idx === question.correctIdx) ? 'border-transparent bg-current' : 'border-slate-300'}`}>
-              {(feedbackMode && idx === question.correctIdx) && <Check size={16} className="text-white" />}
-              {(feedbackMode && isSelected && idx !== question.correctIdx) && <X size={16} className="text-white" />}
+          <div key={idx} onClick={() => onAnswer(question.id, idx)} className={`p-5 rounded-2xl border-2 cursor-pointer transition-all duration-200 flex items-center gap-4 ${optionClass}`}>
+            <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${isSelected || (isSubmitted && idx === question.correctIdx) ? 'border-transparent bg-current' : 'border-slate-300'}`}>
+              {(isSubmitted && idx === question.correctIdx) && <Check size={16} className="text-white" />}
+              {(isSubmitted && isSelected && idx !== question.correctIdx) && <X size={16} className="text-white" />}
             </div>
             <span className="font-['Cairo'] text-xl font-bold leading-relaxed">{option}</span>
-            {feedbackMode && idx === question.correctIdx && <span className="mr-auto text-green-600 bg-green-100 px-3 py-1 rounded-lg text-xs font-bold">الإجابة الصحيحة</span>}
-            {feedbackMode && isSelected && idx !== question.correctIdx && <span className="mr-auto text-red-600 bg-red-100 px-3 py-1 rounded-lg text-xs font-bold">إجابتك (خطأ)</span>}
+            {isSubmitted && idx === question.correctIdx && <span className="mr-auto text-green-600 bg-green-100 px-3 py-1 rounded-lg text-xs font-bold">الإجابة الصحيحة</span>}
+            {isSubmitted && isSelected && idx !== question.correctIdx && <span className="mr-auto text-red-600 bg-red-100 px-3 py-1 rounded-lg text-xs font-bold">إجابتك (خطأ)</span>}
           </div>
         );
       })}
@@ -100,82 +99,157 @@ function McqAnswerOptions({ question, answer, isSubmitted, onAnswer }) {
   );
 }
 
-function PaperMcqAnswerOptions({ question, answer, isSubmitted, onAnswer }) {
-  const locked = !isSubmitted && question.lockAfterAnswer && answer !== undefined && answer !== null;
-  const feedbackMode = isSubmitted || locked;
-  const labels = ['أ', 'ب', 'ج', 'د', 'هـ', 'و'];
+function buildQuestionParts(question) {
+  const raw = String(question?.text || '').trim();
+  const introFromField = String(question?.introText || question?.intro || '').trim();
+  const sourceLabel = String(question?.sourceLabel || question?.sourceTag || question?.sourceType || question?.paperLabel || '').trim();
+  if (!raw) return { prompt: '', intro: introFromField, sourceLabel };
+
+  const introMatch = raw.match(/(?:^|\n)\s*(?:مقدمة|تمهيد)\s*[:：-]\s*(.+)/);
+  const promptMatch = raw.match(/(?:^|\n)\s*(?:السؤال|سؤال)\s*[:：-]\s*(.+)/);
+  if (promptMatch) {
+    return {
+      intro: introFromField || (introMatch ? introMatch[1].trim() : ''),
+      prompt: promptMatch[1].trim(),
+      sourceLabel,
+    };
+  }
+
+  const pieces = raw.split(/[|\n]/).map((item) => item.trim()).filter(Boolean);
+  if (pieces.length >= 2) {
+    return {
+      prompt: pieces[0],
+      intro: introFromField || pieces.slice(1).join(' '),
+      sourceLabel,
+    };
+  }
+
+  return { prompt: raw, intro: introFromField, sourceLabel };
+}
+
+function QuickReviewTemplate({
+  question,
+  answer,
+  isSubmitted,
+  onAnswer,
+  currentQIndex,
+  displayQuestions,
+  onPrevious,
+  onNext,
+}) {
+  const parts = buildQuestionParts(question);
+  const promptText = parts.prompt || String(question?.text || '');
+  const introText = parts.intro;
+  const sourceLabel = parts.sourceLabel || String(question?.branch || question?.topic || '').trim() || 'سؤال عام';
+  const options = Array.isArray(question?.options) ? question.options : [];
+  const letters = ['أ', 'ب', 'ج', 'د', 'هـ', 'و'];
 
   return (
-    <div className="space-y-3 md:space-y-4">
-      {(Array.isArray(question.options) ? question.options : []).map((option, idx) => {
-        const isSelected = answer === idx;
-        let stateClass = 'border-[#c8b9a4] bg-[#fffdf6] hover:bg-[#fff6dd] hover:border-[#a8623a] text-[#1f1b18]';
-        let badgeClass = 'bg-[#9a5838] text-white shadow-[0_3px_0_rgba(0,0,0,.18)]';
-        if (feedbackMode && idx === question.correctIdx) {
-          stateClass = 'border-[#189262] bg-[#e9fff5] text-[#075238] shadow-[0_10px_25px_rgba(24,146,98,.16)] ring-2 ring-[#bdf3db]';
-          badgeClass = 'bg-[#159462] text-white';
-        } else if (feedbackMode && isSelected && idx !== question.correctIdx) {
-          stateClass = 'border-[#d33f49] bg-[#fff0f0] text-[#781f26] shadow-[0_10px_25px_rgba(211,63,73,.14)]';
-          badgeClass = 'bg-[#d33f49] text-white';
-        } else if (feedbackMode) {
-          stateClass = 'border-[#e5d8c3] bg-[#f8f1e5] text-[#817263] opacity-60';
-          badgeClass = 'bg-[#b7aa99] text-white';
-        }
+    <div className="w-full h-full overflow-y-auto bg-[#05070d] p-3 md:p-6">
+      <div className="mx-auto max-w-[1200px]">
+        <div className="relative w-full aspect-[4/3] bg-center bg-contain bg-no-repeat" style={{ backgroundImage: `url(${templateBg})` }}>
+          <div className="absolute inset-0">
+            <div className="absolute left-[31.5%] right-[4.8%] top-[23.7%] h-[24.8%] flex items-center justify-center px-[6.2%] text-center">
+              <div className="w-full leading-[1.18] text-[#9b3e36] font-black [text-shadow:0_1px_0_rgba(255,255,255,0.85)]" style={{ fontFamily: 'Cairo, sans-serif', fontSize: 'clamp(16px, 2.35vw, 30px)' }}>
+                <div>{renderBracketHighlightedText(promptText)}</div>
+                {introText ? <div className="mt-2">مقدمة: {renderBracketHighlightedText(introText)}</div> : null}
+              </div>
+            </div>
 
-        return (
+            <div className="absolute left-[9.8%] top-[39.2%] w-[12.5%] rotate-[-1deg] rounded-[14px] border-2 border-[#6d7b8c] bg-[#e9eef7] px-2 py-3 text-center text-[#0d2341] shadow-[0_5px_14px_rgba(0,0,0,0.18)] font-black" style={{ fontFamily: 'Cairo, sans-serif', fontSize: 'clamp(10px, 1.1vw, 15px)' }}>
+              {sourceLabel}
+            </div>
+
+            {options.map((option, idx) => {
+              const topBase = 57.2 + idx * 8.55;
+              const isSelected = answer === idx;
+              const isCorrect = idx === question.correctIdx;
+              let badge = null;
+              let lineBg = 'transparent';
+              let lineBorder = 'transparent';
+              let lineText = '#30261e';
+              let circleBg = '#bb3c2b';
+              if (!isSubmitted && isSelected) {
+                lineBg = 'rgba(255,199,67,0.22)';
+                lineBorder = 'rgba(214,140,0,0.65)';
+              }
+              if (isSubmitted) {
+                if (isCorrect) {
+                  lineBg = 'rgba(34,197,94,0.18)';
+                  lineBorder = 'rgba(22,163,74,0.65)';
+                  circleBg = '#128c3a';
+                  badge = <Check className="w-[58%] h-[58%] text-white" />;
+                } else if (isSelected) {
+                  lineBg = 'rgba(239,68,68,0.14)';
+                  lineBorder = 'rgba(220,38,38,0.55)';
+                  circleBg = '#bb3c2b';
+                  badge = <X className="w-[58%] h-[58%] text-white" />;
+                }
+              }
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => !isSubmitted && onAnswer(question.id, idx)}
+                  className="absolute left-[32%] right-[4.5%] h-[7.2%] rounded-full transition-all duration-200 text-right"
+                  style={{ top: `${topBase}%`, background: lineBg, border: `2px solid ${lineBorder}` }}
+                  disabled={isSubmitted}
+                >
+                  <div className="relative h-full w-full">
+                    <div className="absolute inset-y-0 right-[8.5%] left-[3%] flex items-center justify-end">
+                      <span className="font-black leading-none" style={{ fontFamily: 'Cairo, sans-serif', color: lineText, fontSize: 'clamp(14px, 2vw, 28px)' }}>
+                        {option}
+                      </span>
+                    </div>
+                    <div className="absolute top-1/2 right-[0.8%] -translate-y-1/2 flex items-center justify-center rounded-full border-[3px] border-[#f4dac1] shadow-md"
+                      style={{ width: 'clamp(24px, 3.2vw, 42px)', height: 'clamp(24px, 3.2vw, 42px)', background: circleBg }}>
+                      {badge || <span className="text-white font-black" style={{ fontFamily: 'Cairo, sans-serif', fontSize: 'clamp(11px, 1.2vw, 16px)' }}>{letters[idx] || idx + 1}</span>}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {isSubmitted && question?.explanation ? (
+          <div className="mt-6 rounded-[28px] border border-amber-200 bg-[#fff7ea] p-5 md:p-6 shadow-lg">
+            <div className="flex items-center gap-2 text-amber-700 font-black text-lg mb-2" style={{ fontFamily: 'Cairo, sans-serif' }}>
+              <HelpCircle className="w-5 h-5" /> شرح الإجابة
+            </div>
+            <p className="text-slate-700 leading-8 whitespace-pre-wrap" style={{ fontFamily: 'Cairo, sans-serif' }}>{question.explanation}</p>
+          </div>
+        ) : null}
+
+        {isSubmitted ? (
+          <div className="mt-4"><LocalQuestionExplanation question={question} answers={{ [question.id]: answer }} /></div>
+        ) : null}
+
+        <div className="mt-6 flex items-center justify-between gap-3">
           <button
-            key={idx}
-            type="button"
-            onClick={() => { if (!locked) onAnswer(question.id, idx); }}
-            disabled={locked || isSubmitted}
-            className={`group w-full rounded-[1.35rem] border-2 px-3 md:px-5 py-3 md:py-4 text-right transition-all duration-200 flex items-center gap-3 md:gap-4 ${stateClass} ${locked || isSubmitted ? 'cursor-default' : 'cursor-pointer hover:-translate-y-0.5'}`}
+            disabled={currentQIndex === 0}
+            onClick={onPrevious}
+            className="px-6 md:px-8 py-3 md:py-4 rounded-2xl bg-white/90 text-slate-800 font-black shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ fontFamily: 'Cairo, sans-serif' }}
           >
-            <span className={`grid h-10 w-10 md:h-11 md:w-11 place-items-center rounded-full shrink-0 font-black text-xl ${badgeClass}`}>{labels[idx] || idx + 1}</span>
-            <span className="flex-1 text-lg md:text-2xl font-black leading-relaxed" style={{ fontFamily: "'Cairo', 'Tajawal', sans-serif" }}>{option}</span>
-            {feedbackMode && idx === question.correctIdx && <Check className="h-6 w-6 text-[#159462]" />}
-            {feedbackMode && isSelected && idx !== question.correctIdx && <X className="h-6 w-6 text-[#d33f49]" />}
+            السابق
           </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function PaperQuestionHeader({ title }) {
-  return (
-    <div className="relative mb-7 flex justify-center select-none">
-      <div className="relative px-5 md:px-12 py-2 md:py-4 text-center">
-        <span className="absolute inset-x-0 top-1/2 h-11 md:h-16 -translate-y-1/2 -rotate-1 rounded-[30%] bg-[#191212] shadow-[0_10px_0_rgba(117,56,34,.25)]" />
-        <span className="absolute -right-5 top-1/2 h-8 w-8 -translate-y-1/2 rounded-full bg-[#191212]" />
-        <span className="absolute left-3 top-3 h-2 w-10 rotate-[-18deg] rounded-full bg-[#191212]" />
-        <h2
-          className="relative z-10 text-[2rem] md:text-[4.25rem] font-black leading-[1.05] tracking-tight text-[#b77542]"
-          style={{
-            fontFamily: "'Cairo', 'Tajawal', sans-serif",
-            WebkitTextStroke: '1px rgba(74,35,25,.35)',
-            textShadow: '0 2px 0 #fff1d7, 0 5px 0 rgba(64,32,20,.28), 0 10px 20px rgba(0,0,0,.22)',
-          }}
-        >
-          {title || 'أسئلة ثانوية عامة واسترشادي'}
-        </h2>
+          <button
+            disabled={currentQIndex === displayQuestions.length - 1}
+            onClick={onNext}
+            className="px-7 md:px-10 py-3 md:py-4 rounded-2xl text-white font-black shadow-[0_18px_35px_rgba(246,142,0,0.35)] disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ fontFamily: 'Cairo, sans-serif', background: 'linear-gradient(90deg, #f97316 0%, #f59e0b 100%)' }}
+          >
+            التالي
+          </button>
+        </div>
       </div>
-      <div className="absolute -left-1 md:left-[9%] top-0 grid h-14 w-16 md:h-20 md:w-24 place-items-center rounded-[1.1rem] bg-[#171532] text-4xl md:text-6xl font-black text-[#d7ad47] shadow-2xl rotate-6 border-2 border-[#d7ad47]">؟</div>
     </div>
   );
 }
-
-function SourceStamp({ value }) {
-  if (!value) return null;
-  return (
-    <div className="relative shrink-0 w-24 md:w-32 min-h-[58px] rounded-[0.55rem] border-2 border-[#526174] bg-[#eef7ff] px-2 py-2 text-center text-xs md:text-sm font-black text-[#172334] shadow-[3px_4px_0_rgba(0,0,0,.16)] -rotate-2">
-      <span className="absolute -top-2 right-4 h-3 w-7 rounded-b bg-[#d7b45c] opacity-80" />
-      <span className="block leading-relaxed whitespace-pre-wrap">{value}</span>
-    </div>
-  );
-}
-
 
 export default function ExamQuestionPanel({
+  exam,
   question,
   flatQuestions = [],
   displayQuestions = [],
@@ -193,65 +267,37 @@ export default function ExamQuestionPanel({
   const answer = answers?.[question.id];
   const questionNumber = flatQuestions.findIndex((origQ) => origQ.id === question.id) + 1;
   const hasBlockText = question?.blockText && question.blockText.trim().length > 0;
-  const isPaperStyle = question?.template === 'paper-style';
-  const hasAnsweredPaperQuestion = isPaperStyle && answer !== undefined && answer !== null;
-  const showPaperExplanation = isSubmitted || hasAnsweredPaperQuestion;
+  const isQuickReviewExam = Boolean(
+    exam?.quickReview === true ||
+    exam?.examType === 'quick_review' ||
+    exam?.category === 'quick_review' ||
+    String(exam?.title || '').includes('مراجعة ف السريع') ||
+    String(exam?.title || '').includes('مراجعة في السريع')
+  );
 
-  if (isPaperStyle && question.type !== 'essay') {
-    const isCorrect = answer === question.correctIdx;
-    const isLastQuestion = currentQIndex === displayQuestions.length - 1;
+  const useReferenceTemplate = Boolean(
+    isQuickReviewExam && (
+      exam?.questionVisualTemplate === 'reference-paper' ||
+      exam?.uiTemplate === 'reference-paper' ||
+      exam?.templateDesign === 'reference-paper' ||
+      question?.visualTemplate === 'reference-paper' ||
+      question?.templateDesign === 'reference-paper' ||
+      true
+    )
+  );
+
+  if (useReferenceTemplate && question?.type !== 'essay' && !hasBlockText) {
     return (
-      <div className="flex-1 h-full overflow-y-auto bg-[#130e17] p-2 md:p-6" dir="rtl">
-        <div className="mx-auto max-w-7xl min-h-full rounded-[2.2rem] border-[3px] border-[#d7b45c] bg-[#fff8ea] p-3 md:p-8 shadow-[0_24px_80px_rgba(0,0,0,.45)] relative overflow-hidden">
-          <div className="absolute inset-y-0 right-0 w-2 bg-[#d7b45c] opacity-70" />
-          <div className="absolute inset-y-0 left-0 w-2 bg-[#d7b45c] opacity-70" />
-          <div className="absolute inset-0 pointer-events-none opacity-70" style={{ backgroundImage: 'radial-gradient(circle at 12% 12%, rgba(215,180,92,.22), transparent 22%), radial-gradient(circle at 86% 90%, rgba(155,63,73,.15), transparent 30%), linear-gradient(135deg, rgba(255,255,255,.45), transparent 35%)' }} />
-          <div className="absolute right-4 top-4 h-20 w-20 rounded-full border border-[#d7b45c]/40 opacity-40" />
-          <div className="absolute left-8 bottom-6 h-28 w-28 rounded-full border border-[#b75b77]/30 opacity-30" />
-
-          <div className="relative z-10">
-            <PaperQuestionHeader title={question.paperTitle} />
-
-            <section className="rounded-[2rem] md:rounded-[2.6rem] border-[3px] md:border-4 border-[#b75b77] bg-[#fffdf7]/95 p-4 md:p-8 shadow-[inset_0_0_0_1px_rgba(255,255,255,.75),0_18px_35px_rgba(80,30,40,.12)]">
-              {question.introText && (
-                <div className="mb-5 text-center text-xl md:text-3xl font-black leading-loose text-[#24211f]" style={{ fontFamily: "'Cairo', 'Tajawal', sans-serif" }}>
-                  {String(question.introText || '').split('|').map((part, i, arr) => (
-                    <React.Fragment key={i}>{renderBracketHighlightedText(part.trim())}{i !== arr.length - 1 && <br />}</React.Fragment>
-                  ))}
-                </div>
-              )}
-
-              <div className="mb-5 flex flex-col md:flex-row items-stretch md:items-center gap-3 rounded-[1.6rem] border-2 border-[#1b1b1b] bg-[#f4fbfb] px-3 md:px-5 py-3 md:py-4 shadow-sm">
-                <span className="hidden md:block h-7 w-7 rounded-full bg-[#0d1016] shrink-0" />
-                <div className="flex-1 text-center text-xl md:text-3xl font-black leading-relaxed text-[#a43b43]" style={{ fontFamily: "'Cairo', 'Tajawal', sans-serif" }}>
-                  {String(question.text || question.promptText || question.instruction || 'اختر الإجابة الصحيحة مما يلي.').split('|').map((part, i, arr) => (
-                    <React.Fragment key={i}>{renderBracketHighlightedText(part.trim())}{i !== arr.length - 1 && <br />}</React.Fragment>
-                  ))}
-                </div>
-                <SourceStamp value={question.sourceLabel} />
-              </div>
-
-              <PaperMcqAnswerOptions question={question} answer={answer} isSubmitted={isSubmitted} onAnswer={onAnswer} />
-            </section>
-
-            {showPaperExplanation && (
-              <div className={`mt-6 rounded-[1.6rem] border-2 p-5 md:p-6 shadow-lg ${isCorrect ? 'border-[#159462] bg-[#edfff6] text-[#075238]' : 'border-[#d33f49] bg-[#fff2f2] text-[#781f26]'}`}>
-                <p className="text-xl md:text-2xl font-black mb-2">{isCorrect ? 'إجابة صحيحة 👏' : 'إجابة غير صحيحة'}</p>
-                {!isCorrect && <p className="font-black mb-2">الإجابة الصحيحة: {(question.options || [])[question.correctIdx]}</p>}
-                {question.explanation ? <p className="leading-8 font-bold whitespace-pre-wrap">{question.explanation}</p> : <p className="text-sm opacity-80 font-bold">لا يوجد شرح مضاف لهذا السؤال.</p>}
-              </div>
-            )}
-
-            <div className="mt-7 flex flex-col sm:flex-row justify-between gap-4">
-              <button disabled={currentQIndex === 0} onClick={onPrevious} className="px-7 py-4 rounded-2xl bg-[#fffdf7] text-[#45362d] border-2 border-[#d9cab4] font-black disabled:opacity-40 hover:bg-[#fff6dd] transition shadow-sm flex items-center justify-center gap-2" style={{ fontFamily: "'Cairo', 'Tajawal', sans-serif" }}><ChevronRight size={20} /> السابق</button>
-              <button disabled={!hasAnsweredPaperQuestion && !isSubmitted || isLastQuestion} onClick={onNext} className="group relative overflow-hidden px-9 md:px-12 py-4 rounded-2xl bg-gradient-to-l from-[#7b2b2f] via-[#c77837] to-[#f0bd52] text-white font-black disabled:opacity-40 transition shadow-[0_14px_28px_rgba(167,85,40,.28)] hover:shadow-[0_18px_34px_rgba(167,85,40,.42)] flex items-center justify-center gap-3" style={{ fontFamily: "'Cairo', 'Tajawal', sans-serif" }}>
-                <span className="absolute inset-0 bg-white/20 translate-x-full group-hover:translate-x-0 transition-transform duration-300" />
-                <span className="relative">{isLastQuestion ? 'انتهت الأسئلة' : 'السؤال التالي'}</span><ChevronRight size={22} className="relative rotate-180" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <QuickReviewTemplate
+        question={question}
+        answer={answer}
+        isSubmitted={isSubmitted}
+        onAnswer={onAnswer}
+        currentQIndex={currentQIndex}
+        displayQuestions={displayQuestions}
+        onPrevious={onPrevious}
+        onNext={onNext}
+      />
     );
   }
 

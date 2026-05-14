@@ -83,7 +83,6 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
   const [editFormData, setEditFormData] = useState({ name: '', phone: '', parentPhone: '', grade: '' });
   const [showFocusMode, setShowFocusMode] = useState(false);
   const [preExam, setPreExam] = useState(null);
-  const [examPageTab, setExamPageTab] = useState('all');
   const [scanningHwId, setScanningHwId] = useState(null);
   
   const [subscriptionCodeInput, setSubscriptionCodeInput] = useState('');
@@ -564,8 +563,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
       });
     };
 
-    const isQuickReviewExam = exam.quickReview || exam.source === 'quick_review' || exam.noAccessCode;
-    if (previousResult && !isQuickReviewExam) {
+    if (previousResult) {
         const hasAdminContinueApproval = previousResult.adminDecision === 'continue';
         const hasAdminRestartApproval = previousResult.adminDecision === 'restart';
 
@@ -643,9 +641,8 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
     const now = new Date(); const start = new Date(exam.startTime); const end = new Date(exam.endTime);
     if (now < start) return platformNotify(`الامتحان لم يبدأ بعد. موعد البدء: ${start.toLocaleString('ar-EG')}`);
     if (now > end) return platformNotify("عفواً، انتهى وقت الامتحان.");
-    const noCodeExam = exam.noAccessCode || exam.quickReview || !exam.accessCode;
-    const code = (options.skipCode || noCodeExam) ? exam.accessCode : platformPrompt("أدخل كود الامتحان:");
-    if (options.skipCode || noCodeExam || code === exam.accessCode) {
+    const code = options.skipCode ? exam.accessCode : platformPrompt("أدخل كود الامتحان:");
+    if (options.skipCode || code === exam.accessCode) {
         try {
             const attemptRef = await addDoc(collection(db, 'exam_results'), {
               examId: exam.id,
@@ -1025,19 +1022,14 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
         {activeTab === 'exams' && !isBannedExam && (
           <div className="space-y-6 page-soft-enter">
             <StudentV2SectionTitle badge="الامتحانات" title="مركز الاختبارات" description="اعرف حالة كل امتحان، المحاولات السابقة، والشهادات المتاحة بعد الانتهاء." />
-            <div className="flex flex-wrap gap-3 rounded-3xl border border-slate-100 bg-white/80 p-2 shadow-sm">
-              <button onClick={()=>setExamPageTab('all')} className={`px-5 py-3 rounded-2xl font-black transition ${examPageTab === 'all' ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'}`}>كل الامتحانات</button>
-              <button onClick={()=>setExamPageTab('quick')} className={`px-5 py-3 rounded-2xl font-black transition ${examPageTab === 'quick' ? 'bg-gradient-to-l from-amber-500 to-orange-600 text-white shadow-lg' : 'bg-amber-50 text-amber-700 hover:bg-amber-100'}`}>مراجعة ف السريع</button>
-            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-             {exams.filter((examItem) => examPageTab === 'quick' ? (examItem.quickReview || examItem.source === 'quick_review') : !(examItem.quickReview || examItem.source === 'quick_review')).map(e => {
-                const isQuickReviewCard = e.quickReview || e.source === 'quick_review';
-                const examAttempts = isQuickReviewCard ? [] : examResults.filter(r => r.examId === e.id);
-                const prevResult = isQuickReviewCard ? null : (examAttempts.find(r => ['continue', 'restart'].includes(r.adminDecision))
+             {exams.map(e => {
+                const examAttempts = examResults.filter(r => r.examId === e.id);
+                const prevResult = examAttempts.find(r => ['continue', 'restart'].includes(r.adminDecision))
                   || examAttempts.find(r => ['security_hold', 'in_progress', 'cheated'].includes(r.status))
                   || examAttempts.find(r => r.status === 'completed')
-                  || examAttempts[0]);
-                const isExamTimeOver = isQuickReviewCard || Date.now() > new Date(e.endTime).getTime();
+                  || examAttempts[0];
+                const isExamTimeOver = Date.now() > new Date(e.endTime).getTime();
                 const accessState = getExamAccessState(e);
                 
                 let statusText = null; let statusClass = "";
@@ -1064,7 +1056,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
                     )}
                     
                     <h3 className={`text-lg md:text-xl font-bold mb-2 mt-4 md:mt-0 ${e.isPremium && !isPremium ? 'text-slate-400' : 'text-slate-800'}`}>{e.title}</h3>
-                    <div className="flex justify-between text-xs md:text-sm text-slate-500 mb-4"><span>{(e.quickReview || e.source === 'quick_review') ? 'بدون وقت' : `⏳ ${e.duration} دقيقة`}</span><span>📝 {e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0)} سؤال</span></div>
+                    <div className="flex justify-between text-xs md:text-sm text-slate-500 mb-4"><span>⏳ {e.duration} دقيقة</span><span>📝 {e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0)} سؤال</span></div>
                     
                     {accessState.locked && (
                       <div className="mb-4 bg-blue-50 border border-blue-200 text-blue-800 rounded-xl p-3 text-sm font-bold flex items-start gap-2">
@@ -1110,8 +1102,6 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
                                 <p className="text-xs text-slate-500">يبدأ: {new Date(e.startTime).toLocaleString('ar-EG')}</p>
                                 {e.isPremium && !isPremium ? (
                                     <button onClick={()=>handlePremiumClick(()=>{})} className="w-full bg-slate-200 text-slate-500 py-3 rounded-xl font-bold flex items-center justify-center gap-2 cursor-not-allowed text-sm"><Lock size={16}/> امتحان مقفل (للمشتركين)</button>
-                                ) : e.quickReview || e.noAccessCode ? (
-                                    <button onClick={() => startExamWithCode(e, { skipCode: true })} className="w-full bg-gradient-to-l from-amber-500 to-orange-600 text-white py-2 md:py-3 rounded-xl font-black hover:shadow-xl hover:shadow-amber-300/40 flex items-center justify-center gap-2 shadow-lg transition text-sm"><Sparkles size={16}/> ابدأ المراجعة الآن</button>
                                 ) : (
                                     <button onClick={() => setPreExam(e)} className="w-full bg-slate-900 text-white py-2 md:py-3 rounded-xl font-bold hover:bg-slate-800 flex items-center justify-center gap-2 shadow-lg hover:shadow-slate-500/30 transition text-sm"><Lock size={14}/> صفحة ما قبل الامتحان</button>
                                 )}
