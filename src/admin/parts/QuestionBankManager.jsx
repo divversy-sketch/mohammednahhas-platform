@@ -77,6 +77,39 @@ const labelToIndex = (label = '') => {
   return Math.max(0, safeNumber(normalized, 1) - 1);
 };
 
+
+const normalizeManualOptionLine = (line = '', idx = 0) => {
+  const cleaned = cleanImportedLine(line);
+  const parsed = parseOptionLine(cleaned);
+  if (parsed) {
+    return {
+      text: cleanImportedLine(parsed.text.replace(/\*/g, '')),
+      correct: parsed.correctByLeadingMarker || /\*/.test(parsed.text),
+    };
+  }
+  return {
+    text: cleaned
+      .replace(/^[(\[]?\s*\*\s*[)\]]?\s*/, '')
+      .replace(/^([أابجدهـهوA-Fa-f]|\d+)\s*[\)\].\-:：،]\s*/u, '')
+      .replace(/\*/g, '')
+      .trim(),
+    correct: /^[(\[]?\s*\*\s*[)\]]?/.test(cleaned) || /\*/.test(cleaned),
+  };
+};
+
+const parseManualOptions = (optionsText = '', fallbackCorrectIdx = 0) => {
+  const rows = String(optionsText || '')
+    .split(/\r?\n/)
+    .map((line, idx) => normalizeManualOptionLine(line, idx))
+    .filter((row) => row.text);
+  const starredIndex = rows.findIndex((row) => row.correct);
+  return {
+    options: rows.map((row) => row.text),
+    correctIdx: starredIndex >= 0 ? starredIndex : Math.max(0, safeNumber(fallbackCorrectIdx, 0)),
+    starredIndex,
+  };
+};
+
 const readPlainTextFile = async (file) => file.text();
 
 const readPdfTextFile = async (file) => {
@@ -276,9 +309,12 @@ export const QuestionBankManager = ({ adminGradeFilter, quickReviewMode = false 
 
   const handleAddQuestion = async (e) => {
     e.preventDefault();
-    const options = form.type === 'mcq' ? form.optionsText.split('\n').map(o => o.trim().replace(/\*/g, '')).filter(Boolean) : [];
+    const parsedManual = form.type === 'mcq' ? parseManualOptions(form.optionsText, form.correctIdx) : { options: [], correctIdx: 0, starredIndex: -1 };
+    const options = parsedManual.options;
+    const correctIdx = Math.max(0, Math.min(Math.max(options.length - 1, 0), parsedManual.correctIdx));
     if (!form.text.trim()) return platformNotify('اكتب نص السؤال أولاً');
     if (form.type === 'mcq' && options.length < 2) return platformNotify('أضف اختيارين على الأقل');
+    if (quickReviewMode && form.type === 'mcq' && parsedManual.starredIndex < 0 && String(form.correctIdx || '').trim() === '') return platformNotify('حط علامة * قبل الاختيار الصحيح أو اكتب رقم الإجابة الصحيحة.');
     await addDoc(collection(db, 'question_bank'), {
       text: form.text.trim(),
       grade: form.grade,
@@ -288,8 +324,8 @@ export const QuestionBankManager = ({ adminGradeFilter, quickReviewMode = false 
       type: form.type,
       difficulty: form.difficulty,
       options,
-      correctIdx: starredIndex >= 0 ? starredIndex : safeNumber(form.correctIdx, 0),
-      explanation: form.explanation,
+      correctIdx,
+      explanation: form.explanation.trim(),
       mark: safeNumber(form.mark, form.type === 'essay' ? 10 : 1),
       tags: form.tags.split(',').map(t => t.trim()).filter(Boolean),
       quickReview: Boolean(quickReviewMode),
@@ -299,7 +335,8 @@ export const QuestionBankManager = ({ adminGradeFilter, quickReviewMode = false 
       source: quickReviewMode ? 'quick_review_manual' : 'question_bank_manual',
       createdAt: serverTimestamp()
     });
-    setForm(prev => ({ ...prev, text: '', optionsText: '', explanation: '', tags: '', topic: '' }));
+    setForm(prev => ({ ...prev, text: '', optionsText: '', explanation: '', tags: '', topic: '', correctIdx: 0 }));
+    platformNotify(quickReviewMode ? 'تم حفظ سؤال المراجعة. انشر المراجعة للطلاب من زر النشر.' : 'تم حفظ السؤال بنجاح');
   };
 
   const handleImportFile = async (event) => {
@@ -472,9 +509,9 @@ export const QuestionBankManager = ({ adminGradeFilter, quickReviewMode = false 
             </select>
           </div>
           <textarea className="border p-3 rounded h-24" placeholder="نص السؤال" value={form.text} onChange={e=>setForm({...form, text:e.target.value})}/>
-          {form.type === 'mcq' && <textarea className="border p-3 rounded h-28 font-mono" placeholder={'كل اختيار في سطر منفصل\nمثال:\nنكرة مقصودة\nمضاف\nشبيه بالمضاف'} value={form.optionsText} onChange={e=>setForm({...form, optionsText:e.target.value})}/>}          
+          {form.type === 'mcq' && <textarea className="border p-3 rounded h-28 font-mono" placeholder={'كل اختيار في سطر منفصل، واكتب الحرف ثم الاختيار\nمثال:\nأ) نكرة مقصودة\n* ب) مضاف\nج) شبيه بالمضاف\nد) علم مفرد'} value={form.optionsText} onChange={e=>setForm({...form, optionsText:e.target.value})}/>}          
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {form.type === 'mcq' && <input type="number" min="0" className="border p-3 rounded" placeholder="رقم الإجابة الصحيحة يبدأ من 0" value={form.correctIdx} onChange={e=>setForm({...form, correctIdx:e.target.value})}/>}            
+            {form.type === 'mcq' && <input type="number" min="0" className="border p-3 rounded" placeholder="اختياري: رقم الإجابة الصحيح يبدأ من 0 لو مفيش *" value={form.correctIdx} onChange={e=>setForm({...form, correctIdx:e.target.value})}/>}            
             <input type="number" min="1" className="border p-3 rounded" placeholder="درجة السؤال" value={form.mark} onChange={e=>setForm({...form, mark:e.target.value})}/>
             <input className="border p-3 rounded" placeholder="tags مفصولة بفاصلة" value={form.tags} onChange={e=>setForm({...form, tags:e.target.value})}/>
           </div>

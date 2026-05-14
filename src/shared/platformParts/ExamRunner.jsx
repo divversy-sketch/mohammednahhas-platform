@@ -64,6 +64,13 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
 
   const mcqQuestions = useMemo(() => flatQuestions.filter(q => q.type !== 'essay'), [flatQuestions]);
   const essayQuestions = useMemo(() => flatQuestions.filter(q => q.type === 'essay'), [flatQuestions]);
+  const isQuickReviewExam = Boolean(
+    exam?.quickReview === true ||
+    exam?.examType === 'quick_review' ||
+    exam?.category === 'quick_review' ||
+    String(exam?.title || '').includes('مراجعة ف السريع') ||
+    String(exam?.title || '').includes('مراجعة في السريع')
+  );
 
   useEffect(() => {
     if (isSubmitted) setCurrentQIndex(0);
@@ -578,15 +585,17 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
       />
 
       <div className="flex-1 flex overflow-hidden relative z-50">
-        <ExamQuestionNavigator
-          displayQuestions={displayQuestions}
-          flatQuestions={flatQuestions}
-          answers={answers}
-          flagged={flagged}
-          isSubmitted={isSubmitted}
-          currentQIndex={currentQIndex}
-          onSelectQuestion={setCurrentQIndex}
-        />
+        {!isQuickReviewExam && (
+          <ExamQuestionNavigator
+            displayQuestions={displayQuestions}
+            flatQuestions={flatQuestions}
+            answers={answers}
+            flagged={flagged}
+            isSubmitted={isSubmitted}
+            currentQIndex={currentQIndex}
+            onSelectQuestion={setCurrentQIndex}
+          />
+        )}
 
         <ExamQuestionPanel
           exam={exam}

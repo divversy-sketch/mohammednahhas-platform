@@ -143,10 +143,17 @@ function QuickReviewTemplate({
   const sourceLabel = parts.sourceLabel || String(question?.branch || question?.topic || '').trim() || 'سؤال عام';
   const options = Array.isArray(question?.options) ? question.options : [];
   const letters = ['أ', 'ب', 'ج', 'د', 'هـ', 'و'];
+  const questionLocked = isSubmitted || answer !== undefined;
+  const totalQuestions = displayQuestions?.length || 1;
 
   return (
     <div className="w-full h-full overflow-y-auto bg-[#05070d] p-3 md:p-6">
       <div className="mx-auto max-w-[1200px]">
+        <div className="mb-3 flex items-center justify-center">
+          <div className="rounded-full border border-amber-400/40 bg-black/55 px-5 py-2 text-amber-100 font-black shadow-lg" style={{ fontFamily: 'Cairo, sans-serif' }}>
+            سؤال {currentQIndex + 1} من {totalQuestions}
+          </div>
+        </div>
         <div className="relative w-full aspect-[4/3] bg-center bg-contain bg-no-repeat" style={{ backgroundImage: `url(${templateBg})` }}>
           <div className="absolute inset-0">
             <div className="absolute left-[31.5%] right-[4.8%] top-[23.7%] h-[24.8%] flex items-center justify-center px-[6.2%] text-center">
@@ -169,11 +176,11 @@ function QuickReviewTemplate({
               let lineBorder = 'transparent';
               let lineText = '#30261e';
               let circleBg = '#bb3c2b';
-              if (!isSubmitted && isSelected) {
+              if (!questionLocked && isSelected) {
                 lineBg = 'rgba(255,199,67,0.22)';
                 lineBorder = 'rgba(214,140,0,0.65)';
               }
-              if (isSubmitted) {
+              if (questionLocked) {
                 if (isCorrect) {
                   lineBg = 'rgba(34,197,94,0.18)';
                   lineBorder = 'rgba(22,163,74,0.65)';
@@ -190,10 +197,10 @@ function QuickReviewTemplate({
                 <button
                   key={idx}
                   type="button"
-                  onClick={() => !isSubmitted && onAnswer(question.id, idx)}
+                  onClick={() => !questionLocked && onAnswer(question.id, idx)}
                   className="absolute left-[32%] right-[4.5%] h-[7.2%] rounded-full transition-all duration-200 text-right"
                   style={{ top: `${topBase}%`, background: lineBg, border: `2px solid ${lineBorder}` }}
-                  disabled={isSubmitted}
+                  disabled={questionLocked}
                 >
                   <div className="relative h-full w-full">
                     <div className="absolute inset-y-0 right-[8.5%] left-[3%] flex items-center justify-end">
@@ -212,7 +219,7 @@ function QuickReviewTemplate({
           </div>
         </div>
 
-        {isSubmitted && question?.explanation ? (
+        {questionLocked && question?.explanation ? (
           <div className="mt-6 rounded-[28px] border border-amber-200 bg-[#fff7ea] p-5 md:p-6 shadow-lg">
             <div className="flex items-center gap-2 text-amber-700 font-black text-lg mb-2" style={{ fontFamily: 'Cairo, sans-serif' }}>
               <HelpCircle className="w-5 h-5" /> شرح الإجابة
@@ -221,26 +228,16 @@ function QuickReviewTemplate({
           </div>
         ) : null}
 
-        {isSubmitted ? (
-          <div className="mt-4"><LocalQuestionExplanation question={question} answers={{ [question.id]: answer }} /></div>
-        ) : null}
 
-        <div className="mt-6 flex items-center justify-between gap-3">
-          <button
-            disabled={currentQIndex === 0}
-            onClick={onPrevious}
-            className="px-6 md:px-8 py-3 md:py-4 rounded-2xl bg-white/90 text-slate-800 font-black shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{ fontFamily: 'Cairo, sans-serif' }}
-          >
-            السابق
-          </button>
+
+        <div className="mt-6 flex items-center justify-center gap-3">
           <button
             disabled={currentQIndex === displayQuestions.length - 1}
             onClick={onNext}
-            className="px-7 md:px-10 py-3 md:py-4 rounded-2xl text-white font-black shadow-[0_18px_35px_rgba(246,142,0,0.35)] disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-10 md:px-14 py-3 md:py-4 rounded-2xl text-white font-black shadow-[0_18px_35px_rgba(246,142,0,0.35)] disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ fontFamily: 'Cairo, sans-serif', background: 'linear-gradient(90deg, #f97316 0%, #f59e0b 100%)' }}
           >
-            التالي
+            Next
           </button>
         </div>
       </div>
