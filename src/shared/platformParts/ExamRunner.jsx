@@ -64,13 +64,6 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
 
   const mcqQuestions = useMemo(() => flatQuestions.filter(q => q.type !== 'essay'), [flatQuestions]);
   const essayQuestions = useMemo(() => flatQuestions.filter(q => q.type === 'essay'), [flatQuestions]);
-  const isQuickReviewExam = Boolean(
-    exam?.quickReview === true ||
-    exam?.examType === 'quick_review' ||
-    exam?.category === 'quick_review' ||
-    String(exam?.title || '').includes('مراجعة ف السريع') ||
-    String(exam?.title || '').includes('مراجعة في السريع')
-  );
 
   useEffect(() => {
     if (isSubmitted) setCurrentQIndex(0);
@@ -81,7 +74,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
   }, [isSubmitted, showSubmitConfirm, isCheating, showAntiCheatChoice]);
 
   useEffect(() => {
-    if (isReviewMode || isQuickReviewExam) return;
+    if (isReviewMode) return;
 
     const updatePositions = () => {
       const newPos = [...Array(6)].map(() => ({
@@ -94,7 +87,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
     updatePositions();
     const interval = setInterval(updatePositions, 6000);
     return () => clearInterval(interval);
-  }, [isReviewMode, isQuickReviewExam]);
+  }, [isReviewMode]);
 
   useEffect(() => {
     const restoreBypass = () => {
@@ -292,17 +285,17 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
       document.removeEventListener('keydown', handleExamKeyDown);
       document.removeEventListener('fullscreenchange', handleFullScreenExit);
     };
-  }, [isReviewMode, isQuickReviewExam, mcqQuestions.length, exam.attemptId, exam.id, exam.duration, startTime, user.uid, user.displayName, showAntiCheatChoice]);
+  }, [isReviewMode, mcqQuestions.length, exam.attemptId, exam.id, exam.duration, startTime, user.uid, user.displayName, showAntiCheatChoice]);
 
   useEffect(() => {
-    if (isReviewMode || isQuickReviewExam || isSubmitted) return;
+    if (isReviewMode || isSubmitted) return;
     if (timeLeft > 0 && !isCheating) {
       const timer = setInterval(() => setTimeLeft((p) => p - 1), 1000);
       return () => clearInterval(timer);
     } else if (timeLeft === 0) {
       handleSubmit(true);
     }
-  }, [timeLeft, isSubmitted, isCheating, isReviewMode, isQuickReviewExam]);
+  }, [timeLeft, isSubmitted, isCheating, isReviewMode]);
 
   const handleAnswer = (qId, value) => {
     if (!isReviewMode && !isSubmitted && !showAntiCheatChoice) {
@@ -560,8 +553,8 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-100 flex flex-col font-['Cairo'] no-select" dir="rtl">
-      {!isQuickReviewExam && !isSubmitted && <ExamWatermarkLayer positions={wmPositions} user={user} />}
-      {!isQuickReviewExam && !isSubmitted && <ConnectionStatusBanner isOnline={isOnline} lastLocalSaveAt={lastLocalSaveAt} />}
+      {!isSubmitted && <ExamWatermarkLayer positions={wmPositions} user={user} />}
+      {!isSubmitted && <ConnectionStatusBanner isOnline={isOnline} lastLocalSaveAt={lastLocalSaveAt} />}
 
       {showAntiCheatChoice && <ExamSecurityHoldOverlay onClose={onClose} />}
 
@@ -572,32 +565,28 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
         />
       )}
 
-      {!isQuickReviewExam && (
-        <ExamTopBar
-          exam={exam}
-          isSubmitted={isSubmitted}
-          timeLeft={timeLeft}
-          activeBranchTab={activeBranchTab}
-          uniqueBranches={uniqueBranches}
-          onDashboard={() => setActiveView('dashboard')}
-          onSubmit={confirmSubmit}
-          onBranchChange={setActiveBranchTab}
-          onFullscreen={() => document.documentElement.requestFullscreen?.().catch(() => platformNotify('لو ملء الشاشة لم يعمل، افتح المنصة من المتصفح مباشرة وليس داخل تطبيق خارجي.'))}
-        />
-      )}
+      <ExamTopBar
+        exam={exam}
+        isSubmitted={isSubmitted}
+        timeLeft={timeLeft}
+        activeBranchTab={activeBranchTab}
+        uniqueBranches={uniqueBranches}
+        onDashboard={() => setActiveView('dashboard')}
+        onSubmit={confirmSubmit}
+        onBranchChange={setActiveBranchTab}
+        onFullscreen={() => document.documentElement.requestFullscreen?.().catch(() => platformNotify('لو ملء الشاشة لم يعمل، افتح المنصة من المتصفح مباشرة وليس داخل تطبيق خارجي.'))}
+      />
 
-      <div className={isQuickReviewExam ? "flex-1 flex overflow-hidden relative z-50 bg-[#05070d]" : "flex-1 flex overflow-hidden relative z-50"}>
-        {!isQuickReviewExam && (
-          <ExamQuestionNavigator
-            displayQuestions={displayQuestions}
-            flatQuestions={flatQuestions}
-            answers={answers}
-            flagged={flagged}
-            isSubmitted={isSubmitted}
-            currentQIndex={currentQIndex}
-            onSelectQuestion={setCurrentQIndex}
-          />
-        )}
+      <div className="flex-1 flex overflow-hidden relative z-50">
+        <ExamQuestionNavigator
+          displayQuestions={displayQuestions}
+          flatQuestions={flatQuestions}
+          answers={answers}
+          flagged={flagged}
+          isSubmitted={isSubmitted}
+          currentQIndex={currentQIndex}
+          onSelectQuestion={setCurrentQIndex}
+        />
 
         <ExamQuestionPanel
           exam={exam}

@@ -21,7 +21,6 @@ export const ADMIN_TAB_LABELS = Object.freeze({
   security_center: 'مركز الحماية',
   app_convert: 'تحويل App',
   question_bank: 'بنك الأسئلة',
-  quick_review: 'مراجعة في السريع',
   smart_exam_engine: 'محرك الامتحانات الذكي',
   student_reports: 'تقارير الطلاب',
   student_groups: 'المجموعات والدفعات',
@@ -45,9 +44,9 @@ export const ADMIN_TABS = Object.freeze(Object.entries(ADMIN_TAB_LABELS));
 export const ROLE_TAB_ACCESS = Object.freeze({
   owner: Object.keys(ADMIN_TAB_LABELS),
   manager: Object.keys(ADMIN_TAB_LABELS).filter((tab) => !['admin_roles'].includes(tab)),
-  exams_supervisor: ['dashboard', 'follow_up', 'exams', 'question_bank', 'quick_review', 'smart_exam_engine', 'security_center', 'video_security', 'student_reports', 'mistakes_admin'],
+  exams_supervisor: ['dashboard', 'follow_up', 'exams', 'question_bank', 'smart_exam_engine', 'security_center', 'video_security', 'student_reports', 'mistakes_admin'],
   students_supervisor: ['dashboard', 'follow_up', 'users', 'all_users', 'student_reports', 'student_groups', 'messages_center', 'notifications_admin', 'password_resets'],
-  content_supervisor: ['dashboard', 'content', 'courses', 'assignments', 'smart_hw', 'question_bank', 'quick_review', 'notifications_admin'],
+  content_supervisor: ['dashboard', 'content', 'courses', 'assignments', 'smart_hw', 'question_bank', 'notifications_admin'],
   finance_supervisor: ['dashboard', 'payments', 'subscriptions_legacy', 'finance_dashboard', 'all_users'],
   support: ['dashboard', 'users', 'all_users', 'messages_center', 'password_resets', 'notifications_admin'],
 });

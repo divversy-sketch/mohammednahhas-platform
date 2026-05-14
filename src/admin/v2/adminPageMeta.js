@@ -49,11 +49,6 @@ export const adminPageMeta = {
     title: 'بنك الأسئلة',
     description: 'تنظيم الأسئلة وتحليلها تمهيدًا لاستخدامها داخل الامتحانات الذكية.',
   },
-  quick_review: {
-    eyebrow: 'Quick Review',
-    title: 'مراجعة في السريع',
-    description: 'رفع أسئلة مراجعة سريعة على التصميم الورقي الجاهز ونشرها للطلاب.',
-  },
   assignments: {
     eyebrow: 'Homework Ops',
     title: 'الواجبات والتسليمات',

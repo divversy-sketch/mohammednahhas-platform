@@ -39,66 +39,6 @@ const StudentMessagesInbox = lazy(() => import('../../features/smartLearning/Sma
 const StudentRemediationCenter = lazy(() => import('../../features/smartLearning/SmartLearningEngine.jsx').then((module) => ({ default: module.StudentRemediationCenter })));
 const ExamPreStartPanel = lazy(() => import('../../features/smartLearning/SmartLearningEngine.jsx').then((module) => ({ default: module.ExamPreStartPanel })));
 
-
-function isQuickReviewExamItem(exam = {}) {
-  return Boolean(
-    exam.quickReview === true ||
-    exam.examType === 'quick_review' ||
-    exam.category === 'quick_review' ||
-    String(exam.title || '').includes('مراجعة في السريع') ||
-    String(exam.title || '').includes('مراجعة ف السريع')
-  );
-}
-
-function StudentQuickReviewPanel({ exams = [], userData, onStartExam }) {
-  const studentGrade = userData?.grade || '';
-  const quickReviews = exams
-    .filter((exam) => isQuickReviewExamItem(exam))
-    .filter((exam) => !exam.grade || !studentGrade || exam.grade === studentGrade || exam.grade === 'all')
-    .sort((a, b) => new Date(b.createdAt?.toDate ? b.createdAt.toDate() : b.startTime || 0).getTime() - new Date(a.createdAt?.toDate ? a.createdAt.toDate() : a.startTime || 0).getTime());
-
-  return (
-    <div className="space-y-6 page-soft-enter" dir="rtl">
-      <StudentV2SectionTitle
-        badge="مراجعة سريعة"
-        title="مراجعة في السريع"
-        description="أسئلة قصيرة بنفس التصميم الورقي المرفوع: السؤال في المربع والاختيارات في أماكنها، يعني مفيش بهدلة CSS قبل الامتحان."
-      />
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {quickReviews.map((exam) => (
-          <div key={exam.id} className="bg-white border border-amber-100 rounded-3xl p-5 shadow-sm hover:shadow-lg transition">
-            <div className="flex items-start justify-between gap-3 mb-4">
-              <div>
-                <p className="text-[11px] font-black text-amber-600 bg-amber-50 border border-amber-100 rounded-full px-3 py-1 inline-flex mb-2">{getGradeLabel(exam.grade)}</p>
-                <h3 className="text-lg font-black text-slate-950 leading-7">{exam.title || 'مراجعة في السريع'}</h3>
-              </div>
-              <ClipboardList className="text-amber-600 shrink-0" />
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-xs font-bold text-slate-600 mb-4">
-              <div className="rounded-2xl bg-slate-50 p-3">الأسئلة: {Array.isArray(exam.questions) ? exam.questions.reduce((sum, group) => sum + (group.subQuestions?.length || 0), 0) : 0}</div>
-              <div className="rounded-2xl bg-slate-50 p-3">المدة: {exam.duration || 10} دقيقة</div>
-            </div>
-            <button
-              type="button"
-              onClick={() => onStartExam?.(exam, { skipCode: true })}
-              className="w-full rounded-2xl bg-amber-600 px-5 py-3 font-black text-white shadow-md hover:bg-amber-700 transition"
-            >
-              ابدأ المراجعة الآن
-            </button>
-          </div>
-        ))}
-      </div>
-      {quickReviews.length === 0 && (
-        <div className="bg-white border border-dashed border-amber-200 rounded-3xl p-8 text-center shadow-sm">
-          <Sparkles className="mx-auto mb-3 text-amber-500" size={34} />
-          <h3 className="text-xl font-black text-slate-900 mb-2">لا توجد مراجعات سريعة متاحة حاليًا</h3>
-          <p className="text-sm font-bold text-slate-500">أول ما الأدمن ينشر مراجعة، هتظهر هنا فورًا.</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
 const LazyPanelFallback = () => (
   <div className="rounded-3xl border border-amber-100 bg-white/80 p-6 text-center text-sm font-bold text-amber-700 shadow-sm">
     جاري تحميل الجزء المطلوب...
@@ -712,7 +652,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
               adminDecision: null,
               resumeApproved: false,
               sourceVideoId: options.sourceVideoId || null,
-              startedFromVideo: !!options.sourceVideoId,
+              startedFromVideo: !!options.skipCode,
               submittedAt: serverTimestamp()
             });
             setActiveExam({ ...exam, attemptId: attemptRef.id, sourceVideoId: options.sourceVideoId || null });
@@ -897,8 +837,6 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
               />
             </div>
         )}
-
-          {activeTab === 'quick_review' && !isBannedExam && <StudentQuickReviewPanel exams={exams} userData={userData} onStartExam={startExamWithCode} />}
 
           {activeTab === 'courses' && !isBannedContent && <div className="space-y-6 page-soft-enter"><StudentV2SectionTitle badge="الكورسات" title="مركز الكورسات التعليمية" description="كل الكورسات، المحاضرات المباشرة، والاختبارات المرتبطة في واجهة واحدة." /><StudentLiveClassesPanel userData={userData} /><LazyPanel><StudentCoursesHub user={user} userData={userData} exams={exams} onStartExam={startExamWithCode} /></LazyPanel></div>}
 
