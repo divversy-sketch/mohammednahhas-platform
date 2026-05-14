@@ -284,7 +284,13 @@ const parseQuestionBankLines = (lines, settings) => {
 export const QuestionBankManager = ({ adminGradeFilter, quickReviewMode = false }) => {
   const [questions, setQuestions] = useState([]);
   const [filters, setFilters] = useState({ grade: adminGradeFilter === 'all' ? '' : adminGradeFilter, branch: '', type: '', topic: '', search: '' });
-  const [form, setForm] = useState({ text: '', grade: adminGradeFilter === 'all' ? '3sec' : adminGradeFilter, branch: 'النحو', topic: '', type: 'mcq', difficulty: 'medium', optionsText: '', correctIdx: 0, explanation: '', mark: 1, tags: '' });
+  const [form, setForm] = useState({ text: '', grade: adminGradeFilter === 'all' ? '3sec' : adminGradeFilter, branch: 'النحو', topic: '', type: 'mcq', difficulty: 'medium', optionsText: '', correctIdx: '', explanation: '', mark: 1, tags: '' });
+  const [manualOptions, setManualOptions] = useState([
+    { label: 'أ', text: '', correct: false },
+    { label: 'ب', text: '', correct: false },
+    { label: 'ج', text: '', correct: false },
+    { label: 'د', text: '', correct: false },
+  ]);
   const [importSettings, setImportSettings] = useState({ grade: adminGradeFilter === 'all' ? '3sec' : adminGradeFilter, branchMode: 'auto', branch: 'النحو', difficulty: 'medium', tags: 'استيراد' });
   const [importPreview, setImportPreview] = useState([]);
   const [importWarnings, setImportWarnings] = useState([]);
@@ -307,14 +313,49 @@ export const QuestionBankManager = ({ adminGradeFilter, quickReviewMode = false 
       return () => unsub();
   }, []);
 
+
+  const buildManualOptionsForSave = () => {
+    if (!(quickReviewMode && form.type === 'mcq')) return parseManualOptions(form.optionsText, form.correctIdx);
+    const sourceRows = manualOptions
+      .map((row) => ({ ...row, text: cleanImportedLine(row.text) }))
+      .filter((row) => row.text);
+    const starredRows = sourceRows.map((row) => {
+      const hasStar = /^[(\[]?\s*\*\s*[)\]]?/.test(row.text) || /\*/.test(row.text);
+      return {
+        ...row,
+        text: cleanImportedLine(row.text.replace(/^[(\[]?\s*\*\s*[)\]]?\s*/, '').replace(/\*/g, '')),
+        correct: row.correct || hasStar,
+      };
+    }).filter((row) => row.text);
+    const starredIndex = starredRows.findIndex((row) => row.correct);
+    return {
+      options: starredRows.map((row) => row.text),
+      correctIdx: starredIndex >= 0 ? starredIndex : Math.max(0, safeNumber(form.correctIdx, 0)),
+      starredIndex,
+    };
+  };
+
+  const updateManualOptionText = (idx, value) => {
+    const hasStar = /^[(\[]?\s*\*\s*[)\]]?/.test(value) || /\*/.test(value);
+    const cleanedValue = hasStar ? value.replace(/^[(\[]?\s*\*\s*[)\]]?\s*/, '').replace(/\*/g, '') : value;
+    setManualOptions((prev) => prev.map((row, rowIdx) => rowIdx === idx
+      ? { ...row, text: cleanedValue, correct: hasStar ? true : row.correct }
+      : (hasStar ? { ...row, correct: false } : row)
+    ));
+  };
+
+  const selectManualCorrect = (idx) => {
+    setManualOptions((prev) => prev.map((row, rowIdx) => ({ ...row, correct: rowIdx === idx })));
+  };
+
   const handleAddQuestion = async (e) => {
     e.preventDefault();
-    const parsedManual = form.type === 'mcq' ? parseManualOptions(form.optionsText, form.correctIdx) : { options: [], correctIdx: 0, starredIndex: -1 };
+    const parsedManual = form.type === 'mcq' ? buildManualOptionsForSave() : { options: [], correctIdx: 0, starredIndex: -1 };
     const options = parsedManual.options;
     const correctIdx = Math.max(0, Math.min(Math.max(options.length - 1, 0), parsedManual.correctIdx));
     if (!form.text.trim()) return platformNotify('اكتب نص السؤال أولاً');
-    if (form.type === 'mcq' && options.length < 2) return platformNotify('أضف اختيارين على الأقل');
-    if (quickReviewMode && form.type === 'mcq' && parsedManual.starredIndex < 0 && String(form.correctIdx || '').trim() === '') return platformNotify('حط علامة * قبل الاختيار الصحيح أو اكتب رقم الإجابة الصحيحة.');
+    if (form.type === 'mcq' && options.length < 2) return platformNotify('اكتب نص اختيارين على الأقل، مثل: أ) اختيار / ب) اختيار. الحروف لوحدها مش كفاية يا نجم.');
+    if (quickReviewMode && form.type === 'mcq' && parsedManual.starredIndex < 0 && String(form.correctIdx || '').trim() === '') return platformNotify('حدد الاختيار الصحيح بالنجمة * أو اضغط دائرة الصح بجانب الاختيار.');
     await addDoc(collection(db, 'question_bank'), {
       text: form.text.trim(),
       grade: form.grade,
@@ -335,7 +376,13 @@ export const QuestionBankManager = ({ adminGradeFilter, quickReviewMode = false 
       source: quickReviewMode ? 'quick_review_manual' : 'question_bank_manual',
       createdAt: serverTimestamp()
     });
-    setForm(prev => ({ ...prev, text: '', optionsText: '', explanation: '', tags: '', topic: '', correctIdx: 0 }));
+    setForm(prev => ({ ...prev, text: '', optionsText: '', explanation: '', tags: '', topic: '', correctIdx: '' }));
+    setManualOptions([
+      { label: 'أ', text: '', correct: false },
+      { label: 'ب', text: '', correct: false },
+      { label: 'ج', text: '', correct: false },
+      { label: 'د', text: '', correct: false },
+    ]);
     platformNotify(quickReviewMode ? 'تم حفظ سؤال المراجعة. انشر المراجعة للطلاب من زر النشر.' : 'تم حفظ السؤال بنجاح');
   };
 
@@ -509,9 +556,34 @@ export const QuestionBankManager = ({ adminGradeFilter, quickReviewMode = false 
             </select>
           </div>
           <textarea className="border p-3 rounded h-24" placeholder="نص السؤال" value={form.text} onChange={e=>setForm({...form, text:e.target.value})}/>
-          {form.type === 'mcq' && <textarea className="border p-3 rounded h-28 font-mono" placeholder={'كل اختيار في سطر منفصل، واكتب الحرف ثم الاختيار\nمثال:\nأ) نكرة مقصودة\n* ب) مضاف\nج) شبيه بالمضاف\nد) علم مفرد'} value={form.optionsText} onChange={e=>setForm({...form, optionsText:e.target.value})}/>}          
+          {form.type === 'mcq' && quickReviewMode && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 rounded-2xl border border-indigo-100 bg-white/75 p-3">
+              <div className="md:col-span-2 text-xs text-slate-500 font-bold">
+                اكتب نص الاختيار أمام أ / ب / ج / د. لتحديد الصح: اضغط الدائرة أو اكتب * قبل نص الاختيار، مثال: * الإجابة الصحيحة.
+              </div>
+              {manualOptions.map((row, idx) => (
+                <div key={row.label} className={`flex items-center gap-2 rounded-xl border p-2 ${row.correct ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-white'}`}>
+                  <button type="button" onClick={() => selectManualCorrect(idx)} className={`h-9 w-9 shrink-0 rounded-full border-2 font-black ${row.correct ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-300 text-slate-600'}`} title="تحديد الإجابة الصحيحة">
+                    {row.correct ? '*' : row.label}
+                  </button>
+                  <input
+                    className="min-w-0 flex-1 rounded-lg border border-slate-200 p-3 outline-none focus:border-indigo-400"
+                    placeholder={`${row.label}) نص الاختيار`}
+                    value={row.text}
+                    onChange={(e) => updateManualOptionText(idx, e.target.value)}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+          {form.type === 'mcq' && !quickReviewMode && <textarea className="border p-3 rounded h-28 font-mono" placeholder={`كل اختيار في سطر منفصل، واكتب الحرف ثم الاختيار
+مثال:
+أ) نكرة مقصودة
+* ب) مضاف
+ج) شبيه بالمضاف
+د) علم مفرد`} value={form.optionsText} onChange={e=>setForm({...form, optionsText:e.target.value})}/>}          
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {form.type === 'mcq' && <input type="number" min="0" className="border p-3 rounded" placeholder="اختياري: رقم الإجابة الصحيح يبدأ من 0 لو مفيش *" value={form.correctIdx} onChange={e=>setForm({...form, correctIdx:e.target.value})}/>}            
+            {form.type === 'mcq' && !quickReviewMode && <input type="number" min="0" className="border p-3 rounded" placeholder="اختياري: رقم الإجابة الصحيح يبدأ من 0 لو مفيش *" value={form.correctIdx} onChange={e=>setForm({...form, correctIdx:e.target.value})}/>}            
             <input type="number" min="1" className="border p-3 rounded" placeholder="درجة السؤال" value={form.mark} onChange={e=>setForm({...form, mark:e.target.value})}/>
             <input className="border p-3 rounded" placeholder="tags مفصولة بفاصلة" value={form.tags} onChange={e=>setForm({...form, tags:e.target.value})}/>
           </div>
