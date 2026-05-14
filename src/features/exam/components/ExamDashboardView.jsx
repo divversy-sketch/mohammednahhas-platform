@@ -24,7 +24,8 @@ export default function ExamDashboardView({
   antiCheatWarnings,
   branchStats,
   canReview,
-  setActiveBranchTab
+  setActiveBranchTab,
+  isQuickReview = false
 }) {
   const detailedMetrics = calculateDetailedExamMetrics(exam, answers);
   const performanceInsights = getPerformanceInsights(detailedMetrics);
@@ -39,7 +40,7 @@ export default function ExamDashboardView({
               {isSubmitted ? (
                 <p className="text-lg text-slate-400">الطالب: {user.displayName}</p>
               ) : (
-                <p className="text-amber-400 font-bold">⏳ الوقت المتبقي: {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</p>
+                <p className="text-amber-400 font-bold">{isQuickReview ? 'مراجعة مفتوحة بدون وقت' : `⏳ الوقت المتبقي: ${Math.floor(timeLeft / 60)}:${String(timeLeft % 60).padStart(2, '0')}`}</p>
               )}
             </div>
             <div className="flex items-center gap-3">

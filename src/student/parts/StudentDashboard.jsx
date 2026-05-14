@@ -564,7 +564,8 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
       });
     };
 
-    if (previousResult) {
+    const isQuickReviewExam = exam.quickReview || exam.source === 'quick_review' || exam.noAccessCode;
+    if (previousResult && !isQuickReviewExam) {
         const hasAdminContinueApproval = previousResult.adminDecision === 'continue';
         const hasAdminRestartApproval = previousResult.adminDecision === 'restart';
 
@@ -1030,12 +1031,13 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
              {exams.filter((examItem) => examPageTab === 'quick' ? (examItem.quickReview || examItem.source === 'quick_review') : !(examItem.quickReview || examItem.source === 'quick_review')).map(e => {
-                const examAttempts = examResults.filter(r => r.examId === e.id);
-                const prevResult = examAttempts.find(r => ['continue', 'restart'].includes(r.adminDecision))
+                const isQuickReviewCard = e.quickReview || e.source === 'quick_review';
+                const examAttempts = isQuickReviewCard ? [] : examResults.filter(r => r.examId === e.id);
+                const prevResult = isQuickReviewCard ? null : (examAttempts.find(r => ['continue', 'restart'].includes(r.adminDecision))
                   || examAttempts.find(r => ['security_hold', 'in_progress', 'cheated'].includes(r.status))
                   || examAttempts.find(r => r.status === 'completed')
-                  || examAttempts[0];
-                const isExamTimeOver = Date.now() > new Date(e.endTime).getTime();
+                  || examAttempts[0]);
+                const isExamTimeOver = isQuickReviewCard || Date.now() > new Date(e.endTime).getTime();
                 const accessState = getExamAccessState(e);
                 
                 let statusText = null; let statusClass = "";
@@ -1062,7 +1064,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
                     )}
                     
                     <h3 className={`text-lg md:text-xl font-bold mb-2 mt-4 md:mt-0 ${e.isPremium && !isPremium ? 'text-slate-400' : 'text-slate-800'}`}>{e.title}</h3>
-                    <div className="flex justify-between text-xs md:text-sm text-slate-500 mb-4"><span>⏳ {e.duration} دقيقة</span><span>📝 {e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0)} سؤال</span></div>
+                    <div className="flex justify-between text-xs md:text-sm text-slate-500 mb-4"><span>{(e.quickReview || e.source === 'quick_review') ? 'بدون وقت' : `⏳ ${e.duration} دقيقة`}</span><span>📝 {e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0)} سؤال</span></div>
                     
                     {accessState.locked && (
                       <div className="mb-4 bg-blue-50 border border-blue-200 text-blue-800 rounded-xl p-3 text-sm font-bold flex items-start gap-2">

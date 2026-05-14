@@ -26,9 +26,10 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
   const [currentQIndex, setCurrentQIndex] = useState(0);
   const autosaveKey = makeExamAutosaveKey(user, exam);
   const localExamBackup = readLocalExamBackup(autosaveKey);
+  const isQuickReviewExam = exam.quickReview || exam.source === 'quick_review' || exam.noAccessCode;
   const [answers, setAnswers] = useState(existingResult?.answers || exam.resumeData?.answers || localExamBackup?.answers || {});
   const [flagged, setFlagged] = useState({});
-  const [timeLeft, setTimeLeft] = useState(safeNumber(existingResult?.remainingTime ?? exam.resumeData?.remainingTime ?? localExamBackup?.remainingTime, exam.duration * 60));
+  const [timeLeft, setTimeLeft] = useState(isQuickReviewExam ? 0 : safeNumber(existingResult?.remainingTime ?? exam.resumeData?.remainingTime ?? localExamBackup?.remainingTime, exam.duration * 60));
   const [isCheating, setIsCheating] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(isReviewMode || existingResult !== null);
   const [score, setScore] = useState(existingResult?.score || 0);
@@ -46,7 +47,6 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
   const [securityLockReason, setSecurityLockReason] = useState('');
   const [lastLocalSaveAt, setLastLocalSaveAt] = useState('');
   const isOnline = useOnlineStatus();
-  const isQuickReviewExam = exam.quickReview || exam.source === 'quick_review' || exam.noAccessCode;
 
   const fileDialogBypassRef = useRef(false);
   const antiCheatWarningsRef = useRef(existingResult?.antiCheatWarnings || exam.resumeData?.antiCheatWarnings || 0);
@@ -129,7 +129,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
         answers,
         remainingTime: timeLeft,
         currentQIndex,
-        totalTime: exam.duration,
+        totalTime: isQuickReviewExam ? 0 : exam.duration,
         status: extra.status || 'in_progress',
         antiCheatWarnings: antiCheatWarningsRef.current,
         antiCheatLog,
@@ -155,7 +155,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
     setFlagged({});
     setCurrentQIndex(0);
     setScore(0);
-    setTimeLeft(exam.duration * 60);
+    setTimeLeft(isQuickReviewExam ? 0 : exam.duration * 60);
     const freshStartTime = Date.now();
     setStartTime(freshStartTime);
     setAntiCheatWarnings(0);
@@ -429,7 +429,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
         answers,
         status: 'completed',
         timeTaken,
-        totalTime: exam.duration,
+        totalTime: isQuickReviewExam ? 0 : exam.duration,
         hasEssay: essayQuestions.length > 0,
         sourceVideoId: exam.sourceVideoId || null,
         startedFromVideo: !!exam.sourceVideoId,
@@ -547,6 +547,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
         antiCheatWarnings={antiCheatWarnings}
         branchStats={branchStats}
         canReview={canReview}
+        isQuickReview={isQuickReviewExam}
         setActiveBranchTab={setActiveBranchTab}
       />
     );
