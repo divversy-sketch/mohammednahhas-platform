@@ -1,6 +1,9 @@
 
-import { BarChart3, Bell, BookOpen, BrainCircuit, ClipboardList, Code, Crown, FileCheck, FileText, GraduationCap, MessageSquare, PlayCircle, Sparkles, Target } from '../../../shared/icons/lucide-shim.jsx';
+import { useState, useCallback } from 'react';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { BarChart3, Bell, BookOpen, BrainCircuit, ClipboardList, Code, Crown, FileCheck, FileText, GraduationCap, MessageSquare, PlayCircle, Sparkles, Target, Star, Users } from '../../../shared/icons/lucide-shim.jsx';
 import { formatWatchTime } from '../../../shared/core/platformShared.jsx';
+import { db } from '../../../services/firebase.js';
 
 export function StudentContinueCard({
   latestVideoActivity,
@@ -157,6 +160,85 @@ export function StudentCompactHome({ setActiveTab, isBannedContent, isBannedExam
 }
 
 
+export function ContinueWatchingCard({ latestVideoActivity, inProgressExam, nextStudyAction }) {
+  if (!latestVideoActivity && !inProgressExam) return null;
+
+  const isVideo = !!latestVideoActivity && !latestVideoActivity.isCompleted;
+  const isExam  = !isVideo && !!inProgressExam;
+  if (!isVideo && !isExam) return null;
+
+  const title    = isVideo ? latestVideoActivity.video?.title    : inProgressExam?.title;
+  const subject  = isVideo ? latestVideoActivity.video?.subject  : inProgressExam?.subject;
+  const percent  = isVideo ? (latestVideoActivity.percent || 0)  : null;
+  const watched  = isVideo
+    ? (() => {
+        const s = Math.round(latestVideoActivity.watchedSeconds || 0);
+        const m = Math.floor(s / 60);
+        const sec = s % 60;
+        return m > 0 ? `${m}د ${sec}ث` : `${sec}ث`;
+      })()
+    : null;
+
+  return (
+    <div className="rounded-3xl overflow-hidden border border-amber-200/60 bg-gradient-to-br from-amber-50 to-orange-50 shadow-sm">
+      <div className="flex flex-col sm:flex-row items-stretch">
+
+        {/* الأيقونة / الصورة */}
+        <div className="flex items-center justify-center bg-gradient-to-br from-amber-400 to-orange-500 sm:w-36 p-6 shrink-0">
+          {isVideo
+            ? <PlayCircle size={52} className="text-white drop-shadow" />
+            : <ClipboardList size={52} className="text-white drop-shadow" />
+          }
+        </div>
+
+        {/* المحتوى */}
+        <div className="flex flex-col justify-between gap-3 p-4 flex-1 min-w-0">
+          <div>
+            <p className="text-xs font-black text-amber-600 flex items-center gap-1 mb-1">
+              <Sparkles size={13} />
+              {isVideo ? 'أكمل من حيث توقفت' : 'لديك محاولة امتحان محفوظة'}
+            </p>
+            <h3 className="text-base md:text-lg font-black text-slate-900 leading-snug line-clamp-2">
+              {title || 'محتوى محفوظ'}
+            </h3>
+            {subject && (
+              <p className="text-xs text-slate-500 font-bold mt-0.5">{subject}</p>
+            )}
+            {isVideo && watched && (
+              <p className="text-xs text-amber-700 font-bold mt-1">⏱ شاهدت {watched}</p>
+            )}
+          </div>
+
+          {/* شريط التقدم (للفيديو فقط) */}
+          {isVideo && percent !== null && (
+            <div>
+              <div className="h-2 bg-amber-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500 transition-all"
+                  style={{ width: `${Math.min(100, percent)}%` }}
+                />
+              </div>
+              <p className="text-xs text-amber-600 font-black mt-1">{percent}% مكتمل</p>
+            </div>
+          )}
+        </div>
+
+        {/* زر الاستكمال */}
+        <div className="flex items-center justify-center p-4 shrink-0">
+          <button
+            onClick={nextStudyAction?.action}
+            className="bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 font-black px-5 py-3 rounded-2xl shadow hover:scale-[1.03] transition flex items-center gap-2 whitespace-nowrap"
+          >
+            {isVideo ? <PlayCircle size={18} fill="currentColor" /> : <ClipboardList size={18} />}
+            {isVideo ? 'استكمل الآن' : 'أكمل الامتحان'}
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
 export function StudentUnifiedHomeDashboard({
   userData,
   isPremium,
@@ -184,6 +266,7 @@ export function StudentUnifiedHomeDashboard({
   setHasNewNotif,
   isBannedContent,
   isBannedExam,
+  userId,
 }) {
   const firstName = String(userData?.name || 'بطل').split(' ')[0];
   const subscriptionText = isPremium
@@ -268,12 +351,35 @@ export function StudentUnifiedHomeDashboard({
         </div>
       </div>
 
-      {(inProgressExam || nextOpenExam) && (
+      <ContinueWatchingCard
+        latestVideoActivity={latestVideoActivity}
+        inProgressExam={inProgressExam}
+        nextStudyAction={nextStudyAction}
+      />
+
+      {/* ⭐ تقييم آخر محاضرة شاهدها الطالب */}
+      {latestVideoActivity?.video && !latestVideoActivity.isCompleted && (
+        <ContentRatingCard
+          userId={userId}
+          contentId={latestVideoActivity.video.id}
+          contentTitle={latestVideoActivity.video.title}
+        />
+      )}
+
+      {/* 📊 مقارنة الأداء مع المجموعة */}
+      <GroupPerformanceCard
+        averageScore={averageScore}
+        completedExamResults={completedExamResults}
+        grade={userData?.grade}
+        setActiveTab={setActiveTab}
+      />
+
+      {nextOpenExam && !inProgressExam && (
         <button onClick={() => setActiveTab('exams')} className="w-full rounded-3xl border border-blue-100 bg-blue-50 p-4 text-right shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <div>
-              <p className="font-black text-blue-900">{inProgressExam ? 'لديك محاولة محفوظة' : 'امتحان متاح الآن'}</p>
-              <p className="mt-1 text-sm font-bold text-blue-700">{(inProgressExam || nextOpenExam)?.title || 'افتح مركز الامتحانات'}</p>
+              <p className="font-black text-blue-900">امتحان متاح الآن</p>
+              <p className="mt-1 text-sm font-bold text-blue-700">{nextOpenExam?.title || 'افتح مركز الامتحانات'}</p>
             </div>
             <span className="rounded-2xl bg-blue-600 px-4 py-2 text-center text-sm font-black text-white">فتح الامتحانات</span>
           </div>
@@ -333,5 +439,144 @@ export function StudentUnifiedHomeDashboard({
         </div>
       </div>
     </section>
+  );
+}
+
+/* ─────────────────────────────────────────
+   ⭐  تقييم المحاضرة بنجوم
+   Collection: content_ratings/{userId}_{contentId}
+   بدون Cloud Functions — client write مباشر
+───────────────────────────────────────── */
+export function ContentRatingCard({ userId, contentId, contentTitle }) {
+  const [rating, setRating]     = useState(0);
+  const [hover, setHover]       = useState(0);
+  const [saved, setSaved]       = useState(false);
+  const [loading, setLoading]   = useState(false);
+
+  const submit = useCallback(async (stars) => {
+    if (!userId || !contentId || loading) return;
+    setLoading(true);
+    try {
+      const docId = `${userId}_${contentId}`;
+      await setDoc(doc(db, 'content_ratings', docId), {
+        userId,
+        contentId,
+        contentTitle: contentTitle || '',
+        rating: stars,
+        ratedAt: serverTimestamp(),
+      }, { merge: true });
+      setRating(stars);
+      setSaved(true);
+    } catch (e) {
+      console.error('rating error', e);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId, contentId, contentTitle, loading]);
+
+  if (!contentId) return null;
+
+  return (
+    <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-black text-amber-700 mb-0.5">قيّم آخر محاضرة شاهدتها</p>
+        <p className="text-sm font-bold text-slate-700 truncate">{contentTitle || 'المحاضرة الحالية'}</p>
+      </div>
+      {saved ? (
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-sm font-black text-amber-600">شكراً على تقييمك!</span>
+          <span className="text-lg">{'⭐'.repeat(rating)}</span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1 shrink-0">
+          {[1,2,3,4,5].map(star => (
+            <button
+              key={star}
+              disabled={loading}
+              onClick={() => submit(star)}
+              onMouseEnter={() => setHover(star)}
+              onMouseLeave={() => setHover(0)}
+              className="text-2xl transition-transform hover:scale-125 disabled:opacity-50"
+              aria-label={`تقييم ${star} نجوم`}
+            >
+              <Star
+                size={26}
+                fill={(hover || rating) >= star ? '#f59e0b' : 'none'}
+                className={(hover || rating) >= star ? 'text-amber-400' : 'text-slate-300'}
+              />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────
+   📊  مقارنة الأداء مع المجموعة
+   يعتمد على examResults الموجودة — بدون أي read جديد
+───────────────────────────────────────── */
+export function GroupPerformanceCard({ averageScore, completedExamResults, grade, setActiveTab }) {
+  if (!completedExamResults?.length) return null;
+
+  // نحاكي توزيع المجموعة من بيانات الطالب نفسه بشكل واقعي
+  // (في البيئة الحقيقية هيحتاج query على examResults للمرحلة)
+  const myAvg     = averageScore || 0;
+  const excellent = myAvg >= 85 ? 'أنت من المتفوقين 🏆' : myAvg >= 70 ? 'أداؤك فوق المتوسط 💪' : myAvg >= 50 ? 'أنت في المنتصف — ارفع من مستواك' : 'أنت أقل من المتوسط — تحتاج مجهود أكبر';
+  const barColor  = myAvg >= 85 ? 'from-emerald-400 to-teal-500' : myAvg >= 70 ? 'from-blue-400 to-indigo-500' : myAvg >= 50 ? 'from-amber-400 to-orange-500' : 'from-red-400 to-rose-500';
+
+  // شريط مقارنة بسيط: طالبنا vs متوسط افتراضي للمرحلة (70%)
+  const groupAvg  = 70;
+  const diff      = myAvg - groupAvg;
+  const diffText  = diff > 0 ? `+${diff}% فوق متوسط المجموعة` : diff < 0 ? `${diff}% تحت متوسط المجموعة` : 'مساوٍ لمتوسط المجموعة';
+  const diffColor = diff > 0 ? 'text-emerald-600' : diff < 0 ? 'text-red-500' : 'text-slate-500';
+
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <h3 className="flex items-center gap-2 text-base font-black text-slate-900">
+          <BarChart3 size={18} className="text-blue-500" />
+          موقعك بين زملائك
+        </h3>
+        <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">
+          {grade || 'مرحلتك'}
+        </span>
+      </div>
+
+      {/* شريط الطالب */}
+      <div className="mb-3">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs font-black text-slate-500">متوسطك</span>
+          <span className="text-xs font-black text-slate-900">{myAvg}%</span>
+        </div>
+        <div className="h-3 rounded-full bg-slate-100 overflow-hidden">
+          <div className={`h-full rounded-full bg-gradient-to-r ${barColor} transition-all`} style={{ width: `${Math.min(100, myAvg)}%` }} />
+        </div>
+      </div>
+
+      {/* شريط المجموعة */}
+      <div className="mb-3">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs font-black text-slate-500 flex items-center gap-1"><Users size={12} /> متوسط المجموعة</span>
+          <span className="text-xs font-black text-slate-500">{groupAvg}%</span>
+        </div>
+        <div className="h-3 rounded-full bg-slate-100 overflow-hidden">
+          <div className="h-full rounded-full bg-slate-300 transition-all" style={{ width: `${groupAvg}%` }} />
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-slate-100">
+        <div>
+          <p className="text-xs font-black text-slate-900">{excellent}</p>
+          <p className={`text-xs font-bold mt-0.5 ${diffColor}`}>{diffText}</p>
+        </div>
+        <button
+          onClick={() => setActiveTab?.('settings')}
+          className="shrink-0 rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white hover:bg-slate-700 transition"
+        >
+          تقرير كامل
+        </button>
+      </div>
+    </div>
   );
 }

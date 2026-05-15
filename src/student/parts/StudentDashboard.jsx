@@ -733,6 +733,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
             setHasNewNotif={setHasNewNotif}
             isBannedContent={isBannedContent}
             isBannedExam={isBannedExam}
+            userId={user?.uid}
           />
         )}
 

@@ -27,4 +27,5 @@ export const COLLECTIONS = Object.freeze({
   NOTIFICATIONS: 'notifications',
   PASSWORD_RESET_REQUESTS: 'password_reset_requests',
   EXAM_ACCESS_OVERRIDES: 'exam_access_overrides',
+  CONTENT_RATINGS: 'content_ratings',
 });
