@@ -694,7 +694,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
         isPremium={isPremium}
       />
 
-      <main className="v2-student-main p-4 md:p-8 lg:p-10 relative z-10 min-h-screen w-full transition-all mx-auto">
+      <main className="v2-student-main relative z-10">
         <StudentV2Topbar
           installPrompt={installPrompt}
           setShowFocusMode={setShowFocusMode}
@@ -704,6 +704,8 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
           subscriptionExpiry={userData?.subscriptionExpiry}
           setMobileMenu={setMobileMenu}
         />
+
+        <div className="nh-page-body">
 
         {activeTab === 'home' && (
           <StudentUnifiedHomeDashboard
@@ -1176,6 +1178,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
                 </div>
               </div>
         )}
+        </div>
       </main>
       {preExam && (
         <LazyPanel>
