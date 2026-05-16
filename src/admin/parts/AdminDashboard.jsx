@@ -22,6 +22,7 @@ import { useAdminDashboardData } from '../hooks/useAdminDashboardData.js';
 import AdminHeader from '../components/AdminHeader.jsx';
 import AdminSidebar from '../components/AdminSidebar.jsx';
 import AdminLazyFallback from '../dashboard/AdminLazyFallback.jsx';
+import { NeonAdminChrome } from '../../features/premium/NeonLearningOS.jsx';
 
 
 import { adminSecureFunctions } from '../services/adminSecureFunctions.js';
@@ -1411,23 +1412,18 @@ export const AdminDashboard = ({ user, adminProfile }) => {
   };
 
   return (
-    <div className="v2-admin-shell font-['Cairo'] relative overflow-x-hidden" dir="rtl">
+    <div className="neo-os neo-admin-shell-root font-['Cairo'] relative overflow-x-hidden" dir="rtl">
       <DebugPanel user={user} />
-      <FloatingArabicBackground />
 
       <Suspense fallback={<AdminLazyFallback />}>
         <AdminDashboardModals ctx={dashboardContext} />
       </Suspense>
 
-      <AdminHeader adminGradeFilter={adminGradeFilter} setAdminGradeFilter={setAdminGradeFilter} />
-
-      <div className="v2-admin-grid grid grid-cols-1 gap-5 p-4 md:p-6 relative z-10">
-        <AdminSidebar activeTab={activeTab} setActiveTab={setActiveTab} adminProfile={adminProfile} />
-
+      <NeonAdminChrome activeTab={activeTab} setActiveTab={setActiveTab} adminProfile={adminProfile} userData={userData}>
         <Suspense fallback={<AdminLazyFallback />}>
           <AdminDashboardTabs ctx={dashboardContext} />
         </Suspense>
-      </div>
+      </NeonAdminChrome>
     </div>
   );
 };
