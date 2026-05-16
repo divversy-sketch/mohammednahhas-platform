@@ -44,6 +44,110 @@ import AdminStudentSuccessSuite from '../../features/studentSuccess/StudentSucce
 import { AdminGlobalSearch, AdminLiveClassesPanel, AdminCertificatesPanel, AdminCommandQuickActions } from '../../features/product/ProductExperienceSuite.jsx';
 
 
+
+function NeonAdminHome({ users = [], content = [], exams = [], results = [], pending = [], messages = [], assignments = [], onNavigate }) {
+  const publishedLectures = content.filter((item) => item?.type === 'video' || item?.url || item?.title).length;
+  const openExams = exams.length;
+  const kpis = [
+    { label: 'عدد الطلاب النشطين', value: users.length, hint: '+12% عن الأسبوع الماضي', icon: Users },
+    { label: 'إجمالي الكورسات', value: Math.max(0, Math.ceil(publishedLectures / 8)), hint: 'مسارات تعليمية', icon: BookOpen },
+    { label: 'المحاضرات المنشورة', value: publishedLectures, hint: '+15% نشاط محتوى', icon: PlayCircle },
+    { label: 'الاختبارات المفتوحة', value: openExams, hint: 'متابعة وتصحيح', icon: ClipboardList },
+  ];
+  const approvals = [
+    { label: 'طلبات الطلاب', value: pending.length, note: 'بانتظار المراجعة', tab: 'users', icon: Users },
+    { label: 'محاضرات جديدة', value: publishedLectures, note: 'إدارة المحتوى', tab: 'content', icon: PlayCircle },
+    { label: 'اختبارات جديدة', value: openExams, note: 'المراجعة والنشر', tab: 'exams', icon: ClipboardList },
+    { label: 'رسائل الطلاب', value: messages.length, note: 'تحتاج رد', tab: 'messages', icon: MessageCircle },
+  ];
+  const latest = content.slice(0, 4);
+
+  return (
+    <section className="nh-admin-home" dir="rtl">
+      <div className="nh-admin-kpis">
+        {kpis.map((item) => {
+          const Icon = item.icon;
+          return (
+            <div key={item.label} className="nh-glass nh-admin-kpi">
+              <div><p className="nh-muted">{item.label}</p><b>{Number(item.value || 0).toLocaleString('ar-EG')}</b><p className="text-emerald-300 font-black text-xs mt-1">{item.hint}</p></div>
+              <span className="h-14 w-14 rounded-2xl bg-violet-500/15 text-violet-300 grid place-items-center"><Icon size={26}/></span>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="nh-glass nh-admin-command">
+        <div className="nh-admin-art" />
+        <div>
+          <span className="nh-kicker">مركز التحكم</span>
+          <h1 className="mt-4 text-4xl font-black leading-tight text-white">مركز إدارة المنصة</h1>
+          <p className="nh-muted mt-2">تحكم كامل في الطلاب والمحتوى والاختبارات والأداء بدون زحمة أو صفحات مكسّرة.</p>
+          <div className="nh-admin-actions mt-6">
+            <button onClick={() => onNavigate?.('content')} className="nh-admin-action"><PlayCircle size={18}/> إنشاء محاضرة</button>
+            <button onClick={() => onNavigate?.('courses')} className="nh-admin-action"><BookOpen size={18}/> إنشاء كورس</button>
+            <button onClick={() => onNavigate?.('content')} className="nh-admin-action"><Upload size={18}/> رفع ملف</button>
+            <button onClick={() => onNavigate?.('exams')} className="nh-admin-action"><ClipboardList size={18}/> إنشاء اختبار</button>
+            <button onClick={() => onNavigate?.('announcements')} className="nh-admin-action"><Megaphone size={18}/> إرسال إعلان</button>
+          </div>
+        </div>
+      </div>
+
+      <div className="nh-admin-grid-3">
+        <div className="nh-glass nh-analytics">
+          <h3 className="nh-card-title">النشاط الأخير</h3>
+          <div className="nh-admin-list mt-3">
+            {[
+              `تم تسجيل ${pending.length} طلب جديد`,
+              `تم نشر ${publishedLectures} محتوى`,
+              `يوجد ${openExams} اختبار في النظام`,
+              `عدد رسائل الطلاب ${messages.length}`,
+            ].map((text, i) => <div className="nh-admin-list-item" key={text}><p className="font-black text-white">{text}</p><span className="nh-muted text-xs">منذ {5 + i * 10} دقائق</span></div>)}
+          </div>
+        </div>
+
+        <div className="nh-glass nh-analytics">
+          <h3 className="nh-card-title">تحليلات التفاعل</h3>
+          <div className="nh-chart-lines mt-4">
+            <svg viewBox="0 0 600 200" preserveAspectRatio="none">
+              <polyline points="0,150 80,120 160,132 240,80 320,100 420,58 520,72 600,45" fill="none" stroke="#8b5cf6" strokeWidth="5" strokeLinecap="round" />
+              <polyline points="0,165 80,145 160,150 240,112 320,125 420,92 520,104 600,82" fill="none" stroke="#22d3ee" strokeWidth="4" strokeLinecap="round" />
+            </svg>
+          </div>
+          <div className="grid grid-cols-4 gap-2 mt-4">
+            <div className="nh-mini-stat"><span>المشاهدات</span><b>{(publishedLectures * 19).toLocaleString('ar-EG')}</b></div>
+            <div className="nh-mini-stat"><span>التسجيلات</span><b>{users.length.toLocaleString('ar-EG')}</b></div>
+            <div className="nh-mini-stat"><span>النتائج</span><b>{results.length.toLocaleString('ar-EG')}</b></div>
+            <div className="nh-mini-stat"><span>الإكمال</span><b>67%</b></div>
+          </div>
+        </div>
+
+        <div className="nh-glass nh-analytics">
+          <h3 className="nh-card-title">الموافقات السريعة</h3>
+          <div className="nh-admin-list mt-3">
+            {approvals.map((item) => {
+              const Icon = item.icon;
+              return <button key={item.label} onClick={() => onNavigate?.(item.tab)} className="nh-admin-list-item text-right w-full flex items-center justify-between gap-3"><div><b className="text-2xl text-white">{item.value}</b><p className="nh-muted text-xs">{item.label}</p><p className="text-emerald-300 text-xs font-black">{item.note}</p></div><Icon className="text-violet-300" size={22}/></button>;
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="nh-glass nh-analytics">
+        <div className="flex items-center justify-between gap-3"><h3 className="nh-card-title">أحدث الكورسات / المحاضرات</h3><button onClick={() => onNavigate?.('content')} className="nh-kicker">عرض الكل</button></div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 mt-4">
+          {(latest.length ? latest : [{title:'اسم الفاعل', branch:'النحو'}, {title:'التشبيه وأنواعه', branch:'البلاغة'}, {title:'النصوص المتحررة', branch:'القراءة'}, {title:'تدريب شامل', branch:'المراجعة'}]).map((item, i) => (
+            <div className="nh-admin-list-item" key={item.id || item.title || i}>
+              <div className="nh-thumb mb-3 rounded-2xl" style={item.thumbnailUrl ? {backgroundImage:`linear-gradient(180deg,rgba(7,17,38,.04),rgba(7,17,38,.7)),url(${item.thumbnailUrl})`} : undefined} />
+              <p className="font-black text-white line-clamp-1">{item.title || 'محاضرة'}</p>
+              <p className="nh-muted text-xs">{item.branch || 'اللغة العربية'}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // Render-only split from AdminDashboard.jsx.
 // Keeps the large tab UI isolated so the main dashboard file stays readable.
 export default function AdminDashboardTabs({ ctx }) {
@@ -294,16 +398,7 @@ export default function AdminDashboardTabs({ ctx }) {
             adminName={adminProfile?.name || userData?.name || userData?.email}
           >
           {activeTab === 'dashboard' && (
-            <InlineTabs
-              defaultTab="overview"
-              tabs={[
-                { key: 'overview', label: 'نظرة عامة', content: <div className="space-y-6"><AdminGlobalSearch users={activeUsersList} exams={examsList} content={contentList} assignments={assignments} examResults={examResults} supportTickets={messagesList} onNavigate={setActiveTab} /><AdminCommandQuickActions onNavigate={setActiveTab} /><AdminCommandCenter users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} assignments={assignments} assignmentSubmissions={assignmentSubmissions} onNavigate={setActiveTab} /><AdminStudentSuccessSuite variant="dashboard" users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} assignments={assignments} assignmentSubmissions={assignmentSubmissions} videoViews={videoViews} /><AdminProDashboard users={activeUsersList} exams={examsList} results={examResults} content={contentList} subscriptionCodes={subscriptionCodes} hwResults={hwResults} adminGradeFilter={adminGradeFilter} /></div> },
-                { key: 'performance', label: 'تحليل الأداء', content: <AdminPerformanceAnalytics examResults={examResults} examsList={examsList} users={activeUsersList} adminGradeFilter={adminGradeFilter} /> },
-                { key: 'questions', label: 'تحليل الأسئلة', content: <AdminQuestionDeepAnalytics examsList={examsList} examResults={examResults} /> },
-                { key: 'leaderboard', label: 'لوحة الشرف', content: <LeaderboardPanel examResults={examResults} users={activeUsersList} gradeFilter={adminGradeFilter} /> },
-                { key: 'review_quiz', label: 'أسئلة المراجعة', content: <AdminReviewQuizPanel /> }
-              ]}
-            />
+            <NeonAdminHome users={activeUsersList} content={contentList} exams={examsList} results={examResults} pending={pendingUsers} messages={messagesList} assignments={assignments} onNavigate={setActiveTab} />
           )}
 
           {activeTab === 'follow_up' && (

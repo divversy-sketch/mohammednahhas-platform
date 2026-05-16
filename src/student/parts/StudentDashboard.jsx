@@ -26,7 +26,6 @@ import StudentAssignmentsPanel from '../../admin/parts/StudentAssignmentsPanel.j
 import StudentSuccessPanel from '../../features/studentSuccess/StudentSuccessPanel.jsx';
 import { imagePlacementStyle } from '../../shared/utils/imagePlacement.js';
 import { StudentLiveClassesPanel, StudentExamReviewCenter, StudentCertificatePanel } from '../../features/product/ProductExperienceSuite.jsx';
-import { NeonStudentChrome, NeonStudentHome } from '../../features/premium/NeonLearningOS.jsx';
 import { StudentReviewQuiz } from '../../features/review/ReviewQuizSystem.jsx';
 
 
@@ -664,11 +663,13 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
 
   return (
     <LazyPanel>
-    <div className="neo-os neo-student-shell relative font-['Cairo'] min-h-screen block" dir="rtl">
+    <div className="v2-student-shell relative font-['Cairo'] min-h-screen block" dir="rtl">
 
+      <MobileStudentBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
       {playingVideo && <LazyPanel><SecureVideoPlayer video={playingVideo} user={user} userName={userData?.name} onClose={() => setPlayingVideo(null)} onProgress={handleVideoProgress} /></LazyPanel>}
       {playingHtml && <LazyPanel><InteractiveViewer content={playingHtml} user={userData} onClose={() => setPlayingHtml(null)} /></LazyPanel>}
       {/* النظام امتحانات الطلاب متوقفة مؤقتًا  */}
+      <FloatingArabicBackground />
       <PWAInstallBox installPrompt={installPrompt} />
       {showNotifications && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setShowNotifications(false)}>
@@ -681,30 +682,61 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
         </div>
       )}
       
-      <NeonStudentChrome
+      <StudentV2Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        userData={userData}
+        mobileMenu={mobileMenu}
+        setMobileMenu={setMobileMenu}
+        setLearningHubTab={setLearningHubTab}
+        isBannedContent={isBannedContent}
+        isBannedExam={isBannedExam}
+        auth={auth}
+        studentName={userData?.name}
         isPremium={isPremium}
-        unseenNotificationCount={unseenNotificationCount}
-        setShowNotifications={setShowNotifications}
-      >
+      />
 
-        <div className="neo-page-content">
+      <main className="v2-student-main relative z-10">
+        <StudentV2Topbar
+          installPrompt={installPrompt}
+          setShowFocusMode={setShowFocusMode}
+          setShowNotifications={setShowNotifications}
+          unseenNotificationCount={unseenNotificationCount}
+          isPremium={isPremium}
+          subscriptionExpiry={userData?.subscriptionExpiry}
+          setMobileMenu={setMobileMenu}
+        />
+
+        <div className="nh-page-body">
 
         {activeTab === 'home' && (
-          <NeonStudentHome
+          <StudentUnifiedHomeDashboard
             userData={userData}
+            isPremium={isPremium}
+            nextStudyAction={nextStudyAction}
+            latestVideoActivity={latestVideoActivity}
+            inProgressExam={inProgressExam}
+            nextOpenExam={nextOpenExam}
+            pendingAssignments={pendingAssignments}
+            pendingAssignmentsCount={pendingAssignmentsCount}
+            videoCompletionPercent={videoCompletionPercent}
+            completedVideoCount={completedVideoCount}
             videos={videos}
             exams={exams}
             filesAndLinks={filesAndLinks}
-            nextStudyAction={nextStudyAction}
-            latestVideoActivity={latestVideoActivity}
-            pendingAssignmentsCount={pendingAssignmentsCount}
-            videoCompletionPercent={videoCompletionPercent}
+            htmls={htmls}
+            completedExamResults={completedExamResults}
             averageScore={averageScore}
+            examResults={examResults}
+            subscriptionDaysLeft={subscriptionDaysLeft}
+            smartWeakBranches={smartWeakBranches}
+            recentNotificationItems={recentNotificationItems}
+            unseenNotificationCount={unseenNotificationCount}
             setActiveTab={setActiveTab}
-            onPlayVideo={(video) => handlePremiumClick(() => setPlayingVideo(video))}
+            setShowNotifications={setShowNotifications}
+            setHasNewNotif={setHasNewNotif}
+            isBannedContent={isBannedContent}
+            isBannedExam={isBannedExam}
+            userId={user?.uid}
           />
         )}
 
@@ -1152,7 +1184,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
               </div>
         )}
         </div>
-      </NeonStudentChrome>
+      </main>
       {preExam && (
         <LazyPanel>
         <ExamPreStartPanel
