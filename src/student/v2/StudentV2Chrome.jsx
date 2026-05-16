@@ -26,6 +26,7 @@ const NAV_GROUPS = [
       { tab: 'remediation',   label: 'العلاج الذكي',         icon: BrainCircuit  },
       { tab: 'files',         label: 'الملفات',              icon: FileText      },
       { tab: 'htmls',         label: 'محتوى تفاعلي',         icon: Code          },
+      { tab: 'review_quiz',   label: 'مراجعة سريعة',         icon: ClipboardList },
     ],
   },
   {

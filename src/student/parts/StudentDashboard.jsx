@@ -26,6 +26,7 @@ import StudentAssignmentsPanel from '../../admin/parts/StudentAssignmentsPanel.j
 import StudentSuccessPanel from '../../features/studentSuccess/StudentSuccessPanel.jsx';
 import { imagePlacementStyle } from '../../shared/utils/imagePlacement.js';
 import { StudentLiveClassesPanel, StudentExamReviewCenter, StudentCertificatePanel } from '../../features/product/ProductExperienceSuite.jsx';
+import { StudentReviewQuiz } from '../../features/review/ReviewQuizSystem.jsx';
 
 
 const SecureVideoPlayer = lazy(() => import('../../features/lectures/SecureVideoPlayer'));
@@ -842,6 +843,10 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
         )}
 
           {activeTab === 'courses' && !isBannedContent && <div className="space-y-6 page-soft-enter"><StudentV2SectionTitle badge="الكورسات" title="مركز الكورسات التعليمية" description="كل الكورسات، المحاضرات المباشرة، والاختبارات المرتبطة في واجهة واحدة." /><StudentLiveClassesPanel userData={userData} /><LazyPanel><StudentCoursesHub user={user} userData={userData} exams={exams} onStartExam={startExamWithCode} /></LazyPanel></div>}
+
+          {activeTab === 'review_quiz' && (
+            <StudentReviewQuiz userData={userData} />
+          )}
 
           {activeTab === 'learning_path' && !isBannedContent && (
             <StudentLearningPath
