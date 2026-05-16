@@ -20,6 +20,7 @@ import { platformNotify, platformPrompt, generatePDF, safeNumber, getResultPerce
 import PerformanceOverview from './PerformanceOverview.jsx';
 import { useStudentDashboardData } from '../hooks/useStudentDashboardData.js';
 import { StudentUnifiedHomeDashboard } from '../components/home/StudentHomeCards.jsx';
+import { PremiumStudentHome, PremiumLecturesPage, PremiumCoursesPage, PremiumExamsPage, PremiumAssignmentsFilesPage, PremiumPerformancePage } from '../premium/StudentPremiumExperience.jsx';
 import { LearningHubTabs } from '../components/layout/StudentLayoutParts.jsx';
 import { StudentV2SectionTitle, StudentV2Sidebar, StudentV2Topbar } from '../v2/StudentV2Chrome.jsx';
 import StudentAssignmentsPanel from '../../admin/parts/StudentAssignmentsPanel.jsx';
@@ -704,41 +705,32 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
           isPremium={isPremium}
           subscriptionExpiry={userData?.subscriptionExpiry}
           setMobileMenu={setMobileMenu}
+          studentName={userData?.name}
         />
 
         <div className="nh-page-body">
 
         {activeTab === 'home' && (
-          <StudentUnifiedHomeDashboard
+          <PremiumStudentHome
             userData={userData}
             isPremium={isPremium}
             nextStudyAction={nextStudyAction}
             latestVideoActivity={latestVideoActivity}
-            inProgressExam={inProgressExam}
-            nextOpenExam={nextOpenExam}
-            pendingAssignments={pendingAssignments}
-            pendingAssignmentsCount={pendingAssignmentsCount}
-            videoCompletionPercent={videoCompletionPercent}
-            completedVideoCount={completedVideoCount}
             videos={videos}
             exams={exams}
             filesAndLinks={filesAndLinks}
-            htmls={htmls}
+            pendingAssignmentsCount={pendingAssignmentsCount}
+            videoCompletionPercent={videoCompletionPercent}
+            completedVideoCount={completedVideoCount}
             completedExamResults={completedExamResults}
             averageScore={averageScore}
-            examResults={examResults}
-            subscriptionDaysLeft={subscriptionDaysLeft}
             smartWeakBranches={smartWeakBranches}
-            recentNotificationItems={recentNotificationItems}
-            unseenNotificationCount={unseenNotificationCount}
             setActiveTab={setActiveTab}
-            setShowNotifications={setShowNotifications}
-            setHasNewNotif={setHasNewNotif}
-            isBannedContent={isBannedContent}
-            isBannedExam={isBannedExam}
-            userId={user?.uid}
+            getVideoWatchPercent={getVideoWatchPercent}
+            onPlayVideo={(video) => handlePremiumClick(() => setPlayingVideo(video))}
           />
         )}
+
 
 
         {activeTab === 'performance' && (
@@ -842,7 +834,12 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
             </div>
         )}
 
-          {activeTab === 'courses' && !isBannedContent && <div className="space-y-6 page-soft-enter"><StudentV2SectionTitle badge="الكورسات" title="مركز الكورسات التعليمية" description="كل الكورسات، المحاضرات المباشرة، والاختبارات المرتبطة في واجهة واحدة." /><StudentLiveClassesPanel userData={userData} /><LazyPanel><StudentCoursesHub user={user} userData={userData} exams={exams} onStartExam={startExamWithCode} /></LazyPanel></div>}
+          {activeTab === 'courses' && !isBannedContent && (
+            <PremiumCoursesPage>
+              <StudentLiveClassesPanel userData={userData} />
+              <LazyPanel><StudentCoursesHub user={user} userData={userData} exams={exams} onStartExam={startExamWithCode} /></LazyPanel>
+            </PremiumCoursesPage>
+          )}
 
           {activeTab === 'review_quiz' && (
             <StudentReviewQuiz userData={userData} />
@@ -897,70 +894,16 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
           )}
 
           {activeTab === 'videos' && !isBannedContent && (
-            <div className="space-y-6 page-soft-enter">
-                <StudentV2SectionTitle badge="المحاضرات" title="مكتبة الفيديوهات" description="تابع الشرح وسجّل تقدمك وافتح الامتحانات المرتبطة بعد المشاهدة." />
-                <div className="bg-white rounded-3xl p-3 border border-slate-100 shadow-sm space-y-3">
-                    <div className="grid grid-cols-2 gap-2">
-                        <button onClick={() => setVideoSectionTab('recorded')} className={`px-6 py-3 rounded-2xl font-black whitespace-nowrap transition ${videoSectionTab === 'recorded' ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-50 text-slate-600'}`}>المحاضرات المسجلة</button>
-                        
-                    </div>
-                    {videoSectionTab === 'recorded' && <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                        <button onClick={() => setLectureInnerTab('explanation')} className={`px-5 py-2 rounded-full font-bold whitespace-nowrap transition ${lectureInnerTab === 'explanation' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 border'}`}>شرح الدروس</button>
-                        <button onClick={() => setLectureInnerTab('exercises')} className={`px-5 py-2 rounded-full font-bold whitespace-nowrap transition ${lectureInnerTab === 'exercises' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 border'}`}>حل التدريبات</button>
-                        <button onClick={() => setLectureInnerTab('reviews')} className={`px-5 py-2 rounded-full font-bold whitespace-nowrap transition ${lectureInnerTab === 'reviews' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 border'}`}>المراجعات النهائية</button>
-                    </div>}
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                    {videos.filter(v => videoSectionTab === 'recorded' && (v.videoSection || 'explanation') === lectureInnerTab).length === 0 ? (
-                         <div className="col-span-full text-center py-12 bg-white rounded-xl border border-slate-100 shadow-sm">
-                             <PlayCircle className="mx-auto text-slate-300 w-16 h-16 mb-4"/>
-                             <p className="text-slate-500 font-bold">لا توجد فيديوهات في هذا القسم حالياً.</p>
-                         </div>
-                    ) : videos.filter(v => videoSectionTab === 'recorded' && (v.videoSection || 'explanation') === lectureInnerTab).map(v => {
-                        const watchPercent = getVideoWatchPercent(v);
-                        return (
-                        <div key={v.id} className="glass-card rounded-xl overflow-hidden cursor-pointer relative group">
-                            <div className="h-48 bg-gradient-to-br from-slate-800 to-black flex items-center justify-center relative overflow-hidden" onClick={() => handlePremiumClick(() => setPlayingVideo(v))}>
-                                {(v.thumbnailUrl || v.posterUrl || v.image) && <img src={v.thumbnailUrl || v.posterUrl || v.image} className="absolute inset-0 w-full h-full transition duration-500 group-hover:scale-105" style={imagePlacementStyle(v.imagePlacement)} alt={v.title || 'غلاف الفيديو'} />}
-                                <div className="absolute inset-0 bg-black/35" />
-                                {v.isPremium && !isPremium ? <Lock className="relative z-10 text-white w-16 h-16 opacity-90 drop-shadow-lg" /> : <PlayCircle className="relative z-10 text-white w-16 h-16 opacity-90 group-hover:scale-110 transition drop-shadow-lg"/>}
-                                <span className="absolute bottom-2 left-2 z-10 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">{getGradeLabel(v.grade)}</span>
-                                {v.isPremium && <span className="absolute top-2 right-2 z-10 bg-amber-500 text-white text-xs px-2 py-1 rounded-full font-bold flex items-center gap-1 shadow-md"><Crown size={12}/> VIP</span>}
-                            </div>
-                            <div className="p-4 space-y-3">
-                                <h3 className={`font-bold text-lg ${v.isPremium && !isPremium ? 'text-slate-400' : 'text-slate-800'}`}>{v.title}</h3>
-                                <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden"><div className="bg-emerald-500 h-2 rounded-full" style={{ width: `${watchPercent}%` }} /></div>
-                                <div className="flex items-center justify-between text-xs text-slate-500"><span>المشاهدة</span><span>{watchPercent}%</span></div>
-                                {v.linkedExamId && (
-                                  <div className="space-y-2">
-                                    {watchPercent >= VIDEO_EXAM_UNLOCK_PERCENT ? (
-                                      <button
-                                        onClick={() => openLinkedExamFromVideo(v)}
-                                        className="w-full py-2 rounded-xl font-bold text-sm bg-emerald-600 text-white hover:bg-emerald-700 shadow"
-                                      >
-                                        ابدأ امتحان الفيديو الآن
-                                      </button>
-                                    ) : (
-                                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
-                                        <p className="text-xs font-bold text-slate-600">
-                                          شاهد {Math.max(0, VIDEO_EXAM_UNLOCK_PERCENT - watchPercent)}% إضافية لفتح امتحان الفيديو
-                                        </p>
-                                        <button
-                                          onClick={() => handlePremiumClick(() => setPlayingVideo(v))}
-                                          className="mt-2 w-full py-2 rounded-xl font-bold text-sm bg-blue-100 text-blue-700 hover:bg-blue-200"
-                                        >
-                                          استكمال مشاهدة الفيديو
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                            </div>
-                        </div>
-                    )})}
-                </div>
-            </div>
+            <PremiumLecturesPage
+              videos={videos}
+              isPremium={isPremium}
+              getVideoWatchPercent={getVideoWatchPercent}
+              onPlayVideo={(video) => handlePremiumClick(() => setPlayingVideo(video))}
+              onLinkedExam={openLinkedExamFromVideo}
+              unlockPercent={VIDEO_EXAM_UNLOCK_PERCENT}
+            />
         )}
+
 
         {activeTab === 'files' && !isBannedContent && (
             <div className="space-y-6 page-soft-enter">
@@ -1028,106 +971,36 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
         )}
         
         {activeTab === 'exams' && !isBannedExam && (
-          <div className="space-y-6 page-soft-enter">
-            <StudentV2SectionTitle badge="الامتحانات" title="مركز الاختبارات" description="اعرف حالة كل امتحان، المحاولات السابقة، والشهادات المتاحة بعد الانتهاء." />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-             {exams.map(e => {
-                const examAttempts = examResults.filter(r => r.examId === e.id);
-                const prevResult = examAttempts.find(r => ['continue', 'restart'].includes(r.adminDecision))
-                  || examAttempts.find(r => ['security_hold', 'in_progress', 'cheated'].includes(r.status))
-                  || examAttempts.find(r => r.status === 'completed')
-                  || examAttempts[0];
-                const isExamTimeOver = Date.now() > new Date(e.endTime).getTime();
-                const accessState = getExamAccessState(e);
-                
-                let statusText = null; let statusClass = "";
-                const canResumeByAdmin = prevResult && prevResult.adminDecision === 'continue';
-                const canRestartByAdmin = prevResult && prevResult.adminDecision === 'restart';
-                const waitingAdminDecision = prevResult && ['security_hold', 'in_progress', 'cheated'].includes(prevResult.status) && !canResumeByAdmin && !canRestartByAdmin;
-                if (prevResult) {
-                    if (canResumeByAdmin) { statusText = "مسموح بالاستكمال ✅"; statusClass = "bg-blue-600 text-white"; }
-                    else if (canRestartByAdmin) { statusText = "مسموح بالإعادة ✅"; statusClass = "bg-amber-600 text-white"; }
-                    else if (prevResult.status === 'completed') { statusText = `تم الحل: ${prevResult.score} درجة`; statusClass = "bg-green-500 text-white"; }
-                    else if (prevResult.status === 'security_hold') { statusText = "موقوف في انتظار الأدمن 🛡️"; statusClass = "bg-red-600 text-white"; }
-                    else if (prevResult.status === 'in_progress') { statusText = "ينتظر موافقة الأدمن ⏳"; statusClass = "bg-yellow-500 text-white"; } 
-                    else if (prevResult.status === 'cheated') { statusText = "تم الحظر (غش)"; statusClass = "bg-red-600 text-white"; }
-                }
-
-                return (
-                  <motion.div whileHover={{scale:1.01}} key={e.id} className={`glass-card p-4 md:p-6 rounded-2xl relative overflow-hidden flex flex-col ${(e.isPremium && !isPremium) || accessState.locked ? 'opacity-80' : ''}`}>
-                    {statusText && <div className={`absolute top-0 left-0 text-[10px] md:text-xs px-2 md:px-3 py-1 rounded-br-xl font-bold shadow-md ${statusClass}`}>{statusText}</div>}
-                    {e.isPremium && <div className="absolute top-2 right-2 bg-amber-100 text-amber-700 text-[10px] px-2 py-1 rounded-full font-bold flex items-center gap-1"><Crown size={12}/> VIP</div>}
-                    {(e.examImageUrl || e.thumbnailUrl || e.image) && (
-                      <div className="h-40 rounded-2xl bg-slate-100 overflow-hidden border mb-4 mt-4">
-                        <img src={e.examImageUrl || e.thumbnailUrl || e.image} className="w-full h-full" style={imagePlacementStyle(e.imagePlacement)} alt={e.title || 'غلاف الامتحان'} />
-                      </div>
-                    )}
-                    
-                    <h3 className={`text-lg md:text-xl font-bold mb-2 mt-4 md:mt-0 ${e.isPremium && !isPremium ? 'text-slate-400' : 'text-slate-800'}`}>{e.title}</h3>
-                    <div className="flex justify-between text-xs md:text-sm text-slate-500 mb-4"><span>⏳ {e.duration} دقيقة</span><span>📝 {e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0)} سؤال</span></div>
-                    
-                    {accessState.locked && (
-                      <div className="mb-4 bg-blue-50 border border-blue-200 text-blue-800 rounded-xl p-3 text-sm font-bold flex items-start gap-2">
-                        <Lock size={16} className="mt-0.5 shrink-0"/>
-                        <span>{accessState.message}</span>
-                      </div>
-                    )}
-                    {accessState.override && (
-                      <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl p-3 text-sm font-bold flex items-center gap-2">
-                        <Unlock size={16}/> مفتوح لك باستثناء من الإدارة
-                      </div>
-                    )}
-
-                    <div className="mt-auto">
-                        {accessState.locked ? (
-                            <button disabled className="w-full bg-blue-100 text-blue-500 py-2 md:py-3 rounded-xl font-bold cursor-not-allowed flex items-center justify-center gap-2 text-sm"><Lock size={14}/> الامتحان مقفول بشرط سابق</button>
-                        ) : canResumeByAdmin ? (
-                            <button onClick={() => startExamWithCode(e, { skipCode: true })} className="w-full bg-blue-600 text-white py-2 md:py-3 rounded-xl font-bold hover:bg-blue-700 flex items-center justify-center gap-2 shadow-lg transition text-sm">
-                                <Play size={14}/> استكمال الامتحان بموافقة الأدمن
-                            </button>
-                        ) : canRestartByAdmin ? (
-                            <button onClick={() => startExamWithCode(e, { skipCode: true })} className="w-full bg-amber-600 text-white py-2 md:py-3 rounded-xl font-bold hover:bg-amber-700 flex items-center justify-center gap-2 shadow-lg transition text-sm">
-                                <RefreshCw size={14}/> بدء الامتحان من جديد بموافقة الأدمن
-                            </button>
-                        ) : waitingAdminDecision ? (
-                            <div className="bg-amber-50 text-amber-700 p-2 md:p-3 rounded-xl font-bold text-center border border-amber-200 text-sm">
-                                المحاولة محفوظة. انتظر موافقة الأدمن للاستكمال أو الإعادة.
-                            </div>
-                        ) : prevResult && prevResult.status === 'completed' ? (
-                            <div className="flex flex-col sm:flex-row gap-2">
-                                 <button disabled className="flex-1 bg-slate-200 text-slate-500 py-2 md:py-3 rounded-xl font-bold cursor-not-allowed text-xs md:text-sm">تم الانتهاء</button>
-                                 {isExamTimeOver ? (
-                                    <button onClick={() => setReviewingExam(e)} className="flex-1 bg-blue-100 text-blue-700 py-2 md:py-3 rounded-xl font-bold hover:bg-blue-200 transition shadow-sm text-xs md:text-sm">عرض الأخطاء</button>
-                                 ) : (
-                                    <button disabled className="flex-1 bg-gray-100 text-gray-400 py-2 md:py-3 rounded-xl font-bold cursor-not-allowed text-[10px] md:text-xs">المراجعة بعد الوقت</button>
-                                 )}
-                                 <button onClick={() => generatePDF('student', {studentName: user.displayName, score: prevResult.score, total: e.questions.reduce((acc,g)=>acc+g.subQuestions.length,0), status: prevResult.status, examTitle: e.title, questions: e.questions.flatMap(q => q.subQuestions), answers: prevResult.answers })} className="flex-1 bg-green-100 text-green-700 py-2 md:py-3 rounded-xl font-bold hover:bg-green-200 flex items-center justify-center gap-1 transition shadow-sm text-xs md:text-sm"><Download size={14}/> شهادة</button>
-                            </div>
-                        ) : prevResult ? (
-                            <div className="bg-red-50 text-red-600 p-2 md:p-3 rounded-xl font-bold text-center border border-red-200 text-sm">لا يمكن دخول الامتحان</div>
-                        ) : (
-                            <div className="space-y-2">
-                                <p className="text-xs text-slate-500">يبدأ: {new Date(e.startTime).toLocaleString('ar-EG')}</p>
-                                {e.isPremium && !isPremium ? (
-                                    <button onClick={()=>handlePremiumClick(()=>{})} className="w-full bg-slate-200 text-slate-500 py-3 rounded-xl font-bold flex items-center justify-center gap-2 cursor-not-allowed text-sm"><Lock size={16}/> امتحان مقفل (للمشتركين)</button>
-                                ) : (
-                                    <button onClick={() => setPreExam(e)} className="w-full bg-slate-900 text-white py-2 md:py-3 rounded-xl font-bold hover:bg-slate-800 flex items-center justify-center gap-2 shadow-lg hover:shadow-slate-500/30 transition text-sm"><Lock size={14}/> صفحة ما قبل الامتحان</button>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                  </motion.div>
-                )
-             })}
-          </div>
-            </div>
+          <PremiumExamsPage
+            exams={exams}
+            examResults={examResults}
+            isPremium={isPremium}
+            getExamAccessState={getExamAccessState}
+            onPreStart={(exam) => setPreExam(exam)}
+            onReview={(exam) => setReviewingExam(exam)}
+            onCertificate={(exam, result) => generatePDF('student', {
+              studentName: user.displayName,
+              score: result?.score,
+              total: (exam.questions || []).reduce((acc,g)=>acc+(g.subQuestions || []).length,0),
+              status: result?.status,
+              examTitle: exam.title,
+              questions: (exam.questions || []).flatMap(q => q.subQuestions || []),
+              answers: result?.answers
+            })}
+            onStartApproved={(exam) => startExamWithCode(exam, { skipCode: true })}
+          />
         )}
 
+
         {activeTab === 'assignments' && !isBannedExam && (
-            <div className="space-y-5">
-              <LearningHubTabs activeTab={activeTab} setActiveTab={setActiveTab} setLearningHubTab={setLearningHubTab} />
-              <StudentAssignmentsPanel assignments={assignments} submissions={assignmentSubmissions} user={user} userData={userData} />
-            </div>
+          <PremiumAssignmentsFilesPage
+            assignments={assignments}
+            submissions={assignmentSubmissions}
+            filesAndLinks={filesAndLinks}
+            user={user}
+            userData={userData}
+            assignmentPanel={<StudentAssignmentsPanel assignments={assignments} submissions={assignmentSubmissions} user={user} userData={userData} />}
+          />
         )}
 
         {activeTab === 'smart_hw_results' && !isBannedExam && (
@@ -1168,20 +1041,25 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
         )}
 
         {activeTab === 'settings' && (
-              <div className="space-y-6 max-w-5xl page-soft-enter">
-                <StudentV2SectionTitle badge="الحساب" title="ملفي الشخصي والأداء" description="بياناتك، شهاداتك، وتحليل أدائك في مكان واحد." />
-                <div className="glass-panel p-4 md:p-6 rounded-2xl"><PerformanceOverview examResults={examResults} content={content} /></div>
-                <StudentCertificatePanel user={user} userData={userData} examResults={examResults} />
-                <div className="glass-panel p-4 md:p-6 rounded-xl max-w-2xl">
-                <form onSubmit={handleUpdateMyProfile} className="space-y-4">
-                  <div><label className="block text-sm font-bold text-slate-700 mb-2">الاسم</label><input disabled className="w-full border p-3 rounded-xl bg-slate-100 text-slate-500 cursor-not-allowed" value={editFormData.name} /><p className="text-xs text-red-500 mt-1">لا يمكن تغيير الاسم (تواصل مع الإدارة).</p></div>
-                  <div><label className="block text-sm font-bold text-slate-700 mb-2">رقم الهاتف</label><input className="w-full border p-3 rounded-xl" value={editFormData.phone} onChange={e=>setEditFormData({...editFormData, phone: normalizeEgyptPhone(e.target.value)})} /></div>
-                  <div><label className="block text-sm font-bold text-slate-700 mb-2">رقم ولي الأمر</label><input disabled className="w-full border p-3 rounded-xl bg-slate-100 text-slate-500 cursor-not-allowed" value={editFormData.parentPhone} /><p className="text-xs text-red-500 mt-1">لا يمكن تغيير رقم ولي الأمر.</p></div>
-                  <div><label className="block text-sm font-bold text-slate-700 mb-2">الصف الدراسي (يتطلب موافقة الأدمن)</label><select className="w-full border p-3 rounded-xl bg-white" value={editFormData.grade} onChange={e=>setEditFormData({...editFormData, grade:e.target.value})}><GradeOptions /></select></div>
-                  <button className="w-full bg-gradient-to-r from-amber-600 to-amber-700 text-white py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-amber-500/40 transition mt-4">حفظ التعديلات</button>
-                </form>
-                </div>
-              </div>
+          <PremiumPerformancePage
+            videos={videos}
+            exams={exams}
+            examResults={examResults}
+            assignments={assignments}
+            submissions={assignmentSubmissions}
+            getVideoWatchPercent={getVideoWatchPercent}
+            growthPanel={<PerformanceOverview examResults={examResults} content={content} />}
+            certificatePanel={<StudentCertificatePanel user={user} userData={userData} examResults={examResults} />}
+            profileForm={(
+              <form onSubmit={handleUpdateMyProfile} className="premium-profile-form">
+                <div><label>الاسم</label><input disabled value={editFormData.name} /></div>
+                <div><label>رقم الهاتف</label><input value={editFormData.phone} onChange={e=>setEditFormData({...editFormData, phone: normalizeEgyptPhone(e.target.value)})} /></div>
+                <div><label>رقم ولي الأمر</label><input disabled value={editFormData.parentPhone} /></div>
+                <div><label>الصف الدراسي</label><select value={editFormData.grade} onChange={e=>setEditFormData({...editFormData, grade:e.target.value})}><GradeOptions /></select></div>
+                <button className="premium-primary-btn">حفظ التعديلات</button>
+              </form>
+            )}
+          />
         )}
         </div>
       </main>

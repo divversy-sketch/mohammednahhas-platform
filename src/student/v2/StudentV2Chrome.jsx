@@ -12,48 +12,39 @@ const NAV_GROUPS = [
   {
     label: 'الرئيسية',
     items: [
-      { tab: 'home',         label: 'لوحة المتابعة',       icon: Layout        },
-      { tab: 'subscription', label: 'الباقة والاشتراك',     icon: Crown, tone: 'amber' },
+      { tab: 'home', label: 'الرئيسية', icon: Layout },
     ],
   },
   {
     label: 'التعلم',
     permission: 'content',
     items: [
-      { tab: 'courses',       label: 'الكورسات',             icon: BookOpen      },
-      { tab: 'videos',        label: 'المحاضرات',            icon: PlayCircle    },
-      { tab: 'learning_path', label: 'مساري التعليمي',       icon: Target        },
-      { tab: 'remediation',   label: 'العلاج الذكي',         icon: BrainCircuit  },
-      { tab: 'files',         label: 'الملفات',              icon: FileText      },
-      { tab: 'htmls',         label: 'محتوى تفاعلي',         icon: Code          },
-      { tab: 'review_quiz',   label: 'مراجعة سريعة',         icon: ClipboardList },
+      { tab: 'videos', label: 'محاضراتي', icon: PlayCircle },
+      { tab: 'courses', label: 'كورساتي', icon: BookOpen },
+      { tab: 'files', label: 'ملفاتي', icon: FileText },
+      { tab: 'learning_path', label: 'الملاحظات', icon: Target },
     ],
   },
   {
-    label: 'التواصل',
-    permission: 'content',
-    items: [
-      { tab: 'student_messages', label: 'رسائلي',     icon: MessageSquare },
-      { tab: 'support',          label: 'الدعم الفني', icon: Bell          },
-    ],
-  },
-  {
-    label: 'الاختبارات',
+    label: 'التقييم',
     permission: 'exam',
     items: [
-      { tab: 'exams',       label: 'الامتحانات',           icon: ClipboardList },
-      { tab: 'assignments', label: 'الواجبات وبنك الأخطاء', icon: FileCheck,
+      { tab: 'exams', label: 'اختباراتي', icon: ClipboardList },
+      { tab: 'assignments', label: 'واجباتي', icon: FileCheck,
         alias: ['assignments','smart_hw_results','mistakes_bank'], action: 'learningHub' },
+      { tab: 'review_quiz', label: 'الإنجازات', icon: Trophy },
     ],
   },
   {
-    label: 'الحساب',
+    label: 'التواصل والحساب',
     items: [
-      { tab: 'settings', label: 'ملفي الشخصي والأداء', icon: Settings,
+      { tab: 'student_messages', label: 'المجتمع', icon: MessageSquare },
+      { tab: 'settings', label: 'أدائي', icon: Settings,
         alias: ['settings','performance'] },
+      { tab: 'subscription', label: 'الإعدادات', icon: Crown, tone: 'amber' },
     ],
   },
-];
+]
 
 /* الـ 5 items للـ bottom nav على الموبايل */
 const BOTTOM_NAV = [
@@ -166,7 +157,7 @@ export function StudentV2Sidebar({
 /* ─── Topbar (ثابت أعلى المحتوى على كل الشاشات) ─── */
 export function StudentV2Topbar({
   setShowFocusMode, setShowNotifications, unseenNotificationCount,
-  isPremium, subscriptionExpiry, setMobileMenu,
+  isPremium, subscriptionExpiry, setMobileMenu, studentName,
 }) {
   const expiryLabel = subscriptionExpiry?.toDate
     ? subscriptionExpiry.toDate().toLocaleDateString('ar-EG')
@@ -175,6 +166,7 @@ export function StudentV2Topbar({
   return (
     <header className="nh-topbar">
       <div className="nh-topbar__left">
+        <span className="nh-topbar__student"><User size={14} /> {studentName || 'طالب'}</span>
         {isPremium && (
           <span className="nh-topbar__vip">
             <Crown size={13} /> VIP {expiryLabel ? `حتى ${expiryLabel}` : 'مفعل'}
