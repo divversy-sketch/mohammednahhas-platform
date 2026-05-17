@@ -289,7 +289,7 @@ export function StudentUnifiedHomeDashboard({
 
   return (
     <section className="page-soft-enter space-y-5">
-      <div className="nh-student-premium-hero nh-animated-border relative overflow-hidden rounded-[2.2rem] border border-white/60 bg-slate-950 p-4 md:p-6 shadow-2xl text-white">
+      <div className="relative overflow-hidden rounded-[2.2rem] border border-white/60 bg-slate-950 p-4 md:p-6 shadow-2xl text-white">
         <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-amber-400/25 blur-3xl" />
         <div className="absolute -left-24 bottom-0 h-72 w-72 rounded-full bg-teal-400/20 blur-3xl" />
         <div className="relative z-10 grid gap-5 xl:grid-cols-[1.05fr_.95fr]">
@@ -306,7 +306,7 @@ export function StudentUnifiedHomeDashboard({
               </p>
             </div>
 
-            <div className="nh-student-continue-fused rounded-3xl border border-white/10 bg-white/10 p-4 backdrop-blur">
+            <div className="rounded-3xl border border-white/10 bg-white/10 p-4 backdrop-blur">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div className="min-w-0">
                   <p className="text-sm font-black text-amber-200">خطوتك التالية</p>
@@ -351,6 +351,11 @@ export function StudentUnifiedHomeDashboard({
         </div>
       </div>
 
+      <ContinueWatchingCard
+        latestVideoActivity={latestVideoActivity}
+        inProgressExam={inProgressExam}
+        nextStudyAction={nextStudyAction}
+      />
 
       {/* ⭐ تقييم آخر محاضرة شاهدها الطالب */}
       {latestVideoActivity?.video && !latestVideoActivity.isCompleted && (
@@ -381,7 +386,7 @@ export function StudentUnifiedHomeDashboard({
         </button>
       )}
 
-      <div className="nh-student-stats-grid grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         {mainActions.map((item) => {
           const Icon = item.icon;
           return (
@@ -389,7 +394,7 @@ export function StudentUnifiedHomeDashboard({
               key={item.key}
               disabled={item.locked}
               onClick={() => !item.locked && setActiveTab(item.key)}
-              className={`nh-student-action-card nh-animated-border group relative overflow-hidden rounded-3xl p-4 text-right text-white shadow-lg transition hover:-translate-y-1 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-50 bg-gradient-to-br ${item.tone}`}
+              className={`group relative overflow-hidden rounded-3xl p-4 text-right text-white shadow-lg transition hover:-translate-y-1 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-50 bg-gradient-to-br ${item.tone}`}
             >
               <Icon className="absolute -bottom-4 -left-4 h-20 w-20 text-white/15 transition group-hover:scale-110" />
               <div className="relative z-10">
@@ -403,7 +408,7 @@ export function StudentUnifiedHomeDashboard({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1.2fr_.8fr]">
-        <div className="nh-soft-panel nh-animated-border rounded-[2rem] border border-white/70 bg-white/95 p-4 md:p-5 shadow-sm">
+        <div className="rounded-[2rem] border border-white/70 bg-white/95 p-4 md:p-5 shadow-sm">
           <div className="flex items-center justify-between gap-3 mb-3">
             <h3 className="flex items-center gap-2 text-lg font-black text-slate-950"><Target className="text-amber-600" /> ركّز على المهم</h3>
             <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-black text-amber-700">بدون تشتت</span>
@@ -418,7 +423,7 @@ export function StudentUnifiedHomeDashboard({
           </div>
         </div>
 
-        <div className="nh-soft-panel nh-animated-border rounded-[2rem] border border-white/70 bg-white/95 p-4 md:p-5 shadow-sm">
+        <div className="rounded-[2rem] border border-white/70 bg-white/95 p-4 md:p-5 shadow-sm">
           <div className="flex items-center justify-between gap-3 mb-3">
             <h3 className="flex items-center gap-2 text-lg font-black text-slate-950"><Bell className="text-blue-600" /> آخر التنبيهات</h3>
             <button onClick={() => { setShowNotifications(true); setHasNewNotif?.(false); }} className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white">عرض الكل</button>
@@ -472,7 +477,7 @@ export function ContentRatingCard({ userId, contentId, contentTitle }) {
   if (!contentId) return null;
 
   return (
-    <div className="nh-rating-card nh-animated-border rounded-2xl border border-amber-100 bg-amber-50 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+    <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
       <div className="flex-1 min-w-0">
         <p className="text-xs font-black text-amber-700 mb-0.5">قيّم آخر محاضرة شاهدتها</p>
         <p className="text-sm font-bold text-slate-700 truncate">{contentTitle || 'المحاضرة الحالية'}</p>

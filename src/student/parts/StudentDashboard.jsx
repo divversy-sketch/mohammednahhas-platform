@@ -2,7 +2,7 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 import { signOut } from 'firebase/auth';
 import { doc, setDoc, collection, addDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { PlayCircle, FileText, LogOut, User, Lock, Menu, X, Loader2, Phone, MessageSquare, BookOpen, ClipboardList, Unlock, Settings, Bell, Download, Code, Sparkles, Ban, RefreshCw, Link as LinkIcon, QrCode, FileCheck, BarChart3, BrainCircuit, Headphones, DownloadCloud, Play, Target, Crown, CreditCard, Key, Star, Layers, Calendar, Search, ShieldCheck } from '../../shared/icons/lucide-shim.jsx';
+import { PlayCircle, FileText, LogOut, User, Lock, Menu, X, Loader2, Phone, MessageSquare, BookOpen, ClipboardList, Unlock, Settings, Bell, Download, Code, Sparkles, Ban, RefreshCw, Link as LinkIcon, QrCode, FileCheck, BarChart3, BrainCircuit, Headphones, DownloadCloud, Play, Target, Crown, CreditCard, Key } from '../../shared/icons/lucide-shim.jsx';
 import { motion } from 'framer-motion';
 import { auth, db, functions } from '../../services/firebase';
 import MobileStudentBottomNav from '../../features/student/MobileStudentBottomNav';
@@ -51,90 +51,6 @@ const LazyPanel = ({ children }) => (
     {children}
   </Suspense>
 );
-
-
-const STUDENT_PAGE_META = {
-  courses: { badge: 'مركز التعلم', title: 'الكورسات والمسارات', description: 'واجهة مرتبة للوصول للكورسات والبث المباشر والاختبارات المرتبطة بدون دوخة التابات.', icon: BookOpen, tone: 'emerald' },
-  videos: { badge: 'المحاضرات', title: 'محاضراتك المسجلة', description: 'كل شرح محفوظ مع حالة المشاهدة، القفل، وآخر تقدم داخل كروت أوضح.', icon: PlayCircle, tone: 'blue' },
-  files: { badge: 'المكتبة', title: 'الملفات والروابط', description: 'ملخصات، مذكرات، وروابط منظمة بنفس الهوية الجديدة وسهلة التحميل.', icon: FileText, tone: 'amber' },
-  htmls: { badge: 'تفاعلي', title: 'أنشطة تفاعلية', description: 'محتوى تفاعلي بكروت واضحة وأزرار تشغيل مميزة بدل المربعات الباهتة.', icon: Code, tone: 'purple' },
-  review_quiz: { badge: 'مراجعة سريعة', title: 'مراجعة ذكية قبل الامتحان', description: 'مراجعات قصيرة وسريعة بواجهة أهدأ وأقرب لتجربة تطبيق تعليم محترم.', icon: ClipboardList, tone: 'rose' },
-  learning_path: { badge: 'مساري', title: 'مسارك التعليمي', description: 'خريطة طريق واضحة: أين تقف، وما المطلوب بعد ذلك، وما الذي يحتاج تركيز.', icon: Target, tone: 'emerald' },
-  remediation: { badge: 'ذكاء تعليمي', title: 'العلاج الذكي', description: 'تحليل نقاط الضعف وتحويلها لخطة متابعة بدل رسائل مبهمة.', icon: BrainCircuit, tone: 'violet' },
-  exams: { badge: 'الاختبارات', title: 'الامتحانات والنتائج', description: 'كل امتحان بحالة واضحة: متاح، مقفل، مكتمل، أو يحتاج موافقة أدمن.', icon: ShieldCheck, tone: 'amber' },
-  assignments: { badge: 'واجبات', title: 'الواجبات وبنك الأخطاء', description: 'واجباتك، تسليماتك، وأخطاءك في مساحة واحدة قابلة للمتابعة.', icon: FileCheck, tone: 'blue' },
-  smart_hw_results: { badge: 'QR', title: 'سجل الواجبات الذكية', description: 'نتائج التصحيح والتعليقات مرتبة حسب الكتب والواجبات.', icon: QrCode, tone: 'emerald' },
-  mistakes_bank: { badge: 'نقاط الضعف', title: 'بنك أخطائك', description: 'حوّل أخطاءك السابقة إلى مراجعة مركزة بدل ما تفضل تخوفك من بعيد.', icon: Target, tone: 'rose' },
-  student_messages: { badge: 'رسائلي', title: 'مركز الرسائل', description: 'رسائل المنصة في واجهة أوضح، مع أولوية للتنبيهات المهمة.', icon: MessageSquare, tone: 'blue' },
-  support: { badge: 'الدعم الفني', title: 'تواصل مع الإدارة', description: 'طلب دعم مرتب وواضح مع توجيه سريع لواتساب الإدارة عند الحاجة.', icon: Headphones, tone: 'emerald' },
-  subscription: { badge: 'الباقة', title: 'الباقة والاشتراك', description: 'حالة الاشتراك والأكواد وطلبات الدفع بشكل أوضح وأسهل.', icon: Crown, tone: 'amber' },
-  settings: { badge: 'الحساب', title: 'ملفي وأدائي', description: 'بياناتك، شهاداتك، وتحليل أدائك في مكان واحد.', icon: Settings, tone: 'slate' },
-  performance: { badge: 'الأداء', title: 'تقرير النمو والتقدم', description: 'متابعة درجاتك، أخطائك، ونشاطك بنظرة أوضح.', icon: BarChart3, tone: 'blue' },
-};
-
-function StudentInnerPageIntro({ activeTab, videos, exams, filesAndLinks, htmls, pendingAssignmentsCount, averageScore, setActiveTab, isPremium }) {
-  if (activeTab === 'home') return null;
-  const meta = STUDENT_PAGE_META[activeTab];
-  if (!meta) return null;
-  const Icon = meta.icon;
-  const counters = [
-    { label: 'محاضرات', value: videos?.length || 0, icon: PlayCircle },
-    { label: 'اختبارات', value: exams?.length || 0, icon: ClipboardList },
-    { label: 'ملفات', value: filesAndLinks?.length || 0, icon: DownloadCloud },
-    { label: 'تفاعلي', value: htmls?.length || 0, icon: Sparkles },
-    { label: 'واجبات', value: pendingAssignmentsCount || 0, icon: Calendar },
-    { label: 'متوسطك', value: averageScore ? `${averageScore}%` : '—', icon: Star },
-  ];
-  const shortcuts = [
-    { tab: 'videos', label: 'المحاضرات', icon: PlayCircle },
-    { tab: 'exams', label: 'الامتحانات', icon: ClipboardList },
-    { tab: 'files', label: 'الملفات', icon: FileText },
-    { tab: 'review_quiz', label: 'مراجعة سريعة', icon: RefreshCw },
-  ];
-  return (
-    <section className={`nh-student-inner-hero nh-student-inner-hero--${meta.tone} nh-animated-border`}>
-      <div className="nh-student-inner-hero__main">
-        <div className="nh-student-inner-hero__icon"><Icon size={30} /></div>
-        <div className="min-w-0">
-          <span className="nh-student-inner-hero__badge">{meta.badge}</span>
-          <h1>{meta.title}</h1>
-          <p>{meta.description}</p>
-        </div>
-      </div>
-      <div className="nh-student-inner-hero__side">
-        <div className="nh-student-inner-search">
-          <Search size={16} />
-          <span>اختار من الشريط الجانبي أو الاختصارات السريعة</span>
-        </div>
-        <div className="nh-student-inner-shortcuts">
-          {shortcuts.map(item => {
-            const SIcon = item.icon;
-            return (
-              <button key={item.tab} type="button" onClick={() => setActiveTab(item.tab)} className={activeTab === item.tab ? 'is-active' : ''}>
-                <SIcon size={15}/><span>{item.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      <div className="nh-student-inner-stats">
-        {counters.map(item => {
-          const CIcon = item.icon;
-          return (
-            <div key={item.label} className="nh-student-mini-stat">
-              <CIcon size={16}/>
-              <strong>{item.value}</strong>
-              <span>{item.label}</span>
-            </div>
-          );
-        })}
-      </div>
-      <div className="nh-student-inner-plan">
-        <div><Layers size={17}/><span>{isPremium ? 'حسابك VIP — كل الأدوات التعليمية مفتوحة حسب صلاحياتك.' : 'حساب مجاني — فعل الباقة لفتح المحتوى المميز.'}</span></div>
-      </div>
-    </section>
-  );
-}
 
 
 
@@ -791,18 +707,6 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
         />
 
         <div className="nh-page-body">
-
-        <StudentInnerPageIntro
-          activeTab={activeTab}
-          videos={videos}
-          exams={exams}
-          filesAndLinks={filesAndLinks}
-          htmls={htmls}
-          pendingAssignmentsCount={pendingAssignmentsCount}
-          averageScore={averageScore}
-          setActiveTab={setActiveTab}
-          isPremium={isPremium}
-        />
 
         {activeTab === 'home' && (
           <StudentUnifiedHomeDashboard
