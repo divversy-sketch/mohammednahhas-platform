@@ -5,13 +5,15 @@ import { User, GraduationCap, Lock, Mail, ChevronRight, Loader2, Phone } from '.
 import { motion } from 'framer-motion';
 import { auth, db } from '../../services/firebase';
 
+
 import { GradeOptions } from '../constants/grades';
 import { normalizeEgyptPhone, validateEgyptianPhones } from '../utils/phone';
-import { FloatingArabicBackground } from '../../features/home/HomeWidgets';
+import { ModernLogo, FloatingArabicBackground } from '../../features/home/HomeWidgets';
+
 
 import { platformNotify, WhatsAppContactButton } from '../core/platformShared.jsx';
 
-const teacherAvatarSrc = '/teacher-avatar.jpg';
+
 
 const getFriendlyAuthError = (error) => {
   const code = error?.code || '';
@@ -28,35 +30,6 @@ const getFriendlyAuthError = (error) => {
   return messages[code] || 'حدث خطأ غير متوقع. جرّب مرة أخرى أو تواصل مع الإدارة.';
 };
 
-const authGlowStyles = `
-@keyframes nahhas-auth-spin { to { transform: rotate(360deg); } }
-@keyframes nahhas-auth-breathe { 0%,100% { opacity:.72; transform: translateY(0px); } 50% { opacity:1; transform: translateY(-2px); } }
-@keyframes nahhas-auth-shell-glow { 0%,100% { box-shadow: 0 30px 90px rgba(15,23,42,.12), 0 0 0 1px rgba(34,211,238,.12);} 50% { box-shadow: 0 34px 110px rgba(8,145,178,.18), 0 0 0 1px rgba(34,211,238,.24);} }
-.nahhas-auth-shell { position: relative; isolation: isolate; overflow: hidden; animation: nahhas-auth-shell-glow 3.2s ease-in-out infinite; }
-.nahhas-auth-shell::before {
-  content: "";
-  position: absolute;
-  inset: -3px;
-  z-index: -2;
-  border-radius: 2rem;
-  background: conic-gradient(from 0deg, rgba(34,211,238,.95), rgba(45,212,191,.85), rgba(250,204,21,.88), rgba(34,211,238,.96), rgba(14,165,233,.85), rgba(34,211,238,.95));
-  animation: nahhas-auth-spin 5.6s linear infinite;
-}
-.nahhas-auth-shell::after {
-  content: "";
-  position: absolute;
-  inset: 2px;
-  z-index: -1;
-  border-radius: 1.85rem;
-  background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(248,251,255,.97));
-}
-.nahhas-auth-input:focus-within {
-  border-color: rgba(34,211,238,.72) !important;
-  box-shadow: 0 0 0 4px rgba(34,211,238,.10), 0 0 28px rgba(45,212,191,.14);
-}
-.nahhas-auth-logo-glow { animation: nahhas-auth-breathe 3.5s ease-in-out infinite; }
-`;
-
 export const AuthPage = ({ onBack }) => {
   const [isRegister, setIsRegister] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -64,13 +37,9 @@ export const AuthPage = ({ onBack }) => {
   const [platformSettings, setPlatformSettings] = useState({ registrationOpen: true, platformName: 'منصة النحاس التعليمية', welcomeMessage: '' });
 
   useEffect(() => {
-    const unsub = onSnapshot(
-      doc(db, 'platform_settings', 'main'),
-      (snap) => {
-        if (snap.exists()) setPlatformSettings((prev) => ({ ...prev, ...snap.data() }));
-      },
-      () => {}
-    );
+    const unsub = onSnapshot(doc(db, 'platform_settings', 'main'), (snap) => {
+      if (snap.exists()) setPlatformSettings((prev) => ({ ...prev, ...snap.data() }));
+    }, () => {});
     return () => unsub();
   }, []);
 
@@ -79,22 +48,22 @@ export const AuthPage = ({ onBack }) => {
     setLoading(true);
 
     if (isRegister) {
-      if (platformSettings.registrationOpen === false) {
-        platformNotify('التسجيل مغلق حاليًا من إدارة المنصة. تواصل مع الإدارة للتفعيل.');
-        setLoading(false);
-        return;
-      }
-      if (!formData.name.trim()) {
-        platformNotify('من فضلك اكتب اسم الطالب.');
-        setLoading(false);
-        return;
-      }
-      const validation = validateEgyptianPhones(formData.phone, formData.parentPhone);
-      if (!validation.ok) {
-        platformNotify(validation.message);
-        setLoading(false);
-        return;
-      }
+        if (platformSettings.registrationOpen === false) {
+            platformNotify('التسجيل مغلق حاليًا من إدارة المنصة. تواصل مع الإدارة للتفعيل.');
+            setLoading(false);
+            return;
+        }
+        if (!formData.name.trim()) {
+            platformNotify("من فضلك اكتب اسم الطالب.");
+            setLoading(false);
+            return;
+        }
+        const validation = validateEgyptianPhones(formData.phone, formData.parentPhone);
+        if (!validation.ok) {
+            platformNotify(validation.message);
+            setLoading(false);
+            return;
+        }
     }
 
     try {
@@ -102,35 +71,20 @@ export const AuthPage = ({ onBack }) => {
         const validation = validateEgyptianPhones(formData.phone, formData.parentPhone);
         const userCred = await createUserWithEmailAndPassword(auth, formData.email.trim(), formData.password);
         await updateProfile(userCred.user, { displayName: formData.name.trim() });
-        await setDoc(doc(db, 'users', userCred.user.uid), {
-          name: formData.name.trim(),
-          email: formData.email.trim(),
-          grade: formData.grade,
-          phone: validation.normalizedStudentPhone,
-          parentPhone: validation.normalizedParentPhone,
-          role: 'student',
-          status: 'pending',
-          subscriptionStatus: 'free',
-          subscriptionExpiry: null,
-          createdAt: new Date(),
+        await setDoc(doc(db, 'users', userCred.user.uid), { 
+            name: formData.name.trim(), email: formData.email.trim(), grade: formData.grade, phone: validation.normalizedStudentPhone, 
+            parentPhone: validation.normalizedParentPhone, role: 'student', status: 'pending', 
+            subscriptionStatus: 'free', subscriptionExpiry: null, createdAt: new Date() 
         });
-        platformNotify('تم إنشاء الحساب! انتظر تفعيل الأدمن.');
-      } else {
-        await signInWithEmailAndPassword(auth, formData.email, formData.password);
-      }
-    } catch (error) {
-      platformNotify(getFriendlyAuthError(error));
-    } finally {
-      setLoading(false);
-    }
+        platformNotify("تم إنشاء الحساب! انتظر تفعيل الأدمن.");
+      } else { await signInWithEmailAndPassword(auth, formData.email, formData.password); }
+    } catch (error) { platformNotify(getFriendlyAuthError(error)); } 
+    finally { setLoading(false); }
   };
 
   const handleForgotPassword = async () => {
     const email = String(formData.email || '').trim().toLowerCase();
-    if (!email) {
-      platformNotify('من فضلك اكتب الإيميل الأول.');
-      return;
-    }
+    if(!email) { platformNotify("من فضلك اكتب الإيميل الأول."); return; }
     setLoading(true);
     try {
       await addDoc(collection(db, 'password_reset_requests'), {
@@ -139,76 +93,41 @@ export const AuthPage = ({ onBack }) => {
         status: 'pending',
         source: 'auth_page',
         createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
       });
-      platformNotify('تم إرسال طلب تغيير كلمة السر للإدارة. سيتم التواصل معك بعد الموافقة.', 'success');
+      platformNotify("تم إرسال طلب تغيير كلمة السر للإدارة. سيتم التواصل معك بعد الموافقة.", 'success');
     } catch (error) {
-      platformNotify('تعذر إرسال الطلب الآن، تواصل مع الإدارة عبر واتساب.', 'error');
+      platformNotify("تعذر إرسال الطلب الآن، تواصل مع الإدارة عبر واتساب.", 'error');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#f4f7fb] p-4 font-['Cairo']" dir="rtl">
-      <style>{authGlowStyles}</style>
+    <div className="min-h-screen flex items-center justify-center p-4 bg-slate-900 font-['Cairo'] relative overflow-hidden" dir="rtl">
       <FloatingArabicBackground />
-
-      <div className="relative z-10 flex min-h-screen items-center justify-center">
-        <motion.div
-          initial={{ scale: 0.96, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="nahhas-auth-shell my-10 max-h-[90vh] w-full max-w-md overflow-y-auto rounded-[2rem] border border-white/50 p-6 shadow-[0_28px_90px_rgba(15,23,42,.13)] scrollbar-hide md:p-8"
-        >
-          <button onClick={onBack} className="mb-4 flex items-center gap-1 text-sm font-bold text-slate-500 hover:text-slate-800 md:mb-6">
-            <ChevronRight size={18} /> العودة
-          </button>
-
-          <div className="nahhas-auth-logo-glow mb-4 flex justify-center">
-            <div className="relative grid h-24 w-24 place-items-center overflow-hidden rounded-[1.9rem] bg-gradient-to-br from-amber-300 to-teal-400 text-4xl font-black text-slate-950 shadow-[0_0_55px_rgba(45,212,191,.22)] ring-2 ring-cyan-200/35">
-              <img src={teacherAvatarSrc} alt="شعار المنصة" className="absolute inset-0 hidden h-full w-full object-cover" onLoad={(e) => e.currentTarget.classList.remove('hidden')} onError={(e) => e.currentTarget.classList.add('hidden')} />
-              <span className="relative z-10">ن</span>
-            </div>
-          </div>
-
-          <h2 className="mb-2 text-center font-arabic text-2xl font-black text-slate-800 md:text-3xl">{isRegister ? 'حساب جديد' : 'تسجيل دخول'}</h2>
-          <p className="text-center text-sm font-bold text-slate-500">{platformSettings.welcomeMessage || 'بوابة الدخول لمنصة النحاس التعليمية بنفس روح الصفحة الرئيسية.'}</p>
-          {isRegister && platformSettings.registrationOpen === false && (
-            <div className="mt-4 rounded-2xl border border-red-100 bg-red-50 p-3 text-center text-sm font-black text-red-700">التسجيل مغلق حاليًا من الإدارة</div>
+      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white/90 backdrop-blur-xl rounded-3xl p-6 md:p-8 w-full max-w-md shadow-2xl relative z-10 my-10 overflow-y-auto max-h-[90vh] border border-white/50 scrollbar-hide">
+        <button onClick={onBack} className="text-slate-500 hover:text-slate-800 text-sm mb-4 md:mb-6 flex items-center gap-1 font-bold"><ChevronRight size={18} /> العودة</button>
+        <div className="flex justify-center mb-4"><ModernLogo /></div>
+        <h2 className="text-2xl md:text-3xl font-bold font-arabic text-slate-800 mb-2 text-center">{isRegister ? 'حساب جديد' : 'تسجيل دخول'}</h2>
+        {platformSettings.welcomeMessage && <p className="text-center text-sm text-slate-500 font-bold leading-6">{platformSettings.welcomeMessage}</p>}
+        {isRegister && platformSettings.registrationOpen === false && <div className="mt-4 bg-red-50 border border-red-100 text-red-700 rounded-2xl p-3 text-sm font-black text-center">التسجيل مغلق حاليًا من الإدارة</div>}
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3 md:gap-4 mt-4 md:mt-6">
+          {isRegister && (
+            <>
+              <div className="relative"><User className="absolute top-3.5 right-4 text-slate-400" size={18} /><input required type="text" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition text-sm md:text-base" placeholder="الاسم ثلاثي" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
+              <div className="relative"><Phone className="absolute top-3.5 right-4 text-slate-400" size={18} /><input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition text-sm md:text-base" placeholder="رقم هاتفك" value={formData.phone} onChange={e => setFormData({...formData, phone: normalizeEgyptPhone(e.target.value)})} /></div>
+              <div className="relative"><Phone className="absolute top-3.5 right-4 text-slate-400" size={18} /><input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition text-sm md:text-base" placeholder="رقم ولي الأمر" value={formData.parentPhone} onChange={e => setFormData({...formData, parentPhone: normalizeEgyptPhone(e.target.value)})} /></div>
+              <div className="relative"><GraduationCap className="absolute top-3.5 right-4 text-slate-400" size={18} /><select className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 appearance-none focus:border-amber-500 outline-none transition text-sm md:text-base" value={formData.grade} onChange={e => setFormData({...formData, grade: e.target.value})}><GradeOptions /></select></div>
+            </>
           )}
-
-          <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3 md:mt-6 md:gap-4">
-            {isRegister && (
-              <>
-                <div className="nahhas-auth-input relative rounded-xl border border-slate-200 bg-slate-50 transition"><User className="absolute right-4 top-3.5 text-slate-400" size={18} /><input required type="text" className="w-full rounded-xl border-0 bg-transparent py-3 pl-4 pr-12 text-sm outline-none transition focus:bg-white/50 md:text-base" placeholder="الاسم ثلاثي" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} /></div>
-                <div className="nahhas-auth-input relative rounded-xl border border-slate-200 bg-slate-50 transition"><Phone className="absolute right-4 top-3.5 text-slate-400" size={18} /><input required type="tel" className="w-full rounded-xl border-0 bg-transparent py-3 pl-4 pr-12 text-sm outline-none transition focus:bg-white/50 md:text-base" placeholder="رقم هاتفك" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: normalizeEgyptPhone(e.target.value) })} /></div>
-                <div className="nahhas-auth-input relative rounded-xl border border-slate-200 bg-slate-50 transition"><Phone className="absolute right-4 top-3.5 text-slate-400" size={18} /><input required type="tel" className="w-full rounded-xl border-0 bg-transparent py-3 pl-4 pr-12 text-sm outline-none transition focus:bg-white/50 md:text-base" placeholder="رقم ولي الأمر" value={formData.parentPhone} onChange={(e) => setFormData({ ...formData, parentPhone: normalizeEgyptPhone(e.target.value) })} /></div>
-                <div className="nahhas-auth-input relative rounded-xl border border-slate-200 bg-slate-50 transition"><GraduationCap className="absolute right-4 top-3.5 text-slate-400" size={18} /><select className="w-full appearance-none rounded-xl border-0 bg-transparent py-3 pl-4 pr-12 text-sm outline-none transition focus:bg-white/50 md:text-base" value={formData.grade} onChange={(e) => setFormData({ ...formData, grade: e.target.value })}><GradeOptions /></select></div>
-              </>
-            )}
-
-            <div className="nahhas-auth-input relative rounded-xl border border-slate-200 bg-slate-50 transition"><Mail className="absolute right-4 top-3.5 text-slate-400" size={18} /><input required type="email" className="w-full rounded-xl border-0 bg-transparent py-3 pl-4 pr-12 text-sm outline-none transition focus:bg-white/50 md:text-base" placeholder="البريد" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} /></div>
-            <div className="nahhas-auth-input relative rounded-xl border border-slate-200 bg-slate-50 transition"><Lock className="absolute right-4 top-3.5 text-slate-400" size={18} /><input required type="password" className="w-full rounded-xl border-0 bg-transparent py-3 pl-4 pr-12 text-sm outline-none transition focus:bg-white/50 md:text-base" placeholder="كلمة السر" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} /></div>
-
-            {!isRegister && (
-              <div className="text-left">
-                <button type="button" onClick={handleForgotPassword} disabled={loading} className="text-xs font-bold text-teal-700 hover:underline disabled:opacity-50">
-                  طلب تغيير كلمة السر من الإدارة
-                </button>
-              </div>
-            )}
-
-            <button disabled={loading} className="mt-2 flex justify-center rounded-xl bg-gradient-to-l from-[#FACC15] to-[#FDE047] py-3 font-black text-slate-950 shadow-[0_16px_34px_rgba(250,204,21,.28)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_45px_rgba(250,204,21,.34)]">
-              {loading ? <Loader2 className="animate-spin" /> : isRegister ? 'تسجيل' : 'دخول'}
-            </button>
-          </form>
-
-          <button onClick={() => setIsRegister(!isRegister)} className="mt-4 block w-full text-center text-sm font-bold text-teal-700 hover:underline md:mt-6">
-            {isRegister ? 'تسجيل الدخول' : 'حساب جديد'}
-          </button>
-        </motion.div>
-      </div>
-
+          <div className="relative"><Mail className="absolute top-3.5 right-4 text-slate-400" size={18} /><input required type="email" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition text-sm md:text-base" placeholder="البريد" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></div>
+          <div className="relative"><Lock className="absolute top-3.5 right-4 text-slate-400" size={18} /><input required type="password" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition text-sm md:text-base" placeholder="كلمة السر" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} /></div>
+          {!isRegister && (<div className="text-left"><button type="button" onClick={handleForgotPassword} disabled={loading} className="text-xs text-amber-600 font-bold hover:underline disabled:opacity-50">طلب تغيير كلمة السر من الإدارة</button></div>)}
+          <button disabled={loading} className="bg-gradient-to-r from-amber-600 to-amber-700 text-white py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-amber-500/50 transition mt-2 flex justify-center">{loading ? <Loader2 className="animate-spin" /> : (isRegister ? 'تسجيل' : 'دخول')}</button>
+        </form>
+        <button onClick={() => setIsRegister(!isRegister)} className="mt-4 md:mt-6 text-amber-800 font-bold hover:underline w-full text-center block text-sm">{isRegister ? 'تسجيل الدخول' : 'حساب جديد'}</button>
+      </motion.div>
       <WhatsAppContactButton />
     </div>
   );
