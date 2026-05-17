@@ -312,6 +312,207 @@ const DesignSystemLoader = () => {
       :root[data-theme="light"] .from-slate-50 { --tw-gradient-from: rgba(255,255,255,.92) !important; }
       .font-arabic { font-family: 'Cairo', sans-serif; }
 
+
+
+      /* ======================================================
+         STUDENT HARD RESET — real premium redesign layer
+         Fixes: weak light mode, generic cards, missing glow borders,
+         sidebar contrast, and old plus-placeholder icons.
+      ====================================================== */
+      :root {
+        --student-page-bg: #07111f;
+        --student-page-bg2: #0c1628;
+        --student-paper: rgba(8, 18, 34, .92);
+        --student-card: rgba(12, 25, 45, .86);
+        --student-card2: rgba(15, 31, 55, .94);
+        --student-text: #f8fafc;
+        --student-muted: #cbd5e1;
+        --student-faint: #93a4ba;
+        --student-border: rgba(245, 158, 11, .28);
+        --student-gold: #f59e0b;
+        --student-orange: #f97316;
+        --student-blue: #38bdf8;
+        --student-purple: #a78bfa;
+        --student-green: #34d399;
+      }
+      :root[data-theme="light"] {
+        --student-page-bg: #eef3f9;
+        --student-page-bg2: #fff7ed;
+        --student-paper: rgba(255, 255, 255, .96);
+        --student-card: rgba(255, 255, 255, .94);
+        --student-card2: #ffffff;
+        --student-text: #101827;
+        --student-muted: #475569;
+        --student-faint: #64748b;
+        --student-border: rgba(245, 158, 11, .32);
+      }
+
+      .v2-student-shell {
+        min-height: 100vh !important;
+        background:
+          radial-gradient(circle at 14% 18%, rgba(245,158,11,.13), transparent 28%),
+          radial-gradient(circle at 88% 8%, rgba(56,189,248,.10), transparent 25%),
+          linear-gradient(135deg, var(--student-page-bg), var(--student-page-bg2)) !important;
+        color: var(--student-text) !important;
+        overflow-x: hidden;
+      }
+      .v2-student-main { padding-inline: clamp(14px, 2vw, 28px) !important; }
+      .nh-page-body { max-width: 1360px !important; padding-block: 12px 96px !important; }
+
+      .nh-topbar {
+        max-width: 520px !important;
+        margin: 14px auto 28px !important;
+        background: rgba(8, 18, 34, .90) !important;
+        color: #f8fafc !important;
+        border: 1px solid rgba(245,158,11,.24) !important;
+        box-shadow: 0 20px 50px rgba(2, 6, 23, .24) !important;
+        border-radius: 999px !important;
+        backdrop-filter: blur(16px) saturate(140%) !important;
+      }
+      .nh-topbar__btn, .nh-topbar__vip, .nh-theme-toggle {
+        background: rgba(255,255,255,.07) !important;
+        color: #f8fafc !important;
+        border-color: rgba(255,255,255,.12) !important;
+      }
+      .nh-theme-toggle { border-color: rgba(245,158,11,.38) !important; }
+
+      .nh-text-sidebar {
+        background: linear-gradient(180deg, #061123 0%, #0a172c 100%) !important;
+        color: #f8fafc !important;
+        border: 1px solid rgba(245,158,11,.28) !important;
+        box-shadow: -12px 0 42px rgba(2,6,23,.18), inset 2px 0 0 rgba(245,158,11,.75) !important;
+      }
+      :root[data-theme="light"] .nh-text-sidebar { background: linear-gradient(180deg, #071225, #0b172a) !important; color: #fff !important; }
+      .nh-text-sidebar__name, .nh-text-sidebar__sub, .nh-nav-group__label, .nh-nav-item { color: #f8fafc !important; }
+      .nh-text-sidebar__sub, .nh-nav-group__label { opacity: .72; }
+      .nh-nav-item svg { flex: 0 0 auto; filter: drop-shadow(0 0 8px rgba(245,158,11,.08)); }
+      .nh-nav-item.is-active { background: linear-gradient(135deg, #f59e0b, #fb923c) !important; color: #111827 !important; box-shadow: 0 18px 42px rgba(245,158,11,.32) !important; }
+      .nh-nav-item.is-active svg { color: #111827 !important; }
+
+      @keyframes nhStudentSweep { 0% { transform: translateX(120%) skewX(-12deg); opacity: 0; } 18% { opacity: .9; } 50%,100% { transform: translateX(-120%) skewX(-12deg); opacity: 0; } }
+      @keyframes nhStudentBorderPulse { 0%,100% { box-shadow: 0 24px 70px rgba(2,6,23,.22), 0 0 0 1px rgba(245,158,11,.20); } 50% { box-shadow: 0 30px 88px rgba(2,6,23,.28), 0 0 0 1px rgba(245,158,11,.46), 0 0 34px rgba(245,158,11,.18); } }
+      .nh-animated-border, .nh-student-premium-hero, .nh-student-inner-hero, .nh-student-action-card, .nh-soft-panel, .glass-panel, .glass-card {
+        position: relative !important;
+        isolation: isolate !important;
+        overflow: hidden !important;
+      }
+      .nh-animated-border::after, .nh-student-premium-hero::after, .nh-student-inner-hero::after, .nh-student-action-card::after, .nh-soft-panel::after {
+        content: '' !important;
+        position: absolute !important;
+        inset: 0 !important;
+        border-radius: inherit !important;
+        pointer-events: none !important;
+        background: linear-gradient(105deg, transparent 18%, rgba(255,255,255,.38), rgba(245,158,11,.28), transparent 72%) !important;
+        width: 62% !important;
+        transform: translateX(120%) skewX(-12deg);
+        animation: nhStudentSweep 5.4s ease-in-out infinite !important;
+        mix-blend-mode: screen;
+        z-index: 3;
+      }
+
+      .nh-student-premium-hero {
+        border-radius: 36px !important;
+        padding: clamp(22px, 3vw, 38px) !important;
+        background:
+          radial-gradient(circle at 12% 22%, rgba(245,158,11,.24), transparent 26%),
+          radial-gradient(circle at 95% 5%, rgba(56,189,248,.18), transparent 30%),
+          linear-gradient(135deg, #071225 0%, #0b1830 48%, #211709 100%) !important;
+        border: 1px solid rgba(245,158,11,.38) !important;
+        color: #f8fafc !important;
+        animation: nhStudentBorderPulse 7s ease-in-out infinite !important;
+      }
+      .nh-student-premium-hero h1 { color: #f8fafc !important; letter-spacing: -.02em; text-shadow: 0 4px 26px rgba(0,0,0,.35); }
+      .nh-student-premium-hero p { color: #cbd5e1 !important; }
+      .nh-student-continue-fused {
+        background: rgba(255,255,255,.08) !important;
+        border-color: rgba(255,255,255,.14) !important;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.08) !important;
+      }
+      .nh-student-premium-hero button { color: inherit; }
+      .nh-student-premium-hero .grid.grid-cols-2 button {
+        background: rgba(255,255,255,.09) !important;
+        border: 1px solid rgba(255,255,255,.13) !important;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.08) !important;
+      }
+
+      .nh-student-stats-grid { margin-top: 14px !important; }
+      .nh-student-action-card {
+        min-height: 128px !important;
+        border: 1px solid rgba(255,255,255,.18) !important;
+        box-shadow: 0 20px 48px rgba(2,6,23,.20) !important;
+      }
+      .nh-student-action-card svg { width: 34px !important; height: 34px !important; opacity: .95; }
+      .nh-student-action-card p { color: rgba(255,255,255,.92) !important; }
+
+      .nh-soft-panel, .nh-rating-card, .nh-student-inner-hero {
+        background: var(--student-card2) !important;
+        color: var(--student-text) !important;
+        border: 1px solid var(--student-border) !important;
+        box-shadow: 0 18px 48px rgba(15,23,42,.10) !important;
+      }
+      .nh-soft-panel h3, .nh-soft-panel p, .nh-rating-card p { color: var(--student-text) !important; }
+      .nh-soft-panel .bg-slate-50, .nh-soft-panel .bg-white, .nh-soft-panel [class*="bg-"] { border-color: rgba(245,158,11,.16) !important; }
+
+      .nh-student-inner-hero {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) minmax(320px, .78fr) !important;
+        gap: 18px !important;
+        border-radius: 36px !important;
+        padding: clamp(22px, 3vw, 34px) !important;
+        background:
+          radial-gradient(circle at 12% 20%, rgba(245,158,11,.20), transparent 27%),
+          radial-gradient(circle at 94% 18%, rgba(56,189,248,.14), transparent 30%),
+          linear-gradient(135deg, #081426, #10253a) !important;
+        color: #f8fafc !important;
+      }
+      .nh-student-inner-hero__main { display: flex; align-items: center; gap: 18px; min-width: 0; }
+      .nh-student-inner-hero__icon {
+        width: 76px; height: 76px; border-radius: 24px; display: grid; place-items: center; flex: 0 0 auto;
+        background: linear-gradient(135deg, #f59e0b, #f97316); color: #111827; box-shadow: 0 20px 42px rgba(245,158,11,.34);
+      }
+      .nh-student-inner-hero__badge { display: inline-flex; color: #fbbf24 !important; font-size: 12px; font-weight: 1000; margin-bottom: 6px; }
+      .nh-student-inner-hero h1 { color: #fff !important; font-size: clamp(2rem, 4vw, 3.5rem) !important; font-weight: 1000 !important; line-height: 1.18 !important; margin: 0 !important; }
+      .nh-student-inner-hero p { color: #cbd5e1 !important; font-weight: 800 !important; line-height: 1.9 !important; margin-top: 8px !important; }
+      .nh-student-inner-hero__side { display: flex; flex-direction: column; gap: 12px; align-self: stretch; justify-content: center; }
+      .nh-student-inner-search { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 16px; border-radius: 18px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.13); color: #e2e8f0; font-weight: 900; }
+      .nh-student-inner-shortcuts { display: flex; flex-wrap: wrap; gap: 10px; }
+      .nh-student-inner-shortcuts button { display: inline-flex; align-items: center; gap: 7px; min-height: 42px; padding: 0 14px; border-radius: 999px; background: rgba(255,255,255,.08); color: #f8fafc; border: 1px solid rgba(255,255,255,.14); font-weight: 1000; }
+      .nh-student-inner-shortcuts button.is-active, .nh-student-inner-shortcuts button:hover { background: linear-gradient(135deg, #f59e0b, #f97316) !important; color: #111827 !important; }
+      .nh-student-inner-stats { grid-column: 1 / -1; display: grid !important; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+      .nh-student-mini-stat { min-height: 84px; border-radius: 20px; padding: 13px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.13); display: flex; flex-direction: column; gap: 4px; color: #fff; }
+      .nh-student-mini-stat svg { color: #fbbf24; }
+      .nh-student-mini-stat strong { font-size: 24px; line-height: 1; color: #fff; }
+      .nh-student-mini-stat span { color: #cbd5e1; font-weight: 900; font-size: 12px; }
+      .nh-student-inner-plan { grid-column: 1 / -1; border-radius: 18px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.11); padding: 12px 16px; color: #fde68a; font-weight: 900; }
+      .nh-student-inner-plan > div { display: flex; align-items: center; gap: 9px; }
+
+      .glass-panel, .glass-card, .bg-white, .bg-white\/90, .bg-white\/95, .bg-white\/80 {
+        color: var(--student-text) !important;
+      }
+      :root[data-theme="light"] .glass-panel, :root[data-theme="light"] .glass-card,
+      :root[data-theme="light"] .bg-white, :root[data-theme="light"] .bg-white\/90, :root[data-theme="light"] .bg-white\/95, :root[data-theme="light"] .bg-white\/80 {
+        background: rgba(255,255,255,.96) !important;
+        color: #101827 !important;
+      }
+      :root[data-theme="light"] .text-slate-900, :root[data-theme="light"] .text-slate-800, :root[data-theme="light"] .text-slate-700 { color: #101827 !important; }
+      :root[data-theme="light"] .text-slate-600, :root[data-theme="light"] .text-slate-500, :root[data-theme="light"] .text-slate-400 { color: #475569 !important; }
+      :root[data-theme="light"] input, :root[data-theme="light"] select, :root[data-theme="light"] textarea { background: #fff !important; color: #101827 !important; }
+
+      .fixed.bottom-5.left-5, .fixed.bottom-6.left-6, [class*="واتساب"] {
+        z-index: 90 !important;
+      }
+
+      @media (max-width: 1100px) {
+        .nh-student-inner-hero { grid-template-columns: 1fr !important; }
+        .nh-student-inner-stats { grid-template-columns: repeat(3, minmax(0,1fr)) !important; }
+      }
+      @media (max-width: 640px) {
+        .nh-page-body { padding-bottom: 118px !important; }
+        .nh-student-premium-hero, .nh-student-inner-hero { border-radius: 28px !important; padding: 18px !important; }
+        .nh-student-inner-stats { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+        .nh-student-stats-grid { grid-template-columns: 1fr !important; }
+      }
+
       @media (prefers-reduced-motion: reduce) {
         *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: 0.001ms !important; }
       }

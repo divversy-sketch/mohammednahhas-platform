@@ -105,7 +105,7 @@ export const AuthPage = ({ onBack }) => {
   };
 
   return (
-    <div className="nh-auth-page min-h-screen flex items-center justify-center p-4 md:p-8 font-['Cairo'] relative overflow-hidden" dir="rtl">
+    <div className="min-h-screen flex items-center justify-center p-4 md:p-8 bg-[var(--nh-bg)] font-['Cairo'] relative overflow-hidden" dir="rtl">
       <FloatingArabicBackground />
 
       <div className="absolute top-5 left-5 z-20 flex gap-3">
@@ -151,7 +151,7 @@ export const AuthPage = ({ onBack }) => {
           initial={{ scale: 0.94, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: .38 }}
-          className="nh-auth-card nh-animated-border rounded-[2.3rem] border p-5 md:p-8 shadow-2xl relative z-10 my-10 max-h-[92vh] overflow-y-auto"
+          className="nh-animated-border rounded-[2.3rem] border p-5 md:p-8 shadow-2xl relative z-10 my-10 max-h-[92vh] overflow-y-auto"
         >
           <div className="flex justify-center mb-5 md:hidden"><ModernLogo /></div>
           <div className="text-center mb-6">
@@ -201,7 +201,7 @@ export const AuthPage = ({ onBack }) => {
           </div>
         </motion.div>
 
-        <div className="nh-auth-side hidden lg:block space-y-4">
+        <div className="hidden lg:block space-y-4">
           <h3 className="text-xl font-black text-[var(--nh-text)] text-center">خيارات أخرى</h3>
           <button onClick={() => setIsRegister(false)} className="nh-animated-border w-full rounded-3xl border p-5 text-right bg-white/5 hover:bg-white/10 transition">
             <div className="flex items-center justify-between gap-4">
