@@ -1,78 +1,207 @@
 import { useState, useEffect } from 'react';
-
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { PlayCircle, Video, Facebook, Code, DownloadCloud } from '../../shared/icons/lucide-shim.jsx';
+import {
+  PlayCircle,
+  Video,
+  Facebook,
+  Code,
+  DownloadCloud,
+  BookOpen,
+  BrainCircuit,
+  BarChart3,
+  Trophy,
+  MessageCircle,
+  Star,
+  Clock,
+  Target,
+  Layers,
+  Sparkles,
+  CheckCircle,
+  GraduationCap,
+  FileText
+} from '../../shared/icons/lucide-shim.jsx';
 
 import { db } from '../../services/firebase';
 import SecureVideoPlayer from '../../features/lectures/SecureVideoPlayer';
-
-
-import { ModernLogo, FloatingArabicBackground, WisdomBox } from '../../features/home/HomeWidgets';
-
+import { ModernLogo } from '../../features/home/HomeWidgets';
 import InteractiveViewer from '../../features/content/InteractiveViewer';
-
-
 import { WhatsAppContactButton } from '../../shared/core/platformShared.jsx';
 
+const StatCard = ({ icon: Icon, value, label, hint, tone = 'amber' }) => (
+  <div className={`nh-landing-stat nh-landing-stat--${tone} nh-animated-border`}>
+    <span className="nh-landing-stat__icon"><Icon size={28} /></span>
+    <div>
+      <strong>{value}</strong>
+      <span>{label}</span>
+      <small>{hint}</small>
+    </div>
+  </div>
+);
+
+const FeaturePill = ({ icon: Icon, children }) => (
+  <span className="nh-landing-pill">
+    <Icon size={17} />
+    {children}
+  </span>
+);
+
+const PublicListCard = ({ title, icon: Icon, empty, items, type, onOpen, color = 'amber' }) => (
+  <section className={`nh-landing-content-card nh-landing-content-card--${color} nh-animated-border`}>
+    <div className="nh-landing-section-head">
+      <div>
+        <small>{type}</small>
+        <h3>{title}</h3>
+      </div>
+      <span><Icon size={28} /></span>
+    </div>
+    <div className="nh-landing-content-list">
+      {items.length > 0 ? items.map((item, i) => (
+        <button key={i} type="button" onClick={() => onOpen(item)} className="nh-landing-content-row">
+          <span className="nh-landing-content-row__icon"><Icon size={20} /></span>
+          <span className="nh-landing-content-row__text">{item.title}</span>
+          <span className="nh-landing-content-row__action">فتح</span>
+        </button>
+      )) : <p className="nh-landing-empty">{empty}</p>}
+    </div>
+  </section>
+);
 
 export const LandingPage = ({ onAuthClick, installPrompt }) => {
   const [publicContent, setPublicContent] = useState([]);
-  const [playingVideo, setPlayingVideo] = useState(null); 
+  const [playingVideo, setPlayingVideo] = useState(null);
   const [playingHtml, setPlayingHtml] = useState(null);
-  
-  useEffect(() => { const u = onSnapshot(query(collection(db, 'content'), where('isPublic', '==', true)), s => setPublicContent(s.docs.map(d=>d.data()))); return u; }, []);
-  const openFacebook = () => window.open("https://www.facebook.com/share/17aiUQWKf5/", "_blank");
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db, 'content'), where('isPublic', '==', true)),
+      (snap) => setPublicContent(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      () => setPublicContent([])
+    );
+    return unsub;
+  }, []);
+
+  const openFacebook = () => window.open('https://www.facebook.com/share/17aiUQWKf5/', '_blank');
+  const videos = publicContent.filter((c) => c.type === 'video');
+  const interactive = publicContent.filter((c) => c.type === 'html');
 
   return (
-    <div className="min-h-screen font-['Cairo'] relative overflow-x-hidden" dir="rtl">
+    <div className="nh-landing-page min-h-screen" dir="rtl">
       {playingVideo && <SecureVideoPlayer video={playingVideo} user={null} userName="زائر" onClose={() => setPlayingVideo(null)} />}
       {playingHtml && <InteractiveViewer content={playingHtml} user={null} onClose={() => setPlayingHtml(null)} />}
-      <FloatingArabicBackground />
+      <div className="nh-landing-bg" aria-hidden="true">
+        <span className="orb orb-1" />
+        <span className="orb orb-2" />
+        <span className="orb orb-3" />
+      </div>
+
       <WhatsAppContactButton />
-      <nav className="relative z-10 flex justify-between items-center p-4 md:p-6 max-w-7xl mx-auto glass-panel mt-4 rounded-full mx-2 md:mx-4 shadow-lg">
-        <div className="flex items-center gap-2"><ModernLogo /><span className="text-xl md:text-2xl font-bold font-arabic text-amber-800 hidden md:block">منصة النحاس</span></div>
-        <div className="flex gap-2 md:gap-4 items-center">
-          {installPrompt && ( <button onClick={installPrompt} className="hidden md:flex bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full font-bold shadow-lg shadow-green-500/30 transition items-center gap-2"><DownloadCloud size={18}/> تثبيت</button> )}
-          <button onClick={openFacebook} className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition shadow-lg hover:shadow-blue-500/50"><Facebook size={20}/></button>
-          <button onClick={onAuthClick} className="bg-slate-900 text-white px-4 md:px-6 py-2 rounded-full font-bold shadow-lg hover:shadow-slate-500/50 transition transform hover:-translate-y-0.5 text-sm md:text-base">دخول الطالب</button>
-        </div>
-      </nav>
-      <main className="relative z-10 px-4 mt-10 max-w-7xl mx-auto text-center">
-        <h1 className="text-4xl md:text-7xl font-black text-slate-900 mb-6 leading-tight">اللغة العربية <span className="text-amber-600">لعبتك</span></h1>
-        <p className="text-lg md:text-xl text-slate-600 mb-8 max-w-2xl mx-auto">أقوى منصة تعليمية للمرحلة الإعدادية والثانوية.</p>
-        <button onClick={onAuthClick} className="bg-amber-600 text-white px-8 md:px-10 py-3 md:py-4 rounded-2xl text-lg md:text-xl font-bold shadow-xl hover:bg-amber-700 transition transform hover:-translate-y-1">اشترك الآن 🚀</button>
-        {installPrompt && (<div className="md:hidden mt-6"><button onClick={installPrompt} className="bg-green-600 text-white px-6 py-3 rounded-full font-bold shadow-lg flex items-center gap-2 mx-auto text-sm"><DownloadCloud size={18}/> تثبيت المنصة على هاتفك</button></div>)}
-        <div className="my-12 px-2"><WisdomBox /></div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 mt-10 mb-20 px-2">
-          <div className="bg-white/80 backdrop-blur p-4 md:p-6 rounded-3xl border border-white shadow-sm overflow-hidden">
-            <h3 className="text-xl md:text-2xl font-bold mb-4 flex items-center gap-2 text-blue-700"><Video /> فيديوهات للجميع</h3>
-            <div className="space-y-4">
-              {publicContent.filter(c => c.type === 'video').length > 0 ? publicContent.filter(c => c.type === 'video').map((v, i) => (
-                 <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl shadow-sm cursor-pointer hover:bg-gray-50" onClick={() => setPlayingVideo(v)}>
-                     <div className="flex items-center gap-3 overflow-hidden">
-                         <PlayCircle className="text-amber-500 shrink-0"/>
-                         <span className="font-bold truncate text-sm md:text-base">{v.title}</span>
-                     </div>
-                     <span className="text-[10px] md:text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded shrink-0">مشاهدة</span>
-                 </div>
-               )) : <p className="text-slate-500 text-sm">لا توجد فيديوهات عامة حالياً</p>}
-            </div>
-          </div>
-          <div className="bg-white/80 backdrop-blur p-4 md:p-6 rounded-3xl border border-white shadow-sm overflow-hidden">
-            <h3 className="text-xl md:text-2xl font-bold mb-4 flex items-center gap-2 text-purple-700"><Code /> تفاعلي للجميع</h3>
-            <div className="space-y-4">
-              {publicContent.filter(c => c.type === 'html').length > 0 ? publicContent.filter(c => c.type === 'html').map((h, i) => (
-                 <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl shadow-sm cursor-pointer hover:bg-gray-50" onClick={() => setPlayingHtml(h)}>
-                     <div className="flex items-center gap-3 overflow-hidden">
-                         <Code className="text-purple-500 shrink-0"/>
-                         <span className="font-bold truncate text-sm md:text-base">{h.title}</span>
-                     </div>
-                     <span className="text-[10px] md:text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded shrink-0">تشغيل</span>
-                 </div>
-               )) : <p className="text-slate-500 text-sm">لا يوجد محتوى تفاعلي عام حالياً</p>}
-            </div>
+
+      <header className="nh-landing-topbar nh-animated-border">
+        <div className="nh-landing-brand">
+          <ModernLogo />
+          <div>
+            <strong>منصة النحاس التعليمية</strong>
+            <span>تعلّم بذكاء .. تميّز بثقة</span>
           </div>
         </div>
+        <nav className="nh-landing-nav" aria-label="روابط المنصة">
+          <a href="#features">المميزات</a>
+          <a href="#public-content">المحتوى المجاني</a>
+          <button type="button" onClick={openFacebook} className="nh-landing-icon-btn" aria-label="Facebook"><Facebook size={19} /></button>
+          {installPrompt && (
+            <button type="button" onClick={installPrompt} className="nh-landing-install"><DownloadCloud size={18} /> تثبيت</button>
+          )}
+          <button type="button" onClick={onAuthClick} className="nh-landing-login">دخول الطالب</button>
+        </nav>
+      </header>
+
+      <main className="nh-landing-main">
+        <section className="nh-landing-hero nh-animated-border">
+          <div className="nh-landing-visual" aria-hidden="true">
+            <div className="nh-landing-monitor nh-animated-border">
+              <span className="monitor-play"><PlayCircle size={86} /></span>
+              <span className="monitor-spark s1"><Sparkles size={18} /></span>
+              <span className="monitor-spark s2"><Star size={18} /></span>
+            </div>
+            <div className="nh-landing-books">
+              <span className="book book-1" />
+              <span className="book book-2" />
+              <span className="book book-3" />
+            </div>
+            <div className="nh-landing-cap"><GraduationCap size={54} /></div>
+          </div>
+
+          <div className="nh-landing-hero-copy">
+            <div className="nh-landing-badge"><Star size={17} /> مسارك المثالي</div>
+            <h1>اللغة العربية <span>لعبتك</span></h1>
+            <p>منصة تعليمية متكاملة للمرحلة الإعدادية والثانوية، تجمع الشرح والاختبارات والملفات والمتابعة الذكية في تجربة واحدة.</p>
+            <div className="nh-landing-pills" id="features">
+              <FeaturePill icon={BookOpen}>مناهج شاملة</FeaturePill>
+              <FeaturePill icon={BrainCircuit}>اختبارات ذكية</FeaturePill>
+              <FeaturePill icon={BarChart3}>متابعة مستمرة</FeaturePill>
+            </div>
+            <div className="nh-landing-actions">
+              <button type="button" onClick={onAuthClick} className="nh-landing-primary"><PlayCircle size={20} /> استكمال التعلم</button>
+              <button type="button" onClick={onAuthClick} className="nh-landing-secondary"><Clock size={20} /> متابعة من آخر درس</button>
+            </div>
+            <div className="nh-landing-progress nh-animated-border">
+              <div><span>تقدمك الحالي</span><strong>65%</strong></div>
+              <i><b style={{ width: '65%' }} /></i>
+            </div>
+          </div>
+        </section>
+
+        <section className="nh-landing-stats" aria-label="إحصائيات المنصة">
+          <StatCard icon={Trophy} value="8" label="إنجازات" hint="شارات وتحديات" tone="amber" />
+          <StatCard icon={BookOpen} value="36" label="درس" hint="شرح منظم" tone="sky" />
+          <StatCard icon={BrainCircuit} value="12" label="اختبار" hint="قياس مستواك" tone="violet" />
+          <StatCard icon={MessageCircle} value="24/7" label="دعم" hint="متابعة مستمرة" tone="emerald" />
+        </section>
+
+        <section className="nh-landing-journey nh-animated-border">
+          <div className="nh-landing-section-head">
+            <div>
+              <small>تعلم بنظام واضح</small>
+              <h2>كل ما تحتاجه في لوحة واحدة</h2>
+            </div>
+            <span><Target size={30} /></span>
+          </div>
+          <div className="nh-landing-journey-grid">
+            {[
+              { icon: Video, title: 'محاضرات مرتبة', text: 'شاهد الدروس بجودة واضحة وخطوات سهلة.' },
+              { icon: FileText, title: 'ملفات وملازم', text: 'ملخصات وملفات مراجعة قابلة للوصول السريع.' },
+              { icon: CheckCircle, title: 'اختبارات قصيرة', text: 'تدريب مستمر ونتائج تساعدك تعرف مستواك.' },
+              { icon: Layers, title: 'مسار تعليمي', text: 'انتقال ذكي بين الدرس والواجب والمراجعة.' }
+            ].map((item) => (
+              <article key={item.title} className="nh-landing-mini-card nh-animated-border">
+                <span><item.icon size={28} /></span>
+                <h3>{item.title}</h3>
+                <p>{item.text}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section id="public-content" className="nh-landing-content-grid">
+          <PublicListCard
+            title="فيديوهات للجميع"
+            type="مشاهدة مجانية"
+            icon={Video}
+            empty="لا توجد فيديوهات عامة حالياً"
+            items={videos}
+            onOpen={setPlayingVideo}
+            color="sky"
+          />
+          <PublicListCard
+            title="تفاعلي للجميع"
+            type="تجربة تفاعلية"
+            icon={Code}
+            empty="لا يوجد محتوى تفاعلي عام حالياً"
+            items={interactive}
+            onOpen={setPlayingHtml}
+            color="violet"
+          />
+        </section>
       </main>
     </div>
   );

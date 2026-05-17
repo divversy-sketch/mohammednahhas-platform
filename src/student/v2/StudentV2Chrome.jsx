@@ -6,6 +6,7 @@ import {
   Target, User, X, Sparkles, Trophy, Layout,
 } from '../../shared/icons/lucide-shim.jsx';
 import { ModernLogo } from '../../features/home/HomeWidgets.jsx';
+import ThemeToggle from '../../shared/ui/ThemeToggle.jsx';
 
 /* ─── تعريف الأقسام ─── */
 const NAV_GROUPS = [
@@ -182,6 +183,7 @@ export function StudentV2Topbar({
         )}
       </div>
       <div className="nh-topbar__right">
+        <ThemeToggle />
         <button
           onClick={() => setShowFocusMode(true)}
           className="nh-topbar__btn"
@@ -206,12 +208,13 @@ export function StudentV2Topbar({
 }
 
 /* ─── Section Title ─── */
-export function StudentV2SectionTitle({ badge, title, action }) {
+export function StudentV2SectionTitle({ badge, title, description, action }) {
   return (
     <div className="nh-section-title">
       <div>
         {badge && <span className="nh-kicker">{badge}</span>}
         <h2 className="nh-section-title__h">{title}</h2>
+        {description && <p className="nh-section-title__desc">{description}</p>}
       </div>
       {action && <div className="nh-section-title__action">{action}</div>}
     </div>
