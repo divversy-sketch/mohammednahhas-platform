@@ -3,9 +3,10 @@ import {
   Bell, BookOpen, BrainCircuit, ClipboardList, Code,
   Crown, FileCheck, FileText, Headphones, LogOut, Menu,
   MessageSquare, MoreVertical, PlayCircle, Settings,
-  Target, User, X, Sparkles, Trophy, Layout,
-} from '../../shared/icons/lucide-shim.jsx';
+  Target, User, X, Sparkles, Trophy, LayoutDashboard as Layout,
+} from 'lucide-react';
 import { ModernLogo } from '../../features/home/HomeWidgets.jsx';
+import ThemeToggle from '../../shared/ui/ThemeToggle.jsx';
 
 /* ─── تعريف الأقسام ─── */
 const NAV_GROUPS = [
@@ -34,7 +35,7 @@ const NAV_GROUPS = [
     permission: 'content',
     items: [
       { tab: 'student_messages', label: 'رسائلي',     icon: MessageSquare },
-      { tab: 'support',          label: 'الدعم الفني', icon: Bell          },
+      { tab: 'support',          label: 'الدعم الفني', icon: Headphones    },
     ],
   },
   {
@@ -182,6 +183,7 @@ export function StudentV2Topbar({
         )}
       </div>
       <div className="nh-topbar__right">
+        <ThemeToggle />
         <button
           onClick={() => setShowFocusMode(true)}
           className="nh-topbar__btn"
@@ -206,12 +208,13 @@ export function StudentV2Topbar({
 }
 
 /* ─── Section Title ─── */
-export function StudentV2SectionTitle({ badge, title, action }) {
+export function StudentV2SectionTitle({ badge, title, description, action }) {
   return (
     <div className="nh-section-title">
       <div>
         {badge && <span className="nh-kicker">{badge}</span>}
         <h2 className="nh-section-title__h">{title}</h2>
+        {description && <p className="nh-section-title__desc">{description}</p>}
       </div>
       {action && <div className="nh-section-title__action">{action}</div>}
     </div>

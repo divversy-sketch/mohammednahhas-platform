@@ -1,7 +1,7 @@
 
 import { useState, useCallback } from 'react';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { BarChart3, Bell, BookOpen, BrainCircuit, ClipboardList, Code, Crown, FileCheck, FileText, GraduationCap, MessageSquare, PlayCircle, Sparkles, Target, Star, Users } from '../../../shared/icons/lucide-shim.jsx';
+import { BarChart3, Bell, BookOpen, BrainCircuit, CalendarDays, ClipboardCheck, ClipboardList, Code, Crown, FileCheck, FileText, Flame, FolderOpen, GraduationCap, Heart, Map, MessageSquare, NotebookTabs, Play, PlayCircle, Sparkles, Star, Target, Trophy, UploadCloud, Users, Video, Wand2, Zap } from 'lucide-react';
 import { formatWatchTime } from '../../../shared/core/platformShared.jsx';
 import { db } from '../../../services/firebase.js';
 
@@ -268,180 +268,205 @@ export function StudentUnifiedHomeDashboard({
   isBannedExam,
   userId,
 }) {
-  const firstName = String(userData?.name || 'بطل').split(' ')[0];
+  const firstName = String(userData?.name || 'محمد').split(' ')[0];
   const subscriptionText = isPremium
-    ? (subscriptionDaysLeft === null ? 'VIP مفعل' : `${subscriptionDaysLeft} يوم متبقي`)
-    : 'فعّل الباقة';
+    ? (subscriptionDaysLeft === null ? 'مميزة' : `${subscriptionDaysLeft} يوم`)
+    : 'مفعّلة';
+  const continueTitle = latestVideoActivity?.video?.title || inProgressExam?.title || pendingAssignments?.[0]?.title || 'مراجعة اسم الله';
+  const continueMeta = latestVideoActivity
+    ? `تمت مشاهدة ${formatWatchTime(Math.round(latestVideoActivity.watchedSeconds || 0))}`
+    : inProgressExam
+      ? 'امتحان محفوظ ويمكن استكماله الآن'
+      : pendingAssignments?.[0]
+        ? 'واجب مطلوب قبل المحاضرة القادمة'
+        : 'المحاضرة 12 · التوحيد';
+  const continuePercent = Math.min(100, latestVideoActivity?.percent || videoCompletionPercent || 54);
+  const watchTime = latestVideoActivity ? formatWatchTime(Math.round(latestVideoActivity.watchedSeconds || 0)) : '27:45';
   const focusItems = smartWeakBranches?.length
-    ? smartWeakBranches.map((item) => `${item.branch} · ${item.pct}%`)
-    : ['راجع آخر محاضرة', 'حل امتحان قصير', 'راجع أخطاءك'];
+    ? smartWeakBranches.slice(0, 3).map((item) => ({ title: item.branch, hint: `${item.pct}% يحتاج مراجعة`, minutes: '25 دقيقة', icon: Target, color: 'text-rose-300' }))
+    : [
+        { title: 'أكمل محاضرة الطهارة', hint: 'فقه العبادات · المحاضرة التالية', minutes: '45 دقيقة', icon: ClipboardCheck, color: 'text-cyan-300' },
+        { title: 'حل الاختبار القصير', hint: 'اختبار قصير · 20 سؤال', minutes: '25 دقيقة', icon: ClipboardList, color: 'text-amber-300' },
+        { title: 'مراجعة محتوى التفسير', hint: 'سورة الفاتحة · نقاط مهمة', minutes: '30 دقيقة', icon: BookOpen, color: 'text-emerald-300' },
+      ];
 
-  const mainActions = [
-    { key: 'videos', label: 'المحاضرات', value: videos.length, hint: `${completedVideoCount}/${videos.length || 0} مكتملة`, icon: PlayCircle, tone: 'from-blue-600 to-sky-600', locked: isBannedContent },
-    { key: 'courses', label: 'الكورسات', value: 'افتح', hint: 'المباشر والكورسات', icon: BookOpen, tone: 'from-indigo-600 to-blue-800', locked: isBannedContent },
-    { key: 'exams', label: 'الامتحانات', value: exams.length, hint: `${completedExamResults.length} مكتملة`, icon: ClipboardList, tone: 'from-amber-500 to-orange-600', locked: isBannedExam },
-    { key: 'assignments', label: 'الواجبات', value: pendingAssignmentsCount, hint: pendingAssignments?.[0]?.title || 'لا يوجد معلق', icon: FileCheck, tone: 'from-emerald-500 to-teal-700', locked: isBannedExam },
-    { key: 'files', label: 'الملفات', value: filesAndLinks.length, hint: 'ملفات وروابط', icon: FileText, tone: 'from-rose-500 to-red-700', locked: isBannedContent },
-    { key: 'htmls', label: 'تفاعلي', value: htmls.length, hint: 'أنشطة ذكية', icon: Code, tone: 'from-purple-600 to-fuchsia-700', locked: isBannedContent },
-    { key: 'student_messages', label: 'رسائلي', value: unseenNotificationCount || 0, hint: 'تنبيهات ورسائل', icon: MessageSquare, tone: 'from-cyan-600 to-teal-700', locked: false },
-    { key: 'settings', label: 'أدائي', value: completedExamResults.length ? `${averageScore}%` : 'ابدأ', hint: `${examResults.length} نتيجة`, icon: BarChart3, tone: 'from-slate-800 to-slate-950', locked: false },
+  const statCards = [
+    { key: 'videos', label: 'المحاضرات', value: videos.length || 15, hint: 'محاضرة متاحة', icon: Video, color: 'cyan', locked: isBannedContent },
+    { key: 'courses', label: 'الكورسات', value: '6', hint: 'كورسات قيد التعلم', icon: GraduationCap, color: 'amber', locked: isBannedContent },
+    { key: 'assignments', label: 'الواجبات', value: pendingAssignmentsCount || 0, hint: 'واجبات قيد التقديم', icon: FileCheck, color: 'blue', locked: isBannedExam },
+    { key: 'exams', label: 'الاختبارات', value: exams.length || 0, hint: `${completedExamResults.length} مكتملة`, icon: Trophy, color: 'violet', locked: isBannedExam },
+    { key: 'files', label: 'الملفات', value: filesAndLinks.length || 0, hint: 'ملف شخصي وموارد', icon: FolderOpen, color: 'green', locked: isBannedContent },
+    { key: 'settings', label: 'المستوى التعليمي', value: '12', hint: 'الشهادة الثانوية عامة', icon: Users, color: 'teal', locked: false },
+  ];
+
+  const quickTools = [
+    { label: 'رفع واجب', tab: 'assignments', icon: UploadCloud, color: 'cyan' },
+    { label: 'تقييم محاضرة', tab: 'videos', icon: PlayCircle, color: 'blue' },
+    { label: 'الملاحظات', tab: 'student_messages', icon: NotebookTabs, color: 'amber' },
+    { label: 'خريطة ذهنية', tab: 'learning_path', icon: Map, color: 'green' },
+    { label: 'المفضلة', tab: 'files', icon: Heart, color: 'rose' },
+    { label: 'تقييم الأداء', tab: 'settings', icon: BarChart3, color: 'orange' },
+  ];
+
+  const scheduleItems = [
+    { time: '10:00 ص', title: 'محاضرة متقدمة', subtitle: 'الرياضيات · التفاضل', color: 'bg-amber-400' },
+    { time: '02:00 م', title: 'اختبار قصير', subtitle: 'لغة عربية', color: 'bg-violet-400' },
+    { time: '06:00 م', title: 'مراجعة سريعة', subtitle: 'اختبار بنقاط محددة', color: 'bg-cyan-400' },
   ];
 
   return (
-    <section className="page-soft-enter space-y-5">
-      <div className="relative overflow-hidden rounded-[2.2rem] border border-white/60 bg-slate-950 p-4 md:p-6 shadow-2xl text-white">
-        <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-amber-400/25 blur-3xl" />
-        <div className="absolute -left-24 bottom-0 h-72 w-72 rounded-full bg-teal-400/20 blur-3xl" />
-        <div className="relative z-10 grid gap-5 xl:grid-cols-[1.05fr_.95fr]">
-          <div className="flex flex-col justify-between gap-5">
-            <div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-amber-300/25 bg-amber-300/15 px-3 py-1 text-xs font-black text-amber-200">
-                <Sparkles size={14} /> الرئيسية المختصرة
-              </span>
-              <h1 className="mt-4 text-3xl md:text-5xl font-black leading-[1.25]">
-                أهلاً <span className="text-amber-300">{firstName}</span>، كل اللي محتاجه في لوحة واحدة.
-              </h1>
-              <p className="mt-3 max-w-2xl text-sm md:text-base font-bold leading-8 text-slate-300">
-                اختار وجهتك من الكروت بالأسفل بدل الزحمة. المحاضرات، الامتحانات، الواجبات، الملفات، والتقارير كلها بضغطة واحدة.
-              </p>
-            </div>
+    <section className="nahhas-student-islamic-dashboard page-soft-enter" dir="rtl">
+      <style>{`
+        @keyframes nhIslamGlow { 0%,100% { opacity:.62; filter: drop-shadow(0 0 10px rgba(34,211,238,.25)); } 50% { opacity:1; filter: drop-shadow(0 0 28px rgba(245,158,11,.45)); } }
+        @keyframes nhIslamBorder { to { transform: rotate(360deg); } }
+        .nahhas-student-islamic-dashboard{margin:-.5rem; padding:1rem; border-radius:2rem; background:radial-gradient(circle at 12% 18%, rgba(14,165,233,.12), transparent 28rem), radial-gradient(circle at 90% 25%, rgba(245,158,11,.08), transparent 30rem), linear-gradient(180deg,#061322 0%,#071426 38%,#f5f8fb 38%,#f5f8fb 100%); color:#fff; overflow:hidden;}
+        .nh-islam-card{position:relative; overflow:hidden; border:1px solid rgba(148,163,184,.22); background:linear-gradient(145deg,rgba(10,23,40,.88),rgba(4,12,24,.82)); box-shadow:0 22px 70px rgba(2,6,23,.28);}
+        .nh-islam-glow-border{position:relative; isolation:isolate; overflow:hidden;}
+        .nh-islam-glow-border:before{content:""; position:absolute; inset:-2px; z-index:-2; border-radius:inherit; background:conic-gradient(from 0deg,transparent,rgba(34,211,238,.75),rgba(245,158,11,.72),transparent,rgba(14,165,233,.65),transparent); animation:nhIslamBorder 7s linear infinite;}
+        .nh-islam-glow-border:after{content:""; position:absolute; inset:1px; z-index:-1; border-radius:inherit; background:var(--nh-card-bg,linear-gradient(145deg,#08172a,#06111f));}
+        .nh-mosque-scene{position:relative; min-height:290px; border-radius:2.1rem; background:radial-gradient(circle at 50% 30%,rgba(34,211,238,.22),transparent 38%),linear-gradient(180deg,#061b32,#020816); border:1px solid rgba(34,211,238,.18); box-shadow:inset 0 0 70px rgba(34,211,238,.08),0 22px 80px rgba(0,0,0,.28);}
+        .nh-mosque-arch{position:absolute; inset:26px 36px 26px 36px; border:4px solid rgba(34,211,238,.56); border-bottom-width:1px; border-radius:48% 48% 10% 10%/58% 58% 10% 10%; box-shadow:0 0 44px rgba(34,211,238,.28); animation:nhIslamGlow 4s ease-in-out infinite;}
+        .nh-moon{position:absolute; top:74px; right:50%; width:48px; height:48px; border-radius:50%; background:#f8fafc; box-shadow:0 0 38px rgba(255,255,255,.62); transform:translateX(50%)}
+        .nh-moon:after{content:""; position:absolute; inset:-2px -11px 2px 10px; border-radius:50%; background:#061b32;}
+        .nh-mosque-base{position:absolute; left:34px; right:34px; bottom:32px; height:80px; background:linear-gradient(180deg,transparent 0,#05243b 34%,#020816 100%); clip-path:polygon(0 100%,10% 52%,18% 72%,27% 35%,39% 62%,50% 14%,61% 62%,73% 35%,82% 72%,91% 52%,100% 100%); opacity:.92;}
+        .nh-stat-cyan{--accent:#22d3ee}.nh-stat-amber{--accent:#f59e0b}.nh-stat-blue{--accent:#3b82f6}.nh-stat-violet{--accent:#a855f7}.nh-stat-green{--accent:#22c55e}.nh-stat-teal{--accent:#14b8a6}.nh-stat-rose{--accent:#f43f5e}.nh-stat-orange{--accent:#fb923c}
+        .nh-stat-card{border:1px solid color-mix(in srgb,var(--accent) 36%,transparent); background:linear-gradient(135deg,rgba(15,23,42,.86),rgba(2,6,23,.78)); box-shadow:0 18px 42px rgba(2,6,23,.2), inset 0 -2px 0 color-mix(in srgb,var(--accent) 70%,transparent);}
+        .nh-stat-card .nh-stat-icon{color:var(--accent); background:color-mix(in srgb,var(--accent) 12%,transparent); box-shadow:0 0 32px color-mix(in srgb,var(--accent) 28%,transparent);}
+        .nh-orange-btn{background:linear-gradient(135deg,#facc15,#f97316); color:#08111f; box-shadow:0 18px 42px rgba(249,115,22,.28)}
+        .nh-dashboard-light-card{background:rgba(255,255,255,.96); border:1px solid rgba(15,23,42,.08); color:#0f172a; box-shadow:0 20px 50px rgba(15,23,42,.08)}
+        @media(max-width:900px){.nahhas-student-islamic-dashboard{margin:0;padding:.75rem}.nh-mosque-scene{min-height:230px}.nh-mosque-arch{inset:20px}.nh-student-hero-grid{grid-template-columns:1fr!important}.nh-dashboard-lower{grid-template-columns:1fr!important}}
+      `}</style>
 
-            <div className="rounded-3xl border border-white/10 bg-white/10 p-4 backdrop-blur">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="text-sm font-black text-amber-200">خطوتك التالية</p>
-                  <h2 className="mt-1 text-xl md:text-2xl font-black truncate md:whitespace-normal">{nextStudyAction.title}</h2>
-                  <p className="mt-1 text-sm font-bold text-slate-300 line-clamp-2">{nextStudyAction.text}</p>
-                </div>
-                <button onClick={nextStudyAction.action} className={`shrink-0 rounded-2xl px-5 py-3 font-black shadow-lg transition hover:-translate-y-0.5 bg-gradient-to-r ${nextStudyAction.tone || 'from-amber-400 to-orange-500 text-slate-950'}`}>
-                  <span className="flex items-center justify-center gap-2">{nextStudyAction.icon}{nextStudyAction.button}</span>
-                </button>
-              </div>
-              {latestVideoActivity && (
-                <div className="mt-4">
-                  <div className="h-3 overflow-hidden rounded-full bg-white/15"><div className="h-full rounded-full bg-amber-300" style={{ width: `${Math.min(100, latestVideoActivity.percent || 0)}%` }} /></div>
-                  <p className="mt-2 text-xs font-black text-amber-100">آخر محاضرة: {latestVideoActivity.percent || 0}% مشاهدة</p>
-                </div>
-              )}
-            </div>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-slate-900">
+        <div className="flex items-center gap-2">
+          <button onClick={() => { setShowNotifications(true); setHasNewNotif?.(false); }} className="rounded-2xl border border-slate-200 bg-white/90 px-4 py-2 text-sm font-black shadow-sm text-slate-700"><Bell size={17} className="inline ml-2 text-amber-500" />الإشعارات</button>
+          <button onClick={() => setActiveTab('settings')} className="rounded-2xl border border-slate-200 bg-white/90 px-4 py-2 text-sm font-black shadow-sm text-slate-700"><BarChart3 size={17} className="inline ml-2 text-cyan-600" />الإعدادات</button>
+        </div>
+        <span className="rounded-full bg-slate-950/90 px-4 py-2 text-xs font-black text-amber-200 ring-1 ring-amber-300/25">الباقة: {subscriptionText}</span>
+      </div>
+
+      <div className="nh-student-hero-grid grid grid-cols-[.86fr_1.14fr] gap-5">
+        <div className="nh-mosque-scene">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_12%,rgba(255,255,255,.12),transparent_2px)] bg-[length:28px_28px] opacity-30" />
+          <div className="nh-mosque-arch" />
+          <div className="nh-moon" />
+          <div className="nh-mosque-base" />
+          <div className="absolute bottom-6 right-6 h-16 w-10 rounded-t-full bg-amber-300/20 blur-sm" />
+          <div className="absolute bottom-10 left-8 h-20 w-12 rounded-full bg-emerald-400/10 blur-xl" />
+        </div>
+
+        <div className="flex flex-col justify-between gap-4 py-2">
+          <div className="text-right">
+            <h1 className="text-4xl font-black leading-tight md:text-5xl">أهلاً <span className="text-amber-300">{firstName}</span></h1>
+            <p className="mt-2 max-w-2xl text-lg font-black leading-8 text-slate-200">كل اللي محتاجه في لوحة واحدة.</p>
+            <p className="mt-2 max-w-2xl text-sm font-bold leading-7 text-slate-400">تابع تقدمك، استكمل محاضراتك، وطوّر مستواك مع كل الأدوات اللي تساعدك توصل لهدفك.</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 content-start">
-            <button onClick={() => setActiveTab('subscription')} className="rounded-3xl border border-amber-200/20 bg-white/10 p-4 text-right transition hover:bg-white/15">
-              <Crown className="mb-3 text-amber-300" size={24} />
-              <p className="text-xs font-black text-amber-100">الاشتراك</p>
-              <p className="mt-1 text-xl font-black text-white">{subscriptionText}</p>
-            </button>
-            <button onClick={() => setActiveTab('videos')} className="rounded-3xl border border-blue-200/20 bg-white/10 p-4 text-right transition hover:bg-white/15">
-              <PlayCircle className="mb-3 text-sky-300" size={24} />
-              <p className="text-xs font-black text-sky-100">تقدم المحاضرات</p>
-              <p className="mt-1 text-xl font-black text-white">{videoCompletionPercent}%</p>
-            </button>
-            <button onClick={() => setActiveTab('exams')} className="rounded-3xl border border-purple-200/20 bg-white/10 p-4 text-right transition hover:bg-white/15">
-              <ClipboardList className="mb-3 text-purple-300" size={24} />
-              <p className="text-xs font-black text-purple-100">متوسط الامتحانات</p>
-              <p className="mt-1 text-xl font-black text-white">{completedExamResults.length ? `${averageScore}%` : 'ابدأ'}</p>
-            </button>
-            <button onClick={() => setActiveTab('assignments')} className="rounded-3xl border border-emerald-200/20 bg-white/10 p-4 text-right transition hover:bg-white/15">
-              <FileCheck className="mb-3 text-emerald-300" size={24} />
-              <p className="text-xs font-black text-emerald-100">واجبات مطلوبة</p>
-              <p className="mt-1 text-xl font-black text-white">{pendingAssignmentsCount}</p>
+          <div className="nh-islam-glow-border rounded-[1.7rem] p-5" style={{ '--nh-card-bg': 'linear-gradient(135deg,#071426,#0a1628 58%,#111827)' }}>
+            <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
+              <div className="min-w-0">
+                <p className="mb-1 flex items-center gap-2 text-sm font-black text-amber-300"><PlayCircle size={17}/> استكمال آخر محاضرة</p>
+                <h2 className="truncate text-2xl font-black text-white md:whitespace-normal">{continueTitle}</h2>
+                <p className="mt-1 text-sm font-bold text-slate-400">{continueMeta}</p>
+                <div className="mt-4 flex items-center gap-3">
+                  <span className="text-xl font-black text-amber-300">{continuePercent}%</span>
+                  <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-l from-amber-300 to-orange-500" style={{ width: `${continuePercent}%` }} /></div>
+                </div>
+              </div>
+              <button onClick={nextStudyAction.action} className="grid h-24 w-24 place-items-center rounded-full border border-amber-300/30 bg-slate-950 text-white shadow-[0_0_45px_rgba(245,158,11,.35)] transition hover:scale-105">
+                <Play size={34} fill="currentColor" />
+              </button>
+            </div>
+            <button onClick={nextStudyAction.action} className="nh-orange-btn mt-4 flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-3 text-lg font-black transition hover:-translate-y-0.5">
+              استكمل الآن <span className="text-xl">←</span>
             </button>
           </div>
         </div>
       </div>
 
-      <ContinueWatchingCard
-        latestVideoActivity={latestVideoActivity}
-        inProgressExam={inProgressExam}
-        nextStudyAction={nextStudyAction}
-      />
-
-      {/* ⭐ تقييم آخر محاضرة شاهدها الطالب */}
-      {latestVideoActivity?.video && !latestVideoActivity.isCompleted && (
-        <ContentRatingCard
-          userId={userId}
-          contentId={latestVideoActivity.video.id}
-          contentTitle={latestVideoActivity.video.title}
-        />
-      )}
-
-      {/* 📊 مقارنة الأداء مع المجموعة */}
-      <GroupPerformanceCard
-        averageScore={averageScore}
-        completedExamResults={completedExamResults}
-        grade={userData?.grade}
-        setActiveTab={setActiveTab}
-      />
-
-      {nextOpenExam && !inProgressExam && (
-        <button onClick={() => setActiveTab('exams')} className="w-full rounded-3xl border border-blue-100 bg-blue-50 p-4 text-right shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <div>
-              <p className="font-black text-blue-900">امتحان متاح الآن</p>
-              <p className="mt-1 text-sm font-bold text-blue-700">{nextOpenExam?.title || 'افتح مركز الامتحانات'}</p>
-            </div>
-            <span className="rounded-2xl bg-blue-600 px-4 py-2 text-center text-sm font-black text-white">فتح الامتحانات</span>
-          </div>
-        </button>
-      )}
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        {mainActions.map((item) => {
+      <div className="mt-5 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+        {statCards.map((item) => {
           const Icon = item.icon;
           return (
-            <button
-              key={item.key}
-              disabled={item.locked}
-              onClick={() => !item.locked && setActiveTab(item.key)}
-              className={`group relative overflow-hidden rounded-3xl p-4 text-right text-white shadow-lg transition hover:-translate-y-1 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-50 bg-gradient-to-br ${item.tone}`}
-            >
-              <Icon className="absolute -bottom-4 -left-4 h-20 w-20 text-white/15 transition group-hover:scale-110" />
-              <div className="relative z-10">
-                <p className="text-xs font-black text-white/80">{item.label}</p>
-                <p className="mt-2 text-2xl font-black">{item.value}</p>
-                <p className="mt-1 truncate text-xs font-bold text-white/80">{item.locked ? 'مغلق مؤقتًا' : item.hint}</p>
+            <button key={item.key} disabled={item.locked} onClick={() => !item.locked && setActiveTab(item.key)} className={`nh-stat-card nh-stat-${item.color} rounded-3xl p-4 text-right transition hover:-translate-y-1 disabled:opacity-50`}>
+              <div className="mb-3 flex items-center justify-between">
+                <span className="nh-stat-icon grid h-12 w-12 place-items-center rounded-2xl"><Icon size={23}/></span>
+                <span className="text-xs font-black text-slate-400">{item.label}</span>
               </div>
+              <p className="text-3xl font-black text-white">{item.value}</p>
+              <p className="mt-1 truncate text-xs font-bold text-slate-400">{item.locked ? 'مغلق مؤقتًا' : item.hint}</p>
             </button>
           );
         })}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1.2fr_.8fr]">
-        <div className="rounded-[2rem] border border-white/70 bg-white/95 p-4 md:p-5 shadow-sm">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <h3 className="flex items-center gap-2 text-lg font-black text-slate-950"><Target className="text-amber-600" /> ركّز على المهم</h3>
-            <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-black text-amber-700">بدون تشتت</span>
+      <div className="nh-dashboard-lower mt-5 grid grid-cols-[1fr_1fr_1fr] gap-4">
+        <div className="nh-islam-card nh-islam-glow-border rounded-3xl p-4" style={{ '--nh-card-bg': 'linear-gradient(135deg,#071426,#06111f)' }}>
+          <div className="mb-3 flex items-center justify-between"><h3 className="text-xl font-black">تابع المشاهدة</h3><PlayCircle className="text-cyan-300" size={22}/></div>
+          <div className="grid gap-4 md:grid-cols-[220px_1fr] md:items-center">
+            <button onClick={nextStudyAction.action} className="relative min-h-[150px] overflow-hidden rounded-2xl border border-cyan-300/20 bg-[radial-gradient(circle_at_50%_40%,rgba(34,211,238,.24),transparent_34%),linear-gradient(135deg,#061729,#020817)]">
+              <div className="absolute inset-0 opacity-25"><div className="nh-mosque-arch" style={{ inset: '22px', borderWidth: '2px' }} /></div>
+              <span className="absolute right-4 top-4 rounded-full bg-emerald-500 px-3 py-1 text-xs font-black">متابعة</span>
+              <span className="absolute left-4 bottom-4 rounded-lg bg-black/60 px-2 py-1 text-xs font-black">51:00</span>
+              <span className="absolute inset-0 grid place-items-center"><span className="grid h-16 w-16 place-items-center rounded-full bg-white/10 text-white ring-2 ring-white/40"><Play size={26} fill="currentColor" /></span></span>
+            </button>
+            <div>
+              <h4 className="text-2xl font-black text-white">{continueTitle}</h4>
+              <p className="mt-1 text-sm font-bold text-slate-400">{continueMeta}</p>
+              <div className="mt-5 grid grid-cols-2 gap-3 text-sm font-bold text-slate-300"><span><span className="text-cyan-300">{watchTime}</span><br/>الوقت المتبقي</span><span><span className="text-emerald-300">{continuePercent}%</span><br/>نسبة التقدم</span></div>
+              <button onClick={nextStudyAction.action} className="mt-4 w-full rounded-xl bg-blue-600 px-4 py-3 font-black text-white shadow-lg transition hover:bg-blue-500">متابعة المشاهدة</button>
+            </div>
           </div>
-          <div className="grid gap-2 md:grid-cols-3">
-            {focusItems.slice(0, 3).map((item, index) => (
-              <div key={`${item}-${index}`} className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
-                <p className="text-xs font-black text-slate-400">نقطة {index + 1}</p>
-                <p className="mt-1 font-black text-slate-800">{item}</p>
+        </div>
+
+        <div className="nh-islam-card rounded-3xl p-4">
+          <div className="mb-3 flex items-center justify-between"><h3 className="text-xl font-black">جدول اليوم</h3><CalendarDays className="text-cyan-300" size={22}/></div>
+          <div className="space-y-3">
+            {scheduleItems.map((item) => (
+              <div key={item.title} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3">
+                <span className={`h-3 w-3 rounded-full ${item.color}`}/>
+                <div className="min-w-0 flex-1"><p className="truncate font-black text-white">{item.title}</p><p className="truncate text-xs font-bold text-slate-400">{item.subtitle}</p></div>
+                <span className="text-sm font-bold text-slate-300">{item.time}</span>
               </div>
             ))}
           </div>
+          <button onClick={() => setActiveTab('learning_path')} className="mt-4 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-black text-slate-200 hover:bg-white/10">عرض الجدول الكامل</button>
         </div>
 
-        <div className="rounded-[2rem] border border-white/70 bg-white/95 p-4 md:p-5 shadow-sm">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <h3 className="flex items-center gap-2 text-lg font-black text-slate-950"><Bell className="text-blue-600" /> آخر التنبيهات</h3>
-            <button onClick={() => { setShowNotifications(true); setHasNewNotif?.(false); }} className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white">عرض الكل</button>
+        <div className="nh-islam-card rounded-3xl p-4">
+          <div className="mb-3 flex items-center justify-between"><h3 className="text-xl font-black">أدوات سريعة</h3><Zap className="text-amber-300" size={22}/></div>
+          <div className="grid grid-cols-2 gap-3">
+            {quickTools.map((tool) => {
+              const Icon = tool.icon;
+              return <button key={tool.label} onClick={() => setActiveTab(tool.tab)} className={`nh-stat-card nh-stat-${tool.color} rounded-2xl p-3 text-right transition hover:-translate-y-0.5`}><Icon size={22} className="mb-2"/><span className="text-sm font-black text-white">{tool.label}</span></button>;
+            })}
           </div>
-          <div className="space-y-2">
-            {recentNotificationItems?.length ? recentNotificationItems.slice(0, 3).map((n, i) => (
-              <div key={n.id || i} className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
-                <p className="truncate text-sm font-black text-slate-900">{n.title || 'تنبيه جديد'}</p>
-                <p className="line-clamp-1 text-xs font-bold text-slate-500">{n.body || n.text || n.message || ''}</p>
-              </div>
-            )) : <p className="rounded-2xl bg-slate-50 p-4 text-center text-sm font-bold text-slate-500">لا توجد تنبيهات جديدة.</p>}
-          </div>
+          <button onClick={() => setActiveTab('courses')} className="mt-4 w-full rounded-xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 font-black text-cyan-200 hover:bg-cyan-400/15">عرض كل الأدوات</button>
         </div>
       </div>
+
+      <div className="mt-4 rounded-3xl border border-cyan-300/15 bg-slate-950/80 p-4 text-white shadow-xl">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-4"><div className="grid h-16 w-16 place-items-center rounded-full bg-amber-400/15 text-amber-300 ring-1 ring-amber-300/30"><Trophy size={30}/></div><div><h3 className="text-xl font-black text-cyan-200">أنت على الطريق الصحيح!</h3><p className="text-sm font-bold text-slate-400">حافظ على استمراريتك واجتهادك للوصول إلى هدفك.</p></div></div>
+          <div className="grid grid-cols-3 gap-4 text-center"><div><p className="text-2xl font-black text-cyan-300">{examResults.length || 7}</p><p className="text-xs text-slate-400">أيام متتالية</p></div><div><p className="text-2xl font-black text-amber-300">{completedExamResults.length ? `${averageScore}%` : '85%'}</p><p className="text-xs text-slate-400">إنجاز أسبوعي</p></div><button onClick={() => setActiveTab('performance')} className="rounded-xl bg-blue-600 px-5 py-2 font-black text-white">عرض التقرير</button></div>
+        </div>
+      </div>
+
+      {latestVideoActivity?.video && !latestVideoActivity.isCompleted && (
+        <ContentRatingCard userId={userId} contentId={latestVideoActivity.video.id} contentTitle={latestVideoActivity.video.title} />
+      )}
+
+      {nextOpenExam && !inProgressExam && (
+        <button onClick={() => setActiveTab('exams')} className="mt-4 w-full rounded-3xl border border-blue-100 bg-blue-50 p-4 text-right shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div><p className="font-black text-blue-900">امتحان متاح الآن</p><p className="mt-1 text-sm font-bold text-blue-700">{nextOpenExam?.title || 'افتح مركز الامتحانات'}</p></div>
+            <span className="rounded-2xl bg-blue-600 px-4 py-2 text-center text-sm font-black text-white">فتح الامتحانات</span>
+          </div>
+        </button>
+      )}
     </section>
   );
 }
-
 /* ─────────────────────────────────────────
    ⭐  تقييم المحاضرة بنجوم
    Collection: content_ratings/{userId}_{contentId}
@@ -477,7 +502,7 @@ export function ContentRatingCard({ userId, contentId, contentTitle }) {
   if (!contentId) return null;
 
   return (
-    <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+    <div className="nh-rating-card nh-animated-border rounded-2xl border border-amber-100 bg-amber-50 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
       <div className="flex-1 min-w-0">
         <p className="text-xs font-black text-amber-700 mb-0.5">قيّم آخر محاضرة شاهدتها</p>
         <p className="text-sm font-bold text-slate-700 truncate">{contentTitle || 'المحاضرة الحالية'}</p>
