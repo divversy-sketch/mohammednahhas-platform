@@ -1,10 +1,10 @@
 # Architecture Report
 
-Generated: 2026-05-22T20:03:08.426Z
+Generated: 2026-05-22T20:32:39.884Z
 
 ## Summary
 
-- Source files scanned: 650
+- Source files scanned: 655
 - Feature folders: 37
 - Feature folders without index.js: 0
 - Compatibility/legacy files remaining: 64

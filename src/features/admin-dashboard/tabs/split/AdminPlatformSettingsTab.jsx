@@ -25,6 +25,7 @@ import { AdminGlobalSearch, AdminLiveClassesPanel, AdminCertificatesPanel, Admin
 import AdminAllUsersTab from '@features/admin-dashboard/tabs/users/AdminAllUsersTab.jsx';
 import AdminDashboardOverviewTab from '@features/admin-dashboard/tabs/dashboard/AdminDashboardOverviewTab.jsx';
 import AdminSystemHealthPanel from '@admin/components/AdminSystemHealthPanel.jsx';
+import { AdminStudentPortalGateManager } from '@features/platform-maintenance/index.js';
 
 export default function AdminPlatformSettingsTab({ ctx }) {
   const {
@@ -214,6 +215,7 @@ export default function AdminPlatformSettingsTab({ ctx }) {
 {activeTab === 'platform_settings' && (
             <div className="space-y-6">
               <AdminPlatformSettingsManager userData={userData} />
+              <AdminStudentPortalGateManager adminUser={adminProfile || userData} />
               <AdminGrowthSuite initialTab="mobile" compact users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} assignments={assignments} assignmentSubmissions={assignmentSubmissions} subscriptionCodes={subscriptionCodes} notifications={announcements} userData={userData} />
               <AdminStudentSuccessSuite variant="gamification" users={activeUsersList} examResults={examResults} />
               <AdminSystemHealthPanel />

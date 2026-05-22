@@ -154,7 +154,7 @@ export const StudentDashboardController = ({ user, userData, installPrompt }) =>
       }
   };
 
-  const { getVideoWatchPercent, handleVideoProgress, latestVideoActivity } = useStudentVideoProgress({ user, videos, videoViews, setVideoViews });
+  const { getStoredLocalVideoProgress, getVideoWatchPercent, handleVideoProgress, latestVideoActivity } = useStudentVideoProgress({ user, videos, videoViews, setVideoViews });
 
   const canOpenLinkedExam = (videoItem) => {
       if (!videoItem?.linkedExamId) return false;
