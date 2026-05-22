@@ -20,7 +20,7 @@ import {
 } from '../../shared/icons/lucide-shim.jsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { auth, db, savePushTokenForUser, setupForegroundPushListener } from '../../services/firebase';
-import SecureVideoPlayer from '../../features/lectures/SecureVideoPlayer';
+import SecureVideoPlayer from '@features/video-security/player/SecureVideoPlayer.jsx';
 import MobileStudentBottomNav from '../../features/student/MobileStudentBottomNav';
 import MobileExamHelperStyles from '../../shared/components/MobileExamHelperStyles';
 import DesignSystemLoader from '../../shared/components/DesignSystemLoader';

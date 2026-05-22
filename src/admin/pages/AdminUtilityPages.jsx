@@ -2,7 +2,7 @@
 import { Trash2 } from '../../shared/icons/lucide-shim.jsx';
 import { InlineTabs } from '../../shared/core/platformShared.jsx';
 import AssignmentsManager from '../parts/AssignmentsManager.jsx';
-import QuestionBankManager from '../parts/QuestionBankManager.jsx';
+import QuestionBankManager from '@features/question-bank/components/QuestionBankManager.jsx';
 
 export function AdminQuestionBankPage({ adminGradeFilter }) {
   return <InlineTabs tabs={[{ key: 'bank', label: 'إدارة بنك الأسئلة', content: <QuestionBankManager adminGradeFilter={adminGradeFilter} /> }]} />;

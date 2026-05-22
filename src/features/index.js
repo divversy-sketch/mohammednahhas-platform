@@ -1,0 +1,12 @@
+export * as adminDashboardFeature from './admin-dashboard/index.js';
+export * as examsFeature from './exams/index.js';
+export * as leaderboardFeature from './leaderboard/index.js';
+export * as lecturesFeature from './lectures/index.js';
+export * as notificationsFeature from './notifications/index.js';
+export * as paymentsFeature from './payments/index.js';
+export * as questionBankFeature from './question-bank/index.js';
+export * as studentDashboardFeature from './student-dashboard/index.js';
+export * as studentsFeature from './students/index.js';
+export * as subscriptionsFeature from './subscriptions/index.js';
+export * as supportFeature from './support/index.js';
+export * as videoSecurityFeature from './video-security/index.js';

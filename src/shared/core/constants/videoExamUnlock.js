@@ -1,0 +1,1 @@
+export const DEFAULT_VIDEO_EXAM_UNLOCK_PERCENT = 80;
