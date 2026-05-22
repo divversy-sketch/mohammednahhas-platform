@@ -1,8 +1,6 @@
 import React, { lazy, Suspense } from 'react';
 import { PlayCircle, FileText, LogOut, User, Lock, Menu, X, Loader2, Phone, MessageSquare, BookOpen, ClipboardList, Unlock, Settings, Bell, Download, Code, Sparkles, Ban, RefreshCw, Link as LinkIcon, QrCode, FileCheck, BarChart3, BrainCircuit, Headphones, DownloadCloud, Play, Target, Crown, CreditCard, Key } from '@shared/icons/lucide-shim.jsx';
-import { signOut } from 'firebase/auth';
 import { motion } from 'framer-motion';
-import { auth } from '@services/firebase';
 import { GradeOptions, getGradeLabel } from '@shared/constants/grades';
 import { PWAInstallBox, ModernLogo, FloatingArabicBackground } from '@features/home/HomeWidgets';
 import PomodoroFocusMode from '@features/study/PomodoroFocusMode';
@@ -11,7 +9,7 @@ import PerformanceOverview from '@features/student-dashboard/components/Performa
 import { StudentUnifiedHomeDashboard } from '@features/student-dashboard/components/home/StudentHomeCards.jsx';
 import { LearningHubTabs } from '@features/student-dashboard/components/layout/StudentLayoutParts.jsx';
 import { StudentV2SectionTitle, StudentV2Sidebar, StudentV2Topbar } from '@features/student-dashboard/components/chrome/StudentV2Chrome.jsx';
-import StudentAssignmentsPanel from '@features/admin-dashboard/legacy/parts/StudentAssignmentsPanel.jsx';
+import StudentAssignmentsPanel from '@features/students/assignments/StudentAssignmentsPanel.jsx';
 import StudentSuccessPanel from '@features/studentSuccess/StudentSuccessPanel.jsx';
 import { imagePlacementStyle } from '@shared/utils/imagePlacement.js';
 import { StudentLiveClassesPanel, StudentExamReviewCenter, StudentCertificatePanel } from '@features/product/ProductExperienceSuite.jsx';

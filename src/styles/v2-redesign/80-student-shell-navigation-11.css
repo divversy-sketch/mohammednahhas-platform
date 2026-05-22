@@ -1,0 +1,4 @@
+/* إخفاء القديم بالكامل عندما يكون النظام الجديد شغال */
+.v2-student-command-nav { display: none !important; }
+.v2-mobile-topbar        { display: none !important; }
+.v2-student-toolbar      { display: none !important; }

@@ -1,5 +1,5 @@
 
-import ExamRunner from '../../shared/platformParts/ExamRunner.jsx';
+import ExamRunner from '@features/exams/runner/ExamRunner.jsx';
 
 export default function AdminReviewExamOverlay({ adminReviewExamData, adminReviewResult, onClose }) {
   if (!adminReviewExamData || !adminReviewResult) return null;

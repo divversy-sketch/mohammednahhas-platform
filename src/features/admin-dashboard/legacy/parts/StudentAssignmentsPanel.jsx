@@ -1,1 +1,1 @@
-export { default } from '../../../../admin/parts/StudentAssignmentsPanel.jsx';
+export { default, StudentAssignmentsPanel } from '@features/students/assignments/StudentAssignmentsPanel.jsx';

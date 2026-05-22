@@ -1,2 +1,1 @@
-export { default } from '../../student/parts/StudentDashboard.jsx';
-export { StudentDashboard } from '../../student/parts/StudentDashboard.jsx';
+export { StudentDashboard as default, StudentDashboard } from '@features/student-dashboard/pages/StudentDashboardPage.jsx';

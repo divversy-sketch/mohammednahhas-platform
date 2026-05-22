@@ -1,0 +1,51 @@
+
+> nahhas-new@0.0.0 build
+> vite build
+
+[36mvite v7.3.3 [32mbuilding client environment for production...[36m[39m
+transforming...
+[32m✓[39m 794 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mdist/[22m[32mindex.html                                          [39m[1m[2m    1.60 kB[22m[1m[22m[2m │ gzip:   0.71 kB[22m
+[2mdist/[22m[2massets/[22m[32mpdf.worker.min-yatZIOMy.mjs                  [39m[1m[2m1,375.84 kB[22m[1m[22m
+[2mdist/[22m[2massets/[22m[35mSecureVideoPlayer-lWnpt-WY.css               [39m[1m[2m    4.40 kB[22m[1m[22m[2m │ gzip:   1.36 kB[22m
+[2mdist/[22m[2massets/[22m[35mindex-CrKDVtJa.css                           [39m[1m[2m  105.96 kB[22m[1m[22m[2m │ gzip:  17.94 kB[22m
+[2mdist/[22m[2massets/[22m[36mmedia-DTpRj9UO.js                            [39m[1m[2m    0.48 kB[22m[1m[22m[2m │ gzip:   0.39 kB[22m
+[2mdist/[22m[2massets/[22m[36mWhatsAppContactButton-yH7tH3Jq.js            [39m[1m[2m    0.67 kB[22m[1m[22m[2m │ gzip:   0.43 kB[22m
+[2mdist/[22m[2massets/[22m[36mimagePlacement-BeVgV6VF.js                   [39m[1m[2m    0.69 kB[22m[1m[22m[2m │ gzip:   0.34 kB[22m
+[2mdist/[22m[2massets/[22m[36mAccessDeniedPage-BF7ee-Qw.js                 [39m[1m[2m    1.48 kB[22m[1m[22m[2m │ gzip:   0.77 kB[22m
+[2mdist/[22m[2massets/[22m[36mEmptyState-RdI57CyD.js                       [39m[1m[2m    1.50 kB[22m[1m[22m[2m │ gzip:   0.76 kB[22m
+[2mdist/[22m[2massets/[22m[36mgrades-ChcF303e.js                           [39m[1m[2m    1.55 kB[22m[1m[22m[2m │ gzip:   0.64 kB[22m
+[2mdist/[22m[2massets/[22m[36mInteractiveViewer-Bt3piFZm.js                [39m[1m[2m    2.75 kB[22m[1m[22m[2m │ gzip:   1.31 kB[22m
+[2mdist/[22m[2massets/[22m[36mImageFitControls-oEH5DtEL.js                 [39m[1m[2m    2.98 kB[22m[1m[22m[2m │ gzip:   1.03 kB[22m
+[2mdist/[22m[2massets/[22m[36mStudentApp-ChNXYAx4.js                       [39m[1m[2m    3.82 kB[22m[1m[22m[2m │ gzip:   1.71 kB[22m
+[2mdist/[22m[2massets/[22m[36mlearningInsights-CEPE7m1p.js                 [39m[1m[2m    4.71 kB[22m[1m[22m[2m │ gzip:   2.16 kB[22m
+[2mdist/[22m[2massets/[22m[36mcomponents-DOlzyQaR.js                       [39m[1m[2m    4.73 kB[22m[1m[22m[2m │ gzip:   2.04 kB[22m
+[2mdist/[22m[2massets/[22m[36mHomeWidgets-CqyPBh4w.js                      [39m[1m[2m    5.11 kB[22m[1m[22m[2m │ gzip:   2.51 kB[22m
+[2mdist/[22m[2massets/[22m[36mAdminPasswordResetRequestsPanel-C2AeLa7B.js  [39m[1m[2m    5.36 kB[22m[1m[22m[2m │ gzip:   2.14 kB[22m
+[2mdist/[22m[2massets/[22m[36mLandingPage-WazIdHjJ.js                      [39m[1m[2m    5.89 kB[22m[1m[22m[2m │ gzip:   2.09 kB[22m
+[2mdist/[22m[2massets/[22m[36mAdminApp-BwNIntZZ.js                         [39m[1m[2m    6.06 kB[22m[1m[22m[2m │ gzip:   2.45 kB[22m
+[2mdist/[22m[2massets/[22m[36mpdf-BxkrTKfO.js                              [39m[1m[2m    6.58 kB[22m[1m[22m[2m │ gzip:   2.10 kB[22m
+[2mdist/[22m[2massets/[22m[36mStudentLearningPath-BUezDv2R.js              [39m[1m[2m    6.61 kB[22m[1m[22m[2m │ gzip:   2.42 kB[22m
+[2mdist/[22m[2massets/[22m[36mStudentGrowthPanel-DOEBIdCW.js               [39m[1m[2m    6.63 kB[22m[1m[22m[2m │ gzip:   2.26 kB[22m
+[2mdist/[22m[2massets/[22m[36mAuthPage-DHzXJmMl.js                         [39m[1m[2m    7.68 kB[22m[1m[22m[2m │ gzip:   2.82 kB[22m
+[2mdist/[22m[2massets/[22m[36mSmartLearningEngine-dQtzNx8n.js              [39m[1m[2m    7.94 kB[22m[1m[22m[2m │ gzip:   2.88 kB[22m
+[2mdist/[22m[2massets/[22m[36mindex-CuVYi2gy.js                            [39m[1m[2m   15.96 kB[22m[1m[22m[2m │ gzip:   6.59 kB[22m
+[2mdist/[22m[2massets/[22m[36mCourseSystem-DP_5FLCI.js                     [39m[1m[2m   16.79 kB[22m[1m[22m[2m │ gzip:   5.65 kB[22m
+[2mdist/[22m[2massets/[22m[36mSecureVideoPlayer-DZZ78rkm.js                [39m[1m[2m   18.87 kB[22m[1m[22m[2m │ gzip:   6.60 kB[22m
+[2mdist/[22m[2massets/[22m[36mroutes-z1-t6Wlm.js                           [39m[1m[2m   19.34 kB[22m[1m[22m[2m │ gzip:   6.11 kB[22m
+[2mdist/[22m[2massets/[22m[36mAdminCoursesManager-Dhri62np.js              [39m[1m[2m   23.34 kB[22m[1m[22m[2m │ gzip:   6.01 kB[22m
+[2mdist/[22m[2massets/[22m[36mAdminVideoSecurityPanel-Bf6EB49O.js          [39m[1m[2m   25.89 kB[22m[1m[22m[2m │ gzip:   7.30 kB[22m
+[2mdist/[22m[2massets/[22m[36mAdminDashboardModals-ChJDZR5R.js             [39m[1m[2m   27.75 kB[22m[1m[22m[2m │ gzip:   6.56 kB[22m
+[2mdist/[22m[2massets/[22m[36mReviewQuizSystem-Cm8_bRB-.js                 [39m[1m[2m   29.69 kB[22m[1m[22m[2m │ gzip:   9.27 kB[22m
+[2mdist/[22m[2massets/[22m[36mExamRunner-BJ2HPPgM.js                       [39m[1m[2m   42.98 kB[22m[1m[22m[2m │ gzip:  12.57 kB[22m
+[2mdist/[22m[2massets/[22m[36mDashboardPage-BEc_bwsa.js                    [39m[1m[2m   77.94 kB[22m[1m[22m[2m │ gzip:  18.32 kB[22m
+[2mdist/[22m[2massets/[22m[36mindex-Cwud_PdH.js                            [39m[1m[2m  107.07 kB[22m[1m[22m[2m │ gzip:  34.43 kB[22m
+[2mdist/[22m[2massets/[22m[36mvendor-ui-D9ujqbFO.js                        [39m[1m[2m  125.76 kB[22m[1m[22m[2m │ gzip:  41.28 kB[22m
+[2mdist/[22m[2massets/[22m[36mDashboardPage-DnKTCFA5.js                    [39m[1m[2m  146.71 kB[22m[1m[22m[2m │ gzip:  29.08 kB[22m
+[2mdist/[22m[2massets/[22m[36mvendor-react-BefydQUw.js                     [39m[1m[2m  192.62 kB[22m[1m[22m[2m │ gzip:  60.41 kB[22m
+[2mdist/[22m[2massets/[22m[36mvendor-pdf-BwWoIsTj.js                       [39m[1m[2m  333.77 kB[22m[1m[22m[2m │ gzip:  98.41 kB[22m
+[2mdist/[22m[2massets/[22m[36mAdminDashboardTabs-DxkGrPoH.js               [39m[1m[2m  343.93 kB[22m[1m[22m[2m │ gzip:  59.61 kB[22m
+[2mdist/[22m[2massets/[22m[36mvendor-firebase-CQKFbKac.js                  [39m[1m[2m  385.02 kB[22m[1m[22m[2m │ gzip: 118.98 kB[22m
+[32m✓ built in 6.44s[39m

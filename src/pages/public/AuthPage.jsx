@@ -1,1 +1,1 @@
-export { default } from '../../shared/platformParts/AuthPage.jsx';
+export { default } from '@features/auth/pages/AuthPage.jsx';

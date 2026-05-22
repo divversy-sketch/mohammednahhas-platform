@@ -25,8 +25,8 @@ import AdminSidebar from '@admin/components/AdminSidebar.jsx';
 import AdminLazyFallback from '@admin/dashboard/AdminLazyFallback.jsx';
 
 
-import { adminSecureFunctions } from '@admin/services/adminSecureFunctions.js';
-import { logAdminAction } from '@admin/services/adminAudit.js';
+import { adminSecureFunctions } from '@features/admin-dashboard/services/adminSecureFunctions.js';
+import { logAdminAction } from '@features/admin-dashboard/services/adminAudit.js';
 import { useAdminDashboardActions } from './actions/useAdminDashboardActions.jsx';
 
 

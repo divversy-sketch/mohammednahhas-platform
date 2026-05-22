@@ -1,0 +1,51 @@
+/* ── Nav Groups (مشتركة lg+) ── */
+.nh-nav-group { margin-bottom: 4px; }
+
+.nh-nav-group__label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #475569;
+  padding: 8px 8px 4px;
+  display: block;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.nh-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: right;
+  transition: background .15s, color .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.nh-nav-item:hover { background: rgba(255,255,255,0.06); color: #cbd5e1; }
+
+.nh-nav-item.is-active {
+  background: rgba(20,184,166,0.16);
+  color: #5DCAA5;
+}
+
+.nh-nav-item.is-active svg { color: #1D9E75; }
+
+.nh-nav-item--amber.is-active {
+  background: rgba(245,158,11,0.14);
+  color: #fbbf24;
+}
+
+.nh-nav-item--logout {
+  color: #f87171;
+  margin: 8px 8px 0;
+  width: calc(100% - 16px);
+}
+.nh-nav-item--logout:hover { background: rgba(248,113,113,0.1); }

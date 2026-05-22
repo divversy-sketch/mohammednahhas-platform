@@ -1,0 +1,25 @@
+# خطة فصل الملف: `src/features/admin-dashboard/tabs/split/AdminContentTab.jsx`
+
+**الحجم:** 19.2 KB  
+**القسم:** 04_admin_dashboard  
+**الحالة:** يحتاج فصل لأنه كبير أو يخلط تصميم الواجهة مع منطق التشغيل.
+
+## الرموز/المكونات الموجودة حاليًا
+- `AdminContentTab`
+
+## الملفات المقترح فصلها منه
+- `AdminContentTabView.jsx`
+- `useAdminContentTabController.js`
+- `AdminContentTabParts.jsx`
+
+## عدد الاستيرادات
+26 import
+
+## طريقة النقل الآمنة
+1. ثبّت اسم الـ export الحالي حتى لا تتكسر الاستيرادات.
+2. انقل JSX/Tailwind فقط إلى ملفات View أو Parts.
+3. انقل Firestore/actions/hooks إلى ملفات Controller أو hooks.
+4. انقل الجداول والكروت والمودالات إلى components صغيرة.
+5. بعد كل مجموعة: شغّل build قبل متابعة المجموعة التالية.
+
+> نسخة الملف الأصلية موجودة هنا بامتداد `.original` عشان المبرمج يفكها بدون ما يلمس الملف التشغيلي مباشرة.

@@ -1,0 +1,1 @@
+export default function Tabs({ items = [], activeKey, onChange }) { return <div className="ui-tabs">{items.map((item) => <button key={item.key} type="button" className={item.key === activeKey ? 'is-active' : ''} onClick={() => onChange?.(item.key)}>{item.label}</button>)}</div>; }

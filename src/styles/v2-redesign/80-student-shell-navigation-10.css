@@ -1,0 +1,6 @@
+/* ── Shell الجديد ── */
+.v2-student-shell {
+  display: flex;
+  min-height: 100dvh;
+  position: relative;
+}

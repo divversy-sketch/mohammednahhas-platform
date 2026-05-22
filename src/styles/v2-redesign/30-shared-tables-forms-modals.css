@@ -1,0 +1,64 @@
+/* Phase 4: Unified tables, filters, forms, modals */
+.v2-data-toolbar,
+.v2-table-shell,
+.v2-empty-state,
+.v2-pagination,
+.v2-modal-panel {
+  animation: v2SoftEnter 0.28s ease both;
+}
+
+.v2-table-scroll table {
+  min-width: 760px;
+}
+
+.v2-table-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.v2-table-shell tbody tr:nth-child(even) td {
+  background: rgba(248, 250, 252, 0.45);
+}
+
+.v2-data-toolbar input,
+.v2-data-toolbar select,
+.v2-form-field input,
+.v2-form-field select,
+.v2-form-field textarea {
+  min-height: 3rem;
+}
+
+.v2-form-field input,
+.v2-form-field select,
+.v2-form-field textarea {
+  width: 100%;
+  border-radius: 1rem !important;
+  border: 1px solid rgb(226 232 240) !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  padding: 0.85rem 1rem;
+  font-weight: 700;
+  color: rgb(15 23 42);
+}
+
+.v2-modal-backdrop {
+  animation: v2FadeIn 0.16s ease both;
+}
+
+.v2-modal-panel {
+  animation: v2ModalIn 0.22s ease both;
+}
+
+.v2-action-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.v2-action-menu[open] summary {
+  background: rgb(248 250 252);
+}
+
+.v2-skeleton .animate-pulse {
+  background: linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 45%, #f8fafc 100%);
+  background-size: 220% 100%;
+  animation: v2Skeleton 1.15s ease-in-out infinite;
+}

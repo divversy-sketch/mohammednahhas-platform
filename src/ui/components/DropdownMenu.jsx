@@ -1,0 +1,1 @@
+export default function DropdownMenu({ label = 'إجراءات', items = [] }) { return <details className="ui-dropdown"><summary>{label}</summary><div>{items.map((item) => <button key={item.key || item.label} type="button" onClick={item.onClick}>{item.label}</button>)}</div></details>; }

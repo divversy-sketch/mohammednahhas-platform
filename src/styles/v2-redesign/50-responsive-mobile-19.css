@@ -1,0 +1,18 @@
+/* ══ Mobile adjustments ══ */
+@media (max-width: 767px) {
+  .v2-student-shell { display: block; }
+  .nh-icon-sidebar  { display: none !important; }
+  .nh-text-sidebar  { display: none !important; }
+
+  .v2-student-main {
+    padding-bottom: calc(72px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .nh-topbar {
+    border-radius: 0;
+    position: sticky;
+    top: 0;
+  }
+
+  .nh-page-body { padding: 0 12px 120px; }
+}

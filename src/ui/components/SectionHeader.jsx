@@ -1,0 +1,1 @@
+export default function SectionHeader({ title, description, actions }) { return <header className="ui-section-header"><div><h2>{title}</h2>{description && <p>{description}</p>}</div>{actions && <div>{actions}</div>}</header>; }

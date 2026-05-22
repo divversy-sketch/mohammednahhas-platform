@@ -1,10 +1,10 @@
-import AppErrorBoundary from '../admin/parts/AppErrorBoundary.jsx';
+import AppErrorBoundary from '../shared/core/AppErrorBoundary.jsx';
 import AppProviders from './AppProviders.jsx';
-import PlatformPerformanceBooster from '../admin/parts/PlatformPerformanceBooster.jsx';
+import PlatformPerformanceBooster from '../shared/core/PlatformPerformanceBooster.jsx';
 
 export default function AdminLayout({ children, user }) {
   return (
-    <AppErrorBoundary>
+    <AppErrorBoundary area="admin">
       <AppProviders user={user} performanceBooster={<PlatformPerformanceBooster />}>
         {children}
       </AppProviders>

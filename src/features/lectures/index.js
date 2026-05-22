@@ -1,1 +1,11 @@
 export { default as SecureVideoPlayer } from '@features/video-security/player/SecureVideoPlayer.jsx';
+export * from './services/lectures.service.js';
+export { useStudentLectures } from './hooks/useStudentLectures.js';
+export { useAdminLectures } from './hooks/useAdminLectures.js';
+export { useLectureProgress } from './hooks/useLectureProgress.js';
+export { default as LectureCard } from './components/LectureCard.jsx';
+export { default as LecturesGrid } from './components/LecturesGrid.jsx';
+export { default as LecturePlayer } from './components/LecturePlayer.jsx';
+export { default as LectureFilters } from './components/LectureFilters.jsx';
+export { default as LectureProgressBadge } from './components/LectureProgressBadge.jsx';
+export { default as LectureForm } from './components/LectureForm.jsx';

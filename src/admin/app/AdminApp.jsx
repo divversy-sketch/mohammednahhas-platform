@@ -2,7 +2,7 @@ import { Suspense, lazy } from 'react';
 import { navigatePlatform } from '../../shared/core/debugTools.jsx';
 import AppLoadingScreen from '../../shared/ui/AppLoadingScreen.jsx';
 import { useAdminSession } from '../hooks/useAdminSession.js';
-import AdminLayout from '../../layouts/AdminLayout.jsx';
+import { AdminRoute } from '../../app/routes.jsx';
 
 const AdminDashboardPage = lazy(() => import('../../pages/admin/DashboardPage.jsx'));
 const AuthPage = lazy(() => import('../../pages/public/AuthPage.jsx'));
@@ -32,7 +32,7 @@ function AdminApp() {
   }
 
   return (
-    <AdminLayout user={user}>
+    <AdminRoute user={user}>
       <Suspense fallback={<AdminRouteFallback />}>
         {!user ? (
           <AuthPage key="admin-auth" onBack={() => navigatePlatform('/')} />
@@ -42,7 +42,7 @@ function AdminApp() {
           <AdminAccessDeniedPage key="admin-denied" user={user} />
         )}
       </Suspense>
-    </AdminLayout>
+    </AdminRoute>
   );
 }
 

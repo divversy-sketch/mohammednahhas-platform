@@ -1,0 +1,82 @@
+/* ══ Icon Sidebar (md → lg) ══ */
+.nh-icon-sidebar {
+  display: none;
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+  .nh-icon-sidebar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 64px;
+    min-height: 100dvh;
+    background: #0f172a;
+    padding: 12px 0 16px;
+    gap: 4px;
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    overflow-y: auto;
+    flex-shrink: 0;
+    z-index: 30;
+  }
+
+  .nh-icon-sidebar__logo {
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+
+  .nh-icon-sidebar__nav {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    flex: 1;
+    width: 100%;
+    padding: 0 8px;
+  }
+
+  .nh-icon-btn {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    border: none;
+    background: transparent;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background .15s, color .15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .nh-icon-btn:hover { background: rgba(255,255,255,0.08); color: #cbd5e1; }
+
+  .nh-icon-btn.is-active {
+    background: rgba(20,184,166,0.18);
+    color: #5DCAA5;
+  }
+
+  .nh-icon-btn__dot {
+    position: absolute;
+    inset-inline-start: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 18px;
+    border-radius: 999px;
+    background: #1D9E75;
+  }
+
+  .nh-icon-btn--logout {
+    margin-top: auto;
+    color: #f87171;
+  }
+  .nh-icon-btn--logout:hover { background: rgba(248,113,113,0.12); }
+}

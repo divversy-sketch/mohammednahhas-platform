@@ -1,0 +1,40 @@
+/* Bring older shared elements into the same system without changing their logic. */
+.v2-admin-workspace .rounded-3xl.border.bg-white,
+.v2-student-main .rounded-3xl.border.bg-white,
+.v2-admin-workspace .overflow-x-auto,
+.v2-student-main .overflow-x-auto {
+  border-color: rgba(226, 232, 240, 0.85) !important;
+}
+
+.v2-admin-workspace .fixed.inset-0,
+.v2-student-main .fixed.inset-0 {
+  backdrop-filter: blur(10px);
+}
+
+@keyframes v2FadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes v2ModalIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes v2Skeleton {
+  0% { background-position: 120% 0; }
+  100% { background-position: -120% 0; }
+}
+
+@media (max-width: 767px) {
+  .v2-data-toolbar {
+    border-radius: 1.35rem;
+    padding: 0.9rem;
+  }
+  .v2-table-scroll table {
+    min-width: 620px;
+  }
+  .v2-modal-panel {
+    border-radius: 1.5rem;
+  }
+}

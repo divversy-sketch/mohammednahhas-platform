@@ -1,1 +1,1 @@
-export { default, LeaderboardPanel } from '@features/leaderboard/components/LeaderboardPanel.jsx';
+export { default, LeaderboardPanel } from '@ui/components/LeaderboardPanel.jsx';

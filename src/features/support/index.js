@@ -1,2 +1,10 @@
 export { StudentMessagesInbox } from '../smartLearning/SmartLearningEngine.jsx';
 export { createStudentSupportTicket, validateSupportDraft } from './services/studentSupportTickets.js';
+export * from './services/support.service.js';
+export { useSupportTickets } from './hooks/useSupportTickets.js';
+export { useCreateTicket } from './hooks/useCreateTicket.js';
+export { useUpdateTicketStatus } from './hooks/useUpdateTicketStatus.js';
+export { default as SupportTicketForm } from './components/SupportTicketForm.jsx';
+export { default as SupportTicketsTable } from './components/SupportTicketsTable.jsx';
+export { default as SupportTicketDetailsDrawer } from './components/SupportTicketDetailsDrawer.jsx';
+export { default as TicketStatusBadge } from './components/TicketStatusBadge.jsx';

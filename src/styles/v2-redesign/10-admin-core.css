@@ -1,0 +1,90 @@
+/* Phase 2: Admin core pages redesign polish */
+.v2-admin-workspace .glass-panel,
+.v2-admin-workspace .admin-glass,
+.v2-admin-workspace .dashboard-card {
+  border-radius: 1.5rem !important;
+  border: 1px solid rgba(226, 232, 240, 0.9) !important;
+  background: rgba(255, 255, 255, 0.88) !important;
+  box-shadow: 0 16px 42px rgba(15, 23, 42, 0.07) !important;
+  backdrop-filter: blur(18px);
+}
+
+.v2-admin-workspace h2,
+.v2-admin-workspace h3 {
+  letter-spacing: -0.02em;
+}
+
+.v2-admin-workspace input,
+.v2-admin-workspace select,
+.v2-admin-workspace textarea {
+  border-radius: 1rem !important;
+  border-color: rgb(226 232 240) !important;
+  background: rgba(255,255,255,0.96) !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+
+.v2-admin-workspace input:focus,
+.v2-admin-workspace select:focus,
+.v2-admin-workspace textarea:focus {
+  outline: none !important;
+  border-color: rgb(245 158 11) !important;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.14) !important;
+}
+
+.v2-admin-workspace button:not(.v2-btn) {
+  border-radius: 1rem;
+  transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease, background .18s ease;
+}
+
+.v2-admin-workspace button:not(.v2-btn):hover {
+  transform: translateY(-1px);
+}
+
+.v2-admin-workspace table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+}
+
+.v2-admin-workspace thead th {
+  background: rgb(248 250 252) !important;
+  color: rgb(51 65 85) !important;
+  font-weight: 900 !important;
+  font-size: .82rem;
+  padding: .95rem !important;
+  border-bottom: 1px solid rgb(226 232 240);
+}
+
+.v2-admin-workspace tbody td {
+  padding: .9rem !important;
+  border-bottom: 1px solid rgb(241 245 249);
+}
+
+.v2-admin-workspace tbody tr:hover td {
+  background: rgba(255, 251, 235, 0.5) !important;
+}
+
+.v2-admin-workspace .InlineTabs,
+.v2-admin-workspace [role="tablist"] {
+  border-radius: 1.25rem;
+}
+
+.v2-admin-workspace .fixed .bg-white {
+  border-radius: 1.5rem !important;
+}
+
+@media (max-width: 768px) {
+  .v2-admin-workspace {
+    padding: .85rem !important;
+  }
+  .v2-admin-workspace table,
+  .v2-admin-workspace thead,
+  .v2-admin-workspace tbody,
+  .v2-admin-workspace th,
+  .v2-admin-workspace td,
+  .v2-admin-workspace tr {
+    font-size: .88rem;
+  }
+}

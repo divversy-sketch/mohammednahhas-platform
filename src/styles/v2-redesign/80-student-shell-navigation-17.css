@@ -1,0 +1,22 @@
+/* ══ Main content area ══ */
+.v2-student-main {
+  flex: 1;
+  min-width: 0;
+  padding: 0 !important;
+  display: flex;
+  flex-direction: column;
+}
+
+.nh-page-body {
+  flex: 1;
+  padding: 0 16px 100px;
+}
+
+@media (min-width: 768px) {
+  .nh-page-body { padding: 0 20px 40px; }
+  .nh-topbar__btn-label { display: inline; }
+}
+
+@media (min-width: 1200px) {
+  .nh-page-body { padding: 0 28px 40px; }
+}

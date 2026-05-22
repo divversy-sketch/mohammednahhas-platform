@@ -1,0 +1,60 @@
+/* ══ Text Sidebar (lg+) ══ */
+.nh-text-sidebar {
+  display: none;
+}
+
+@media (min-width: 1200px) {
+  .nh-text-sidebar {
+    display: flex;
+    flex-direction: column;
+    width: 220px;
+    min-height: 100dvh;
+    background: #0f172a;
+    padding: 0 0 16px;
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    overflow-y: auto;
+    flex-shrink: 0;
+    z-index: 30;
+  }
+
+  .nh-text-sidebar__header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 14px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    margin-bottom: 8px;
+  }
+
+  .nh-text-sidebar__brand {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .nh-text-sidebar__name {
+    font-size: 14px;
+    font-weight: 900;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .nh-text-sidebar__sub {
+    font-size: 11px;
+    color: #5DCAA5;
+    margin-top: 1px;
+  }
+
+  .nh-text-sidebar__nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    flex: 1;
+    padding: 0 8px;
+    overflow-y: auto;
+  }
+}

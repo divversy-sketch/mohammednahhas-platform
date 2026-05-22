@@ -1,0 +1,105 @@
+/* Phase 3: Student pages full V2 polish */
+.v2-student-shell {
+  background:
+    radial-gradient(circle at 82% 6%, rgba(20, 184, 166, 0.17), transparent 32rem),
+    radial-gradient(circle at 12% 24%, rgba(59, 130, 246, 0.1), transparent 26rem),
+    linear-gradient(180deg, #f8fafc 0%, #eefdfb 100%);
+}
+
+.v2-student-nav {
+  background: rgba(255, 255, 255, 0.9) !important;
+}
+
+.v2-student-nav-item:hover {
+  transform: translateX(-3px);
+}
+
+.v2-student-toolbar {
+  position: sticky;
+  top: 1rem;
+  z-index: 20;
+}
+
+.v2-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  padding: 0.65rem 1rem;
+  font-weight: 900;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.1);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.v2-toolbar-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.14);
+}
+
+.v2-student-hero {
+  isolation: isolate;
+}
+
+.v2-student-section-title {
+  border-radius: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(18px);
+}
+
+.v2-student-main .glass-card,
+.v2-student-main .glass-panel,
+.v2-student-main .bg-white.rounded-3xl,
+.v2-student-main .bg-white.rounded-2xl {
+  border: 1px solid rgba(226, 232, 240, 0.8) !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  box-shadow: 0 16px 44px rgba(15, 23, 42, 0.07) !important;
+  backdrop-filter: blur(18px);
+}
+
+.v2-student-main .glass-card,
+.v2-student-main .glass-panel {
+  border-radius: 1.5rem !important;
+}
+
+.v2-student-main .grid > .glass-card,
+.v2-student-main .grid > .glass-panel,
+.v2-student-main .grid > .bg-white {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.v2-student-main .grid > .glass-card:hover,
+.v2-student-main .grid > .glass-panel:hover,
+.v2-student-main .grid > .bg-white:hover {
+  transform: translateY(-2px);
+  border-color: rgba(20, 184, 166, 0.24) !important;
+  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.11) !important;
+}
+
+.v2-student-main form.bg-white,
+.v2-student-main .border-t-4 {
+  border-radius: 1.5rem !important;
+}
+
+.v2-student-main input,
+.v2-student-main select,
+.v2-student-main textarea {
+  border-radius: 1rem !important;
+}
+
+@media (max-width: 767px) {
+  .v2-student-toolbar {
+    position: relative;
+    top: auto;
+  }
+  .v2-student-hero {
+    border-radius: 1.5rem;
+    padding: 1.25rem;
+  }
+  .v2-student-section-title {
+    padding: 1rem;
+  }
+}

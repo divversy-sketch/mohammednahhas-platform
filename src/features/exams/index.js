@@ -5,3 +5,17 @@ export { default as ExamSecurityHoldOverlay } from './components/ExamSecurityHol
 export { default as ExamSubmitConfirmDialog } from './components/ExamSubmitConfirmDialog.jsx';
 export { default as ExamTopBar } from './components/ExamTopBar.jsx';
 export { default as ExamWatermarkLayer } from './components/ExamWatermarkLayer.jsx';
+export * from './services/exams.service.js';
+export { useStudentExams } from './hooks/useStudentExams.js';
+export { useAdminExams } from './hooks/useAdminExams.js';
+export { useExamAttempt } from './hooks/useExamAttempt.js';
+export { useExamResults } from './hooks/useExamResults.js';
+export { default as ExamCard } from './components/ExamCard.jsx';
+export { default as ExamsTable } from './components/ExamsTable.jsx';
+export { default as ExamBuilder } from './components/ExamBuilder.jsx';
+export { default as ExamRulesPanel } from './components/ExamRulesPanel.jsx';
+export { default as ExamStatusBadge } from './components/ExamStatusBadge.jsx';
+export { default as ExamTimer } from './components/ExamTimer.jsx';
+export { default as ExamAttemptReview } from './components/ExamAttemptReview.jsx';
+export { default as ExamSecurityPanel } from './components/ExamSecurityPanel.jsx';
+export { default as ExamResultsTable } from './components/ExamResultsTable.jsx';

@@ -1,0 +1,4 @@
+const permissionKeys = ['canViewStudents','canEditStudents','canActivateStudents','canReviewPayments','canGenerateSubscriptionCodes','canCreateCourses','canPublishLectures','canCreateExams','canReviewResults','canSendMessages','canManageSupport','canViewReports','canManageSettings','canManageAdmins','canViewAuditLogs'];
+export const ADMIN_PERMISSION_KEYS = Object.freeze(permissionKeys);
+export function buildPermissions(profile = {}) { const role = profile.role || profile.adminRole || 'admin'; const explicit = profile.permissions || {}; const isOwner = role === 'owner' || profile.isOwner === true; return Object.fromEntries(permissionKeys.map((key) => [key, isOwner || explicit[key] === true || role === 'admin'])); }
+export function can(permissionMap, key) { return Boolean(permissionMap?.[key]); }

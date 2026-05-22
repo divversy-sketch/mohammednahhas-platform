@@ -1,0 +1,62 @@
+/* ══ Bottom Nav (موبايل فقط) ══ */
+.nh-bottom-nav {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .nh-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    inset-inline: 0;
+    z-index: 9990;
+    background: rgba(255,255,255,0.97);
+    border-top: 1px solid #e2e8f0;
+    box-shadow: 0 -4px 20px rgba(15,23,42,0.08);
+    padding: 6px 4px;
+    padding-bottom: max(6px, env(safe-area-inset-bottom));
+  }
+
+  .nh-bottom-nav__item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-radius: 12px;
+    padding: 4px 2px;
+    transition: background .15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .nh-bottom-nav__icon {
+    width: 34px;
+    height: 28px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    transition: background .15s, color .15s;
+  }
+
+  .nh-bottom-nav__item.is-active .nh-bottom-nav__icon {
+    background: #E1F5EE;
+    color: #0F6E56;
+  }
+
+  .nh-bottom-nav__label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #94a3b8;
+    line-height: 1;
+  }
+
+  .nh-bottom-nav__item.is-active .nh-bottom-nav__label {
+    color: #0F6E56;
+  }
+}

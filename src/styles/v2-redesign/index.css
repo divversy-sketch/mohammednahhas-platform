@@ -1,0 +1,45 @@
+@import '../tokens.css';
+@import '../base.css';
+@import '../utilities.css';
+@import '../layouts/public-layout.css';
+@import '../layouts/student-layout.css';
+@import '../layouts/admin-layout.css';
+@import '../components/buttons.css';
+@import '../components/cards.css';
+@import '../components/modals.css';
+@import '../components/drawers.css';
+@import '../components/tables.css';
+@import '../components/forms.css';
+@import '../components/badges.css';
+@import '../components/navigation.css';
+@import '../pages/landing.css';
+@import '../pages/auth.css';
+@import '../pages/student-dashboard.css';
+@import '../pages/admin-dashboard.css';
+@import '../responsive/mobile.css';
+@import '../responsive/tablet.css';
+@import '../responsive/desktop.css';
+
+/* Compatibility CSS imports are grouped to guarantee Refactor Without Visual Change.
+   TODO: remove after each rule is migrated into modular CSS buckets above. */
+/* Runtime v2 redesign entry: split CSS chunks only. */
+@import './00-core-shell.css';
+@import './10-admin-core.css';
+@import './20-student-pages.css';
+@import './30-shared-tables-forms-modals.css';
+@import './40-compatibility-normalization.css';
+@import './50-responsive-mobile-05.css';
+@import './60-navigation-fix.css';
+@import './70-readability-fix.css';
+@import './50-responsive-mobile-08.css';
+@import './80-student-shell-navigation-09.css';
+@import './80-student-shell-navigation-10.css';
+@import './80-student-shell-navigation-11.css';
+@import './80-student-shell-navigation-12.css';
+@import './13-Bottom-Nav-mobile-only.css';
+@import './14-Icon-Sidebar-md-lg.css';
+@import './15-Text-Sidebar-lg.css';
+@import './16-Nav-Groups-shared-lg.css';
+@import './80-student-shell-navigation-17.css';
+@import './18-Section-Title-new.css';
+@import './50-responsive-mobile-19.css';

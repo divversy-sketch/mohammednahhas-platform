@@ -1,3 +1,13 @@
 export { default as PaymentRequestStudentPanel } from './student/PaymentRequestStudentPanel.jsx';
 export { default as AdminPaymentRequestsPanel } from './admin/AdminPaymentRequestsPanel.jsx';
 export { createStudentPaymentRequest, validateStudentPaymentDraft } from './services/studentPaymentRequests.js';
+export * from './services/payments.service.js';
+export { useStudentPayments } from './hooks/useStudentPayments.js';
+export { useAdminPayments } from './hooks/useAdminPayments.js';
+export { useReviewPayment } from './hooks/useReviewPayment.js';
+export { default as PaymentRequestForm } from './components/PaymentRequestForm.jsx';
+export { default as PaymentMethodsPanel } from './components/PaymentMethodsPanel.jsx';
+export { default as PaymentStatusBadge } from './components/PaymentStatusBadge.jsx';
+export { default as PaymentRequestsTable } from './components/PaymentRequestsTable.jsx';
+export { default as PaymentReviewDrawer } from './components/PaymentReviewDrawer.jsx';
+export { default as PaymentHistory } from './components/PaymentHistory.jsx';

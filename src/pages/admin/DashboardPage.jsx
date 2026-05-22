@@ -1,2 +1,1 @@
-export { default } from '../../admin/parts/AdminDashboard.jsx';
-export { AdminDashboard } from '../../admin/parts/AdminDashboard.jsx';
+export { AdminDashboard as default, AdminDashboard } from '@features/admin-dashboard/pages/AdminDashboard.jsx';
