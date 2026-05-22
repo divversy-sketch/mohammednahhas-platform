@@ -24,6 +24,7 @@ import AdminStudentSuccessSuite from '@features/studentSuccess/StudentSuccessAdm
 import { AdminGlobalSearch, AdminLiveClassesPanel, AdminCertificatesPanel, AdminCommandQuickActions } from '@features/product/ProductExperienceSuite.jsx';
 import AdminAllUsersTab from '@features/admin-dashboard/tabs/users/AdminAllUsersTab.jsx';
 import AdminDashboardOverviewTab from '@features/admin-dashboard/tabs/dashboard/AdminDashboardOverviewTab.jsx';
+import AdminSystemHealthPanel from '@admin/components/AdminSystemHealthPanel.jsx';
 
 export default function AdminPlatformSettingsTab({ ctx }) {
   const {

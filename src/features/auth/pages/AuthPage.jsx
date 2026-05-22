@@ -1,19 +1,14 @@
 import { useState, useEffect } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc, collection, addDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
-import { User, GraduationCap, Lock, Mail, ChevronRight, Loader2, Phone } from '@shared/icons/lucide-shim.jsx';
+import { User, GraduationCap, Lock, Mail, ChevronRight, Loader2, Phone, ShieldCheck, Sparkles, BookOpen, MessageSquare } from '@shared/icons/lucide-shim.jsx';
 import { motion } from 'framer-motion';
 import { auth, db } from '../../../services/firebase';
-
-
 import { GradeOptions } from '@shared/constants/grades.jsx';
 import { normalizeEgyptPhone, validateEgyptianPhones } from '@shared/utils/phone.js';
-import { ModernLogo, FloatingArabicBackground } from '@features/home/HomeWidgets.jsx';
-
-
+import { ModernLogo } from '@features/home/HomeWidgets.jsx';
 import { platformNotify, WhatsAppContactButton } from '@shared/core/platformShared.jsx';
-
-
+import { GlowFrame } from '@ui/components';
 
 const getFriendlyAuthError = (error) => {
   const code = error?.code || '';
@@ -29,6 +24,21 @@ const getFriendlyAuthError = (error) => {
   };
   return messages[code] || 'حدث خطأ غير متوقع. جرّب مرة أخرى أو تواصل مع الإدارة.';
 };
+
+const Field = ({ icon: Icon, children }) => (
+  <div className="nh-input-wrap">
+    <Icon size={19} />
+    {children}
+  </div>
+);
+
+const AuthBenefit = ({ icon: Icon, title, text }) => (
+  <div className="rounded-3xl border border-white/10 bg-white/10 p-4 backdrop-blur">
+    <Icon className="mb-3 text-cyan-300" size={26} />
+    <p className="font-black text-white">{title}</p>
+    <p className="mt-1 text-xs font-bold leading-6 text-slate-300">{text}</p>
+  </div>
+);
 
 export const AuthPage = ({ onBack }) => {
   const [isRegister, setIsRegister] = useState(false);
@@ -54,7 +64,7 @@ export const AuthPage = ({ onBack }) => {
             return;
         }
         if (!formData.name.trim()) {
-            platformNotify("من فضلك اكتب اسم الطالب.");
+            platformNotify('من فضلك اكتب اسم الطالب.');
             setLoading(false);
             return;
         }
@@ -71,20 +81,20 @@ export const AuthPage = ({ onBack }) => {
         const validation = validateEgyptianPhones(formData.phone, formData.parentPhone);
         const userCred = await createUserWithEmailAndPassword(auth, formData.email.trim(), formData.password);
         await updateProfile(userCred.user, { displayName: formData.name.trim() });
-        await setDoc(doc(db, 'users', userCred.user.uid), { 
-            name: formData.name.trim(), email: formData.email.trim(), grade: formData.grade, phone: validation.normalizedStudentPhone, 
-            parentPhone: validation.normalizedParentPhone, role: 'student', status: 'pending', 
-            subscriptionStatus: 'free', subscriptionExpiry: null, createdAt: new Date() 
+        await setDoc(doc(db, 'users', userCred.user.uid), {
+            name: formData.name.trim(), email: formData.email.trim(), grade: formData.grade, phone: validation.normalizedStudentPhone,
+            parentPhone: validation.normalizedParentPhone, role: 'student', status: 'pending',
+            subscriptionStatus: 'free', subscriptionExpiry: null, createdAt: new Date()
         });
-        platformNotify("تم إنشاء الحساب! انتظر تفعيل الأدمن.");
+        platformNotify('تم إنشاء الحساب! انتظر تفعيل الأدمن.');
       } else { await signInWithEmailAndPassword(auth, formData.email, formData.password); }
-    } catch (error) { platformNotify(getFriendlyAuthError(error)); } 
+    } catch (error) { platformNotify(getFriendlyAuthError(error)); }
     finally { setLoading(false); }
   };
 
   const handleForgotPassword = async () => {
     const email = String(formData.email || '').trim().toLowerCase();
-    if(!email) { platformNotify("من فضلك اكتب الإيميل الأول."); return; }
+    if(!email) { platformNotify('من فضلك اكتب الإيميل الأول.'); return; }
     setLoading(true);
     try {
       await addDoc(collection(db, 'password_reset_requests'), {
@@ -95,40 +105,109 @@ export const AuthPage = ({ onBack }) => {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
-      platformNotify("تم إرسال طلب تغيير كلمة السر للإدارة. سيتم التواصل معك بعد الموافقة.", 'success');
+      platformNotify('تم إرسال طلب تغيير كلمة السر للإدارة. سيتم التواصل معك بعد الموافقة.', 'success');
     } catch (error) {
-      platformNotify("تعذر إرسال الطلب الآن، تواصل مع الإدارة عبر واتساب.", 'error');
+      platformNotify('تعذر إرسال الطلب الآن، تواصل مع الإدارة عبر واتساب.', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-slate-900 font-['Cairo'] relative overflow-hidden" dir="rtl">
-      <FloatingArabicBackground />
-      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white/90 backdrop-blur-xl rounded-3xl p-6 md:p-8 w-full max-w-md shadow-2xl relative z-10 my-10 overflow-y-auto max-h-[90vh] border border-white/50 scrollbar-hide">
-        <button onClick={onBack} className="text-slate-500 hover:text-slate-800 text-sm mb-4 md:mb-6 flex items-center gap-1 font-bold"><ChevronRight size={18} /> العودة</button>
-        <div className="flex justify-center mb-4"><ModernLogo /></div>
-        <h2 className="text-2xl md:text-3xl font-bold font-arabic text-slate-800 mb-2 text-center">{isRegister ? 'حساب جديد' : 'تسجيل دخول'}</h2>
-        {platformSettings.welcomeMessage && <p className="text-center text-sm text-slate-500 font-bold leading-6">{platformSettings.welcomeMessage}</p>}
-        {isRegister && platformSettings.registrationOpen === false && <div className="mt-4 bg-red-50 border border-red-100 text-red-700 rounded-2xl p-3 text-sm font-black text-center">التسجيل مغلق حاليًا من الإدارة</div>}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3 md:gap-4 mt-4 md:mt-6">
-          {isRegister && (
-            <>
-              <div className="relative"><User className="absolute top-3.5 right-4 text-slate-400" size={18} /><input required type="text" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition text-sm md:text-base" placeholder="الاسم ثلاثي" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
-              <div className="relative"><Phone className="absolute top-3.5 right-4 text-slate-400" size={18} /><input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition text-sm md:text-base" placeholder="رقم هاتفك" value={formData.phone} onChange={e => setFormData({...formData, phone: normalizeEgyptPhone(e.target.value)})} /></div>
-              <div className="relative"><Phone className="absolute top-3.5 right-4 text-slate-400" size={18} /><input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition text-sm md:text-base" placeholder="رقم ولي الأمر" value={formData.parentPhone} onChange={e => setFormData({...formData, parentPhone: normalizeEgyptPhone(e.target.value)})} /></div>
-              <div className="relative"><GraduationCap className="absolute top-3.5 right-4 text-slate-400" size={18} /><select className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 appearance-none focus:border-amber-500 outline-none transition text-sm md:text-base" value={formData.grade} onChange={e => setFormData({...formData, grade: e.target.value})}><GradeOptions /></select></div>
-            </>
-          )}
-          <div className="relative"><Mail className="absolute top-3.5 right-4 text-slate-400" size={18} /><input required type="email" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition text-sm md:text-base" placeholder="البريد" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></div>
-          <div className="relative"><Lock className="absolute top-3.5 right-4 text-slate-400" size={18} /><input required type="password" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition text-sm md:text-base" placeholder="كلمة السر" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} /></div>
-          {!isRegister && (<div className="text-left"><button type="button" onClick={handleForgotPassword} disabled={loading} className="text-xs text-amber-600 font-bold hover:underline disabled:opacity-50">طلب تغيير كلمة السر من الإدارة</button></div>)}
-          <button disabled={loading} className="bg-gradient-to-r from-amber-600 to-amber-700 text-white py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-amber-500/50 transition mt-2 flex justify-center">{loading ? <Loader2 className="animate-spin" /> : (isRegister ? 'تسجيل' : 'دخول')}</button>
-        </form>
-        <button onClick={() => setIsRegister(!isRegister)} className="mt-4 md:mt-6 text-amber-800 font-bold hover:underline w-full text-center block text-sm">{isRegister ? 'تسجيل الدخول' : 'حساب جديد'}</button>
-      </motion.div>
+    <div className="nh-page flex min-h-screen items-center justify-center px-4 py-8 font-['Cairo']" dir="rtl">
+      <div className="nh-shell-grid" />
       <WhatsAppContactButton />
+
+      <div className="nh-container grid items-center gap-6 lg:grid-cols-[.9fr_1.1fr]">
+        <motion.section initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: .5 }} className="hidden lg:block">
+          <span className="nh-chip"><Sparkles size={16} /> دخول بتجربة جديدة بالكامل</span>
+          <h1 className="mt-5 text-5xl font-black leading-[1.18] text-white">
+            منصة واحدة للمذاكرة،
+            <span className="block bg-gradient-to-l from-cyan-300 via-teal-200 to-amber-300 bg-clip-text text-transparent">والتقييم، والمتابعة.</span>
+          </h1>
+          <p className="mt-5 max-w-xl text-base font-bold leading-8 text-slate-300">
+            صفحة الدخول الجديدة ليست فورم عادي؛ هي بوابة واضحة للطالب، وتعرض حالة التسجيل ورسائل المنصة من الإعدادات الحقيقية.
+          </p>
+          <div className="mt-7 grid gap-3 sm:grid-cols-3">
+            <AuthBenefit icon={BookOpen} title="دروسك" text="بعد الدخول تظهر المحاضرات من محتوى المنصة." />
+            <AuthBenefit icon={ShieldCheck} title="حساب آمن" text="بيانات الدخول والتسجيل مرتبطة بـ Firebase." />
+            <AuthBenefit icon={MessageSquare} title="تواصل سريع" text="الدعم وطلب كلمة السر واضحين للطالب." />
+          </div>
+        </motion.section>
+
+        <motion.div initial={{ opacity: 0, y: 24, scale: .96 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: .55 }}>
+          <GlowFrame tone={isRegister ? 'purple' : 'student'} intensity="normal">
+            <section className="relative max-h-[92vh] overflow-y-auto rounded-[28px] border border-white/10 bg-slate-950/82 p-5 shadow-2xl backdrop-blur-2xl md:p-7">
+              <div className="absolute -left-24 -top-24 h-56 w-56 rounded-full bg-cyan-400/20 blur-3xl" />
+              <div className="absolute -bottom-28 -right-20 h-64 w-64 rounded-full bg-amber-400/15 blur-3xl" />
+
+              <div className="relative z-10">
+                <button onClick={onBack} className="mb-5 flex items-center gap-1 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-black text-slate-300 transition hover:bg-white/10">
+                  <ChevronRight size={18} /> العودة
+                </button>
+
+                <div className="mb-5 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <ModernLogo />
+                    <div>
+                      <p className="text-xs font-black text-cyan-200">{platformSettings.platformName || 'منصة النحاس التعليمية'}</p>
+                      <h2 className="text-2xl font-black text-white md:text-3xl">{isRegister ? 'إنشاء حساب طالب' : 'تسجيل الدخول'}</h2>
+                    </div>
+                  </div>
+                  <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-black text-amber-200">{isRegister ? 'مراجعة الإدارة' : 'دخول مباشر'}</span>
+                </div>
+
+                {platformSettings.welcomeMessage && (
+                  <div className="mb-4 rounded-3xl border border-cyan-300/15 bg-cyan-300/10 p-3 text-sm font-bold leading-7 text-cyan-50">
+                    {platformSettings.welcomeMessage}
+                  </div>
+                )}
+
+                {isRegister && platformSettings.registrationOpen === false && (
+                  <div className="mb-4 rounded-3xl border border-red-300/20 bg-red-500/15 p-3 text-center text-sm font-black text-red-100">
+                    التسجيل مغلق حاليًا من الإدارة
+                  </div>
+                )}
+
+                <div className="mb-5 grid grid-cols-2 rounded-3xl border border-white/10 bg-white/5 p-1">
+                  <button type="button" onClick={() => setIsRegister(false)} className={`rounded-[1.35rem] px-4 py-3 text-sm font-black transition ${!isRegister ? 'bg-cyan-300 text-slate-950 shadow-lg' : 'text-slate-300'}`}>دخول</button>
+                  <button type="button" onClick={() => setIsRegister(true)} className={`rounded-[1.35rem] px-4 py-3 text-sm font-black transition ${isRegister ? 'bg-amber-300 text-slate-950 shadow-lg' : 'text-slate-300'}`}>حساب جديد</button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+                  {isRegister && (
+                    <>
+                      <Field icon={User}><input required type="text" className="nh-input" placeholder="الاسم ثلاثي" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></Field>
+                      <Field icon={Phone}><input required type="tel" className="nh-input" placeholder="رقم هاتف الطالب" value={formData.phone} onChange={e => setFormData({...formData, phone: normalizeEgyptPhone(e.target.value)})} /></Field>
+                      <Field icon={Phone}><input required type="tel" className="nh-input" placeholder="رقم ولي الأمر" value={formData.parentPhone} onChange={e => setFormData({...formData, parentPhone: normalizeEgyptPhone(e.target.value)})} /></Field>
+                      <Field icon={GraduationCap}><select className="nh-input nh-select" value={formData.grade} onChange={e => setFormData({...formData, grade: e.target.value})}><GradeOptions /></select></Field>
+                    </>
+                  )}
+
+                  <Field icon={Mail}><input required type="email" className="nh-input" placeholder="البريد الإلكتروني" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></Field>
+                  <Field icon={Lock}><input required type="password" className="nh-input" placeholder="كلمة السر" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} /></Field>
+
+                  {!isRegister && (
+                    <div className="text-left">
+                      <button type="button" onClick={handleForgotPassword} disabled={loading} className="text-xs font-black text-cyan-200 hover:underline disabled:opacity-50">
+                        طلب تغيير كلمة السر من الإدارة
+                      </button>
+                    </div>
+                  )}
+
+                  <button disabled={loading} className="nh-btn-primary mt-2 w-full py-4 text-base disabled:cursor-wait disabled:opacity-70">
+                    {loading ? <Loader2 className="animate-spin" /> : (isRegister ? 'إرسال طلب التسجيل' : 'دخول الطالب')}
+                  </button>
+                </form>
+
+                <p className="mt-5 text-center text-xs font-bold leading-6 text-slate-400">
+                  {isRegister ? 'بعد التسجيل سيتم مراجعة الحساب من الإدارة قبل فتح المحتوى.' : 'لو نسيت كلمة السر اكتب الإيميل واضغط طلب تغيير كلمة السر.'}
+                </p>
+              </div>
+            </section>
+          </GlowFrame>
+        </motion.div>
+      </div>
     </div>
   );
 };

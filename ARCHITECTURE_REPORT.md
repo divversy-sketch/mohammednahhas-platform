@@ -1,10 +1,10 @@
 # Architecture Report
 
-Generated: 2026-05-22T19:35:34.910Z
+Generated: 2026-05-22T20:03:08.426Z
 
 ## Summary
 
-- Source files scanned: 649
+- Source files scanned: 650
 - Feature folders: 37
 - Feature folders without index.js: 0
 - Compatibility/legacy files remaining: 64
@@ -15,9 +15,9 @@ Generated: 2026-05-22T19:35:34.910Z
 | Size KB | File |
 |---:|---|
 | 26.5 | `src/features/courses/modules/AdminCoursesManager.jsx` |
+| 23.7 | `src/features/admin-dashboard/operations/runtime/AdminGrowthSuiteRuntime.jsx` |
 | 23.4 | `src/features/student-dashboard/shell/controllers/StudentDashboardController.jsx` |
 | 23.3 | `src/features/admin-dashboard/operations/legacy/AdminGrowthSuiteLegacy.jsx` |
-| 23.3 | `src/features/admin-dashboard/operations/runtime/AdminGrowthSuiteRuntime.jsx` |
 | 22.8 | `src/features/admin-dashboard/tabs/split/AdminExamResultsTab.jsx` |
 | 21.4 | `src/features/exams/runner/ExamRunnerCore.jsx` |
 | 21.4 | `src/features/exams/runner/legacy/ExamRunnerLegacy.jsx` |
@@ -33,6 +33,7 @@ Generated: 2026-05-22T19:35:34.910Z
 | 18.1 | `src/features/studentSuccess/StudentSuccessAdminSuite.jsx` |
 | 16.8 | `src/features/video-security/player/SecureVideoPlayerCore.jsx` |
 | 16.8 | `src/features/video-security/player/legacy/SecureVideoPlayerLegacy.jsx` |
+| 15.9 | `src/features/student-dashboard/components/home/cards/StudentUnifiedHomeDashboard.jsx` |
 | 15.6 | `src/features/admin-dashboard/tabs/split/AdminSubscriptionsLegacyTab.jsx` |
 | 15.6 | `src/features/admin-dashboard/tabs/split/AdminSubscriptionsTab.jsx` |
 | 14.9 | `src/features/admin-dashboard/tabs/AdminDashboardTabs.jsx` |
@@ -41,9 +42,8 @@ Generated: 2026-05-22T19:35:34.910Z
 | 13.9 | `src/features/student-dashboard/shell/tabs/StudentExamsTab.jsx` |
 | 13.7 | `src/shared/core/debugTools.jsx` |
 | 13.5 | `src/features/admin-dashboard/controllers/actions/contentActions.jsx` |
-| 13.2 | `src/features/student-dashboard/components/home/cards/StudentUnifiedHomeDashboard.jsx` |
 | 13 | `src/features/admin-dashboard/analytics/AdminProDashboard.jsx` |
-| 13 | `src/features/exams/components/ExamDashboardView.jsx` |
+| 13 | `src/features/auth/pages/AuthPage.jsx` |
 
 ## Feature folders missing index.js
 

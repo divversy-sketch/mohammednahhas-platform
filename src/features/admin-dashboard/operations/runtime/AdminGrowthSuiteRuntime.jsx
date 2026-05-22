@@ -17,6 +17,16 @@ import { MobileSettingsPanel } from '../components/MobileSettingsPanel.jsx';
 import { SupportTicketsPanel } from '../components/SupportTicketsPanel.jsx';
 import { AdminGrowthSuiteRuntimeView } from '../views/AdminGrowthSuiteView.jsx';
 
+const growthTabs = [
+  ['payments', 'المدفوعات والاشتراكات'],
+  ['courses', 'المحتوى والكورسات'],
+  ['questions', 'بنك الأسئلة'],
+  ['analytics', 'التقارير والتحليلات'],
+  ['notifications', 'الإشعارات والتنبيهات'],
+  ['mobile', 'تجربة الموبايل'],
+  ['support', 'الدعم والرسائل'],
+];
+
 export function AdminGrowthSuite({ users = [], exams = [], examResults = [], content = [], assignments = [], assignmentSubmissions = [], subscriptionCodes = [], notifications = [], userData = {}, initialTab = 'payments', compact = false }) {
   const [tab, setTab] = useState(initialTab || 'payments');
   const [payments, setPayments] = useState([]);
