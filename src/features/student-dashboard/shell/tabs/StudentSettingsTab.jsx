@@ -14,6 +14,7 @@ import StudentSuccessPanel from '@features/studentSuccess/StudentSuccessPanel.js
 import { imagePlacementStyle } from '@shared/utils/imagePlacement.js';
 import { StudentLiveClassesPanel, StudentExamReviewCenter, StudentCertificatePanel } from '@features/product/ProductExperienceSuite.jsx';
 import { StudentReviewQuiz } from '@features/review/ReviewQuizSystem.jsx';
+import { normalizeEgyptPhone } from '@shared/utils/phone.js';
 
 const StudentCoursesHub = lazy(() => import('@features/courses/CourseSystem').then((module) => ({ default: module.StudentCoursesHub })));
 const StudentMessagesInbox = lazy(() => import('@features/smartLearning/SmartLearningEngine.jsx').then((module) => ({ default: module.StudentMessagesInbox })));

@@ -27,6 +27,44 @@ const growthTabs = [
   ['support', 'الدعم والرسائل'],
 ];
 
+const statusLabel = (status) => ({
+  pending: 'معلق',
+  approved: 'مقبول',
+  rejected: 'مرفوض',
+  completed: 'مكتمل',
+  open: 'مفتوحة',
+  replied: 'تم الرد',
+  closed: 'مغلقة',
+  published: 'منشور',
+  draft: 'مسودة',
+  medium: 'متوسط',
+  easy: 'سهل',
+  hard: 'صعب',
+  all: 'الكل',
+}[(status || '').toString()] || status || '—');
+
+const toInputDate = (value) => {
+  const date = value?.toDate ? value.toDate() : value ? new Date(value) : null;
+  return date && !Number.isNaN(date.getTime()) ? date.toISOString().slice(0, 10) : '';
+};
+
+const parseCsvLine = (line = '') => {
+  const out = [];
+  let cur = '';
+  let quoted = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i];
+    if (ch === '"' && line[i + 1] === '"') { cur += '"'; i += 1; continue; }
+    if (ch === '"') { quoted = !quoted; continue; }
+    if (ch === ',' && !quoted) { out.push(cur.trim()); cur = ''; continue; }
+    cur += ch;
+  }
+  out.push(cur.trim());
+  return out;
+};
+
+const excelDownload = (filename, rows) => downloadXlsx(filename.replace(/\.csv$/i, '.xlsx'), rows);
+
 export function AdminGrowthSuite({ users = [], exams = [], examResults = [], content = [], assignments = [], assignmentSubmissions = [], subscriptionCodes = [], notifications = [], userData = {}, initialTab = 'payments', compact = false }) {
   const [tab, setTab] = useState(initialTab || 'payments');
   const [payments, setPayments] = useState([]);
