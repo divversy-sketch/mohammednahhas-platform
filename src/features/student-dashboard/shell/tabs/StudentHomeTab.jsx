@@ -128,9 +128,7 @@ export default function StudentHomeTab({ ctx }) {
     unseenNotificationCount,
     nowForStudentDashboard,
     nextOpenExam,
-    nextStudyAction,
     weakBranches,
-    smartWeakBranches,
     subscriptionDaysLeft,
     isBannedAll,
     isBannedContent,
@@ -138,6 +136,42 @@ export default function StudentHomeTab({ ctx }) {
     getExamAccessState,
     startExamWithCode,
   } = ctx;
+
+  const nextStudyAction = (() => {
+    if (inProgressExam) {
+      return {
+        title: inProgressExam.title || 'استكمال محاولة محفوظة',
+        text: 'لديك محاولة امتحان محفوظة يمكنك استكمالها الآن.',
+        button: 'استكمال الامتحان',
+        action: () => setActiveTab('exams'),
+      };
+    }
+    if (latestVideoActivity?.video || latestVideoActivity) {
+      const video = latestVideoActivity.video || latestVideoActivity;
+      return {
+        title: video?.title || 'استكمال آخر محاضرة',
+        text: 'آخر محاضرة بدأت مشاهدتها داخل المنصة.',
+        button: 'متابعة المحاضرة',
+        action: () => setActiveTab('videos'),
+      };
+    }
+    if (nextOpenExam) {
+      return {
+        title: nextOpenExam.title || 'اختبار متاح الآن',
+        text: 'يوجد اختبار متاح يمكنك فتحه من مركز الامتحانات.',
+        button: 'فتح الامتحانات',
+        action: () => setActiveTab('exams'),
+      };
+    }
+    return {
+      title: videos?.[0]?.title || 'ابدأ رحلتك التعليمية',
+      text: 'افتح المحاضرات واختر أول محتوى مناسب لك.',
+      button: 'فتح المحاضرات',
+      action: () => setActiveTab('videos'),
+    };
+  })();
+
+  const smartWeakBranches = weakBranches || [];
 
   return (
     <>
