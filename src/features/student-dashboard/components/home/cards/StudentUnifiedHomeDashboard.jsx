@@ -1,81 +1,169 @@
 import {
-  ArrowIcon,
-  AssignmentIcon,
-  BellIcon,
-  BrainIcon,
-  CourseIcon,
-  CrownIcon,
-  ExamIcon,
-  FileBoxIcon,
-  FocusIcon,
-  InteractiveIcon,
-  LessonIcon,
-  MessageIcon,
-  SparkIcon,
-  TrophyIcon,
+  IconVideo,
+  IconExam,
+  IconTask,
+  IconFiles,
+  IconCode,
+  IconBrain,
+  IconWallet,
+  IconSpark,
+  IconRocket,
+  IconCalendar,
+  IconPlay,
+  IconCrown,
+  IconChart,
 } from '@shared/icons/nahhasCustomIcons.jsx';
 
 const safeList = (value) => Array.isArray(value) ? value : [];
-const getTitle = (item, fallback) => item?.title || item?.name || item?.lessonTitle || item?.examTitle || fallback;
-const getSub = (item, fallback = 'متاح من بيانات المنصة') => item?.description || item?.gradeLabel || item?.branch || item?.status || item?.type || fallback;
+const clamp = (value, min = 0, max = 100) => Math.min(max, Math.max(min, Number(value) || 0));
 
-const StatCard = ({ icon: Icon, label, value, sub, onClick, tone = 'blue', disabled }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    disabled={disabled}
-    className={`nh-modern-stat nh-modern-stat--${tone} ${disabled ? 'is-disabled' : ''}`}
-  >
-    <span className="nh-modern-stat__icon"><Icon size={24} /></span>
-    <span className="nh-modern-stat__body">
-      <span className="nh-modern-stat__label">{label}</span>
-      <strong>{value}</strong>
-      <small>{disabled ? 'مغلق مؤقتًا' : sub}</small>
-    </span>
-  </button>
-);
+const firstTitle = (items, fallback) => safeList(items).find((item) => item?.title || item?.name)?.title || safeList(items).find((item) => item?.title || item?.name)?.name || fallback;
 
-const DataList = ({ title, eyebrow, icon: Icon, items, emptyText, actionLabel, onAction, tone = 'blue' }) => (
-  <section className="nh-modern-panel">
-    <div className="nh-modern-panel__head">
-      <div className="nh-modern-titleline">
-        <span className={`nh-modern-titleicon nh-modern-titleicon--${tone}`}><Icon size={22} /></span>
+function StatCard({ icon: Icon, label, value, hint, onClick, accent = 'violet', disabled }) {
+  return (
+    <button type="button" onClick={onClick} disabled={disabled} className={`creative-stat-card is-${accent}`}>
+      <span className="creative-stat-card__icon"><Icon size={24} /></span>
+      <span className="creative-stat-card__content">
+        <strong>{value}</strong>
+        <small>{label}</small>
+        <em>{disabled ? 'مغلق مؤقتًا' : hint}</em>
+      </span>
+      <span className="creative-sparkline" aria-hidden="true" />
+    </button>
+  );
+}
+
+function StudySchedule({ videos, exams, assignments, setActiveTab }) {
+  const rows = [
+    { time: '10:00', title: firstTitle(videos, 'محاضرة جديدة من المنصة'), meta: 'ابدأ بالمحتوى الأحدث', tab: 'videos' },
+    { time: '12:30', title: firstTitle(assignments, 'مراجعة واجبات الأسبوع'), meta: 'ثبّت نقاطك الضعيفة', tab: 'assignments' },
+    { time: '04:00', title: firstTitle(exams, 'اختبار تدريبي سريع'), meta: 'اختبر مستواك الآن', tab: 'exams' },
+  ];
+  return (
+    <section className="creative-side-card creative-schedule">
+      <div className="creative-card-head">
         <div>
-          <p>{eyebrow}</p>
+          <span>خطة اليوم</span>
+          <h3>جدول مقترح من محتوى المنصة</h3>
+        </div>
+        <IconCalendar size={22} />
+      </div>
+      <div className="creative-timeline">
+        {rows.map((row) => (
+          <button key={`${row.time}-${row.tab}`} type="button" onClick={() => setActiveTab?.(row.tab)} className="creative-timeline__row">
+            <time>{row.time}</time>
+            <span>
+              <strong>{row.title}</strong>
+              <small>{row.meta}</small>
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ContinueCard({ latestVideoActivity, inProgressExam, nextOpenExam, videos, setActiveTab }) {
+  const hasVideo = Boolean(latestVideoActivity?.video);
+  const title = hasVideo
+    ? latestVideoActivity.video?.title
+    : inProgressExam?.title || nextOpenExam?.title || firstTitle(videos, 'ابدأ أول محاضرة متاحة');
+  const percent = clamp(hasVideo ? latestVideoActivity?.percent : 0);
+  const tab = hasVideo ? 'videos' : (inProgressExam || nextOpenExam ? 'exams' : 'videos');
+  return (
+    <section className="creative-panel creative-continue-card">
+      <div className="creative-card-head">
+        <div>
+          <span>أكمل من حيث توقفت</span>
           <h3>{title}</h3>
         </div>
+        <IconPlay size={24} />
       </div>
-      <button type="button" onClick={onAction} className="nh-modern-mini-btn">{actionLabel}</button>
-    </div>
+      <div className="creative-media-preview">
+        <div className="creative-play-orb"><IconPlay size={34} /></div>
+      </div>
+      <div className="creative-progress-line"><span style={{ width: `${hasVideo ? percent : 38}%` }} /></div>
+      <div className="creative-card-footer">
+        <small>{hasVideo ? `${percent}% مشاهدة` : 'مقترح كبداية الآن'}</small>
+        <button type="button" onClick={() => setActiveTab?.(tab)}>متابعة الآن</button>
+      </div>
+    </section>
+  );
+}
 
-    <div className="nh-modern-list">
-      {items.length ? items.slice(0, 4).map((item, index) => (
-        <button key={item.id || `${title}-${index}`} type="button" onClick={onAction} className="nh-modern-list__item">
-          <span className="nh-modern-list__number">{String(index + 1).padStart(2, '0')}</span>
-          <span className="nh-modern-list__text">
-            <strong>{getTitle(item, `عنصر رقم ${index + 1}`)}</strong>
-            <small>{getSub(item)}</small>
-          </span>
-          <ArrowIcon size={18} />
-        </button>
-      )) : (
-        <div className="nh-modern-empty">{emptyText}</div>
-      )}
-    </div>
-  </section>
-);
+function UpcomingTests({ exams, nextOpenExam, setActiveTab }) {
+  const list = safeList(exams).slice(0, 3);
+  if (nextOpenExam && !list.find((exam) => exam.id === nextOpenExam.id)) list.unshift(nextOpenExam);
+  return (
+    <section className="creative-panel creative-tests">
+      <div className="creative-card-head">
+        <div>
+          <span>الاختبارات القادمة</span>
+          <h3>امتحاناتك حسب بيانات المنصة</h3>
+        </div>
+        <button type="button" onClick={() => setActiveTab?.('exams')}>عرض الكل</button>
+      </div>
+      <div className="creative-test-list">
+        {list.length ? list.slice(0, 3).map((exam, index) => (
+          <button type="button" onClick={() => setActiveTab?.('exams')} key={exam.id || index} className="creative-test-row">
+            <span className="creative-test-icon"><IconExam size={20} /></span>
+            <span>
+              <strong>{exam.title || exam.name || `اختبار رقم ${index + 1}`}</strong>
+              <small>{exam.unit || exam.gradeLabel || exam.status || 'متاح من المنصة'}</small>
+            </span>
+            <em>{index === 0 ? 'الأقرب' : `${index + 2} يوم`}</em>
+          </button>
+        )) : <div className="creative-empty">لا توجد اختبارات متاحة حاليًا.</div>}
+      </div>
+    </section>
+  );
+}
 
-const TodayStep = ({ index, text }) => (
-  <div className="nh-modern-step">
-    <span>{index}</span>
-    <p>{text}</p>
-  </div>
-);
+function RecentLessons({ videos, setActiveTab }) {
+  const list = safeList(videos).slice(0, 4);
+  return (
+    <section className="creative-panel creative-lessons">
+      <div className="creative-card-head">
+        <div>
+          <span>المحاضرات الأخيرة</span>
+          <h3>اختار محاضرتك التالية</h3>
+        </div>
+        <button type="button" onClick={() => setActiveTab?.('videos')}>عرض الكل</button>
+      </div>
+      <div className="creative-lesson-grid">
+        {list.length ? list.map((video, index) => (
+          <button type="button" onClick={() => setActiveTab?.('videos')} key={video.id || index} className="creative-lesson-card">
+            <span className="creative-lesson-art"><IconBrain size={32} /></span>
+            <strong>{video.title || video.name || `محاضرة رقم ${index + 1}`}</strong>
+            <small>{video.teacherName || video.description || 'من محتوى المنصة'}</small>
+            <span className="creative-mini-progress"><i style={{ width: `${20 + (index * 18)}%` }} /></span>
+          </button>
+        )) : <div className="creative-empty">لا توجد محاضرات ظاهرة للطالب حاليًا.</div>}
+      </div>
+    </section>
+  );
+}
+
+function AchievementStrip({ averageScore, completedVideoCount, completedExamResults, videoCompletionPercent }) {
+  const xp = Math.round((Number(videoCompletionPercent) || 0) * 12 + safeList(completedExamResults).length * 85 + completedVideoCount * 25);
+  const level = Math.max(1, Math.floor(xp / 350) + 1);
+  const levelProgress = clamp((xp % 350) / 3.5);
+  return (
+    <section className="creative-achievements">
+      <div className="creative-badge-card"><IconSpark size={24} /><span><strong>متعلم نشط</strong><small>أكملت {completedVideoCount || 0} محاضرات</small></span></div>
+      <div className="creative-badge-card"><IconChart size={24} /><span><strong>متوسطك {averageScore || 0}%</strong><small>أداء الامتحانات</small></span></div>
+      <div className="creative-xp">
+        <strong>{xp} XP</strong>
+        <span><i style={{ width: `${levelProgress}%` }} /></span>
+      </div>
+      <div className="creative-level">{level}</div>
+    </section>
+  );
+}
 
 export function StudentUnifiedHomeDashboard({
   userData,
   isPremium,
-  nextStudyAction,
   latestVideoActivity,
   inProgressExam,
   nextOpenExam,
@@ -96,7 +184,6 @@ export function StudentUnifiedHomeDashboard({
   unseenNotificationCount = 0,
   setActiveTab,
   setShowNotifications,
-  setHasNewNotif,
   isBannedContent,
   isBannedExam,
 }) {
@@ -104,119 +191,75 @@ export function StudentUnifiedHomeDashboard({
   const examItems = safeList(exams);
   const fileItems = safeList(filesAndLinks);
   const htmlItems = safeList(htmls);
+  const weakItems = safeList(smartWeakBranches);
   const notificationItems = safeList(recentNotificationItems);
   const assignmentItems = safeList(pendingAssignments);
-  const weakItems = safeList(smartWeakBranches);
-
-  const firstName = String(userData?.name || 'طالب').trim().split(' ')[0] || 'طالب';
-  const continueTitle = latestVideoActivity?.video?.title || inProgressExam?.title || nextOpenExam?.title || videoItems[0]?.title || 'ابدأ من أول محاضرة متاحة';
-  const continueText = latestVideoActivity
-    ? `آخر تقدم محفوظ ${latestVideoActivity.percent || 0}%`
-    : inProgressExam
-      ? 'لديك امتحان بدأ بالفعل ويمكنك استكماله.'
-      : nextOpenExam
-        ? 'أقرب امتحان متاح من بيانات المنصة.'
-        : 'لم يتم تسجيل نشاط سابق بعد.';
-  const continueTarget = latestVideoActivity ? 'videos' : (inProgressExam || nextOpenExam ? 'exams' : 'videos');
-
+  const firstName = String(userData?.name || 'بطل').trim().split(' ')[0] || 'بطل';
+  const completion = clamp(videoCompletionPercent);
   const subscriptionText = isPremium
-    ? (subscriptionDaysLeft === null || subscriptionDaysLeft === undefined ? 'VIP مفعل' : `${subscriptionDaysLeft} يوم`)
-    : 'مجاني';
-
-  const planItems = weakItems.length
-    ? weakItems.map((item) => `${item.branch || item.title || 'نقطة مراجعة'} · ${item.pct || item.percent || 0}%`)
-    : [
-      videoItems[0]?.title ? `شاهد: ${videoItems[0].title}` : 'شاهد محاضرة من المتاح',
-      examItems[0]?.title ? `حل: ${examItems[0].title}` : 'حل امتحان قصير',
-      assignmentItems[0]?.title ? `أنهِ: ${assignmentItems[0].title}` : 'راجع أخطاءك السابقة',
-    ];
+    ? (subscriptionDaysLeft === null || subscriptionDaysLeft === undefined ? 'VIP' : `${subscriptionDaysLeft} يوم`)
+    : 'فعّل الباقة';
+  const focusTitle = weakItems[0]?.branch || weakItems[0]?.title || firstTitle(videoItems, 'ابدأ محاضرة جديدة');
 
   return (
-    <section className="nh-modern-student-home" dir="rtl">
-      <div className="nh-modern-hero">
-        <div className="nh-modern-hero__copy">
-          <span className="nh-modern-kicker"><SparkIcon size={18} /> لوحة الطالب الجديدة</span>
-          <h1>أهلاً {firstName}، كل خطوة مذاكرة واضحة قدامك.</h1>
-          <p>واجهة جديدة تعتمد على محتوى المنصة الحقيقي: المحاضرات، الامتحانات، الواجبات، الملفات والتنبيهات بدون نصوص تجريبية ثابتة.</p>
-          <div className="nh-modern-hero__actions">
-            <button type="button" onClick={() => setActiveTab(continueTarget)} className="nh-modern-primary-btn">
-              <span>{latestVideoActivity ? 'استكمال آخر نشاط' : 'ابدأ المذاكرة'}</span>
-              <ArrowIcon size={18} />
-            </button>
-            <button type="button" onClick={() => setActiveTab('settings')} className="nh-modern-secondary-btn">عرض الأداء</button>
-          </div>
-        </div>
-
-        <div className="nh-modern-next-card">
-          <span className="nh-modern-next-card__icon"><LessonIcon size={26} /></span>
-          <p>خطوتك التالية</p>
-          <h2>{continueTitle}</h2>
-          <small>{continueText}</small>
-          <div className="nh-modern-progress">
-            <span style={{ width: `${Math.min(100, Number(latestVideoActivity?.percent || videoCompletionPercent || 0))}%` }} />
-          </div>
-        </div>
-      </div>
-
-      <div className="nh-modern-stats-grid">
-        <StatCard icon={CrownIcon} label="الاشتراك" value={subscriptionText} sub="حالة الباقة" tone="gold" onClick={() => setActiveTab('subscription')} />
-        <StatCard icon={LessonIcon} label="المحاضرات" value={`${videoCompletionPercent}%`} sub={`${completedVideoCount}/${videoItems.length || 0} مكتملة`} onClick={() => setActiveTab('videos')} disabled={isBannedContent} />
-        <StatCard icon={ExamIcon} label="الامتحانات" value={completedExamResults.length ? `${averageScore}%` : examItems.length} sub={`${examResults.length} نتيجة محفوظة`} tone="purple" onClick={() => setActiveTab('exams')} disabled={isBannedExam} />
-        <StatCard icon={AssignmentIcon} label="الواجبات" value={pendingAssignmentsCount} sub={assignmentItems[0]?.title || 'لا يوجد معلق'} tone="green" onClick={() => setActiveTab('assignments')} disabled={isBannedExam} />
-      </div>
-
-      <div className="nh-modern-layout-grid">
-        <div className="nh-modern-main-column">
-          <div className="nh-modern-feature-grid">
-            <DataList title="آخر المحاضرات" eyebrow="من محتوى المنصة" icon={LessonIcon} items={videoItems} emptyText="لا توجد محاضرات متاحة حتى الآن." actionLabel="كل المحاضرات" onAction={() => setActiveTab('videos')} />
-            <DataList title="الامتحانات المتاحة" eyebrow="حسب جدولك" icon={ExamIcon} items={examItems} emptyText="لا توجد امتحانات متاحة حتى الآن." actionLabel="كل الامتحانات" onAction={() => setActiveTab('exams')} tone="purple" />
-          </div>
-
-          <div className="nh-modern-feature-grid nh-modern-feature-grid--three">
-            <DataList title="واجبات مطلوبة" eyebrow="متابعة يومية" icon={AssignmentIcon} items={assignmentItems} emptyText="لا توجد واجبات معلقة حاليًا." actionLabel="فتح" onAction={() => setActiveTab('assignments')} tone="green" />
-            <DataList title="ملفات وروابط" eyebrow="مذكرات وملخصات" icon={FileBoxIcon} items={fileItems} emptyText="لا توجد ملفات متاحة حاليًا." actionLabel="فتح" onAction={() => setActiveTab('files')} tone="gold" />
-            <DataList title="محتوى تفاعلي" eyebrow="أنشطة HTML" icon={InteractiveIcon} items={htmlItems} emptyText="لا يوجد محتوى تفاعلي متاح حاليًا." actionLabel="تشغيل" onAction={() => setActiveTab('htmls')} tone="pink" />
-          </div>
-        </div>
-
-        <aside className="nh-modern-side-column">
-          <section className="nh-modern-panel nh-modern-plan-panel">
-            <div className="nh-modern-panel__head">
-              <div className="nh-modern-titleline">
-                <span className="nh-modern-titleicon nh-modern-titleicon--gold"><FocusIcon size={22} /></span>
-                <div><p>خطة اليوم</p><h3>ركز على المهم</h3></div>
-              </div>
+    <section className="creative-dashboard" dir="rtl">
+      <div className="creative-dashboard__bg" />
+      <div className="creative-dashboard__layout">
+        <div className="creative-left-column">
+          <StudySchedule videos={videoItems} exams={examItems} assignments={assignmentItems} setActiveTab={setActiveTab} />
+          <section className="creative-side-card creative-focus-card">
+            <div className="creative-card-head">
+              <div><span>هدفك القادم</span><h3>{focusTitle}</h3></div>
+              <IconRocket size={24} />
             </div>
-            <div className="nh-modern-steps">
-              {planItems.slice(0, 3).map((item, index) => <TodayStep key={`${item}-${index}`} index={index + 1} text={item} />)}
+            <p>خليك ماشي خطوة بخطوة. المنصة بتعرض لك أقرب محتوى بناءً على بياناتك الحالية.</p>
+            <button type="button" onClick={() => setActiveTab?.(weakItems.length ? 'remediation' : 'videos')}>ابدأ المهمة</button>
+          </section>
+        </div>
+
+        <main className="creative-main-column">
+          <section className="creative-hero-card">
+            <div className="creative-hero-card__content">
+              <span className="creative-kicker"><IconSpark size={16} /> تجربة الإبداع الجديدة</span>
+              <h1>مرحباً بك، <span>{firstName}</span> 👋</h1>
+              <p>تابع رحلتك التعليمية وحقق أهدافك خطوة بخطوة من خلال محتوى المنصة الحقيقي.</p>
+            </div>
+            <div className="creative-rocket-scene" aria-hidden="true">
+              <div className="creative-planet" />
+              <div className="creative-rocket"><IconRocket size={70} /></div>
+              <div className="creative-cloud cloud-1" />
+              <div className="creative-cloud cloud-2" />
+            </div>
+            <div className="creative-hero-progress">
+              <strong>تقدمك في التعلم</strong>
+              <span>{completion}%</span>
+              <div><i style={{ width: `${completion}%` }} /></div>
+              <small>{completion >= 70 ? 'ممتاز، كمل بنفس القوة' : 'استمر على هذا التقدم'}</small>
             </div>
           </section>
 
-          <section className="nh-modern-panel nh-modern-notify-panel">
-            <div className="nh-modern-panel__head">
-              <div className="nh-modern-titleline">
-                <span className="nh-modern-titleicon"><BellIcon size={22} /></span>
-                <div><p>{unseenNotificationCount ? `${unseenNotificationCount} غير مقروء` : 'آخر تحديثاتك'}</p><h3>التنبيهات</h3></div>
-              </div>
-              <button type="button" onClick={() => { setShowNotifications(true); setHasNewNotif?.(false); }} className="nh-modern-mini-btn">عرض</button>
-            </div>
-            <div className="nh-modern-list nh-modern-list--compact">
-              {notificationItems.length ? notificationItems.slice(0, 3).map((n, i) => (
-                <div key={n.id || i} className="nh-modern-notification-item">
-                  <strong>{n.title || 'تنبيه جديد'}</strong>
-                  <small>{n.body || n.text || n.message || 'رسالة من الإدارة'}</small>
-                </div>
-              )) : <div className="nh-modern-empty">لا توجد تنبيهات جديدة.</div>}
-            </div>
-          </section>
+          <div className="creative-stats-grid">
+            <StatCard icon={IconVideo} label="عدد المحاضرات" value={videoItems.length} hint={`${completedVideoCount} محاضرة مكتملة`} onClick={() => setActiveTab?.('videos')} disabled={isBannedContent} accent="violet" />
+            <StatCard icon={IconExam} label="الامتحانات المتاحة" value={examItems.length} hint={nextOpenExam?.title || 'افتح الامتحانات'} onClick={() => setActiveTab?.('exams')} disabled={isBannedExam} accent="pink" />
+            <StatCard icon={IconTask} label="واجبات مطلوبة" value={pendingAssignmentsCount} hint={assignmentItems[0]?.title || 'لا يوجد معلق'} onClick={() => setActiveTab?.('assignments')} disabled={isBannedExam} accent="blue" />
+            <StatCard icon={IconWallet} label="الاشتراك" value={subscriptionText} hint="حالة الباقة" onClick={() => setActiveTab?.('subscription')} accent="gold" />
+          </div>
 
-          <section className="nh-modern-panel nh-modern-achievement-panel">
-            <span><TrophyIcon size={24} /></span>
-            <h3>ملخص أدائك</h3>
-            <p>متوسط نتائجك الحالي {completedExamResults.length ? `${averageScore}%` : 'لم يبدأ بعد'}.</p>
-            <button type="button" onClick={() => setActiveTab('settings')}>فتح التقرير</button>
-          </section>
-        </aside>
+          <div className="creative-content-grid">
+            <ContinueCard latestVideoActivity={latestVideoActivity} inProgressExam={inProgressExam} nextOpenExam={nextOpenExam} videos={videoItems} setActiveTab={setActiveTab} />
+            <UpcomingTests exams={examItems} nextOpenExam={nextOpenExam} setActiveTab={setActiveTab} />
+            <RecentLessons videos={videoItems} setActiveTab={setActiveTab} />
+          </div>
+
+          <div className="creative-resource-grid">
+            <StatCard icon={IconFiles} label="الملفات" value={fileItems.length} hint={firstTitle(fileItems, 'مذكرات وروابط')} onClick={() => setActiveTab?.('files')} disabled={isBannedContent} accent="blue" />
+            <StatCard icon={IconCode} label="تفاعلي" value={htmlItems.length} hint="أنشطة HTML" onClick={() => setActiveTab?.('htmls')} disabled={isBannedContent} accent="pink" />
+            <StatCard icon={IconBrain} label="العلاج الذكي" value={weakItems.length || 'جاهز'} hint="نقاط تحتاج مراجعة" onClick={() => setActiveTab?.('remediation')} disabled={isBannedExam} accent="violet" />
+            <StatCard icon={IconCrown} label="التنبيهات" value={unseenNotificationCount || notificationItems.length} hint={notificationItems[0]?.title || 'آخر رسائل الإدارة'} onClick={() => setShowNotifications?.(true)} accent="gold" />
+          </div>
+
+          <AchievementStrip averageScore={averageScore} completedVideoCount={completedVideoCount} completedExamResults={completedExamResults} videoCompletionPercent={videoCompletionPercent} examResults={examResults} />
+        </main>
       </div>
     </section>
   );
