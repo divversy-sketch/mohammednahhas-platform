@@ -44,3 +44,22 @@ export const PlatformMark = ({ size = 42, className = '' }) => (
     </defs>
   </svg>
 );
+
+// Backward-compatible aliases for older navigation files and patches.
+// Keep these exports so Vercel builds do not fail if another file still imports the previous icon names.
+export const HomePanelIcon = IconHome;
+export const LessonIcon = IconVideo;
+export const ExamIcon = IconExam;
+export const TrophyIcon = IconChart;
+export const CrownIcon = IconCrown;
+export const CourseIcon = IconBook;
+export const WalletIcon = IconWallet;
+export const MessageIcon = IconMessage;
+export const SupportIcon = IconSupport;
+export const FileIcon = IconFiles;
+export const InteractiveIcon = IconCode;
+export const BrainIcon = IconBrain;
+export const UserIcon = IconUser;
+export const CalendarIcon = IconCalendar;
+export const PlayIcon = IconPlay;
+export const RocketIcon = IconRocket;
