@@ -1,10 +1,10 @@
-import AppErrorBoundary from '../shared/core/AppErrorBoundary.jsx';
+import AppErrorBoundary from '../student/parts/AppErrorBoundary.jsx';
 import AppProviders from './AppProviders.jsx';
-import PlatformPerformanceBooster from '../shared/core/PlatformPerformanceBooster.jsx';
+import PlatformPerformanceBooster from '../student/parts/PlatformPerformanceBooster.jsx';
 
 export default function StudentLayout({ children, user }) {
   return (
-    <AppErrorBoundary area="student">
+    <AppErrorBoundary>
       <AppProviders user={user} performanceBooster={<PlatformPerformanceBooster />}>
         {children}
       </AppProviders>

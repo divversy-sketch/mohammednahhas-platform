@@ -4,7 +4,6 @@ import { usePwaInstallPrompt } from '../../shared/pwa/usePwaInstallPrompt.js';
 import { useServiceWorkerRegistration } from '../../shared/pwa/useServiceWorkerRegistration.js';
 import { useStudentSession } from '../hooks/useStudentSession.js';
 import { StudentRoute } from '../../app/routes.jsx';
-import { StudentPortalGate } from '../../features/platform-maintenance/index.js';
 
 const StudentDashboardPage = lazy(() => import('../../pages/student/DashboardPage.jsx'));
 const LandingPage = lazy(() => import('../../pages/public/LandingPage.jsx'));
@@ -45,9 +44,7 @@ function StudentApp() {
             ? <LandingPage key="landing" onAuthClick={() => setViewMode('auth')} installPrompt={installPrompt} />
             : <AuthPage key="auth" onBack={() => setViewMode('landing')} />
         ) : (
-          <StudentPortalGate user={user}>
-            <StudentDashboardPage key="student" user={user} userData={userData} installPrompt={installPrompt} />
-          </StudentPortalGate>
+          <StudentDashboardPage key="student" user={user} userData={userData} installPrompt={installPrompt} />
         )}
       </Suspense>
     </StudentRoute>

@@ -12,7 +12,7 @@ import { getGradeLabel } from '@shared/constants/grades';
 
 import { platformNotify, platformConfirm, platformPrompt, safeNumber } from '@shared/core/platformShared.jsx';
 
-import { adminSecureFunctions } from '@features/admin-dashboard/services/adminSecureFunctions.js';
+import { adminSecureFunctions } from '@admin/services/adminSecureFunctions.js';
 
 const PAYMENT_METHOD_LABELS = {
   vodafone_cash: 'فودافون كاش',

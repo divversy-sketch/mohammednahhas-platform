@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { CheckCircle, KeyRound, Mail, ShieldAlert, Trash2, User, XCircle } from '@shared/icons/lucide-shim.jsx';
 import { platformNotify, platformPrompt, platformConfirm } from '@shared/core/platformShared.jsx';
-import { adminSecureFunctions } from '@features/admin-dashboard/services/adminSecureFunctions.js';
+import { adminSecureFunctions } from '@admin/services/adminSecureFunctions.js';
 
 const normalizeEmail = (value = '') => String(value || '').trim().toLowerCase();
 

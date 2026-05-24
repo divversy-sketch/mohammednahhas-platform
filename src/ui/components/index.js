@@ -32,5 +32,3 @@ export { default as ErrorState } from './ErrorState.jsx';
 export { default as PageHeader } from './PageHeader.jsx';
 export { default as SectionHeader } from './SectionHeader.jsx';
 export { default as Toast } from './Toast.jsx';
-export { GlowFrame } from './GlowFrame.jsx';
-export { default as GlowFrameDefault } from './GlowFrame.jsx';

@@ -1,195 +1,219 @@
 import { signOut } from 'firebase/auth';
 import {
-  C03BellIcon,
-  C03BookIcon,
-  C03CalendarIcon,
-  C03ChartIcon,
-  C03CrownIcon,
-  C03ExamIcon,
-  C03FileIcon,
-  C03HomeIcon,
-  C03LogoutIcon,
-  C03MessageIcon,
-  C03PlayIcon,
-  C03RocketIcon,
-  C03SearchIcon,
-  C03SettingsIcon,
-  C03SparkIcon,
-  C03UserIcon,
-} from '@shared/icons/creative03Icons.jsx';
+  Bell, BookOpen, BrainCircuit, ClipboardList, Code,
+  Crown, FileCheck, FileText, Headphones, LogOut, Menu,
+  MessageSquare, MoreVertical, PlayCircle, Settings,
+  Target, User, X, Sparkles, Trophy, Layout,
+} from '@shared/icons/lucide-shim.jsx';
+import { ModernLogo } from '@features/home/HomeWidgets.jsx';
 
+/* ─── تعريف الأقسام ─── */
 const NAV_GROUPS = [
   {
-    label: 'لوحتك',
+    label: 'الرئيسية',
     items: [
-      { tab: 'home', label: 'الرئيسية', icon: C03HomeIcon },
-      { tab: 'subscription', label: 'الاشتراكات', icon: C03CrownIcon, tone: 'pink' },
+      { tab: 'home',         label: 'لوحة المتابعة',       icon: Layout        },
+      { tab: 'subscription', label: 'الباقة والاشتراك',     icon: Crown, tone: 'amber' },
     ],
   },
   {
     label: 'التعلم',
     permission: 'content',
     items: [
-      { tab: 'courses', label: 'الكورسات', icon: C03BookIcon },
-      { tab: 'videos', label: 'المحاضرات', icon: C03PlayIcon },
-      { tab: 'learning_path', label: 'مساري التعليمي', icon: C03RocketIcon },
-      { tab: 'remediation', label: 'العلاج الذكي', icon: C03SparkIcon },
-      { tab: 'files', label: 'الملفات', icon: C03FileIcon },
-      { tab: 'htmls', label: 'محتوى تفاعلي', icon: C03SparkIcon },
-      { tab: 'review_quiz', label: 'مراجعة سريعة', icon: C03ExamIcon },
-    ],
-  },
-  {
-    label: 'الاختبارات',
-    permission: 'exam',
-    items: [
-      { tab: 'exams', label: 'الامتحانات', icon: C03ExamIcon },
-      {
-        tab: 'assignments',
-        label: 'الواجبات وبنك الأخطاء',
-        icon: C03CalendarIcon,
-        alias: ['assignments', 'smart_hw_results', 'mistakes_bank'],
-        action: 'learningHub',
-      },
+      { tab: 'courses',       label: 'الكورسات',             icon: BookOpen      },
+      { tab: 'videos',        label: 'المحاضرات',            icon: PlayCircle    },
+      { tab: 'learning_path', label: 'مساري التعليمي',       icon: Target        },
+      { tab: 'remediation',   label: 'العلاج الذكي',         icon: BrainCircuit  },
+      { tab: 'files',         label: 'الملفات',              icon: FileText      },
+      { tab: 'htmls',         label: 'محتوى تفاعلي',         icon: Code          },
+      { tab: 'review_quiz',   label: 'مراجعة سريعة',         icon: ClipboardList },
     ],
   },
   {
     label: 'التواصل',
     permission: 'content',
     items: [
-      { tab: 'student_messages', label: 'رسائلي', icon: C03MessageIcon },
-      { tab: 'support', label: 'الدعم الفني', icon: C03BellIcon },
+      { tab: 'student_messages', label: 'رسائلي',     icon: MessageSquare },
+      { tab: 'support',          label: 'الدعم الفني', icon: Bell          },
+    ],
+  },
+  {
+    label: 'الاختبارات',
+    permission: 'exam',
+    items: [
+      { tab: 'exams',       label: 'الامتحانات',           icon: ClipboardList },
+      { tab: 'assignments', label: 'الواجبات وبنك الأخطاء', icon: FileCheck,
+        alias: ['assignments','smart_hw_results','mistakes_bank'], action: 'learningHub' },
     ],
   },
   {
     label: 'الحساب',
     items: [
-      { tab: 'settings', label: 'ملفي والأداء', icon: C03SettingsIcon, alias: ['settings', 'performance'] },
+      { tab: 'settings', label: 'ملفي الشخصي والأداء', icon: Settings,
+        alias: ['settings','performance'] },
     ],
   },
 ];
 
-const canShowGroup = (group, isBannedContent, isBannedExam) => {
-  if (group.permission === 'content') return !isBannedContent;
-  if (group.permission === 'exam') return !isBannedExam;
-  return true;
-};
+/* الـ 5 items للـ bottom nav على الموبايل */
+const BOTTOM_NAV = [
+  { tab: 'home',        label: 'الرئيسية',  icon: Layout        },
+  { tab: 'courses',     label: 'كورسات',    icon: BookOpen      },
+  { tab: 'exams',       label: 'امتحانات',  icon: ClipboardList },
+  { tab: 'settings',    label: 'أدائي',     icon: Trophy        },
+  { tab: '_more',       label: 'المزيد',    icon: MoreVertical  },
+];
 
+/* ─── Sidebar الرئيسي (مخفي على موبايل — يظهر md+) ─── */
 export function StudentV2Sidebar({
-  activeTab,
-  setActiveTab,
-  setMobileMenu,
-  setLearningHubTab,
-  isBannedContent,
-  isBannedExam,
-  auth,
-  studentName,
-  isPremium,
+  activeTab, setActiveTab, setMobileMenu,
+  setLearningHubTab, isBannedContent, isBannedExam,
+  auth, studentName, isPremium,
 }) {
-  const firstName = String(studentName || 'طالب').split(' ')[0];
+  const canShow = (group) => {
+    if (group.permission === 'content') return !isBannedContent;
+    if (group.permission === 'exam')    return !isBannedExam;
+    return true;
+  };
 
   const goTo = (item) => {
     if (item.action === 'learningHub') setLearningHubTab?.('assignments');
-    setActiveTab?.(item.tab);
+    setActiveTab(item.tab);
     setMobileMenu?.(false);
   };
 
-  const isActive = (item) => [item.tab, ...(item.alias || [])].includes(activeTab);
+  const isActive = (item) =>
+    [item.tab, ...(item.alias || [])].includes(activeTab);
+
+  const toneClass = {
+    amber: 'nh-nav-item--amber',
+  };
 
   return (
-    <aside className="c03-sidebar" aria-label="قائمة منصة النحاس">
-      <div className="c03-sidebar__brand">
-        <div className="c03-logo-mark">ن</div>
-        <div>
-          <strong>منصة النحاس</strong>
-          <span>{firstName} · {isPremium ? 'VIP' : 'حساب مجاني'}</span>
+    <>
+      {/* ── Icon Sidebar (md → lg) ── */}
+      <aside className="nh-icon-sidebar" aria-label="قائمة الأقسام">
+        <div className="nh-icon-sidebar__logo">
+          <ModernLogo size={32} />
         </div>
-      </div>
+        <nav className="nh-icon-sidebar__nav">
+          {NAV_GROUPS.filter(canShow).flatMap(g => g.items).map(item => {
+            const Icon = item.icon;
+            const active = isActive(item);
+            return (
+              <button
+                key={item.tab}
+                onClick={() => goTo(item)}
+                className={`nh-icon-btn${active ? ' is-active' : ''}`}
+                title={item.label}
+                aria-label={item.label}
+              >
+                <Icon size={20} />
+                {active && <span className="nh-icon-btn__dot" />}
+              </button>
+            );
+          })}
+        </nav>
+        <button onClick={() => signOut(auth)} className="nh-icon-btn nh-icon-btn--logout mt-auto" title="خروج" aria-label="خروج">
+          <LogOut size={20} />
+        </button>
+      </aside>
 
-      <nav className="c03-sidebar__nav">
-        {NAV_GROUPS.filter((group) => canShowGroup(group, isBannedContent, isBannedExam)).map((group) => (
-          <div className="c03-nav-group" key={group.label}>
-            <p>{group.label}</p>
-            {group.items.map((item) => {
-              const Icon = item.icon;
-              const active = isActive(item);
-              return (
-                <button
-                  type="button"
-                  key={item.tab}
-                  onClick={() => goTo(item)}
-                  className={`c03-nav-item${active ? ' is-active' : ''}${item.tone ? ` is-${item.tone}` : ''}`}
-                  aria-current={active ? 'page' : undefined}
-                >
-                  <span className="c03-nav-item__icon"><Icon size={20} /></span>
-                  <span className="c03-nav-item__label">{item.label}</span>
-                </button>
-              );
-            })}
+      {/* ── Text Sidebar (lg+) ── */}
+      <aside className="nh-text-sidebar" aria-label="قائمة الأقسام الكاملة">
+        <div className="nh-text-sidebar__header">
+          <ModernLogo size={28} />
+          <div className="nh-text-sidebar__brand">
+            <span className="nh-text-sidebar__name">منصة النحاس</span>
+            <span className="nh-text-sidebar__sub">
+              {studentName ? studentName.split(' ')[0] : 'طالب'} · {isPremium ? '⭐ VIP' : 'مجاني'}
+            </span>
           </div>
-        ))}
-      </nav>
+        </div>
 
-      <div className="c03-upgrade-card">
-        <C03CrownIcon size={23} />
-        <strong>ترقية حسابك</strong>
-        <p>افتح كل المحاضرات والاختبارات بتجربة كاملة.</p>
-        <button type="button" onClick={() => setActiveTab?.('subscription')}>ترقية الآن</button>
-      </div>
+        <nav className="nh-text-sidebar__nav">
+          {NAV_GROUPS.filter(canShow).map(group => (
+            <div key={group.label} className="nh-nav-group">
+              <span className="nh-nav-group__label">{group.label}</span>
+              {group.items.map(item => {
+                const Icon = item.icon;
+                const active = isActive(item);
+                return (
+                  <button
+                    key={item.tab}
+                    onClick={() => goTo(item)}
+                    className={`nh-nav-item${active ? ' is-active' : ''}${toneClass[item.tone] ? ' ' + toneClass[item.tone] : ''}`}
+                    aria-current={active ? 'page' : undefined}
+                  >
+                    <Icon size={17} />
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </nav>
 
-      <button type="button" onClick={() => auth && signOut(auth)} className="c03-logout">
-        <C03LogoutIcon size={18} />
-        <span>تسجيل الخروج</span>
-      </button>
-    </aside>
+        <button onClick={() => signOut(auth)} className="nh-nav-item nh-nav-item--logout">
+          <LogOut size={17} />
+          <span>تسجيل الخروج</span>
+        </button>
+      </aside>
+    </>
   );
 }
 
+/* ─── Topbar (ثابت أعلى المحتوى على كل الشاشات) ─── */
 export function StudentV2Topbar({
-  setShowFocusMode,
-  setShowNotifications,
-  unseenNotificationCount,
-  isPremium,
-  subscriptionExpiry,
+  setShowFocusMode, setShowNotifications, unseenNotificationCount,
+  isPremium, subscriptionExpiry, setMobileMenu,
 }) {
   const expiryLabel = subscriptionExpiry?.toDate
     ? subscriptionExpiry.toDate().toLocaleDateString('ar-EG')
     : null;
 
   return (
-    <header className="c03-topbar">
-      <div className="c03-user-chip">
-        <button type="button" className="c03-icon-button c03-icon-button--hot"><C03UserIcon size={19} /></button>
-        <button type="button" onClick={() => setShowNotifications?.(true)} className="c03-icon-button">
-          <C03BellIcon size={19} />
-          {unseenNotificationCount > 0 && <span>{unseenNotificationCount}</span>}
+    <header className="nh-topbar">
+      <div className="nh-topbar__left">
+        {isPremium && (
+          <span className="nh-topbar__vip">
+            <Crown size={13} /> VIP {expiryLabel ? `حتى ${expiryLabel}` : 'مفعل'}
+          </span>
+        )}
+      </div>
+      <div className="nh-topbar__right">
+        <button
+          onClick={() => setShowFocusMode(true)}
+          className="nh-topbar__btn"
+          aria-label="وضع التركيز"
+        >
+          <Headphones size={17} />
+          <span className="nh-topbar__btn-label">تركيز</span>
         </button>
-        <button type="button" className="c03-icon-button"><C03MessageIcon size={19} /></button>
-      </div>
-
-      <div className="c03-search-box">
-        <C03SearchIcon size={19} />
-        <input placeholder="ابحث عن محاضرة، اختبار، ملف..." readOnly aria-label="بحث داخل المنصة" />
-      </div>
-
-      <div className="c03-top-actions">
-        {isPremium && <span className="c03-vip-pill">VIP {expiryLabel ? `حتى ${expiryLabel}` : 'مفعل'}</span>}
-        <button type="button" onClick={() => setShowFocusMode?.(true)} className="c03-focus-btn">
-          <C03SparkIcon size={17} /> وضع التركيز
+        <button
+          onClick={() => setShowNotifications(true)}
+          className="nh-topbar__btn nh-topbar__btn--notif"
+          aria-label="الإشعارات"
+        >
+          <Bell size={17} />
+          {unseenNotificationCount > 0 && (
+            <span className="nh-notif-badge">{unseenNotificationCount}</span>
+          )}
         </button>
       </div>
     </header>
   );
 }
 
+/* ─── Section Title ─── */
 export function StudentV2SectionTitle({ badge, title, action }) {
   return (
-    <div className="c03-section-title">
+    <div className="nh-section-title">
       <div>
-        {badge && <span>{badge}</span>}
-        <h2>{title}</h2>
+        {badge && <span className="nh-kicker">{badge}</span>}
+        <h2 className="nh-section-title__h">{title}</h2>
       </div>
-      {action && <div>{action}</div>}
+      {action && <div className="nh-section-title__action">{action}</div>}
     </div>
   );
 }

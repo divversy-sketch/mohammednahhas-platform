@@ -1,5 +1,5 @@
-import AppErrorBoundary from '../shared/core/AppErrorBoundary.jsx';
+import AppErrorBoundary from '../student/parts/AppErrorBoundary.jsx';
 
 export default function PublicLayout({ children }) {
-  return <AppErrorBoundary area="public">{children}</AppErrorBoundary>;
+  return <AppErrorBoundary>{children}</AppErrorBoundary>;
 }

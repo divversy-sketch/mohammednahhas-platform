@@ -8,8 +8,8 @@ import { uploadToCloudinary } from '@services/cloudinaryUpload';
 import { downloadXlsx } from '@shared/utils/exportData.js';
 import { platformNotify, platformConfirm, platformPrompt, sendSystemNotification, safeNumber, VIDEO_EXAM_UNLOCK_PERCENT, getQuestionMaxScore, calculateDetailedExamMetrics } from '@shared/core/platformShared.jsx';
 import { normalizeImagePlacement, defaultImagePlacement } from '@shared/utils/imagePlacement.js';
-import { adminSecureFunctions } from '@features/admin-dashboard/services/adminSecureFunctions.js';
-import { confirmSensitiveAction } from '@features/admin-dashboard/services/adminAudit.js';
+import { adminSecureFunctions } from '@admin/services/adminSecureFunctions.js';
+import { confirmSensitiveAction } from '@admin/services/adminAudit.js';
 
 export const createExamEditorActions = (ctx) => {
   const {

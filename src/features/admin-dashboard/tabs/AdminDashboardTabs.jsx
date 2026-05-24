@@ -34,7 +34,7 @@ import { AdminAssignmentsPage, AdminExamViewTabs, AdminQuestionBankPage } from '
 
 import AdminFollowUpPanel from '@features/insights/AdminFollowUpPanel.jsx';
 import AdminSmartHomeworkManager from '@features/homework/AdminSmartHomeworkManager.jsx';
-import { AdminAuditLogViewer, AdminNotificationsManager, AdminPlatformSettingsManager, AdminRolesManager, AdminGrowthSuite } from '@features/admin-dashboard/operations/index.js';
+import { AdminAuditLogViewer, AdminNotificationsManager, AdminPlatformSettingsManager, AdminRolesManager, AdminGrowthSuite } from '@admin/parts/AdminOperationsSuite.jsx';
 import { AdminSmartExamEngine, AdminStudentReports, AdminGroupsManager, AdminMessagingCenter, AdminFinanceDashboard, AdminVideoSecurityPanel } from '@features/smartLearning/SmartLearningEngine.jsx';
 import { canAccessAdminTab } from '@config/adminPermissions';
 import AdminCommandCenter from '@admin/components/AdminCommandCenter.jsx';

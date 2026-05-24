@@ -18,14 +18,12 @@ import AdminPendingUsersPage from '@admin/pages/AdminPendingUsersPage.jsx';
 import { AdminAssignmentsPage, AdminExamViewTabs, AdminQuestionBankPage } from '@admin/pages/AdminUtilityPages.jsx';
 import AdminFollowUpPanel from '@features/insights/AdminFollowUpPanel.jsx';
 import AdminSmartHomeworkManager from '@features/homework/AdminSmartHomeworkManager.jsx';
-import { AdminAuditLogViewer, AdminNotificationsManager, AdminPlatformSettingsManager, AdminRolesManager, AdminGrowthSuite } from '@features/admin-dashboard/operations/index.js';
+import { AdminAuditLogViewer, AdminNotificationsManager, AdminPlatformSettingsManager, AdminRolesManager, AdminGrowthSuite } from '@admin/parts/AdminOperationsSuite.jsx';
 import { AdminSmartExamEngine, AdminStudentReports, AdminGroupsManager, AdminMessagingCenter, AdminFinanceDashboard, AdminVideoSecurityPanel } from '@features/smartLearning/SmartLearningEngine.jsx';
 import AdminStudentSuccessSuite from '@features/studentSuccess/StudentSuccessAdminSuite.jsx';
 import { AdminGlobalSearch, AdminLiveClassesPanel, AdminCertificatesPanel, AdminCommandQuickActions } from '@features/product/ProductExperienceSuite.jsx';
 import AdminAllUsersTab from '@features/admin-dashboard/tabs/users/AdminAllUsersTab.jsx';
 import AdminDashboardOverviewTab from '@features/admin-dashboard/tabs/dashboard/AdminDashboardOverviewTab.jsx';
-import AdminSystemHealthPanel from '@admin/components/AdminSystemHealthPanel.jsx';
-import { AdminStudentPortalGateManager } from '@features/platform-maintenance/index.js';
 
 export default function AdminPlatformSettingsTab({ ctx }) {
   const {
@@ -215,7 +213,6 @@ export default function AdminPlatformSettingsTab({ ctx }) {
 {activeTab === 'platform_settings' && (
             <div className="space-y-6">
               <AdminPlatformSettingsManager userData={userData} />
-              <AdminStudentPortalGateManager adminUser={adminProfile || userData} />
               <AdminGrowthSuite initialTab="mobile" compact users={activeUsersList} exams={examsList} examResults={examResults} content={contentList} assignments={assignments} assignmentSubmissions={assignmentSubmissions} subscriptionCodes={subscriptionCodes} notifications={announcements} userData={userData} />
               <AdminStudentSuccessSuite variant="gamification" users={activeUsersList} examResults={examResults} />
               <AdminSystemHealthPanel />
