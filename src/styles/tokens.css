@@ -1,27 +1,41 @@
+/* ═══ Design Tokens - Dark Luxury Theme ═══ */
 :root {
-  --color-primary: #0f766e;
-  --color-primary-soft: #ccfbf1;
-  --color-admin: #f59e0b;
-  --color-admin-soft: #fef3c7;
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
-  --color-danger: #ef4444;
-  --color-info: #0ea5e9;
-  --color-text: #0f172a;
-  --color-muted: #64748b;
-  --color-border: #e2e8f0;
-  --color-surface: #ffffff;
-  --color-background: #f8fafc;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 18px;
-  --radius-xl: 24px;
-  --shadow-card: 0 10px 30px rgba(15, 23, 42, 0.08);
-  --shadow-modal: 0 20px 60px rgba(15, 23, 42, 0.18);
-  --space-xs: 4px;
-  --space-sm: 8px;
-  --space-md: 12px;
-  --space-lg: 16px;
-  --space-xl: 24px;
+  /* Brand */
+  --color-primary:      #f5b820;
+  --color-primary-soft: rgba(245,184,32,0.12);
+  --color-admin:        #f5b820;
+  --color-admin-soft:   rgba(245,184,32,0.12);
+
+  /* Semantic */
+  --color-success:  #00d4aa;
+  --color-warning:  #f5b820;
+  --color-danger:   #f87171;
+  --color-info:     #4fc3f7;
+
+  /* Text */
+  --color-text:     #f0f4f8;
+  --color-muted:    #94a3b8;
+  --color-border:   rgba(245,184,32,0.2);
+
+  /* Surfaces */
+  --color-surface:     rgba(13,17,32,0.9);
+  --color-background:  #080c14;
+
+  /* Radius */
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+
+  /* Shadows (now glow-based) */
+  --shadow-card:  0 0 30px rgba(245,184,32,0.12), 0 8px 30px rgba(0,0,0,0.4);
+  --shadow-modal: 0 0 80px rgba(245,184,32,0.18), 0 20px 60px rgba(0,0,0,0.6);
+
+  /* Spacing */
+  --space-xs:  4px;
+  --space-sm:  8px;
+  --space-md:  12px;
+  --space-lg:  16px;
+  --space-xl:  24px;
   --space-2xl: 32px;
 }

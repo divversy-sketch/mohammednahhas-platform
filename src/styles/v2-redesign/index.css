@@ -43,4 +43,6 @@
 @import './80-student-shell-navigation-17.css';
 @import './18-Section-Title-new.css';
 @import './50-responsive-mobile-19.css';
-@import '../pages/creative03-student.css';
+
+/* 🔥 نظام التصميم الجديد - Dark Luxury + Glowing Borders */
+@import './90-new-design-system.css';
