@@ -139,6 +139,59 @@ export default function StudentHomeTab({ ctx }) {
     startExamWithCode,
   } = ctx;
 
+  const smartWeakBranches = ctx.smartWeakBranches || ctx.weakBranches || weakBranches || [];
+
+  const nextStudyAction = ctx.nextStudyAction || (() => {
+    if (latestVideoActivity && !latestVideoActivity.isCompleted) {
+      return {
+        title: 'استكمل آخر محاضرة',
+        text: latestVideoActivity.video?.title || 'محاضرة محفوظة',
+        action: () => setPlayingVideo(latestVideoActivity.video),
+        button: 'استكمال الآن',
+        icon: <Play size={18} fill="currentColor" />,
+        tone: 'from-amber-400 to-orange-500 text-slate-950'
+      };
+    }
+    if (inProgressExam) {
+      return {
+        title: 'استكمل امتحانك',
+        text: inProgressExam.title || 'امتحان محفوظ',
+        action: () => startExamWithCode(inProgressExam, { skipCode: true }),
+        button: 'دخول الامتحان',
+        icon: <ClipboardList size={18} />,
+        tone: 'from-blue-500 to-indigo-600 text-white'
+      };
+    }
+    if (nextOpenExam) {
+      return {
+        title: 'امتحان متاح الآن',
+        text: nextOpenExam.title || 'ادخل قبل انتهاء الوقت',
+        action: () => setActiveTab('exams'),
+        button: 'فتح صفحة الامتحانات',
+        icon: <ClipboardList size={18} />,
+        tone: 'from-purple-600 to-indigo-700 text-white'
+      };
+    }
+    if (pendingAssignments?.[0]) {
+      return {
+        title: 'عندك واجب مطلوب',
+        text: pendingAssignments[0].title || 'واجب جديد',
+        action: () => setActiveTab('assignments'),
+        button: 'فتح الواجبات',
+        icon: <QrCode size={18} />,
+        tone: 'from-emerald-500 to-teal-600 text-white'
+      };
+    }
+    return {
+      title: 'ابدأ خطوة جديدة',
+      text: videos?.[0]?.title || 'افتح المحاضرات المتاحة لك',
+      action: () => setActiveTab('videos'),
+      button: 'فتح المحاضرات',
+      icon: <PlayCircle size={18} />,
+      tone: 'from-slate-900 to-slate-700 text-white'
+    };
+  })();
+
   return (
     <>
 {activeTab === 'home' && (
