@@ -16,19 +16,3 @@ export { default as FormField } from './FormField.jsx';
 export { default as ActionMenu } from './ActionMenu.jsx';
 export { default as MobileQuickActions } from './MobileQuickActions.jsx';
 export { default as ResponsiveDataCards } from './ResponsiveDataCards.jsx';
-
-export { default as LeaderboardPanel } from './LeaderboardPanel.jsx';
-
-export { default as Drawer } from './Drawer.jsx';
-export { default as Table } from './Table.jsx';
-export { default as Badge } from './Badge.jsx';
-export { default as Input } from './Input.jsx';
-export { default as Select } from './Select.jsx';
-export { default as Textarea } from './Textarea.jsx';
-export { default as Tabs } from './Tabs.jsx';
-export { default as DropdownMenu } from './DropdownMenu.jsx';
-export { default as LoadingState } from './LoadingState.jsx';
-export { default as ErrorState } from './ErrorState.jsx';
-export { default as PageHeader } from './PageHeader.jsx';
-export { default as SectionHeader } from './SectionHeader.jsx';
-export { default as Toast } from './Toast.jsx';

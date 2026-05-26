@@ -1,9 +1,9 @@
-import { AdminGrowthSuite as AdminGrowthSuiteRuntime } from './runtime/AdminGrowthSuiteRuntime.jsx';
+import { AdminGrowthSuite as AdminGrowthSuiteLegacy } from './legacy/AdminGrowthSuiteLegacy.jsx';
 
 // Phase 6 boundary file for Growth operations.
 export function AdminGrowthSuite(props) {
-  return <AdminGrowthSuiteRuntime {...props} />;
+  return <AdminGrowthSuiteLegacy {...props} />;
 }
 
 export default AdminGrowthSuite;
-export { AdminGrowthSuiteRuntime };
+export { AdminGrowthSuiteLegacy };

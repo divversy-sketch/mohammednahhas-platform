@@ -27,9 +27,8 @@ if (read('index.html').includes('cdn.tailwindcss.com')) {
 }
 
 const main = read('src/main.jsx');
-const firebaseService = read('src/services/firebase.js');
-if (!main.includes('initializeFirebaseAppCheck') || !firebaseService.includes('import.meta.env.VITE_RECAPTCHA_V3_SITE_KEY')) {
-  fail('App Check should be initialized from main.jsx and read its site key from VITE_RECAPTCHA_V3_SITE_KEY in src/services/firebase.js.');
+if (!main.includes('import.meta.env.VITE_RECAPTCHA_V3_SITE_KEY')) {
+  fail('App Check site key should be read from VITE_RECAPTCHA_V3_SITE_KEY.');
 }
 
 const vite = read('vite.config.js');

@@ -1,9 +1,9 @@
-import AdminDashboardRuntime, { AdminDashboard as NamedAdminDashboardRuntime } from './AdminDashboardRuntime.jsx';
+import AdminDashboardLegacy, { AdminDashboard as NamedAdminDashboardLegacy } from './legacy/AdminDashboardLegacy.jsx';
 
 // Phase 6 boundary file.
 // New admin layout/controllers/modals should hang off features/admin-dashboard/*.
 export function AdminDashboard(props) {
-  const Component = NamedAdminDashboardRuntime || AdminDashboardRuntime;
+  const Component = NamedAdminDashboardLegacy || AdminDashboardLegacy;
   return <Component {...props} />;
 }
 

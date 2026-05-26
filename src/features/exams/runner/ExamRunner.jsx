@@ -1,8 +1,8 @@
-import ExamRunnerCore, { ExamRunner as NamedExamRunnerCore } from './ExamRunnerCore.jsx';
+import ExamRunnerLegacy, { ExamRunner as NamedExamRunnerLegacy } from './legacy/ExamRunnerLegacy.jsx';
 
 // Phase 6 boundary file for the exam runtime.
 export function ExamRunner(props) {
-  const Component = NamedExamRunnerCore || ExamRunnerCore;
+  const Component = NamedExamRunnerLegacy || ExamRunnerLegacy;
   return <Component {...props} />;
 }
 

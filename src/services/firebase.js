@@ -24,22 +24,3 @@ export const FIREBASE_VAPID_KEY = '';
 export const getBrowserMessaging = async () => null;
 export const savePushTokenForUser = async () => null;
 export const setupForegroundPushListener = async () => () => {};
-
-
-export async function initializeFirebaseAppCheck() {
-  if (!import.meta.env.VITE_RECAPTCHA_V3_SITE_KEY) {
-    if (import.meta.env.PROD) console.warn('App Check disabled: VITE_RECAPTCHA_V3_SITE_KEY is missing.');
-    return null;
-  }
-
-  try {
-    const { initializeAppCheck, ReCaptchaV3Provider } = await import('firebase/app-check');
-    return initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider(import.meta.env.VITE_RECAPTCHA_V3_SITE_KEY),
-      isTokenAutoRefreshEnabled: true
-    });
-  } catch (error) {
-    console.warn('App Check init skipped:', error);
-    return null;
-  }
-}

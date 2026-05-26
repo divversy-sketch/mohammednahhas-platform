@@ -3,7 +3,7 @@ import AppLoadingScreen from '../../shared/ui/AppLoadingScreen.jsx';
 import { usePwaInstallPrompt } from '../../shared/pwa/usePwaInstallPrompt.js';
 import { useServiceWorkerRegistration } from '../../shared/pwa/useServiceWorkerRegistration.js';
 import { useStudentSession } from '../hooks/useStudentSession.js';
-import { StudentRoute } from '../../app/routes.jsx';
+import StudentLayout from '../../layouts/StudentLayout.jsx';
 
 const StudentDashboardPage = lazy(() => import('../../pages/student/DashboardPage.jsx'));
 const LandingPage = lazy(() => import('../../pages/public/LandingPage.jsx'));
@@ -37,7 +37,7 @@ function StudentApp() {
   }
 
   return (
-    <StudentRoute user={user}>
+    <StudentLayout user={user}>
       <Suspense fallback={<StudentRouteFallback />}>
         {!user ? (
           viewMode === 'landing'
@@ -47,7 +47,7 @@ function StudentApp() {
           <StudentDashboardPage key="student" user={user} userData={userData} installPrompt={installPrompt} />
         )}
       </Suspense>
-    </StudentRoute>
+    </StudentLayout>
   );
 }
 

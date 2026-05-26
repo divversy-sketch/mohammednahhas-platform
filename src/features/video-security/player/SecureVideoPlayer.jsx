@@ -1,8 +1,8 @@
-import SecureVideoPlayerCore from './SecureVideoPlayerCore.jsx';
+import SecureVideoPlayerLegacy from './legacy/SecureVideoPlayerLegacy.jsx';
 
 // Phase 6 boundary file for secure video playback.
 export function SecureVideoPlayer(props) {
-  return <SecureVideoPlayerCore {...props} />;
+  return <SecureVideoPlayerLegacy {...props} />;
 }
 
 export default SecureVideoPlayer;
