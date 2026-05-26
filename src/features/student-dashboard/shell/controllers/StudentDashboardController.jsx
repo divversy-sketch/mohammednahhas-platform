@@ -193,6 +193,7 @@ export const StudentDashboardController = ({ user, userData, installPrompt }) =>
   const subscriptionDaysLeft = getSubscriptionDaysLeft({ isPremium, subscriptionExpiry: userData?.subscriptionExpiry, now: nowForStudentDashboard });
 
   const smartWeakBranches = getWeakBranches({ completedExamResults });
+  const weakBranches = smartWeakBranches;
 
   const nextStudyAction = (() => {
       if (latestVideoActivity && !latestVideoActivity.isCompleted) {

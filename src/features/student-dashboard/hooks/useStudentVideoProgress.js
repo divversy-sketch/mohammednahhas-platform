@@ -123,5 +123,5 @@ export function useStudentVideoProgress({ user, videos = [], videoViews = [], se
   })();
 
 
-  return { getVideoWatchPercent, handleVideoProgress, latestVideoActivity };
+  return { getStoredLocalVideoProgress, getVideoWatchPercent, handleVideoProgress, latestVideoActivity };
 }
