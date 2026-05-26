@@ -120,8 +120,8 @@ export function useStudentVideoProgress({ user, videos = [], videoViews = [], se
           percent,
           isCompleted: percent >= 95
       };
-  })();
+  }, [user?.uid, videos, videoViews, getVideoWatchPercent]);
 
 
-  return { getVideoWatchPercent, handleVideoProgress, latestVideoActivity };
+  return { getStoredLocalVideoProgress, getVideoWatchPercent, handleVideoProgress, latestVideoActivity };
 }

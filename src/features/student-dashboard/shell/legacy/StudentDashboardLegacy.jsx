@@ -154,7 +154,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
       }
   };
 
-  const { getVideoWatchPercent, handleVideoProgress, latestVideoActivity } = useStudentVideoProgress({ user, videos, videoViews, setVideoViews });
+  const { getStoredLocalVideoProgress, getVideoWatchPercent, handleVideoProgress, latestVideoActivity } = useStudentVideoProgress({ user, videos, videoViews, setVideoViews });
 
   const canOpenLinkedExam = (videoItem) => {
       if (!videoItem?.linkedExamId) return false;
@@ -193,6 +193,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
   const subscriptionDaysLeft = getSubscriptionDaysLeft({ isPremium, subscriptionExpiry: userData?.subscriptionExpiry, now: nowForStudentDashboard });
 
   const smartWeakBranches = getWeakBranches({ completedExamResults });
+  const weakBranches = smartWeakBranches;
 
   const nextStudyAction = (() => {
       if (latestVideoActivity && !latestVideoActivity.isCompleted) {
