@@ -73,6 +73,8 @@ export const StudentDashboardMainView = ({ ctx }) => {
     startExamWithCode
   } = ctx;
 
+  const studentTabCtx = ctx;
+
   return (
     <LazyPanel>
     <div className="v2-student-shell relative font-['Cairo'] min-h-screen block" dir="rtl">
