@@ -1,19 +1,30 @@
-
 import { signOut } from 'firebase/auth';
-import { LogOut, ShieldAlert } from '../../shared/icons/lucide-shim.jsx';
+import AdminNeoIcon from './AdminNeoIcon.jsx';
 import { auth } from '../../services/firebase';
 import { GradeOptions } from '../../shared/constants/grades';
+import { getAdminPageMeta } from '../v2/adminPageMeta.js';
 
-export default function AdminHeader({ adminGradeFilter, setAdminGradeFilter }) {
+export default function AdminHeader({ activeTab, adminProfile, adminGradeFilter, setAdminGradeFilter, onMenuClick }) {
+  const meta = getAdminPageMeta(activeTab);
+  const role = adminProfile?.adminRoleLabel || adminProfile?.adminRole || 'إدارة المنصة';
+  const today = new Date().toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' });
+
   return (
-    <header className="v2-topbar flex justify-between items-center mb-8 glass-panel p-4 md:p-5 rounded-3xl relative z-10 mx-4">
-      <div className="flex items-center gap-3 pr-1"><ShieldAlert className="text-amber-600"/> <div><p className="v2-kicker w-fit mb-1">مركز التحكم</p><h1 className="v2-page-title text-2xl md:text-3xl font-black font-arabic v2-gradient-text">لوحة تحكم النحاس</h1></div></div>
-      <div className="flex gap-4 items-center">
-        <select className="bg-white/90 border border-slate-200 text-slate-700 px-4 py-3 rounded-2xl font-bold shadow-sm cursor-pointer hidden md:block" value={adminGradeFilter} onChange={(e) => setAdminGradeFilter(e.target.value)}>
-          <option value="all">كل المراحل الدراسية</option>
+    <header className="admin-neo-header">
+      <button type="button" className="admin-neo-header__mobile" onClick={onMenuClick} aria-label="فتح أقسام الإدارة"><AdminNeoIcon name="menu" size={22} /></button>
+      <div>
+        <span className="admin-neo-kicker">{meta.eyebrow}</span>
+        <h1>{meta.title}</h1>
+        <p>{meta.description || 'مساحة عمل منظمة لإدارة المنصة بسرعة ووضوح.'}</p>
+      </div>
+      <div className="admin-neo-header__actions">
+        <span className="admin-neo-header__pill"><AdminNeoIcon name="shieldAlert" size={17} /> {role}</span>
+        <span className="admin-neo-header__pill"><AdminNeoIcon name="calendar" size={17} /> {today}</span>
+        <select className="admin-neo-grade-select" value={adminGradeFilter} onChange={(event) => setAdminGradeFilter(event.target.value)} aria-label="فلترة المرحلة الدراسية">
+          <option value="all">كل المراحل</option>
           <GradeOptions />
         </select>
-        <button onClick={() => signOut(auth)} className="text-red-600 font-black px-4 py-3 flex gap-2 hover:bg-red-50 rounded-2xl transition border border-red-100 bg-white/70"><LogOut /> خروج</button>
+        <button type="button" onClick={() => signOut(auth)} className="admin-neo-logout"><AdminNeoIcon name="logout" size={18} /> خروج</button>
       </div>
     </header>
   );

@@ -1,0 +1,241 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@500;700;800;900&display=swap');
+
+.nahhas-loading-screen,
+.nahhas-loading-screen * { box-sizing: border-box; }
+
+.nahhas-loading-screen {
+  position: relative;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: 24px;
+  font-family: 'Cairo', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #f8fbff;
+  background:
+    radial-gradient(circle at 16% 18%, rgba(245, 184, 32, .22), transparent 28%),
+    radial-gradient(circle at 82% 8%, rgba(69, 204, 255, .18), transparent 30%),
+    linear-gradient(135deg, #07101d, #0b1729 54%, #050914);
+}
+
+.nahhas-loading-screen::before,
+.nahhas-loading-screen::after {
+  content: '';
+  position: absolute;
+  width: 520px;
+  height: 520px;
+  border-radius: 999px;
+  filter: blur(18px);
+  opacity: .48;
+  pointer-events: none;
+  animation: nahhasLoadingDrift 8s ease-in-out infinite;
+}
+
+.nahhas-loading-screen::before {
+  top: -250px;
+  right: -170px;
+  background: radial-gradient(circle, rgba(245, 184, 32, .24), transparent 62%);
+}
+
+.nahhas-loading-screen::after {
+  bottom: -280px;
+  left: -180px;
+  background: radial-gradient(circle, rgba(69, 204, 255, .20), transparent 62%);
+  animation-delay: -3.5s;
+}
+
+.nahhas-loading-letters {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: .65;
+}
+
+.nahhas-loading-letters span {
+  --delay: calc(var(--i) * -1.7s);
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border: 1px solid rgba(245, 184, 32, .16);
+  border-radius: 24px;
+  color: rgba(245, 184, 32, .18);
+  background: rgba(255, 255, 255, .035);
+  font-size: 30px;
+  font-weight: 900;
+  backdrop-filter: blur(4px);
+  animation: nahhasLetterFloat 13s ease-in-out infinite;
+  animation-delay: var(--delay);
+}
+
+.nahhas-loading-letters span:nth-child(1) { top: 11%; right: 13%; }
+.nahhas-loading-letters span:nth-child(2) { top: 22%; left: 16%; }
+.nahhas-loading-letters span:nth-child(3) { bottom: 20%; right: 18%; }
+.nahhas-loading-letters span:nth-child(4) { bottom: 14%; left: 22%; }
+.nahhas-loading-letters span:nth-child(5) { top: 52%; right: 6%; }
+.nahhas-loading-letters span:nth-child(6) { top: 48%; left: 7%; }
+
+.nahhas-loading-card {
+  position: relative;
+  z-index: 2;
+  width: min(92vw, 520px);
+  min-height: 380px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 38px 34px 32px;
+  border: 1px solid rgba(245, 184, 32, .24);
+  border-radius: 38px;
+  text-align: center;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.11), rgba(255,255,255,.035)),
+    linear-gradient(160deg, rgba(245,184,32,.10), transparent 42%),
+    rgba(9, 19, 34, .76);
+  box-shadow: 0 36px 100px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.10);
+  backdrop-filter: blur(28px);
+  animation: nahhasCardIn .72s cubic-bezier(.2,.9,.2,1) both;
+}
+
+.nahhas-loading-card__shine {
+  position: absolute;
+  inset: -40% auto auto -30%;
+  width: 180px;
+  height: 180%;
+  transform: rotate(24deg);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.18), transparent);
+  animation: nahhasShine 2.8s ease-in-out infinite;
+}
+
+.nahhas-loading-visual {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 156px;
+  height: 156px;
+  margin-bottom: 14px;
+}
+
+.nahhas-loading-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: conic-gradient(from 0deg, rgba(245,184,32,1), rgba(69,204,255,1), rgba(54,226,191,1), rgba(245,184,32,1));
+  mask: radial-gradient(circle, transparent 58%, #000 60%);
+  -webkit-mask: radial-gradient(circle, transparent 58%, #000 60%);
+  animation: nahhasSpin 1.8s linear infinite;
+  filter: drop-shadow(0 0 18px rgba(245,184,32,.22));
+}
+
+.nahhas-loading-orb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 126px;
+  height: 126px;
+  border-radius: 42px;
+  color: #f5b820;
+  background:
+    radial-gradient(circle at 24% 18%, rgba(245,184,32,.18), transparent 34%),
+    linear-gradient(135deg, rgba(69,204,255,.22), rgba(54,226,191,.12)),
+    rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.14);
+  box-shadow: 0 20px 50px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.16);
+  animation: nahhasOrbPulse 2.6s ease-in-out infinite;
+}
+
+.nahhas-loading-student {
+  width: 108px;
+  height: 90px;
+  display: block;
+}
+
+.nahhas-loading-kicker {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  color: #08111f;
+  background: linear-gradient(135deg, #f5b820, #ffdf7b);
+  font-size: 12px;
+  font-weight: 900;
+  box-shadow: 0 12px 24px rgba(245,184,32,.22);
+}
+
+.nahhas-loading-card h2 {
+  margin: 14px 0 8px;
+  color: #f8fbff;
+  font-size: clamp(26px, 4vw, 34px);
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.nahhas-loading-card p {
+  max-width: 360px;
+  margin: 0;
+  color: #aebdd0;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.8;
+}
+
+.nahhas-loading-progress {
+  position: relative;
+  width: min(100%, 300px);
+  height: 11px;
+  margin-top: 22px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255,255,255,.09);
+}
+
+.nahhas-loading-progress span {
+  position: absolute;
+  inset-block: 0;
+  right: 0;
+  width: 46%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #36e2bf, #45ccff, #f5b820);
+  animation: nahhasProgress 1.55s ease-in-out infinite;
+}
+
+.nahhas-loading-steps {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 16px;
+  color: #dce8f7;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.nahhas-loading-steps i {
+  width: 22px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #f5b820, #45ccff);
+  opacity: .8;
+}
+
+.nahhas-loading-screen--admin .nahhas-loading-card {
+  border-color: rgba(69, 204, 255, .24);
+}
+
+@keyframes nahhasSpin { to { transform: rotate(360deg); } }
+@keyframes nahhasCardIn { from { opacity: 0; transform: translateY(22px) scale(.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes nahhasShine { 0% { transform: translateX(-280%) rotate(24deg); } 55%, 100% { transform: translateX(520%) rotate(24deg); } }
+@keyframes nahhasProgress { 0% { transform: translateX(120%); width: 28%; } 50% { width: 58%; } 100% { transform: translateX(-220%); width: 28%; } }
+@keyframes nahhasOrbPulse { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-5px) scale(1.025); } }
+@keyframes nahhasLoadingDrift { 0%,100% { transform: translate3d(0,0,0) scale(1); } 50% { transform: translate3d(28px,-18px,0) scale(1.08); } }
+@keyframes nahhasLetterFloat { 0%,100% { transform: translate3d(0,0,0) rotate(0deg); opacity: .44; } 50% { transform: translate3d(-18px,22px,0) rotate(8deg); opacity: .9; } }
+
+@media (max-width: 560px) {
+  .nahhas-loading-card { min-height: 350px; padding: 30px 22px; border-radius: 30px; }
+  .nahhas-loading-visual { width: 136px; height: 136px; }
+  .nahhas-loading-orb { width: 110px; height: 110px; border-radius: 36px; }
+  .nahhas-loading-student { width: 96px; height: 80px; }
+}

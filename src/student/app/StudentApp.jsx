@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState } from 'react';
+import { Suspense, lazy, useMemo, useState } from 'react';
 import AppLoadingScreen from '../../shared/ui/AppLoadingScreen.jsx';
 import { usePwaInstallPrompt } from '../../shared/pwa/usePwaInstallPrompt.js';
 import { useServiceWorkerRegistration } from '../../shared/pwa/useServiceWorkerRegistration.js';
@@ -20,7 +20,13 @@ function StudentRouteFallback() {
 }
 
 function StudentApp() {
-  const [viewMode, setViewMode] = useState(() => 'landing');
+  const initialPublicMode = useMemo(() => {
+    if (typeof window === 'undefined') return 'landing';
+    if (window.location.pathname === '/login') return 'auth-login';
+    if (window.location.pathname === '/register') return 'auth-register';
+    return 'landing';
+  }, []);
+  const [viewMode, setViewMode] = useState(() => initialPublicMode);
   const { user, userData, isLoading } = useStudentSession();
   const { installPrompt } = usePwaInstallPrompt();
 
@@ -41,8 +47,17 @@ function StudentApp() {
       <Suspense fallback={<StudentRouteFallback />}>
         {!user ? (
           viewMode === 'landing'
-            ? <LandingPage key="landing" onAuthClick={() => setViewMode('auth')} installPrompt={installPrompt} />
-            : <AuthPage key="auth" onBack={() => setViewMode('landing')} />
+            ? <LandingPage
+                key="landing"
+                onAuthClick={(mode = 'login') => setViewMode(mode === 'register' ? 'auth-register' : 'auth-login')}
+                onRegisterClick={() => setViewMode('auth-register')}
+                installPrompt={installPrompt}
+              />
+            : <AuthPage
+                key={viewMode}
+                initialMode={viewMode === 'auth-register' ? 'register' : 'login'}
+                onBack={() => setViewMode('landing')}
+              />
         ) : (
           <StudentDashboardPage key="student" user={user} userData={userData} installPrompt={installPrompt} />
         )}

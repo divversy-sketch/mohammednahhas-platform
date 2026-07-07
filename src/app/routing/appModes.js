@@ -6,7 +6,7 @@ export const APP_MODES = Object.freeze({
 
 export function resolveAppMode(pathname = '/') {
   if (pathname.startsWith('/admin')) return APP_MODES.admin;
-  if (pathname.startsWith('/auth') || pathname === '/') return APP_MODES.public;
+  if (pathname.startsWith('/auth') || pathname === '/' || pathname === '/public' || pathname === '/login' || pathname === '/register' || pathname === '/forgot-password') return APP_MODES.public;
   return APP_MODES.student;
 }
 

@@ -1,0 +1,2 @@
+This patch restores functional admin files and adds an isolated clean admin skin inside AdminDashboardShell.
+It keeps add/edit/delete functions, while overriding broken visual layers only inside admin.

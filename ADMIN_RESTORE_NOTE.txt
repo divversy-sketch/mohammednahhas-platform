@@ -1,0 +1,2 @@
+This patch restores the original functional admin dashboard files only: add/edit/delete and tab logic.
+It does not replace the landing page/auth redesign files.

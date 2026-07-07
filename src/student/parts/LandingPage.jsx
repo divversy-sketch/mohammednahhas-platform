@@ -1,81 +1,331 @@
-import { useState, useEffect } from 'react';
-
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { PlayCircle, Video, Facebook, Code, DownloadCloud } from '../../shared/icons/lucide-shim.jsx';
+import { useEffect, useMemo, useState } from 'react';
+import { collection, limit, onSnapshot, query, where } from 'firebase/firestore';
+import { motion } from 'framer-motion';
+import {
+  ArrowLeft,
+  BookOpen,
+  BrainCircuit,
+  CheckCircle,
+  DownloadCloud,
+  Facebook,
+  Feather,
+  Lightbulb,
+  Moon,
+  PlayCircle,
+  Radio,
+  Sparkles,
+  Sun,
+  Target,
+  Video,
+  Wand2
+} from '../../shared/icons/lucide-shim.jsx';
 
 import { db } from '../../services/firebase';
 import SecureVideoPlayer from '@features/video-security/player/SecureVideoPlayer.jsx';
-
-
-import { ModernLogo, FloatingArabicBackground, WisdomBox } from '../../features/home/HomeWidgets';
-
 import InteractiveViewer from '../../features/content/InteractiveViewer';
-
-
 import { WhatsAppContactButton } from '../../shared/core/platformShared.jsx';
+import '../../styles/pages/landing.css';
 
+const arabicLetters = ['أ', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي', 'لا', 'ة'];
 
-export const LandingPage = ({ onAuthClick, installPrompt }) => {
+const gradeNames = {
+  '1prep': 'الأول الإعدادي',
+  '2prep': 'الثاني الإعدادي',
+  '3prep': 'الثالث الإعدادي',
+  '1sec': 'الأول الثانوي',
+  '2sec': 'الثاني الثانوي',
+  '3sec': 'الثالث الثانوي'
+};
+
+const contentTypeLabels = {
+  video: 'فيديو شرح',
+  html: 'نشاط تفاعلي',
+  pdf: 'ملف PDF',
+  file: 'ملف تدريبي',
+  exam: 'تدريب',
+  assignment: 'واجب'
+};
+
+function ArabicLettersField() {
+  return (
+    <div className="neo-arabic-field" aria-hidden="true">
+      {arabicLetters.map((letter, index) => (
+        <span
+          key={`${letter}-${index}`}
+          style={{
+            '--i': index,
+            '--x': `${(index * 10.8) % 112 - 8}%`,
+            '--y': `${(index * 17.4) % 108 - 4}%`
+          }}
+        >
+          {letter}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function ThemeToggle({ theme, onToggle }) {
+  const isDark = theme === 'dark';
+  return (
+    <button type="button" onClick={onToggle} className="neo-theme-toggle" aria-label="تبديل الوضع النهاري والليلي">
+      {isDark ? <Sun size={18} /> : <Moon size={18} />}
+      <span>{isDark ? 'نهاري' : 'ليلي'}</span>
+    </button>
+  );
+}
+
+function NeoLogo() {
+  return (
+    <div className="neo-logo" aria-label="منصة النحاس">
+      <span className="neo-logo-mark">ن</span>
+      <span className="neo-logo-text">
+        <strong>منصة النحاس</strong>
+        <small>Arabic Learning OS</small>
+      </span>
+    </div>
+  );
+}
+
+function typeOfContent(item) {
+  const type = String(item?.type || item?.contentType || '').toLowerCase();
+  const mime = String(item?.mimeType || '').toLowerCase();
+  if (type.includes('video')) return 'video';
+  if (type.includes('html') || item?.htmlContent) return 'html';
+  if (type.includes('pdf') || mime.includes('pdf')) return 'pdf';
+  if (type.includes('exam')) return 'exam';
+  if (type.includes('assignment') || type.includes('homework')) return 'assignment';
+  return 'file';
+}
+
+function formatGrade(value) {
+  return gradeNames[value] || value || 'كل الصفوف';
+}
+
+const featureCards = [
+  { icon: BrainCircuit, title: 'مسار تعلم ذكي', text: 'الطالب لا يرى محتوى عشوائيًا؛ يرى رحلة واضحة من الشرح للتدريب ثم المراجعة.' },
+  { icon: Feather, title: 'لغة عربية أخف', text: 'النحو والبلاغة والقراءة تُعرض كأنها منتج رقمي حديث، لا سبورة متعبة.' },
+  { icon: Target, title: 'تقدّم واضح للطالب', text: 'كل خطوة داخل المنصة تقرّب الطالب من فهم أعمق، ومذاكرة أهدأ، وثقة أكبر قبل الامتحان.' }
+];
+
+const journey = [
+  ['01', 'افهم', 'شرح قصير ومباشر قبل القاعدة.'],
+  ['02', 'طبّق', 'تدريب متدرج من السهل للنموذج الكامل.'],
+  ['03', 'راجع', 'مراجعة ذكية حسب أخطاء الطالب لا حسب المزاج.']
+];
+
+export const LandingPage = ({ onAuthClick, onRegisterClick, installPrompt }) => {
+  const [theme, setTheme] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('nahhas-public-theme') : null) || 'dark');
   const [publicContent, setPublicContent] = useState([]);
-  const [playingVideo, setPlayingVideo] = useState(null); 
+  const [publicFiles, setPublicFiles] = useState([]);
+  const [playingVideo, setPlayingVideo] = useState(null);
   const [playingHtml, setPlayingHtml] = useState(null);
-  
-  useEffect(() => { const u = onSnapshot(query(collection(db, 'content'), where('isPublic', '==', true)), s => setPublicContent(s.docs.map(d=>d.data()))); return u; }, []);
-  const openFacebook = () => window.open("https://www.facebook.com/share/17aiUQWKf5/", "_blank");
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('nahhas-public-theme', theme);
+      document.documentElement.dataset.publicTheme = theme;
+    }
+  }, [theme]);
+
+  useEffect(() => {
+    const publicQuery = query(collection(db, 'content'), where('isPublic', '==', true), limit(18));
+    const unsubscribe = onSnapshot(publicQuery, (snapshot) => {
+      setPublicContent(snapshot.docs.map((docSnap) => ({ id: docSnap.id, source: 'content', ...docSnap.data() })));
+    }, () => setPublicContent([]));
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const filesQuery = query(collection(db, 'files'), where('isPublic', '==', true), limit(12));
+    const unsubscribe = onSnapshot(filesQuery, (snapshot) => {
+      setPublicFiles(snapshot.docs.map((docSnap) => ({ id: docSnap.id, source: 'files', type: 'file', ...docSnap.data() })));
+    }, () => setPublicFiles([]));
+    return unsubscribe;
+  }, []);
+
+  const liveItems = useMemo(() => [...publicContent, ...publicFiles].filter(Boolean), [publicContent, publicFiles]);
+  const highlightedItems = useMemo(() => liveItems.slice(0, 8), [liveItems]);
+  const videos = useMemo(() => liveItems.filter((item) => typeOfContent(item) === 'video').slice(0, 4), [liveItems]);
+  const interactiveItems = useMemo(() => liveItems.filter((item) => ['html', 'exam', 'assignment'].includes(typeOfContent(item))).slice(0, 4), [liveItems]);
+  const fileItems = useMemo(() => liveItems.filter((item) => ['pdf', 'file'].includes(typeOfContent(item))).slice(0, 4), [liveItems]);
+
+  const openFacebook = () => window.open('https://www.facebook.com/share/17aiUQWKf5/', '_blank', 'noopener,noreferrer');
+  const goLogin = () => onAuthClick?.('login');
+  const goRegister = () => (onRegisterClick || onAuthClick)?.('register');
+
+  const openItem = (item) => {
+    const itemType = typeOfContent(item);
+    if (itemType === 'video') {
+      setPlayingVideo(item);
+      return;
+    }
+    if (itemType === 'html') {
+      setPlayingHtml(item);
+      return;
+    }
+    const url = item.url || item.fileUrl || item.downloadURL || item.downloadUrl || item.storageUrl;
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+  };
 
   return (
-    <div className="min-h-screen font-['Cairo'] relative overflow-x-hidden" dir="rtl">
+    <div className={`neo-public-page neo-public-${theme}`} dir="rtl">
       {playingVideo && <SecureVideoPlayer video={playingVideo} user={null} userName="زائر" onClose={() => setPlayingVideo(null)} />}
       {playingHtml && <InteractiveViewer content={playingHtml} user={null} onClose={() => setPlayingHtml(null)} />}
-      <FloatingArabicBackground />
+      <ArabicLettersField />
+      <div className="neo-noise" aria-hidden="true" />
+      <div className="neo-orb neo-orb-one" />
+      <div className="neo-orb neo-orb-two" />
+      <div className="neo-orb neo-orb-three" />
       <WhatsAppContactButton />
-      <nav className="relative z-10 flex justify-between items-center p-4 md:p-6 max-w-7xl mx-auto glass-panel mt-4 rounded-full mx-2 md:mx-4 shadow-lg">
-        <div className="flex items-center gap-2"><ModernLogo /><span className="text-xl md:text-2xl font-bold font-arabic text-amber-800 hidden md:block">منصة النحاس</span></div>
-        <div className="flex gap-2 md:gap-4 items-center">
-          {installPrompt && ( <button onClick={installPrompt} className="hidden md:flex bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full font-bold shadow-lg shadow-green-500/30 transition items-center gap-2"><DownloadCloud size={18}/> تثبيت</button> )}
-          <button onClick={openFacebook} className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition shadow-lg hover:shadow-blue-500/50"><Facebook size={20}/></button>
-          <button onClick={onAuthClick} className="bg-slate-900 text-white px-4 md:px-6 py-2 rounded-full font-bold shadow-lg hover:shadow-slate-500/50 transition transform hover:-translate-y-0.5 text-sm md:text-base">دخول الطالب</button>
+
+      <header className="neo-public-nav">
+        <NeoLogo />
+        <nav className="neo-nav-links" aria-label="روابط الصفحة الرئيسية">
+          <a href="#experience">التجربة</a>
+          <a href="#content">المحتوى المفتوح</a>
+          <a href="#journey">رحلة الطالب</a>
+        </nav>
+        <div className="neo-nav-actions">
+          {installPrompt && (
+            <button type="button" onClick={installPrompt} className="neo-icon-button neo-install-button">
+              <DownloadCloud size={18} />
+              <span>ثبّت المنصة</span>
+            </button>
+          )}
+          <button type="button" onClick={openFacebook} className="neo-icon-button" aria-label="Facebook">
+            <Facebook size={18} />
+          </button>
+          <ThemeToggle theme={theme} onToggle={() => setTheme((value) => value === 'dark' ? 'light' : 'dark')} />
+          <button type="button" onClick={goLogin} className="neo-ghost-button">دخول</button>
         </div>
-      </nav>
-      <main className="relative z-10 px-4 mt-10 max-w-7xl mx-auto text-center">
-        <h1 className="text-4xl md:text-7xl font-black text-slate-900 mb-6 leading-tight">اللغة العربية <span className="text-amber-600">لعبتك</span></h1>
-        <p className="text-lg md:text-xl text-slate-600 mb-8 max-w-2xl mx-auto">أقوى منصة تعليمية للمرحلة الإعدادية والثانوية.</p>
-        <button onClick={onAuthClick} className="bg-amber-600 text-white px-8 md:px-10 py-3 md:py-4 rounded-2xl text-lg md:text-xl font-bold shadow-xl hover:bg-amber-700 transition transform hover:-translate-y-1">اشترك الآن 🚀</button>
-        {installPrompt && (<div className="md:hidden mt-6"><button onClick={installPrompt} className="bg-green-600 text-white px-6 py-3 rounded-full font-bold shadow-lg flex items-center gap-2 mx-auto text-sm"><DownloadCloud size={18}/> تثبيت المنصة على هاتفك</button></div>)}
-        <div className="my-12 px-2"><WisdomBox /></div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 mt-10 mb-20 px-2">
-          <div className="bg-white/80 backdrop-blur p-4 md:p-6 rounded-3xl border border-white shadow-sm overflow-hidden">
-            <h3 className="text-xl md:text-2xl font-bold mb-4 flex items-center gap-2 text-blue-700"><Video /> فيديوهات للجميع</h3>
-            <div className="space-y-4">
-              {publicContent.filter(c => c.type === 'video').length > 0 ? publicContent.filter(c => c.type === 'video').map((v, i) => (
-                 <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl shadow-sm cursor-pointer hover:bg-gray-50" onClick={() => setPlayingVideo(v)}>
-                     <div className="flex items-center gap-3 overflow-hidden">
-                         <PlayCircle className="text-amber-500 shrink-0"/>
-                         <span className="font-bold truncate text-sm md:text-base">{v.title}</span>
-                     </div>
-                     <span className="text-[10px] md:text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded shrink-0">مشاهدة</span>
-                 </div>
-               )) : <p className="text-slate-500 text-sm">لا توجد فيديوهات عامة حالياً</p>}
+      </header>
+
+      <main className="neo-public-main">
+        <section className="neo-hero-grid" id="experience">
+          <motion.div
+            className="neo-hero-copy"
+            initial={{ opacity: 0, y: 28 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, ease: 'easeOut' }}
+          >
+            <span className="neo-pill"><Sparkles size={16} /> منصة عربي تعمل كمنتج 2026</span>
+            <h1>العربي بقى تجربة ذكية، مش صفحة طويلة بتتعلق في الهواء.</h1>
+            <p>
+              منصة تعليمية حديثة تجعل دراسة اللغة العربية أوضح وأسهل وأقرب للطالب، من أول شرح القاعدة حتى التدريب والمراجعة بثقة.
+            </p>
+            <div className="neo-hero-actions">
+              <button type="button" onClick={goRegister} className="neo-primary-button">
+                إنشاء حساب طالب
+                <ArrowLeft size={19} />
+              </button>
+              <button type="button" onClick={goLogin} className="neo-secondary-button">
+                تسجيل الدخول
+              </button>
             </div>
-          </div>
-          <div className="bg-white/80 backdrop-blur p-4 md:p-6 rounded-3xl border border-white shadow-sm overflow-hidden">
-            <h3 className="text-xl md:text-2xl font-bold mb-4 flex items-center gap-2 text-purple-700"><Code /> تفاعلي للجميع</h3>
-            <div className="space-y-4">
-              {publicContent.filter(c => c.type === 'html').length > 0 ? publicContent.filter(c => c.type === 'html').map((h, i) => (
-                 <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl shadow-sm cursor-pointer hover:bg-gray-50" onClick={() => setPlayingHtml(h)}>
-                     <div className="flex items-center gap-3 overflow-hidden">
-                         <Code className="text-purple-500 shrink-0"/>
-                         <span className="font-bold truncate text-sm md:text-base">{h.title}</span>
-                     </div>
-                     <span className="text-[10px] md:text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded shrink-0">تشغيل</span>
-                 </div>
-               )) : <p className="text-slate-500 text-sm">لا يوجد محتوى تفاعلي عام حالياً</p>}
+            <div className="neo-stat-strip">
+              <div><strong>{liveItems.length || '—'}</strong><span>عنصر مفتوح من ملفات ومحتوى المنصة</span></div>
+              <div><strong>{videos.length || '—'}</strong><span>فيديوهات يمكن تجربتها قبل الدخول</span></div>
+              <div><strong>{interactiveItems.length || '—'}</strong><span>تدريبات وأنشطة تفاعلية متاحة</span></div>
             </div>
+          </motion.div>
+
+          <motion.div
+            className="neo-hero-showcase"
+            initial={{ opacity: 0, scale: 0.94, rotate: -1.5 }}
+            animate={{ opacity: 1, scale: 1, rotate: 0 }}
+            transition={{ duration: 0.8, ease: 'easeOut', delay: 0.08 }}
+          >
+            <div className="neo-showcase-glow" />
+            <div className="neo-showcase-topline">
+              <span><Radio size={16} /> Live Content</span>
+              <strong>من داخل المنصة</strong>
+            </div>
+            <div className="neo-device-frame">
+              <div className="neo-device-bar"><i /><i /><i /></div>
+              {(highlightedItems.length ? highlightedItems.slice(0, 3) : [
+                { title: 'شرح نص القراءة', type: 'video', grade: '1sec' },
+                { title: 'تدريب بلاغة تفاعلي', type: 'html', grade: '2sec' },
+                { title: 'مراجعة ليلة الامتحان', type: 'pdf', grade: '3sec' }
+              ]).map((item, index) => {
+                const itemType = typeOfContent(item);
+                const Icon = itemType === 'video' ? Video : itemType === 'html' ? Wand2 : BookOpen;
+                return (
+                  <button key={item.id || `${item.title}-${index}`} type="button" onClick={() => openItem(item)} className={`neo-learning-card ${index === 0 ? 'active' : ''}`}>
+                    <Icon size={22} />
+                    <div>
+                      <strong>{item.title || item.name || 'محتوى مفتوح'}</strong>
+                      <span>{contentTypeLabels[itemType]} · {formatGrade(item.grade)}</span>
+                    </div>
+                    <CheckCircle size={20} />
+                  </button>
+                );
+              })}
+              <div className="neo-mini-board">
+                <div>
+                  <span>الذكاء هنا في الترتيب</span>
+                  <strong>الشرح ← التدريب ← المراجعة</strong>
+                </div>
+                <Lightbulb size={24} />
+              </div>
+            </div>
+          </motion.div>
+        </section>
+
+        <section className="neo-feature-grid" aria-label="مميزات المنصة">
+          {featureCards.map(({ icon: Icon, title, text }) => (
+            <article className="neo-feature-card" key={title}>
+              <div className="neo-feature-icon"><Icon size={23} /></div>
+              <h2>{title}</h2>
+              <p>{text}</p>
+            </article>
+          ))}
+        </section>
+
+        <section className="neo-public-content" id="content">
+          <div className="neo-section-heading">
+            <span>جرّب المنصة من الداخل</span>
+            <h2>نماذج مفتوحة تمنحك إحساس التجربة قبل الدخول</h2>
           </div>
-        </div>
+          <div className="neo-content-grid">
+            <ContentColumn title="فيديوهات مفتوحة" icon={Video} items={videos} empty="لا توجد فيديوهات عامة حاليًا." onOpen={openItem} />
+            <ContentColumn title="أنشطة وتدريبات" icon={Wand2} items={interactiveItems} empty="لا توجد أنشطة عامة حاليًا." onOpen={openItem} />
+            <ContentColumn title="ملفات ومراجعات" icon={BookOpen} items={fileItems} empty="لا توجد ملفات عامة حاليًا." onOpen={openItem} wide />
+          </div>
+        </section>
+
+        <section className="neo-journey" id="journey">
+          {journey.map(([step, title, text]) => (
+            <article key={step}>
+              <span>{step}</span>
+              <h3>{title}</h3>
+              <p>{text}</p>
+            </article>
+          ))}
+        </section>
       </main>
     </div>
   );
 };
+
+function ContentColumn({ title, icon: Icon, items, empty, onOpen, wide = false }) {
+  return (
+    <article className={`neo-content-card ${wide ? 'neo-content-card-wide' : ''}`}>
+      <h3><Icon size={22} /> {title}</h3>
+      <div className="neo-content-list">
+        {items.length ? items.map((item) => {
+          const itemType = typeOfContent(item);
+          return (
+            <button key={item.id || item.title || item.name} type="button" onClick={() => onOpen(item)}>
+              <PlayCircle size={19} />
+              <span>{item.title || item.name || item.fileName || 'محتوى مفتوح'}</span>
+              <small>{contentTypeLabels[itemType]}</small>
+            </button>
+          );
+        }) : <p>{empty}</p>}
+      </div>
+    </article>
+  );
+}
 
 export default LandingPage;

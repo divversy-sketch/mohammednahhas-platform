@@ -3,7 +3,7 @@ import {
   Bell, BookOpen, BrainCircuit, ClipboardList, Code,
   Crown, FileCheck, FileText, Headphones, LogOut, Menu,
   MessageSquare, MoreVertical, PlayCircle, Settings,
-  Target, User, X, Sparkles, Trophy, Layout,
+  Target, User, X, Sparkles, Trophy, Layout, Moon, Sun,
 } from '@shared/icons/lucide-shim.jsx';
 import { ModernLogo } from '@features/home/HomeWidgets.jsx';
 
@@ -166,7 +166,7 @@ export function StudentV2Sidebar({
 /* ─── Topbar (ثابت أعلى المحتوى على كل الشاشات) ─── */
 export function StudentV2Topbar({
   setShowFocusMode, setShowNotifications, unseenNotificationCount,
-  isPremium, subscriptionExpiry, setMobileMenu,
+  isPremium, subscriptionExpiry, setMobileMenu, studentTheme = 'dark', onToggleTheme,
 }) {
   const expiryLabel = subscriptionExpiry?.toDate
     ? subscriptionExpiry.toDate().toLocaleDateString('ar-EG')
@@ -182,6 +182,14 @@ export function StudentV2Topbar({
         )}
       </div>
       <div className="nh-topbar__right">
+        <button
+          onClick={onToggleTheme}
+          className="nh-topbar__btn nh-topbar__theme"
+          aria-label={studentTheme === 'light' ? 'تفعيل الوضع الليلي' : 'تفعيل الوضع النهاري'}
+        >
+          {studentTheme === 'light' ? <Moon size={17} /> : <Sun size={17} />}
+          <span className="nh-topbar__btn-label">{studentTheme === 'light' ? 'ليلي' : 'نهاري'}</span>
+        </button>
         <button
           onClick={() => setShowFocusMode(true)}
           className="nh-topbar__btn"

@@ -1,0 +1,1 @@
+Functional admin files are original, but shell/sidebar/header/page frame are rebuilt. New CSS imported in src/main.jsx when available.

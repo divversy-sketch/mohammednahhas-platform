@@ -1,105 +1,140 @@
 export const adminPageMeta = {
   dashboard: {
-    eyebrow: 'مركز التحكم',
-    title: 'مركز قيادة المنصة',
-    description: 'نظرة تشغيلية موحدة على الطلاب، الامتحانات، المحتوى، المتابعة، والتحليلات.',
+    eyebrow: 'مركز القيادة',
+    title: 'لوحة التحكم الرئيسية',
+    description: 'نظرة تشغيلية منظمة على أهم مؤشرات المنصة، والتنبيهات، والمهام التي تحتاج قرارًا سريعًا.',
+  },
+  follow_up: {
+    eyebrow: 'متابعة الأداء',
+    title: 'المتابعة والتقارير',
+    description: 'تابع حركة الطلاب، نقاط الضعف، والمؤشرات التعليمية من مساحة واحدة واضحة.',
   },
   users: {
-    eyebrow: 'Admissions',
-    title: 'طلبات التسجيل',
-    description: 'مراجعة الطلاب الجدد وقبولهم أو رفضهم بسرعة.',
+    eyebrow: 'قبول الطلاب',
+    title: 'طلبات الانضمام',
+    description: 'راجع طلبات التسجيل الجديدة واتخذ قرار القبول أو الرفض بسرعة وبدون زحمة.',
   },
   all_users: {
-    eyebrow: 'Students CRM',
-    title: 'إدارة الطلاب',
-    description: 'بحث، فلاتر، تصدير، وإجراءات سريعة لإدارة الطلاب النشطين من شاشة واحدة.',
+    eyebrow: 'إدارة الطلاب',
+    title: 'سجل الطلاب',
+    description: 'بحث، فلاتر، حالات اشتراك، وإجراءات مباشرة لإدارة كل طالب داخل المنصة.',
   },
   password_resets: {
-    eyebrow: 'Security Desk',
+    eyebrow: 'الدخول والأمان',
     title: 'طلبات تغيير كلمة السر',
-    description: 'متابعة طلبات استعادة الدخول بدون كشف كلمات السر داخل التنبيهات.',
+    description: 'تعامل مع طلبات استعادة الدخول بشكل منظم وآمن.',
   },
   payments: {
-    eyebrow: 'Revenue Operations',
-    title: 'المدفوعات والاشتراكات',
-    description: 'طلبات الدفع، الاشتراكات، الأكواد، ولوحات النمو في لوحة الإدارة.',
+    eyebrow: 'المدفوعات',
+    title: 'طلبات الدفع والاشتراكات',
+    description: 'راجع طلبات الدفع، فعّل الاشتراكات، وتابع الحالة المالية للطلاب.',
   },
   subscriptions_legacy: {
-    eyebrow: 'Subscriptions',
-    title: 'أكواد الاشتراك',
-    description: 'توليد ومتابعة أكواد الاشتراك مع أدوات نسخ وتصدير منظمة.',
-  },
-  courses: {
-    eyebrow: 'Learning Content',
-    title: 'الكورسات والحصص',
-    description: 'إدارة الكورسات، الحصص المباشرة، وربط المحتوى بالطالب.',
-  },
-  content: {
-    eyebrow: 'Content Library',
-    title: 'مكتبة المحتوى',
-    description: 'رفع وتنظيم الدروس، الملفات، والفيديوهات مع تحكم في المرحلة والصلاحية.',
-  },
-  exams: {
-    eyebrow: 'Assessment Studio',
-    title: 'الامتحانات والنتائج',
-    description: 'بناء الامتحانات، إدارة الوقت، النتائج، والاستثناءات من نفس المركز.',
-  },
-  question_bank: {
-    eyebrow: 'Question Bank',
-    title: 'بنك الأسئلة',
-    description: 'تنظيم الأسئلة وتحليلها تمهيدًا لاستخدامها داخل الامتحانات الذكية.',
-  },
-  assignments: {
-    eyebrow: 'Homework Ops',
-    title: 'الواجبات والتسليمات',
-    description: 'متابعة الواجبات وتسليمات الطلاب ومؤشرات الالتزام.',
-  },
-  smart_hw: {
-    eyebrow: 'Smart Homework',
-    title: 'الواجب الذكي',
-    description: 'إنشاء ومتابعة واجبات ذكية تعتمد على مفاتيح الإجابة والتحليل.',
-  },
-  student_reports: {
-    eyebrow: 'Student Intelligence',
-    title: 'تقارير الطلاب',
-    description: 'رؤية أداء الطلاب، الشهادات، والنجاح الدراسي من شاشة موحدة.',
-  },
-  messages_center: {
-    eyebrow: 'Support Inbox',
-    title: 'الرسائل والدعم',
-    description: 'إدارة رسائل الطلاب وأولياء الأمور والردود والمتابعة.',
+    eyebrow: 'أكواد الاشتراك',
+    title: 'إدارة أكواد الاشتراك',
+    description: 'ولّد الأكواد، راقب المستخدم منها، وصدّر البيانات عند الحاجة.',
   },
   finance_dashboard: {
-    eyebrow: 'Finance',
+    eyebrow: 'الماليات',
     title: 'لوحة الماليات',
-    description: 'ملخص الاشتراكات والإيرادات والطلبات المالية.',
+    description: 'ملخص واضح للإيرادات، الطلبات، والاشتراكات النشطة.',
   },
-  platform_settings: {
-    eyebrow: 'Platform Control',
-    title: 'إعدادات المنصة',
-    description: 'إعدادات التشغيل، الموبايل، الجماليات، وتجربة الطالب.',
+  courses: {
+    eyebrow: 'الكورسات',
+    title: 'الكورسات والحصص',
+    description: 'نظّم الكورسات والحصص بما يظهر للطالب بشكل مرتب وسهل.',
   },
-  admin_roles: {
-    eyebrow: 'Permissions',
-    title: 'صلاحيات الأدمن',
-    description: 'إدارة أدوار المساعدين والصلاحيات التفصيلية.',
+  content: {
+    eyebrow: 'المحتوى',
+    title: 'مكتبة المحتوى',
+    description: 'ارفع ونظّم الفيديوهات، الملفات، والدروس حسب المرحلة والصلاحية.',
   },
-  audit_logs: {
-    eyebrow: 'Audit Trail',
-    title: 'سجل العمليات',
-    description: 'متابعة العمليات الحساسة ومعرفة من قام بماذا ومتى.',
+  assignments: {
+    eyebrow: 'الواجبات',
+    title: 'الواجبات والتسليمات',
+    description: 'أنشئ الواجبات وتابع تسليمات الطلاب ومؤشرات الالتزام.',
+  },
+  smart_hw: {
+    eyebrow: 'واجب ذكي',
+    title: 'الواجب الذكي QR',
+    description: 'أنشئ واجبات ذكية مبنية على مفاتيح الإجابة والتحليل السريع.',
+  },
+  exams: {
+    eyebrow: 'الاختبارات',
+    title: 'الامتحانات والنتائج',
+    description: 'إدارة الامتحانات، النتائج، الوقت، والاستثناءات من شاشة واحدة.',
+  },
+  question_bank: {
+    eyebrow: 'بنك الأسئلة',
+    title: 'إدارة بنك الأسئلة',
+    description: 'رتّب الأسئلة وحضّرها للاستخدام داخل الاختبارات والمحرك الذكي.',
+  },
+  smart_exam_engine: {
+    eyebrow: 'محرك ذكي',
+    title: 'محرك الامتحانات الذكي',
+    description: 'ابنِ اختبارات أكثر ذكاءً اعتمادًا على الأهداف ومستوى الطالب.',
+  },
+  mistakes_admin: {
+    eyebrow: 'بنك الأخطاء',
+    title: 'تحليل الأخطاء',
+    description: 'حوّل أخطاء الطلاب إلى خطة مراجعة واضحة قابلة للتنفيذ.',
+  },
+  student_reports: {
+    eyebrow: 'تقارير الطلاب',
+    title: 'تقارير الأداء',
+    description: 'افهم مستوى الطالب، تقدمه، ونقاط التحسين بوضوح.',
+  },
+  student_groups: {
+    eyebrow: 'الدفعات',
+    title: 'المجموعات والدفعات',
+    description: 'نظّم الطلاب داخل مجموعات ليسهل التواصل والمتابعة.',
+  },
+  messages_center: {
+    eyebrow: 'التواصل',
+    title: 'رسائل الطلاب والدعم',
+    description: 'تابع رسائل الطلاب وأولياء الأمور ورد عليها من مركز واحد.',
   },
   notifications_admin: {
-    eyebrow: 'Broadcast Center',
-    title: 'إدارة الإشعارات',
-    description: 'إرسال وإدارة التنبيهات العامة والموجهة للطلاب.',
+    eyebrow: 'الإشعارات',
+    title: 'مركز الإشعارات',
+    description: 'أرسل تنبيهات عامة أو موجهة للطلاب حسب الحاجة.',
+  },
+  security_center: {
+    eyebrow: 'الأمان',
+    title: 'مركز الحماية',
+    description: 'تابع مؤشرات الحماية ومحاولات المخالفة وإجراءات الأمان.',
+  },
+  video_security: {
+    eyebrow: 'حماية الفيديو',
+    title: 'حماية الفيديوهات',
+    description: 'إعدادات وتأمين مشاهدة الفيديوهات داخل المنصة.',
+  },
+  app_convert: {
+    eyebrow: 'تطبيق المنصة',
+    title: 'تحويل المنصة لتطبيق',
+    description: 'إرشادات وتجهيزات تجربة التطبيق للطلاب.',
+  },
+  platform_settings: {
+    eyebrow: 'الإعدادات',
+    title: 'إعدادات المنصة',
+    description: 'تحكم في التسجيل، الواجهة، الإشعارات، والإعدادات العامة.',
+  },
+  admin_roles: {
+    eyebrow: 'الصلاحيات',
+    title: 'صلاحيات الأدمن',
+    description: 'إدارة أدوار المساعدين وما يمكن لكل شخص الوصول إليه.',
+  },
+  audit_logs: {
+    eyebrow: 'سجل العمليات',
+    title: 'سجل الإدارة',
+    description: 'راجع العمليات الحساسة ومن قام بها ومتى.',
   },
 };
 
 export function getAdminPageMeta(activeTab) {
   return adminPageMeta[activeTab] || {
-    eyebrow: 'Admin Workspace',
-    title: 'مساحة الإدارة',
-    description: '',
+    eyebrow: 'مساحة الإدارة',
+    title: 'قسم إداري',
+    description: 'مساحة منظمة لإدارة هذا الجزء من المنصة.',
   };
 }

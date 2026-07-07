@@ -1,19 +1,31 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc, collection, addDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
-import { User, GraduationCap, Lock, Mail, ChevronRight, Loader2, Phone } from '../icons/lucide-shim.jsx';
 import { motion } from 'framer-motion';
+import {
+  ArrowLeft,
+  BrainCircuit,
+  ChevronRight,
+  GraduationCap,
+  KeyRound,
+  Loader2,
+  Lock,
+  Mail,
+  Moon,
+  Phone,
+  Shield,
+  Sparkles,
+  Sun,
+  User
+} from '../icons/lucide-shim.jsx';
 import { auth, db } from '../../services/firebase';
-
-
 import { GradeOptions } from '../constants/grades';
 import { normalizeEgyptPhone, validateEgyptianPhones } from '../utils/phone';
-import { ModernLogo, FloatingArabicBackground } from '../../features/home/HomeWidgets';
-
-
 import { platformNotify, WhatsAppContactButton } from '../core/platformShared.jsx';
+import '../../styles/pages/landing.css';
+import '../../styles/pages/auth.css';
 
-
+const arabicLetters = ['أ', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'س', 'ش', 'ص', 'ض', 'ط', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي', 'لا'];
 
 const getFriendlyAuthError = (error) => {
   const code = error?.code || '';
@@ -30,11 +42,49 @@ const getFriendlyAuthError = (error) => {
   return messages[code] || 'حدث خطأ غير متوقع. جرّب مرة أخرى أو تواصل مع الإدارة.';
 };
 
-export const AuthPage = ({ onBack }) => {
-  const [isRegister, setIsRegister] = useState(false);
+function ArabicLettersField() {
+  return (
+    <div className="neo-arabic-field neo-auth-letters" aria-hidden="true">
+      {arabicLetters.map((letter, index) => (
+        <span key={`${letter}-${index}`} style={{ '--i': index, '--x': `${(index * 8.2) % 108 - 8}%`, '--y': `${(index * 13.7) % 104 - 2}%` }}>{letter}</span>
+      ))}
+    </div>
+  );
+}
+
+function ThemeToggle({ theme, onToggle }) {
+  const isDark = theme === 'dark';
+  return (
+    <button type="button" onClick={onToggle} className="neo-theme-toggle" aria-label="تبديل الوضع النهاري والليلي">
+      {isDark ? <Sun size={18} /> : <Moon size={18} />}
+      <span>{isDark ? 'نهاري' : 'ليلي'}</span>
+    </button>
+  );
+}
+
+function AuthInput({ icon: Icon, ...props }) {
+  return (
+    <label className="neo-auth-input">
+      <Icon size={18} />
+      <input {...props} />
+    </label>
+  );
+}
+
+export const AuthPage = ({ onBack, initialMode = 'login' }) => {
+  const [isRegister, setIsRegister] = useState(() => initialMode === 'register');
+  const [theme, setTheme] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('nahhas-public-theme') : null) || 'dark');
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({ email: '', password: '', name: '', grade: '1sec', phone: '', parentPhone: '' });
   const [platformSettings, setPlatformSettings] = useState({ registrationOpen: true, platformName: 'منصة النحاس التعليمية', welcomeMessage: '' });
+
+  useEffect(() => {
+    setIsRegister(initialMode === 'register');
+  }, [initialMode]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') localStorage.setItem('nahhas-public-theme', theme);
+  }, [theme]);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'platform_settings', 'main'), (snap) => {
@@ -48,22 +98,22 @@ export const AuthPage = ({ onBack }) => {
     setLoading(true);
 
     if (isRegister) {
-        if (platformSettings.registrationOpen === false) {
-            platformNotify('التسجيل مغلق حاليًا من إدارة المنصة. تواصل مع الإدارة للتفعيل.');
-            setLoading(false);
-            return;
-        }
-        if (!formData.name.trim()) {
-            platformNotify("من فضلك اكتب اسم الطالب.");
-            setLoading(false);
-            return;
-        }
-        const validation = validateEgyptianPhones(formData.phone, formData.parentPhone);
-        if (!validation.ok) {
-            platformNotify(validation.message);
-            setLoading(false);
-            return;
-        }
+      if (platformSettings.registrationOpen === false) {
+        platformNotify('التسجيل مغلق حاليًا من إدارة المنصة. تواصل مع الإدارة للتفعيل.');
+        setLoading(false);
+        return;
+      }
+      if (!formData.name.trim()) {
+        platformNotify('من فضلك اكتب اسم الطالب.');
+        setLoading(false);
+        return;
+      }
+      const validation = validateEgyptianPhones(formData.phone, formData.parentPhone);
+      if (!validation.ok) {
+        platformNotify(validation.message);
+        setLoading(false);
+        return;
+      }
     }
 
     try {
@@ -71,20 +121,35 @@ export const AuthPage = ({ onBack }) => {
         const validation = validateEgyptianPhones(formData.phone, formData.parentPhone);
         const userCred = await createUserWithEmailAndPassword(auth, formData.email.trim(), formData.password);
         await updateProfile(userCred.user, { displayName: formData.name.trim() });
-        await setDoc(doc(db, 'users', userCred.user.uid), { 
-            name: formData.name.trim(), email: formData.email.trim(), grade: formData.grade, phone: validation.normalizedStudentPhone, 
-            parentPhone: validation.normalizedParentPhone, role: 'student', status: 'pending', 
-            subscriptionStatus: 'free', subscriptionExpiry: null, createdAt: new Date() 
+        await setDoc(doc(db, 'users', userCred.user.uid), {
+          name: formData.name.trim(),
+          email: formData.email.trim(),
+          grade: formData.grade,
+          phone: validation.normalizedStudentPhone,
+          parentPhone: validation.normalizedParentPhone,
+          role: 'student',
+          status: 'pending',
+          subscriptionStatus: 'free',
+          subscriptionExpiry: null,
+          createdAt: new Date()
         });
-        platformNotify("تم إنشاء الحساب! انتظر تفعيل الأدمن.");
-      } else { await signInWithEmailAndPassword(auth, formData.email, formData.password); }
-    } catch (error) { platformNotify(getFriendlyAuthError(error)); } 
-    finally { setLoading(false); }
+        platformNotify('تم إنشاء الحساب. انتظر تفعيل الإدارة.', 'success');
+      } else {
+        await signInWithEmailAndPassword(auth, formData.email.trim(), formData.password);
+      }
+    } catch (error) {
+      platformNotify(getFriendlyAuthError(error));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleForgotPassword = async () => {
     const email = String(formData.email || '').trim().toLowerCase();
-    if(!email) { platformNotify("من فضلك اكتب الإيميل الأول."); return; }
+    if (!email) {
+      platformNotify('اكتب الإيميل أولًا حتى نرسل الطلب للإدارة.');
+      return;
+    }
     setLoading(true);
     try {
       await addDoc(collection(db, 'password_reset_requests'), {
@@ -95,40 +160,102 @@ export const AuthPage = ({ onBack }) => {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
-      platformNotify("تم إرسال طلب تغيير كلمة السر للإدارة. سيتم التواصل معك بعد الموافقة.", 'success');
+      platformNotify('تم إرسال طلب تغيير كلمة السر للإدارة. سيتم التواصل معك بعد المراجعة.', 'success');
     } catch (error) {
-      platformNotify("تعذر إرسال الطلب الآن، تواصل مع الإدارة عبر واتساب.", 'error');
+      platformNotify('تعذر إرسال الطلب الآن، تواصل مع الإدارة عبر واتساب.', 'error');
     } finally {
       setLoading(false);
     }
   };
 
+  const headline = isRegister ? 'افتح بوابة الطالب الجديدة.' : 'ارجع لمساحتك الدراسية.';
+  const subtitle = isRegister
+    ? 'سجّل بياناتك الأساسية، وبعد موافقة الإدارة تبدأ رحلة منظمة مبنية على الصف والمحتوى المتاح لك.'
+    : 'كل درس وواجب واختبار في لوحة واحدة واضحة — لأن المتاهات مكانها الروايات مش منصة تعليمية.';
+
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-slate-900 font-['Cairo'] relative overflow-hidden" dir="rtl">
-      <FloatingArabicBackground />
-      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white/90 backdrop-blur-xl rounded-3xl p-6 md:p-8 w-full max-w-md shadow-2xl relative z-10 my-10 overflow-y-auto max-h-[90vh] border border-white/50 scrollbar-hide">
-        <button onClick={onBack} className="text-slate-500 hover:text-slate-800 text-sm mb-4 md:mb-6 flex items-center gap-1 font-bold"><ChevronRight size={18} /> العودة</button>
-        <div className="flex justify-center mb-4"><ModernLogo /></div>
-        <h2 className="text-2xl md:text-3xl font-bold font-arabic text-slate-800 mb-2 text-center">{isRegister ? 'حساب جديد' : 'تسجيل دخول'}</h2>
-        {platformSettings.welcomeMessage && <p className="text-center text-sm text-slate-500 font-bold leading-6">{platformSettings.welcomeMessage}</p>}
-        {isRegister && platformSettings.registrationOpen === false && <div className="mt-4 bg-red-50 border border-red-100 text-red-700 rounded-2xl p-3 text-sm font-black text-center">التسجيل مغلق حاليًا من الإدارة</div>}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3 md:gap-4 mt-4 md:mt-6">
-          {isRegister && (
-            <>
-              <div className="relative"><User className="absolute top-3.5 right-4 text-slate-400" size={18} /><input required type="text" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition text-sm md:text-base" placeholder="الاسم ثلاثي" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
-              <div className="relative"><Phone className="absolute top-3.5 right-4 text-slate-400" size={18} /><input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition text-sm md:text-base" placeholder="رقم هاتفك" value={formData.phone} onChange={e => setFormData({...formData, phone: normalizeEgyptPhone(e.target.value)})} /></div>
-              <div className="relative"><Phone className="absolute top-3.5 right-4 text-slate-400" size={18} /><input required type="tel" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition text-sm md:text-base" placeholder="رقم ولي الأمر" value={formData.parentPhone} onChange={e => setFormData({...formData, parentPhone: normalizeEgyptPhone(e.target.value)})} /></div>
-              <div className="relative"><GraduationCap className="absolute top-3.5 right-4 text-slate-400" size={18} /><select className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 appearance-none focus:border-amber-500 outline-none transition text-sm md:text-base" value={formData.grade} onChange={e => setFormData({...formData, grade: e.target.value})}><GradeOptions /></select></div>
-            </>
-          )}
-          <div className="relative"><Mail className="absolute top-3.5 right-4 text-slate-400" size={18} /><input required type="email" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition text-sm md:text-base" placeholder="البريد" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></div>
-          <div className="relative"><Lock className="absolute top-3.5 right-4 text-slate-400" size={18} /><input required type="password" className="w-full py-3 pr-12 pl-4 rounded-xl border bg-slate-50 focus:border-amber-500 outline-none transition text-sm md:text-base" placeholder="كلمة السر" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} /></div>
-          {!isRegister && (<div className="text-left"><button type="button" onClick={handleForgotPassword} disabled={loading} className="text-xs text-amber-600 font-bold hover:underline disabled:opacity-50">طلب تغيير كلمة السر من الإدارة</button></div>)}
-          <button disabled={loading} className="bg-gradient-to-r from-amber-600 to-amber-700 text-white py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-amber-500/50 transition mt-2 flex justify-center">{loading ? <Loader2 className="animate-spin" /> : (isRegister ? 'تسجيل' : 'دخول')}</button>
-        </form>
-        <button onClick={() => setIsRegister(!isRegister)} className="mt-4 md:mt-6 text-amber-800 font-bold hover:underline w-full text-center block text-sm">{isRegister ? 'تسجيل الدخول' : 'حساب جديد'}</button>
-      </motion.div>
+    <div className={`neo-public-page neo-auth-page neo-public-${theme}`} dir="rtl">
+      <ArabicLettersField />
+      <div className="neo-orb neo-orb-one" />
+      <div className="neo-orb neo-orb-two" />
       <WhatsAppContactButton />
+
+      <header className="neo-auth-header">
+        <button type="button" onClick={onBack} className="neo-back-button">
+          <ChevronRight size={18} />
+          الصفحة الرئيسية
+        </button>
+        <ThemeToggle theme={theme} onToggle={() => setTheme((value) => value === 'dark' ? 'light' : 'dark')} />
+      </header>
+
+      <main className="neo-auth-shell">
+        <motion.aside
+          className="neo-auth-story"
+          initial={{ opacity: 0, x: 28 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.65, ease: 'easeOut' }}
+        >
+          <span className="neo-pill"><Sparkles size={16} /> بوابة الطالب الجديدة</span>
+          <h1>{headline}</h1>
+          <p>{subtitle}</p>
+          <div className="neo-auth-points">
+            <div><Shield size={20} /><span>حسابات محمية ومراجعة من الإدارة</span></div>
+            <div><BrainCircuit size={20} /><span>متابعة ذكية لمستوى الطالب</span></div>
+            <div><KeyRound size={20} /><span>استعادة كلمة السر بطلب مباشر</span></div>
+          </div>
+        </motion.aside>
+
+        <motion.section
+          className="neo-auth-card"
+          initial={{ opacity: 0, y: 26, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.65, ease: 'easeOut', delay: 0.08 }}
+        >
+          <div className="neo-auth-card-head">
+            <div className="neo-logo compact"><span className="neo-logo-mark">ن</span></div>
+            <div>
+              <span>{platformSettings.platformName || (isRegister ? 'إنشاء حساب' : 'تسجيل الدخول')}</span>
+              <h2>{isRegister ? 'حساب طالب جديد' : 'مرحبًا بعودتك'}</h2>
+            </div>
+          </div>
+
+          {platformSettings.welcomeMessage && <p className="neo-auth-message">{platformSettings.welcomeMessage}</p>}
+          {isRegister && platformSettings.registrationOpen === false && <div className="neo-auth-alert">التسجيل مغلق حاليًا من الإدارة.</div>}
+
+          <div className="neo-auth-tabs" role="tablist" aria-label="اختيار نوع العملية">
+            <button type="button" className={!isRegister ? 'active' : ''} onClick={() => setIsRegister(false)}>دخول</button>
+            <button type="button" className={isRegister ? 'active' : ''} onClick={() => setIsRegister(true)}>حساب جديد</button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="neo-auth-form">
+            {isRegister && (
+              <>
+                <AuthInput icon={User} required type="text" placeholder="اسم الطالب ثلاثي" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+                <AuthInput icon={Phone} required type="tel" placeholder="رقم هاتف الطالب" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: normalizeEgyptPhone(e.target.value) })} />
+                <AuthInput icon={Phone} required type="tel" placeholder="رقم ولي الأمر" value={formData.parentPhone} onChange={(e) => setFormData({ ...formData, parentPhone: normalizeEgyptPhone(e.target.value) })} />
+                <label className="neo-auth-input">
+                  <GraduationCap size={18} />
+                  <select value={formData.grade} onChange={(e) => setFormData({ ...formData, grade: e.target.value })}>
+                    <GradeOptions />
+                  </select>
+                </label>
+              </>
+            )}
+            <AuthInput icon={Mail} required type="email" placeholder="البريد الإلكتروني" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
+            <AuthInput icon={Lock} required type="password" placeholder="كلمة السر" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
+
+            {!isRegister && (
+              <button type="button" onClick={handleForgotPassword} disabled={loading} className="neo-forgot-button">
+                طلب تغيير كلمة السر من الإدارة
+              </button>
+            )}
+
+            <button disabled={loading} className="neo-primary-button neo-auth-submit">
+              {loading ? <Loader2 className="animate-spin" /> : <>{isRegister ? 'إنشاء الحساب' : 'الدخول للمنصة'} <ArrowLeft size={19} /></>}
+            </button>
+          </form>
+        </motion.section>
+      </main>
     </div>
   );
 };

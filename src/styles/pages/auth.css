@@ -1,1 +1,223 @@
-/* Modular CSS bucket: pages/auth.css. Keep page-specific rules here after migration. */
+/* Auth 2026 redesign. Relies on variables/classes from landing.css. */
+.neo-auth-page {
+  display: flex;
+  flex-direction: column;
+}
+
+.neo-auth-letters span { opacity: .55; }
+
+.neo-auth-header {
+  width: min(1120px, calc(100% - 32px));
+}
+
+.neo-auth-shell {
+  width: min(1120px, calc(100% - 32px));
+  margin: 42px auto 0;
+  padding-bottom: 72px;
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(0, .92fr) minmax(380px, .78fr);
+  gap: 22px;
+  align-items: stretch;
+}
+
+.neo-auth-story,
+.neo-auth-card {
+  border-radius: 38px;
+  position: relative;
+  overflow: hidden;
+}
+
+.neo-auth-story {
+  padding: clamp(26px, 4.8vw, 48px);
+  min-height: 620px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.neo-auth-story::before,
+.neo-auth-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 12% 15%, color-mix(in srgb, var(--neo-cyan), transparent 78%), transparent 33%),
+    radial-gradient(circle at 85% 90%, color-mix(in srgb, var(--neo-gold), transparent 78%), transparent 34%);
+}
+
+.neo-auth-story > *,
+.neo-auth-card > * { position: relative; z-index: 1; }
+
+.neo-auth-points {
+  display: grid;
+  gap: 12px;
+  margin-top: 34px;
+}
+
+.neo-auth-points div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  padding: 14px 15px;
+  border-radius: 20px;
+  border: 1px solid var(--neo-border);
+  background: color-mix(in srgb, var(--neo-surface-strong), transparent 18%);
+  color: var(--neo-text);
+  font-weight: 900;
+}
+
+.neo-auth-points svg { color: var(--neo-gold-2); }
+.neo-public-light .neo-auth-points svg { color: #8a5600; }
+
+.neo-auth-card {
+  padding: clamp(20px, 3.5vw, 34px);
+  align-self: center;
+}
+
+.neo-auth-card-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.neo-auth-card-head span {
+  display: block;
+  color: var(--neo-muted);
+  font-size: .86rem;
+  font-weight: 1000;
+}
+
+.neo-auth-card-head h2 {
+  margin: 4px 0 0;
+  font-size: clamp(1.6rem, 3vw, 2.25rem);
+  letter-spacing: -.04em;
+}
+
+.neo-auth-message,
+.neo-auth-alert {
+  margin: 0 0 14px;
+  padding: 13px 15px;
+  border-radius: 18px;
+  border: 1px solid var(--neo-border);
+  background: color-mix(in srgb, var(--neo-surface-strong), transparent 18%);
+  color: var(--neo-muted);
+  line-height: 1.8;
+  font-weight: 850;
+}
+
+.neo-auth-alert {
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, .34);
+  background: rgba(127, 29, 29, .24);
+}
+.neo-public-light .neo-auth-alert { color: #991b1b; background: #fee2e2; border-color: #fecaca; }
+
+.neo-auth-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding: 7px;
+  margin: 16px 0 18px;
+  border: 1px solid var(--neo-border);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--neo-card), transparent 10%);
+}
+
+.neo-auth-tabs button {
+  min-height: 46px;
+  border: 0;
+  border-radius: 17px;
+  background: transparent;
+  color: var(--neo-muted);
+  cursor: pointer;
+  font-weight: 1000;
+  transition: background .22s ease, color .22s ease, transform .22s ease, box-shadow .22s ease;
+}
+
+.neo-auth-tabs button:hover { transform: translateY(-1px); }
+.neo-auth-tabs button.active {
+  color: #101725;
+  background: linear-gradient(135deg, var(--neo-gold-2), var(--neo-gold));
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--neo-gold), transparent 72%);
+}
+
+.neo-auth-form {
+  display: grid;
+  gap: 12px;
+}
+
+.neo-auth-input {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 0 15px;
+  border-radius: 19px;
+  border: 1px solid var(--neo-border);
+  color: var(--neo-muted);
+  background: color-mix(in srgb, var(--neo-surface-strong), transparent 14%);
+  transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+
+.neo-auth-input:focus-within {
+  border-color: color-mix(in srgb, var(--neo-gold), transparent 25%);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--neo-gold), transparent 84%);
+  transform: translateY(-1px);
+}
+
+.neo-auth-input svg { color: var(--neo-gold-2); flex: 0 0 auto; }
+.neo-public-light .neo-auth-input svg { color: #8a5600; }
+
+.neo-auth-input input,
+.neo-auth-input select {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--neo-text);
+  font-size: .98rem;
+  font-weight: 850;
+  min-width: 0;
+}
+
+.neo-auth-input input::placeholder { color: color-mix(in srgb, var(--neo-muted), transparent 18%); }
+.neo-auth-input select option { color: #111827; background: #fff; }
+
+.neo-forgot-button {
+  justify-self: start;
+  border: 0;
+  background: transparent;
+  color: var(--neo-gold-2);
+  cursor: pointer;
+  padding: 4px 2px 8px;
+  font-weight: 1000;
+}
+.neo-public-light .neo-forgot-button { color: #8a5600; }
+.neo-forgot-button:disabled { opacity: .55; cursor: not-allowed; }
+
+.neo-auth-submit {
+  width: 100%;
+  margin-top: 4px;
+}
+.neo-auth-submit:disabled { opacity: .72; cursor: progress; transform: none; }
+.neo-auth-submit .animate-spin { animation: neo-spin 1s linear infinite; }
+@keyframes neo-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 960px) {
+  .neo-auth-shell { grid-template-columns: 1fr; }
+  .neo-auth-story { min-height: auto; }
+}
+
+@media (max-width: 640px) {
+  .neo-auth-header,
+  .neo-auth-shell { width: min(100% - 20px, 1120px); }
+  .neo-auth-shell { margin-top: 26px; padding-bottom: 110px; }
+  .neo-auth-story,
+  .neo-auth-card { border-radius: 30px; }
+  .neo-auth-card { padding: 18px; }
+}

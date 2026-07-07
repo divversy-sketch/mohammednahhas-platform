@@ -1,0 +1,625 @@
+/* Admin true redesign: preserves React logic, replaces old visual architecture */
+html[data-theme='day'] {
+  --adm-bg: #f6fbff;
+  --adm-bg2: #fff8ea;
+  --adm-panel: rgba(255,255,255,.84);
+  --adm-panel2: rgba(255,255,255,.96);
+  --adm-text: #10243a;
+  --adm-muted: #607993;
+  --adm-line: rgba(70,128,180,.18);
+  --adm-sky: #2f8dff;
+  --adm-gold: #ffbd4f;
+  --adm-purple: #8f6cff;
+  --adm-green: #22b99f;
+  --adm-rose: #ff6d98;
+}
+html[data-theme='night'] {
+  --adm-bg: #07111f;
+  --adm-bg2: #111a33;
+  --adm-panel: rgba(13,28,50,.84);
+  --adm-panel2: rgba(18,38,64,.94);
+  --adm-text: #eff8ff;
+  --adm-muted: #a7c1d9;
+  --adm-line: rgba(132,183,255,.16);
+  --adm-sky: #57c7ff;
+  --adm-gold: #ffd16c;
+  --adm-purple: #b38dff;
+  --adm-green: #50d5bd;
+  --adm-rose: #ff85a7;
+}
+
+.nahhas-admin-shell {
+  min-height: 100vh;
+  color: var(--adm-text);
+  background:
+    radial-gradient(circle at 12% 8%, color-mix(in srgb, var(--adm-sky) 14%, transparent), transparent 24rem),
+    radial-gradient(circle at 88% 12%, color-mix(in srgb, var(--adm-gold) 12%, transparent), transparent 24rem),
+    linear-gradient(135deg, var(--adm-bg), var(--adm-bg2)) !important;
+}
+.nahhas-admin-shell :is(.floating-ring,.floating-orb,.floating-line,.floating-script-trail,.floating-gradient) {
+  display: none !important;
+}
+.nahhas-admin-shell .floating-scene { opacity: .32; }
+.nahhas-admin-shell .floating-mark {
+  color: color-mix(in srgb, var(--adm-text) 11%, transparent) !important;
+  opacity: .5 !important;
+  animation: admLetterFloat 14s ease-in-out infinite !important;
+}
+.nahhas-admin-shell .floating-mark:nth-child(odd) { animation-name: admLetterFloatAlt !important; }
+@keyframes admLetterFloat { 0%,100%{transform:translate3d(0,0,0)} 50%{transform:translate3d(14px,-14px,0)} }
+@keyframes admLetterFloatAlt { 0%,100%{transform:translate3d(0,0,0)} 50%{transform:translate3d(-16px,-10px,0)} }
+
+.nahhas-admin-container {
+  width: min(1780px, calc(100% - 28px));
+  margin: 0 auto;
+  padding: 14px 0 36px;
+  position: relative;
+  z-index: 5;
+}
+.nahhas-admin-layout {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 330px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.nahhas-admin-header,
+.nahhas-admin-nav,
+.nahhas-admin-page-frame,
+.nahhas-admin-content-card,
+.nahhas-admin-dashboard-hero,
+.nahhas-admin-shell :is(.v2-card,.glass-panel,.admin-glass,.dashboard-card,.bg-white,.bg-white\/80,.rounded-3xl,.rounded-2xl) {
+  position: relative;
+  border: 1px solid var(--adm-line) !important;
+  background: var(--adm-panel) !important;
+  color: var(--adm-text) !important;
+  box-shadow: 0 14px 40px color-mix(in srgb, #000 12%, transparent) !important;
+  backdrop-filter: blur(14px);
+}
+.nahhas-admin-header::before,
+.nahhas-admin-nav::before,
+.nahhas-admin-page-frame::before,
+.nahhas-admin-content-card::before,
+.nahhas-admin-dashboard-hero::before,
+.nahhas-admin-shell :is(.v2-card,.glass-panel,.admin-glass,.dashboard-card,.bg-white,.bg-white\/80,.rounded-3xl,.rounded-2xl)::before {
+  content: '' !important;
+  position: absolute !important;
+  inset: -1px !important;
+  border-radius: inherit !important;
+  padding: 1.5px !important;
+  background: linear-gradient(100deg, var(--adm-sky), var(--adm-gold), var(--adm-purple), var(--adm-green), var(--adm-sky)) !important;
+  background-size: 240% 240% !important;
+  animation: admBorderMove 9s linear infinite !important;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0) !important;
+  -webkit-mask-composite: xor !important;
+  mask-composite: exclude !important;
+  pointer-events: none !important;
+  display: block !important;
+}
+@keyframes admBorderMove { from{background-position:0% 50%} to{background-position:240% 50%} }
+
+.nahhas-admin-header {
+  position: sticky;
+  top: 10px;
+  z-index: 80;
+  min-height: 84px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-radius: 24px;
+  padding: 12px;
+}
+.nahhas-admin-brand { display:flex; align-items:center; gap:10px; }
+.nahhas-admin-brand-icon {
+  width: 58px; height: 58px; display:grid; place-items:center; border-radius:18px;
+  color:#fff; background:linear-gradient(135deg,var(--adm-sky),var(--adm-purple));
+}
+.nahhas-admin-brand small { color: var(--adm-gold); font-weight:950; }
+.nahhas-admin-brand h1 { margin:4px 0 0; color:var(--adm-text); font-size:clamp(1.4rem,2.3vw,2.55rem); font-weight:950; }
+.nahhas-admin-header-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.nahhas-admin-header-actions button,
+.nahhas-admin-header-actions label {
+  display:inline-flex; align-items:center; gap:7px; min-height:42px;
+  border-radius:14px; padding:8px 12px; background:var(--adm-panel2);
+  border:1px solid var(--adm-line); color:var(--adm-text); font-weight:900;
+}
+.nahhas-admin-header-actions .danger { color:#fff; background:linear-gradient(135deg,var(--adm-rose),var(--adm-purple)); }
+.nahhas-admin-header-actions select { border:0!important; background:transparent!important; color:var(--adm-text)!important; box-shadow:none!important; font-weight:900; }
+.nahhas-admin-header-actions select option { color:#0f172a!important; }
+
+.nahhas-admin-nav {
+  position: sticky;
+  top: 108px;
+  z-index: 50;
+  border-radius: 24px;
+  padding: 12px;
+}
+.nahhas-admin-nav-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.nahhas-admin-nav-head small { color:var(--adm-muted); font-weight:950; }
+.nahhas-admin-nav-head strong { display:block; color:var(--adm-text); font-size:1.15rem; font-weight:950; }
+.nahhas-admin-nav-head > span { min-width:36px; height:36px; display:grid; place-items:center; border-radius:12px; color:#10243a; background:linear-gradient(135deg,var(--adm-gold),var(--adm-green)); font-weight:950; }
+.nahhas-admin-search { display:flex; align-items:center; gap:8px; border-radius:16px; padding:7px 10px; background:var(--adm-panel2); border:1px solid var(--adm-line); margin-bottom:10px; }
+.nahhas-admin-search span { color:var(--adm-sky); font-weight:950; }
+.nahhas-admin-search input { width:100%; border:0!important; background:transparent!important; box-shadow:none!important; color:var(--adm-text)!important; padding:8px 3px!important; }
+.nahhas-admin-groups { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px; margin-bottom:10px; }
+.nahhas-admin-groups button { display:grid; place-items:center; gap:4px; min-height:70px; border-radius:18px; background:transparent; border:1px solid var(--adm-line); color:var(--adm-text); font-weight:900; transition:.16s ease; }
+.nahhas-admin-groups button:hover,.nahhas-admin-groups button.is-active { transform:translateY(-2px); background:var(--adm-panel2); }
+.nahhas-admin-groups button span { width:34px; height:34px; display:grid; place-items:center; border-radius:999px; color:#fff; background:linear-gradient(135deg,var(--adm-sky),var(--adm-purple)); }
+.nahhas-admin-groups button.is-active span { color:#10243a; background:linear-gradient(135deg,var(--adm-gold),var(--adm-green)); }
+.nahhas-admin-groups small { color:var(--adm-muted); font-size:.64rem; }
+
+.nahhas-admin-tabs { display:grid; gap:7px; max-height:calc(100vh - 330px); overflow:auto; scrollbar-width:thin; scrollbar-color:var(--adm-sky) transparent; }
+.nahhas-admin-tabs button { display:grid; grid-template-columns:auto 1fr; gap:9px; align-items:center; min-height:58px; padding:8px; border-radius:18px; text-align:right; background:transparent; border:1px solid transparent; color:var(--adm-text); animation:admTabIn .25s ease both; animation-delay:calc(var(--i,0) * 12ms); transition:.16s ease; }
+@keyframes admTabIn { from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:translateY(0)} }
+.nahhas-admin-tabs button:hover,.nahhas-admin-tabs button.is-active { background:var(--adm-panel2); border-color:var(--adm-line); transform:translateY(-1px); }
+.nahhas-admin-tabs button span { width:40px; height:40px; display:grid; place-items:center; border-radius:14px; color:#fff; background:linear-gradient(135deg,var(--adm-sky),var(--adm-purple)); font-weight:950; }
+.nahhas-admin-tabs button.is-active span { color:#10243a; background:linear-gradient(135deg,var(--adm-gold),var(--adm-green)); }
+.nahhas-admin-tabs button strong { color:var(--adm-text); font-size:.86rem; line-height:1.4; }
+
+.nahhas-admin-page-frame { border-radius:24px; padding:16px; overflow:hidden; min-height:72vh; }
+.nahhas-admin-page-frame > *:not(.nahhas-admin-page-letters) { position:relative; z-index:2; }
+.nahhas-admin-page-letters { position:absolute; inset:0; overflow:hidden; pointer-events:none; z-index:1; }
+.nahhas-admin-page-letters span { position:absolute; right:calc((var(--i) * 11%) - 8%); top:calc(8% + ((var(--i) * 17%) % 78%)); color:color-mix(in srgb,var(--adm-text) 9%,transparent); font-weight:950; font-size:clamp(1.2rem,2vw,2.3rem); animation:admLetterFloat 12s ease-in-out infinite; animation-delay:calc(var(--i) * .18s); }
+
+.nahhas-admin-page-hero { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:14px; }
+.nahhas-admin-chip { display:inline-flex; padding:5px 11px; border-radius:99px; color:var(--adm-gold); background:var(--adm-panel2); font-size:.76rem; font-weight:950; }
+.nahhas-admin-page-hero h2 { margin:8px 0 4px; color:var(--adm-text); font-size:clamp(2rem,3vw,3.8rem); line-height:1.05; font-weight:950; }
+.nahhas-admin-quick-actions { display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; }
+.nahhas-admin-quick-actions button { display:inline-flex; align-items:center; gap:7px; min-height:42px; border-radius:14px; padding:9px 12px; color:var(--adm-text); background:var(--adm-panel2); border:1px solid var(--adm-line); font-weight:900; }
+
+.nahhas-admin-dashboard-hero { border-radius:22px; padding:16px; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; gap:14px; }
+.nahhas-admin-dashboard-hero h3 { margin:8px 0; color:var(--adm-text); font-size:clamp(1.5rem,2.4vw,2.6rem); font-weight:950; }
+.nahhas-admin-dashboard-hero p { color:var(--adm-muted); font-weight:800; }
+.nahhas-admin-health { min-width:150px; display:grid; place-items:center; gap:5px; padding:16px; border-radius:20px; color:#10243a; background:linear-gradient(135deg,var(--adm-gold),var(--adm-green)); font-weight:950; }
+.nahhas-admin-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-bottom:14px; }
+.nahhas-admin-content-card { border-radius:22px!important; padding:14px!important; }
+.nahhas-admin-content-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; padding-bottom:12px; border-bottom:1px solid var(--adm-line); }
+.nahhas-admin-content-head h3 { margin:5px 0 0; color:var(--adm-text); font-size:1.55rem; font-weight:950; }
+
+.nahhas-admin-shell :is(.v2-card,.glass-panel,.admin-glass,.dashboard-card,.bg-white,.bg-white\/80,.bg-slate-50,.bg-gray-50,.rounded-3xl,.rounded-2xl) { border-radius:20px!important; background:var(--adm-panel2)!important; color:var(--adm-text)!important; }
+.nahhas-admin-shell :is(h1,h2,h3,h4,.text-slate-900,.text-slate-950,.text-slate-800,.text-gray-900,.text-black) { color:var(--adm-text)!important; }
+.nahhas-admin-shell :is(.text-slate-500,.text-slate-600,.text-gray-500,.text-gray-600,.text-slate-400,.text-gray-400) { color:var(--adm-muted)!important; }
+.nahhas-admin-shell :is(input,select,textarea) { color:var(--adm-text)!important; background:var(--adm-panel)!important; border:1px solid var(--adm-line)!important; border-radius:14px!important; box-shadow:none!important; }
+.nahhas-admin-shell select option { color:#0f172a!important; }
+.nahhas-admin-shell thead th { background:var(--adm-panel)!important; color:var(--adm-text)!important; }
+.nahhas-admin-shell :is(td,th,tr) { border-color:var(--adm-line)!important; }
+
+@media (max-width:1150px){ .nahhas-admin-layout{grid-template-columns:1fr}.nahhas-admin-nav,.nahhas-admin-header{position:relative;top:auto}.nahhas-admin-tabs{max-height:none; grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}.nahhas-admin-metrics{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@media (max-width:760px){ .nahhas-admin-container{width:min(100% - 16px,1780px)}.nahhas-admin-header,.nahhas-admin-header-actions,.nahhas-admin-page-hero,.nahhas-admin-dashboard-hero,.nahhas-admin-content-head{align-items:stretch; flex-direction:column}.nahhas-admin-groups,.nahhas-admin-metrics{grid-template-columns:1fr}.nahhas-admin-quick-actions{justify-content:stretch}.nahhas-admin-quick-actions button{width:100%; justify-content:center} }
+
+
+
+
+/* ===== Stability + smoothness patch ===== */
+
+/* Keep admin light and fast */
+.nahhas-admin-shell *,
+.v2-admin-shell * {
+  transition-duration: .14s !important;
+}
+
+/* Remove slow / ugly diagonal graphics and rotating shapes inside admin */
+.nahhas-admin-shell :is(
+  .floating-ring,
+  .floating-orb,
+  .floating-line,
+  .floating-script-trail,
+  .floating-gradient,
+  .nh-admin-tab-stage-bg,
+  .admin-safe-letters,
+  .admin-real-stage-letters,
+  .nh-admin-stage-letters
+) {
+  display: none !important;
+  animation: none !important;
+}
+
+.nahhas-admin-shell .floating-scene {
+  opacity: .20 !important;
+}
+
+.nahhas-admin-shell .floating-mark {
+  opacity: .28 !important;
+  animation-duration: 18s !important;
+  filter: none !important;
+}
+
+/* Make border glow subtle, not heavy */
+.nahhas-admin-shell :is(
+  .nahhas-admin-header,
+  .nahhas-admin-nav,
+  .nahhas-admin-page-frame,
+  .nahhas-admin-content-card,
+  .nahhas-admin-dashboard-hero,
+  .v2-card,
+  .glass-panel,
+  .admin-glass,
+  .dashboard-card,
+  .bg-white,
+  .bg-white\/80,
+  .rounded-3xl,
+  .rounded-2xl
+)::before {
+  opacity: .48 !important;
+  animation-duration: 14s !important;
+}
+
+/* Stop old pseudo artifacts from previous patches */
+.nahhas-admin-shell :is(
+  .nh-admin-command-shell,
+  .nh-admin-studio,
+  .admin-safe-shell,
+  .admin-real-stage,
+  .admin-safe-stage,
+  .nh-admin-tab-stage,
+  .nh-admin-clean-stage
+)::before,
+.nahhas-admin-shell :is(
+  .nh-admin-command-shell,
+  .nh-admin-studio,
+  .admin-safe-shell,
+  .admin-real-stage,
+  .admin-safe-stage,
+  .nh-admin-tab-stage,
+  .nh-admin-clean-stage
+)::after {
+  display: none !important;
+  content: none !important;
+}
+
+/* Layout smoothness */
+.nahhas-admin-container {
+  padding-top: 12px !important;
+}
+
+.nahhas-admin-header {
+  top: 8px !important;
+  min-height: 74px !important;
+}
+
+.nahhas-admin-nav {
+  top: 96px !important;
+}
+
+.nahhas-admin-tabs {
+  scroll-behavior: smooth;
+}
+
+.nahhas-admin-tabs button,
+.nahhas-admin-groups button,
+.nahhas-admin-quick-actions button,
+.nahhas-admin-header-actions button {
+  will-change: transform;
+}
+
+.nahhas-admin-tabs button:hover,
+.nahhas-admin-groups button:hover,
+.nahhas-admin-quick-actions button:hover,
+.nahhas-admin-header-actions button:hover {
+  transform: translateY(-1px) !important;
+}
+
+/* Improve readability */
+.nahhas-admin-shell :is(.v2-card, .glass-panel, .admin-glass, .dashboard-card, .bg-white, .bg-white\/80, .rounded-3xl, .rounded-2xl) {
+  backdrop-filter: blur(8px) !important;
+}
+
+.nahhas-admin-content-card {
+  min-height: 420px;
+}
+
+/* Forms/buttons must remain clickable */
+.nahhas-admin-shell button,
+.nahhas-admin-shell input,
+.nahhas-admin-shell select,
+.nahhas-admin-shell textarea,
+.nahhas-admin-shell label {
+  pointer-events: auto !important;
+}
+
+/* Reduce expensive shadows */
+.nahhas-admin-shell :is(.nahhas-admin-header, .nahhas-admin-nav, .nahhas-admin-page-frame, .nahhas-admin-content-card, .v2-card, .glass-panel) {
+  box-shadow: 0 10px 26px rgba(0,0,0,.12) !important;
+}
+
+/* Mobile / smaller screens */
+@media (max-width: 1150px) {
+  .nahhas-admin-layout {
+    grid-template-columns: 1fr !important;
+  }
+
+  .nahhas-admin-header,
+  .nahhas-admin-nav {
+    position: relative !important;
+    top: auto !important;
+  }
+
+  .nahhas-admin-tabs {
+    max-height: none !important;
+  }
+}
+
+
+
+
+/* ===== Fresh admin icons patch ===== */
+.nahhas-admin-shell .admin-fresh-icon {
+  display: inline-block;
+  vertical-align: middle;
+  flex: 0 0 auto;
+  transition: transform .18s ease, filter .18s ease;
+}
+
+.nahhas-admin-shell button:hover .admin-fresh-icon,
+.nahhas-admin-shell .nahhas-admin-brand-icon:hover .admin-fresh-icon,
+.nahhas-admin-shell .nahhas-admin-health:hover .admin-fresh-icon {
+  transform: translateY(-1px) scale(1.07);
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--adm-sky, #57c7ff) 36%, transparent));
+}
+
+/* New icon badges in sidebar */
+.nahhas-admin-groups button span,
+.nahhas-admin-tabs button span {
+  display: grid !important;
+  place-items: center !important;
+}
+
+.nahhas-admin-tabs button span .admin-fresh-icon,
+.nahhas-admin-groups button span .admin-fresh-icon {
+  color: currentColor;
+}
+
+/* Make old shim icons inside admin less visually dominant if any old component still renders them */
+.nahhas-admin-shell .admin-fresh-icon + svg,
+.nahhas-admin-shell svg.lucide {
+  opacity: .82;
+}
+
+/* smoother icon animation */
+@keyframes adminIconSoftPulse {
+  0%,100% { transform: scale(1); }
+  50% { transform: scale(1.045); }
+}
+
+.nahhas-admin-tabs button.is-active .admin-fresh-icon,
+.nahhas-admin-groups button.is-active .admin-fresh-icon {
+  animation: adminIconSoftPulse 2.8s ease-in-out infinite;
+}
+
+
+
+
+/* ===== Admin performance / smoothness final patch ===== */
+
+/*
+  The admin page has many tables, forms and cards.
+  Heavy blur + animated borders on many children causes repaint lag.
+  This patch keeps the identity, but limits animation to large containers only.
+*/
+
+.nahhas-admin-shell {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Reduce global transition cost */
+.nahhas-admin-shell *,
+.v2-admin-shell * {
+  transition-property: background-color, border-color, color, opacity, transform !important;
+  transition-duration: .12s !important;
+  transition-timing-function: ease-out !important;
+}
+
+/* Kill heavy background animation layers inside admin */
+.nahhas-admin-shell :is(
+  .floating-scene,
+  .floating-mark,
+  .floating-ring,
+  .floating-orb,
+  .floating-line,
+  .floating-script-trail,
+  .floating-gradient
+) {
+  animation: none !important;
+  transition: none !important;
+  filter: none !important;
+}
+
+.nahhas-admin-shell .floating-scene {
+  opacity: .10 !important;
+}
+
+.nahhas-admin-shell .floating-mark {
+  opacity: .16 !important;
+  transform: none !important;
+}
+
+/* Blur is very expensive on large scrolling admin pages */
+.nahhas-admin-header,
+.nahhas-admin-nav,
+.nahhas-admin-page-frame,
+.nahhas-admin-content-card,
+.nahhas-admin-dashboard-hero,
+.nahhas-admin-shell :is(.v2-card,.glass-panel,.admin-glass,.dashboard-card,.bg-white,.bg-white\/80,.rounded-3xl,.rounded-2xl) {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: 0 8px 20px rgba(0,0,0,.10) !important;
+}
+
+/* Keep moving light only on the big layout pieces */
+.nahhas-admin-shell :is(
+  .v2-card,
+  .glass-panel,
+  .admin-glass,
+  .dashboard-card,
+  .bg-white,
+  .bg-white\/80,
+  .rounded-3xl,
+  .rounded-2xl
+)::before {
+  display: none !important;
+  animation: none !important;
+  content: none !important;
+}
+
+.nahhas-admin-header::before,
+.nahhas-admin-nav::before,
+.nahhas-admin-page-frame::before,
+.nahhas-admin-content-card::before {
+  opacity: .45 !important;
+  animation-duration: 18s !important;
+  will-change: background-position;
+}
+
+/* Disable glow on tiny nested cards/tables to avoid constant repaint */
+.nahhas-admin-shell :is(table, tr, td, th, input, textarea, select, label, button)::before,
+.nahhas-admin-shell :is(table, tr, td, th, input, textarea, select, label, button)::after {
+  display: none !important;
+  content: none !important;
+  animation: none !important;
+}
+
+/* Smoother scrolling areas */
+.nahhas-admin-shell,
+.nahhas-admin-tabs,
+.nahhas-admin-workspace,
+.nahhas-admin-content-card {
+  scroll-behavior: smooth;
+  overscroll-behavior: contain;
+}
+
+.nahhas-admin-tabs {
+  contain: layout paint;
+  will-change: scroll-position;
+}
+
+/* Make hover feel smooth without forcing expensive layout */
+.nahhas-admin-tabs button,
+.nahhas-admin-groups button,
+.nahhas-admin-quick-actions button,
+.nahhas-admin-header-actions button {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+.nahhas-admin-tabs button:hover,
+.nahhas-admin-groups button:hover,
+.nahhas-admin-quick-actions button:hover,
+.nahhas-admin-header-actions button:hover {
+  transform: translate3d(0, -1px, 0) !important;
+}
+
+/* Tables can be huge; optimize paint */
+.nahhas-admin-shell table {
+  contain: paint;
+}
+
+.nahhas-admin-shell :is(tbody, tr, td) {
+  transition: none !important;
+}
+
+/* Form inputs should respond instantly */
+.nahhas-admin-shell :is(input, textarea, select) {
+  transition: border-color .1s ease, background-color .1s ease !important;
+}
+
+/* Reduce expensive icon animation */
+.nahhas-admin-shell .admin-fresh-icon {
+  transition: transform .12s ease-out, opacity .12s ease-out !important;
+  filter: none !important;
+}
+
+.nahhas-admin-tabs button.is-active .admin-fresh-icon,
+.nahhas-admin-groups button.is-active .admin-fresh-icon {
+  animation: none !important;
+}
+
+/* Lower layout work on the big workspace */
+.nahhas-admin-workspace {
+  min-width: 0;
+  contain: layout;
+}
+
+/* Keep cards readable but lighter */
+.nahhas-admin-shell :is(.v2-card,.glass-panel,.admin-glass,.dashboard-card,.bg-white,.bg-white\/80,.rounded-3xl,.rounded-2xl) {
+  background: color-mix(in srgb, var(--adm-panel2, rgba(18,38,64,.94)) 96%, transparent) !important;
+}
+
+/* Avoid sticky jank on smaller screens */
+@media (max-width: 1150px) {
+  .nahhas-admin-header,
+  .nahhas-admin-nav {
+    position: relative !important;
+    top: auto !important;
+  }
+}
+
+/* Respect reduced motion users and give a speed mode */
+@media (prefers-reduced-motion: reduce) {
+  .nahhas-admin-shell *,
+  .v2-admin-shell * {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+
+
+
+/* ===== Final wheel scroll fix for admin ===== */
+
+/* Ensure page itself can receive wheel events and scroll normally */
+html,
+body,
+#root {
+  height: auto !important;
+  min-height: 100% !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+.nahhas-admin-shell,
+.v2-admin-shell,
+.nahhas-admin-container,
+.nahhas-admin-layout,
+.nahhas-admin-workspace,
+.nahhas-admin-page-frame,
+.nahhas-admin-content-card {
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  overscroll-behavior: auto !important;
+  contain: none !important;
+}
+
+/* The tab list itself can scroll, but must not trap the whole page wheel */
+.nahhas-admin-tabs {
+  overflow-y: auto !important;
+  overscroll-behavior: auto !important;
+  contain: none !important;
+  pointer-events: auto !important;
+}
+
+/* Remove hidden/fixed scroll traps from previous patches */
+.nahhas-admin-shell :is(.admin-safe-shell, .admin-real-stage, .admin-safe-stage, .nh-admin-studio, .nh-admin-command-shell) {
+  overflow: visible !important;
+  height: auto !important;
+  max-height: none !important;
+  contain: none !important;
+  overscroll-behavior: auto !important;
+}
+
+/* Keep sticky sidebar/header, but don't let them block wheel */
+.nahhas-admin-header,
+.nahhas-admin-nav {
+  pointer-events: auto !important;
+}
+
+/* On long admin pages, let browser handle scrolling smoothly */
+.nahhas-admin-shell {
+  scroll-behavior: smooth;
+  touch-action: pan-y !important;
+}
