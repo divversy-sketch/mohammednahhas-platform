@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where, limit } from 'firebase/firestore';
 import { db } from '@services/firebase';
-import { BarChart3, ClipboardList, CreditCard, Download, Lock, MessageSquare, PlayCircle, Save, Send, Shield, Sparkles, Target, Users, Wand2 } from '@shared/icons/lucide-shim.jsx';
+import { BarChart3, ClipboardList, CreditCard, Download, Lock, MessageSquare, PlayCircle, Save, Send, Shield, Sparkles, Target, Trash2, Users, Wand2 } from '@shared/icons/lucide-shim.jsx';
 import { GradeOptions, getGradeLabel } from '@shared/constants/grades.jsx';
-import { platformConfirm, platformNotify } from '@shared/core/platformShared.jsx';
+import { platformNotify } from '@shared/core/platformShared.jsx';
 import PageHeader from '@shared/ui/PageHeader.jsx';
 import EmptyState from '@shared/ui/EmptyState.jsx';
 
@@ -57,6 +57,23 @@ export function AdminGroupsManager({ users = [], userData }) {
     await addDoc(collection(db, 'student_groups'), { ...form, members: [], createdAt: serverTimestamp(), createdBy: userData?.email || 'admin' });
     setForm({ ...form, name: '', description: '' });
   };
+  const deleteGroup = async (group) => {
+    if (!group?.id) return;
+    const name = group.name || 'هذه المجموعة';
+    if (!window.confirm(`هل أنت متأكد من حذف مجموعة: ${name}؟`)) return;
+    const memberIds = Array.isArray(group.members) ? group.members : [];
+    await Promise.all(memberIds.map(async (id) => {
+      const student = users.find((u) => (u.id || u.uid) === id);
+      const currentGroupIds = Array.isArray(student?.groupIds) ? student.groupIds : [];
+      if (currentGroupIds.includes(group.id)) {
+        await updateDoc(doc(db, 'users', id), { groupIds: currentGroupIds.filter((x) => x !== group.id), updatedAt: serverTimestamp() });
+      }
+    }));
+    await deleteDoc(doc(db, 'student_groups', group.id));
+    setSelectedGroup('');
+    platformNotify('تم حذف المجموعة بنجاح');
+  };
+
   const toggleMember = async (group, student) => {
     const id = student.id || student.uid;
     const members = Array.isArray(group.members) ? group.members : [];
@@ -65,19 +82,6 @@ export function AdminGroupsManager({ users = [], userData }) {
     const currentGroupIds = Array.isArray(student.groupIds) ? student.groupIds : [];
     const nextGroupIds = next.includes(id) ? Array.from(new Set([...currentGroupIds, group.id])) : currentGroupIds.filter((x) => x !== group.id);
     await updateDoc(doc(db, 'users', id), { groupIds: nextGroupIds, updatedAt: serverTimestamp() });
-  };
-  const deleteGroup = async (groupToDelete) => {
-    if (!groupToDelete?.id) return;
-    if (!platformConfirm(`حذف المجموعة "${groupToDelete.name || 'بدون اسم'}"؟ لن يتم حذف الطلاب، سيتم حذف المجموعة فقط وإزالة ربطها من الطلاب.`)) return;
-    const memberIds = Array.isArray(groupToDelete.members) ? groupToDelete.members.filter(Boolean) : [];
-    for (const id of memberIds) {
-      const student = users.find((u) => (u.id || u.uid) === id);
-      const currentGroupIds = Array.isArray(student?.groupIds) ? student.groupIds : [];
-      await updateDoc(doc(db, 'users', id), { groupIds: currentGroupIds.filter((x) => x !== groupToDelete.id), updatedAt: serverTimestamp() }).catch(() => {});
-    }
-    await deleteDoc(doc(db, 'student_groups', groupToDelete.id));
-    if (selectedGroup === groupToDelete.id) setSelectedGroup('');
-    platformNotify('تم حذف المجموعة بنجاح.');
   };
   const group = groups.find((g) => g.id === selectedGroup) || groups[0];
   return <div className="space-y-6" dir="rtl">
@@ -89,7 +93,7 @@ export function AdminGroupsManager({ users = [], userData }) {
       <button className="bg-blue-700 text-white rounded-xl font-black">إنشاء مجموعة</button>
     </form>
     <div className="grid lg:grid-cols-3 gap-5">
-      <div className="bg-white rounded-3xl border p-4 space-y-2">{groups.map((g)=> <div key={g.id} className={`flex items-center gap-2 rounded-2xl p-2 ${group?.id===g.id?'bg-blue-50 text-blue-700':'bg-slate-50'}`}><button type="button" onClick={()=>setSelectedGroup(g.id)} className="flex-1 text-right p-2 font-black">{g.name}<span className="block text-xs text-slate-500">{(g.members||[]).length} طالب</span></button><button type="button" onClick={()=>deleteGroup(g)} className="shrink-0 rounded-xl bg-red-50 text-red-700 px-3 py-2 text-xs font-black hover:bg-red-100" title="حذف المجموعة">حذف</button></div>)}{!groups.length && <EmptyState title="لا توجد مجموعات" icon="👥"/>}</div>
+      <div className="bg-white rounded-3xl border p-4 space-y-2">{groups.map((g)=> <div key={g.id} className={`flex items-center gap-2 rounded-2xl p-2 ${group?.id===g.id?'bg-blue-50':'bg-slate-50'}`}><button type="button" onClick={()=>setSelectedGroup(g.id)} className={`flex-1 text-right p-2 rounded-xl font-black ${group?.id===g.id?'text-blue-700':'text-slate-800'}`}>{g.name}<span className="block text-xs text-slate-500">{(g.members||[]).length} طالب</span></button><button type="button" title="حذف المجموعة" onClick={()=>deleteGroup(g)} className="shrink-0 rounded-xl border border-red-100 bg-red-50 p-2 text-red-700 hover:bg-red-100"><Trash2 size={18}/></button></div>)}{!groups.length && <EmptyState title="لا توجد مجموعات" icon="👥"/>}</div>
       <div className="lg:col-span-2 bg-white rounded-3xl border p-4"><h3 className="font-black mb-3">طلاب المجموعة: {group?.name || '—'}</h3><div className="grid md:grid-cols-2 gap-2 max-h-[520px] overflow-auto">{users.map((u)=>{ const id = u.id || u.uid; const active = (group?.members || []).includes(id); return <button key={id} disabled={!group} onClick={()=>toggleMember(group,u)} className={`text-right border rounded-2xl p-3 ${active?'bg-emerald-50 border-emerald-200':'bg-slate-50'}`}><p className="font-black">{u.name || u.displayName || u.email}</p><p className="text-xs text-slate-500">{u.email}</p><p className={`text-xs font-black ${active?'text-emerald-700':'text-slate-400'}`}>{active?'داخل المجموعة':'اضغط للإضافة'}</p></button>})}</div></div>
     </div>
   </div>;

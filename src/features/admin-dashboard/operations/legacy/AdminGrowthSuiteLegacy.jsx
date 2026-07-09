@@ -401,7 +401,7 @@ export function AdminGrowthSuite({ users = [], exams = [], examResults = [], con
         setPaymentFilter, exportPayments, visiblePayments, paymentsPagination,
         statusLabel, toInputDate, decidePayment, units, content, exams, unitDraft,
         setUnitDraft, saveUnit, questions, filteredQuestions, questionDraft,
-        setQuestionDraft, bulkQuestions, setBulkQuestions, saveQuestion, importQuestions,
+        setQuestionDraft, bulkQuestions, setBulkQuestions, importQuestions,
         examDraft, setExamDraft, buildExamFromBank, exportQuestionBank,
         questionFilter, setQuestionFilter, questionsPagination, deleteQuestion,
         visibleStudentsAtRisk, assignmentSubmissions, examResults,

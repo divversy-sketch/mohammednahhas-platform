@@ -6,5 +6,4 @@ export const ADMIN_WORK_CENTERS = [
   'content',
   'exams',
   'student_reports',
-  'platform_settings'
 ];
