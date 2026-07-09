@@ -27,7 +27,6 @@ export const ADMIN_TAB_LABELS = Object.freeze({
   messages_center: 'رسائل الطلاب',
   finance_dashboard: 'اللوحة المالية',
   video_security: 'حماية الفيديوهات',
-  platform_settings: 'إعدادات المنصة',
   admin_roles: 'صلاحيات الأدمن',
   audit_logs: 'سجل الإدارة',
   notifications_admin: 'الإشعارات',

@@ -114,11 +114,6 @@ export const adminPageMeta = {
     title: 'تحويل المنصة لتطبيق',
     description: 'إرشادات وتجهيزات تجربة التطبيق للطلاب.',
   },
-  platform_settings: {
-    eyebrow: 'الإعدادات',
-    title: 'إعدادات المنصة',
-    description: 'تحكم في التسجيل، الواجهة، الإشعارات، والإعدادات العامة.',
-  },
   admin_roles: {
     eyebrow: 'الصلاحيات',
     title: 'صلاحيات الأدمن',

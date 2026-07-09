@@ -1354,3 +1354,16 @@
   .student-neo-profile-card__art .student-neo-study-illustration { width: 104px; height: 82px; }
   .student-neo-avatar { display: none; }
 }
+
+
+/* Safe dark-mode readability patch */
+.student-neo-shell:not(.student-neo-shell--light) :is(.bg-amber-50,.bg-amber-100,.bg-yellow-50,.bg-yellow-100,.from-amber-50,.from-yellow-50,.to-amber-100,.to-yellow-100) {
+  background: linear-gradient(135deg, rgba(245,184,32,.16), rgba(255,255,255,.045)) !important;
+  color: #f8fbff !important;
+  border-color: rgba(245,184,32,.24) !important;
+  box-shadow: 0 14px 32px rgba(0,0,0,.22) !important;
+}
+.student-neo-shell:not(.student-neo-shell--light) :is(.bg-amber-50,.bg-amber-100,.bg-yellow-50,.bg-yellow-100,.from-amber-50,.from-yellow-50,.to-amber-100,.to-yellow-100) :is(h1,h2,h3,p,span,strong) {
+  color: #f8fbff !important;
+  text-shadow: 0 1px 2px rgba(0,0,0,.35);
+}

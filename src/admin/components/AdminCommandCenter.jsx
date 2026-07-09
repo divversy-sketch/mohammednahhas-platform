@@ -79,7 +79,7 @@ export default function AdminCommandCenter({ users = [], exams = [], examResults
         <Card tone="red" title="اشتراكات قرب الانتهاء" value={expiring.length} note={topExpiring || 'لا يوجد خطر قريب'} icon={<Bell size={24}/>} onClick={() => onNavigate?.('payments')} />
         <Card tone="purple" title="تذاكر دعم مفتوحة" value={openTickets.length} note="تدار من رسائل الطلاب" icon={<MessageCircle size={24}/>} onClick={() => onNavigate?.('messages_center')} />
         <Card tone="blue" title="محاولات امتحان تحتاج متابعة" value={held} note="أمن الامتحانات والنتائج" icon={<FileCheck size={24}/>} onClick={() => onNavigate?.('exams')} />
-        <Card tone="red" title="أخطاء نظام آخر 7 أيام" value={recentErrors.length} note="تظهر داخل إعدادات المنصة وسجل الأمان" icon={<AlertTriangle size={24}/>} onClick={() => onNavigate?.('platform_settings')} />
+        <Card tone="red" title="أخطاء نظام آخر 7 أيام" value={recentErrors.length} note="تظهر داخل سجل الأمان والإدارة" icon={<AlertTriangle size={24}/>} onClick={() => onNavigate?.('audit_logs')} />
         <Card tone="amber" title="طلاب غير نشطين" value={inactive.length} note="متابعة تعليمية وتسويقية" icon={<Users size={24}/>} onClick={() => onNavigate?.('student_reports')} />
         <Card tone="red" title="نتائج أقل من 50%" value={lowScores} note="تحتاج مراجعة تعليمية" icon={<TrendingDown size={24}/>} onClick={() => onNavigate?.('student_reports')} />
         <Card tone="emerald" title="إجمالي الامتحانات" value={exams.length} note="مؤشر جاهزية المحتوى" icon={<FileCheck size={24}/>} onClick={() => onNavigate?.('exams')} />

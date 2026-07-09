@@ -27,7 +27,6 @@ const TAB_ICONS = {
   security_center: 'shield',
   video_security: 'lock',
   app_convert: 'phone',
-  platform_settings: 'settings',
   admin_roles: 'shield',
   audit_logs: 'activity',
 };
@@ -55,7 +54,7 @@ const GROUPS = [
   },
   {
     title: 'الأمان والتشغيل',
-    tabs: ['security_center', 'video_security', 'app_convert', 'platform_settings', 'admin_roles', 'audit_logs'],
+    tabs: ['security_center', 'video_security', 'app_convert', 'admin_roles', 'audit_logs'],
   },
 ];
 

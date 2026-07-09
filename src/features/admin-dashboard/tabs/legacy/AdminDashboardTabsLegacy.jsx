@@ -65,7 +65,6 @@ import AdminExamViewNavTab from '../split/AdminExamViewNavTab.jsx';
 import AdminExamManageTab from '../split/AdminExamManageTab.jsx';
 import AdminExamResultsTab from '../split/AdminExamResultsTab.jsx';
 import AdminSecurityCenterTab from '../split/AdminSecurityCenterTab.jsx';
-import AdminPlatformSettingsTab from '../split/AdminPlatformSettingsTab.jsx';
 import AdminRolesTab from '../split/AdminRolesTab.jsx';
 import AdminAuditLogsTab from '../split/AdminAuditLogsTab.jsx';
 import AdminNotificationsAdminTab from '../split/AdminNotificationsAdminTab.jsx';
@@ -390,7 +389,6 @@ export default function AdminDashboardTabs({ ctx }) {
           <AdminSecurityCenterTab ctx={tabCtx} />
 
 
-          <AdminPlatformSettingsTab ctx={tabCtx} />
 
           <AdminRolesTab ctx={tabCtx} />
 
