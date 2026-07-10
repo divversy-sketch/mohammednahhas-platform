@@ -212,7 +212,7 @@ export const LandingPage = ({ onAuthClick, onRegisterClick, installPrompt }) => 
           >
             <span className="neo-pill"><Sparkles size={16} /> منصة تعليمية حديثة للغة العربية</span>
             <div className="neo-hero-brand">
-              <AnimatedLogo src={nahhasLogo} alt="شعار منصة النحاس" wrapperClassName="neo-hero-brand__logo" imgClassName="neo-hero-brand__image" />
+              <img src={nahhasLogo} alt="شعار منصة النحاس" className="neo-hero-brand__image" />
             </div>
             <h1>العربية أوضح، والتعلّم أذكى، والنتيجة أقرب.</h1>
             <p>

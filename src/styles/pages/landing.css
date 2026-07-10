@@ -293,15 +293,20 @@ html[data-public-theme='light'] body {
 }
 .neo-public-light .neo-pill { color: #8a5600; }
 .neo-hero-brand {
-  margin: 22px 0 8px;
+  margin: 18px 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  max-width: 280px;
 }
 
 .neo-hero-brand__image {
   display: block;
-  width: min(100%, 420px);
+  width: min(100%, 280px);
+  max-width: 100%;
   height: auto;
   object-fit: contain;
-  filter: drop-shadow(0 22px 34px rgba(168, 91, 28, 0.14));
+  filter: drop-shadow(0 18px 28px rgba(168, 91, 28, 0.12));
 }
 
 .neo-hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
@@ -544,8 +549,9 @@ button.neo-learning-card:hover { transform: translateY(-3px) scale(1.01); box-sh
   .neo-auth-story h1 { font-size: clamp(2.35rem, 14.5vw, 4.2rem); line-height: 1.18; }
   .neo-logo-image { height: 72px; }
   .neo-logo--large .neo-logo-image,
-  .neo-logo--auth .neo-logo-image,
-  .neo-hero-brand__image { width: min(100%, 320px); height: auto; }
+  .neo-logo--auth .neo-logo-image { width: min(100%, 320px); height: auto; }
+  .neo-hero-brand { max-width: 220px; }
+  .neo-hero-brand__image { width: min(100%, 220px); height: auto; }
   .neo-hero-actions > * { width: 100%; }
   .neo-section-heading { display: block; }
   .neo-section-heading h2 { margin-top: 8px; }
