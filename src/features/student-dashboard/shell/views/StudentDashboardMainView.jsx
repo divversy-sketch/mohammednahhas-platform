@@ -4,6 +4,8 @@ import { auth } from '@services/firebase';
 import SmartHomeworkScanner from '@features/homework/SmartHomeworkScanner.jsx';
 import '@styles/pages/student-neo.css';
 import nahhasLogo from '@assets/nahhas-logo-transparent.png';
+import AnimatedLogo from '@shared/ui/AnimatedLogo.jsx';
+import { GradeOptions, getGradeLabel } from '@shared/constants/grades';
 
 const SecureVideoPlayer = lazy(() => import('@features/video-security/player/SecureVideoPlayer.jsx'));
 const InteractiveViewer = lazy(() => import('@features/content/InteractiveViewer'));
@@ -324,7 +326,7 @@ function Topbar({ ctx, theme, setTheme, currentTab, mobileOpen, setMobileOpen })
         <Icon name={mobileOpen ? 'close' : 'menu'} />
       </button>
       <div className="student-neo-topbar__title">
-        <img src={nahhasLogo} alt="منصة النحاس" className="student-neo-topbar__logo" />
+        <AnimatedLogo src={nahhasLogo} alt="منصة النحاس" wrapperClassName="student-neo-topbar__logo-wrap" imgClassName="student-neo-topbar__logo" />
         <div>
           <span>بوابة الطالب</span>
           <h1>{tabLabel}</h1>
@@ -355,7 +357,7 @@ function Sidebar({ ctx, active, setActive, open, setOpen }) {
   return (
     <aside className={`student-neo-sidebar ${open ? 'is-open' : ''}`}>
       <div className="student-neo-brand">
-        <img src={nahhasLogo} alt="منصة النحاس" className="student-neo-brand__logo" />
+        <AnimatedLogo src={nahhasLogo} alt="منصة النحاس" wrapperClassName="student-neo-brand__logo-wrap" imgClassName="student-neo-brand__logo" />
         <div>
           <span>منصة النحاس</span>
           <strong>بوابة الطالب</strong>
@@ -363,9 +365,8 @@ function Sidebar({ ctx, active, setActive, open, setOpen }) {
       </div>
       <div className="student-neo-profile-card student-neo-profile-card--welcome">
         <div className="student-neo-profile-card__copy">
-          <span className="student-neo-profile-card__eyebrow">مساحة الطالب</span>
           <h2>{`أهلًا يا ${name}`}</h2>
-          <p>كل ما تحتاجه أصبح أوضح وأقرب. اختر وجهتك السريعة وابدأ مباشرة.</p>
+          <p className="student-neo-welcome-message">كل ما تحتاجه أصبح أوضح وأقرب، والوصول إلى دروسك واختباراتك أصبح أسرع.</p>
           <span>{grade}</span>
         </div>
         <div className="student-neo-quick-links" aria-label="وصول سريع">
@@ -719,18 +720,44 @@ function SupportView({ ctx }) {
 
 function ProfileView({ ctx }) {
   const form = ctx.editFormData || {};
+  const currentGrade = ctx.userData?.grade || '';
+  const hasPendingGradeRequest = ctx.userData?.gradeUpdateStatus === 'pending' && ctx.userData?.requestedGrade;
+
   return (
     <div className="student-neo-section">
-      <SectionHeader kicker="حسابي" title="بيانات الطالب" text="تعديل سريع لبياناتك الأساسية." />
+      <SectionHeader kicker="حسابي" title="بيانات الطالب" text="حدّث بياناتك الأساسية، ويمكنك طلب تغيير المرحلة الدراسية بعد موافقة الإدارة." />
       <section className="student-neo-panel">
         <div className="student-neo-form-grid">
-          <input value={form.name || ''} onChange={(event) => ctx.setEditFormData?.({ ...form, name: event.target.value })} placeholder="الاسم" />
+          <input value={form.name || ''} onChange={(event) => ctx.setEditFormData?.({ ...form, name: event.target.value })} placeholder="الاسم" disabled />
           <input value={form.phone || ''} onChange={(event) => ctx.setEditFormData?.({ ...form, phone: event.target.value })} placeholder="رقم الطالب" />
-          <input value={form.parentPhone || ''} onChange={(event) => ctx.setEditFormData?.({ ...form, parentPhone: event.target.value })} placeholder="رقم ولي الأمر" />
-          <input value={form.grade || ''} onChange={(event) => ctx.setEditFormData?.({ ...form, grade: event.target.value })} placeholder="الصف" />
+          <input value={form.parentPhone || ''} onChange={(event) => ctx.setEditFormData?.({ ...form, parentPhone: event.target.value })} placeholder="رقم ولي الأمر" disabled />
+          <label className="student-neo-grade-field">
+            <span>المرحلة الدراسية الحالية: <strong>{getGradeLabel(currentGrade)}</strong></span>
+            <select
+              value={form.grade || currentGrade}
+              onChange={(event) => ctx.setEditFormData?.({ ...form, grade: event.target.value })}
+              disabled={Boolean(hasPendingGradeRequest)}
+            >
+              <GradeOptions />
+            </select>
+            <small>أي تغيير في المرحلة يُرسل كطلب للإدارة، ولن يتفعّل إلا بعد الموافقة.</small>
+          </label>
         </div>
+
+        {hasPendingGradeRequest && (
+          <div className="student-neo-grade-request-status" role="status">
+            <Icon name="clock" size={20} />
+            <div>
+              <strong>طلب تغيير المرحلة قيد المراجعة</strong>
+              <span>المرحلة المطلوبة: {getGradeLabel(ctx.userData.requestedGrade)} — لن تتغير مرحلتك الحالية إلا بعد موافقة الإدارة.</span>
+            </div>
+          </div>
+        )}
+
         <div className="student-neo-profile-actions">
-          <NeoButton onClick={ctx.handleUpdateMyProfile}>حفظ البيانات</NeoButton>
+          <NeoButton onClick={ctx.handleUpdateMyProfile}>
+            {hasPendingGradeRequest ? 'حفظ بيانات الاتصال' : 'حفظ البيانات وإرسال الطلب'}
+          </NeoButton>
           <NeoButton tone="ghost" onClick={() => signOut(auth)}>تسجيل الخروج</NeoButton>
         </div>
       </section>

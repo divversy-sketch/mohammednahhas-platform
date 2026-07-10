@@ -1527,3 +1527,96 @@
     font-size: 10.5px;
   }
 }
+
+/* Clearer welcome message and grade-change approval flow */
+.student-neo-welcome-message {
+  max-width: none !important;
+  margin: 2px 0 4px !important;
+  color: var(--neo-text) !important;
+  font-size: 13px !important;
+  line-height: 1.95 !important;
+  font-weight: 800 !important;
+  text-wrap: pretty;
+}
+
+.student-neo-grade-field {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--neo-border);
+  border-radius: 20px;
+  background: rgba(255,255,255,.055);
+}
+
+.student-neo-grade-field > span {
+  color: var(--neo-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.student-neo-grade-field > span strong { color: var(--neo-text); }
+
+.student-neo-grade-field select {
+  width: 100%;
+  min-height: 50px;
+  padding: 10px 12px;
+  border: 1px solid var(--neo-border);
+  border-radius: 15px;
+  background: var(--neo-surface-strong);
+  color: var(--neo-text);
+  font-family: inherit;
+  font-weight: 850;
+  outline: none;
+}
+
+.student-neo-grade-field select:focus {
+  border-color: var(--neo-gold);
+  box-shadow: 0 0 0 4px rgba(245,184,32,.12);
+}
+
+.student-neo-grade-field select:disabled { opacity: .68; cursor: not-allowed; }
+
+.student-neo-grade-field small {
+  color: var(--neo-muted);
+  font-size: 11.5px;
+  line-height: 1.75;
+  font-weight: 750;
+}
+
+.student-neo-grade-request-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(245,184,32,.34);
+  border-radius: 18px;
+  color: var(--neo-text);
+  background: rgba(245,184,32,.10);
+}
+
+.student-neo-grade-request-status svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--neo-gold);
+}
+
+.student-neo-grade-request-status strong,
+.student-neo-grade-request-status span { display: block; }
+
+.student-neo-grade-request-status strong {
+  margin-bottom: 4px;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.student-neo-grade-request-status span {
+  color: var(--neo-muted);
+  font-size: 12px;
+  line-height: 1.75;
+  font-weight: 750;
+}
+
+.student-neo-shell--light .student-neo-grade-field { background: rgba(255,255,255,.78); }
+.student-neo-shell--light .student-neo-grade-field select { background: #fff; }
