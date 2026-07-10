@@ -1,0 +1,26 @@
+.platform-logo {
+  --logo-bg: #fffaf2;
+  --logo-border: rgba(147, 74, 28, .22);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  background: var(--logo-bg);
+  border: 1px solid var(--logo-border);
+  box-shadow: 0 10px 30px rgba(96, 48, 20, .14);
+  overflow: hidden;
+  isolation: isolate;
+  color: #3b2115;
+}
+.platform-logo img { display:block; width:100%; height:100%; object-fit:contain; user-select:none; }
+.platform-logo--full { width: 176px; height: 68px; padding: 4px 8px; border-radius: 18px; }
+.platform-logo--mark { width: 58px; height: 58px; padding: 4px; border-radius: 18px; }
+.platform-logo--mark img { object-fit: cover; object-position: 50% 28%; transform: scale(1.52); }
+.platform-logo__label { display:flex; flex-direction:column; line-height:1.15; margin-inline-start:10px; white-space:nowrap; }
+.platform-logo__label strong { font-size:1rem; font-weight:950; }
+.platform-logo__label small { font-size:.68rem; font-weight:800; color:#8a4b28; }
+.platform-logo--sm.platform-logo--full { width: 136px; height: 52px; border-radius: 14px; }
+.platform-logo--sm.platform-logo--mark { width: 44px; height: 44px; border-radius: 14px; }
+.platform-logo--lg.platform-logo--full { width: min(330px, 82vw); height: 126px; padding: 8px 16px; border-radius: 28px; }
+.platform-logo--strong { box-shadow: 0 20px 55px rgba(134, 66, 28, .24), 0 0 0 5px rgba(255,250,242,.72); border-color: rgba(164,77,31,.34); }
+@media (max-width: 640px){ .platform-logo--full { width: 142px; height:56px; } .platform-logo--lg.platform-logo--full { width:min(280px,88vw); height:108px; } }

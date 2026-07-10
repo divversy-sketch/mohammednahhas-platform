@@ -25,6 +25,7 @@ import SecureVideoPlayer from '@features/video-security/player/SecureVideoPlayer
 import InteractiveViewer from '../../features/content/InteractiveViewer';
 import { WhatsAppContactButton } from '../../shared/core/platformShared.jsx';
 import '../../styles/pages/landing.css';
+import PlatformLogo from '../../shared/ui/PlatformLogo.jsx';
 
 const arabicLetters = ['أ', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي', 'لا', 'ة'];
 
@@ -76,15 +77,7 @@ function ThemeToggle({ theme, onToggle }) {
 }
 
 function NeoLogo() {
-  return (
-    <div className="neo-logo" aria-label="منصة النحاس">
-      <span className="neo-logo-mark">ن</span>
-      <span className="neo-logo-text">
-        <strong>منصة النحاس</strong>
-        <small>Arabic Learning OS</small>
-      </span>
-    </div>
-  );
+  return <PlatformLogo variant="full" size="sm" className="neo-logo-image" />;
 }
 
 function typeOfContent(item) {
@@ -115,7 +108,7 @@ const journey = [
 ];
 
 export const LandingPage = ({ onAuthClick, onRegisterClick, installPrompt }) => {
-  const [theme, setTheme] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('nahhas-public-theme') : null) || 'dark');
+  const [theme, setTheme] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('nahhas-public-theme') : null) || 'light');
   const [publicContent, setPublicContent] = useState([]);
   const [publicFiles, setPublicFiles] = useState([]);
   const [playingVideo, setPlayingVideo] = useState(null);
@@ -209,10 +202,11 @@ export const LandingPage = ({ onAuthClick, onRegisterClick, installPrompt }) => 
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, ease: 'easeOut' }}
           >
-            <span className="neo-pill"><Sparkles size={16} /> منصة عربي تعمل كمنتج 2026</span>
-            <h1>العربي بقى تجربة ذكية، مش صفحة طويلة بتتعلق في الهواء.</h1>
+            <PlatformLogo variant="full" size="lg" strong className="neo-hero-brand" />
+            <span className="neo-pill"><Sparkles size={16} /> تعلّم العربية بفهم أعمق وثقة أكبر</span>
+            <h1>العربية أوضح، والتعلّم أذكى، والنتيجة أقرب.</h1>
             <p>
-              منصة تعليمية حديثة تجعل دراسة اللغة العربية أوضح وأسهل وأقرب للطالب، من أول شرح القاعدة حتى التدريب والمراجعة بثقة.
+              تجربة تعليمية متكاملة تشرح اللغة العربية ببساطة، ثم تنقل الطالب إلى التدريب والمراجعة بخطوات واضحة، حتى يصل إلى الفهم والثقة والتميز.
             </p>
             <div className="neo-hero-actions">
               <button type="button" onClick={goRegister} className="neo-primary-button">

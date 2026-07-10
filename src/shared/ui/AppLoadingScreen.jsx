@@ -1,4 +1,5 @@
 import '../../styles/pages/app-loading.css';
+import PlatformLogo from './PlatformLogo.jsx';
 
 const loadingLetters = ['ن', 'ح', 'و', 'ص', 'ر', 'ف'];
 
@@ -45,7 +46,8 @@ export const AppLoadingScreen = ({
             <LoadingStudentMark />
           </div>
         </div>
-        <span className="nahhas-loading-kicker">منصة عربية ذكية</span>
+        <PlatformLogo variant="full" size="sm" strong className="nahhas-loading-brand" />
+        <span className="nahhas-loading-kicker">رحلة تعليمية أذكى في اللغة العربية</span>
         <h2>{title}</h2>
         <p>{finalMessage}</p>
         <div className="nahhas-loading-progress" aria-hidden="true"><span /></div>

@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import { Sparkles } from '../icons/lucide-shim.jsx';
 
 const getInitialTheme = () => {
-  if (typeof window === 'undefined') return 'dark';
+  if (typeof window === 'undefined') return 'light';
   const saved = window.localStorage?.getItem('nahhas-theme');
   if (saved === 'light' || saved === 'dark') return saved;
-  return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  return 'light';
 };
 
 export default function ThemeToggle({ compact = false }) {

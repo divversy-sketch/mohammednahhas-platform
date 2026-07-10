@@ -73,7 +73,7 @@ function AuthInput({ icon: Icon, ...props }) {
 
 export const AuthPage = ({ onBack, initialMode = 'login' }) => {
   const [isRegister, setIsRegister] = useState(() => initialMode === 'register');
-  const [theme, setTheme] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('nahhas-public-theme') : null) || 'dark');
+  const [theme, setTheme] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('nahhas-public-theme') : null) || 'light');
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({ email: '', password: '', name: '', grade: '1sec', phone: '', parentPhone: '' });
   const [platformSettings, setPlatformSettings] = useState({ registrationOpen: true, platformName: 'منصة النحاس التعليمية', welcomeMessage: '' });

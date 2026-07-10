@@ -3,6 +3,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '@services/firebase';
 import SmartHomeworkScanner from '@features/homework/SmartHomeworkScanner.jsx';
 import '@styles/pages/student-neo.css';
+import PlatformLogo from '../../../../shared/ui/PlatformLogo.jsx';
 
 const SecureVideoPlayer = lazy(() => import('@features/video-security/player/SecureVideoPlayer.jsx'));
 const InteractiveViewer = lazy(() => import('@features/content/InteractiveViewer'));
@@ -322,8 +323,8 @@ function Topbar({ ctx, theme, setTheme, currentTab, mobileOpen, setMobileOpen })
       <button className="student-neo-icon-btn student-neo-menu-btn" onClick={() => setMobileOpen(!mobileOpen)} aria-label="فتح القائمة">
         <Icon name={mobileOpen ? 'close' : 'menu'} />
       </button>
-      <div className="student-neo-topbar__title">
-        <span>منصة النحاس</span>
+      <div className="student-neo-topbar__title student-neo-topbar__title--brand">
+        <PlatformLogo variant="full" size="sm" strong />
         <h1>{tabLabel}</h1>
       </div>
       <div className="student-neo-topbar__actions">
@@ -350,12 +351,9 @@ function Sidebar({ ctx, active, setActive, open, setOpen }) {
   const grade = ctx.userData?.grade || 'الصف الدراسي';
   return (
     <aside className={`student-neo-sidebar ${open ? 'is-open' : ''}`}>
-      <div className="student-neo-brand">
-        <div className="student-neo-brand__mark">ن</div>
-        <div>
-          <span>منصة النحاس</span>
-          <strong>بوابة الطالب</strong>
-        </div>
+      <div className="student-neo-brand student-neo-brand--logo">
+        <PlatformLogo variant="full" size="sm" strong />
+        <strong>بوابة الطالب</strong>
       </div>
       <div className="student-neo-profile-card">
         <div className="student-neo-profile-card__art"><StudentStudyIllustration /></div>
