@@ -8,11 +8,6 @@ import '@styles/pages/admin-neo.css';
 const AdminDashboardTabs = lazy(() => import('@admin/parts/AdminDashboardTabs.jsx'));
 const AdminDashboardModals = lazy(() => import('@admin/parts/AdminDashboardModals.jsx'));
 
-function AdminArabicBackground() {
-  const letters = ['أ', 'د', 'م', 'ن', 'ن', 'ح', 'ا', 'س', 'ت', 'ع'];
-  return <div className="admin-neo-bg" aria-hidden="true">{letters.map((letter, index) => <span key={`${letter}-${index}`}>{letter}</span>)}</div>;
-}
-
 export const AdminDashboardShell = ({
   user,
   adminProfile,
@@ -32,7 +27,6 @@ export const AdminDashboardShell = ({
   return (
     <div className="admin-neo-shell" dir="rtl">
       <DebugPanel user={user} />
-      <AdminArabicBackground />
       <Suspense fallback={<AdminLazyFallback />}>
         <AdminDashboardModals ctx={dashboardContext} />
       </Suspense>
