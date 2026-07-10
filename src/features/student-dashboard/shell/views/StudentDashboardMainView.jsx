@@ -326,7 +326,7 @@ function Topbar({ ctx, theme, setTheme, currentTab, mobileOpen, setMobileOpen })
       <div className="student-neo-topbar__title">
         <img src={nahhasLogo} alt="منصة النحاس" className="student-neo-topbar__logo" />
         <div>
-          <span>منصة النحاس</span>
+          <span>بوابة الطالب</span>
           <h1>{tabLabel}</h1>
         </div>
       </div>
@@ -361,12 +361,30 @@ function Sidebar({ ctx, active, setActive, open, setOpen }) {
           <strong>بوابة الطالب</strong>
         </div>
       </div>
-      <div className="student-neo-profile-card">
-        <div className="student-neo-profile-card__art"><StudentStudyIllustration /></div>
-        <img src={nahhasLogo} alt="منصة النحاس" className="student-neo-profile-card__logo" />
-        <h2>{`أهلًا يا ${name}`}</h2>
-        <p>كمل بهدوء… كل درس تنجزه اليوم يقربك من النتيجة اللي تتمناها.</p>
-        <span>{grade}</span>
+      <div className="student-neo-profile-card student-neo-profile-card--welcome">
+        <div className="student-neo-profile-card__copy">
+          <span className="student-neo-profile-card__eyebrow">مساحة الطالب</span>
+          <h2>{`أهلًا يا ${name}`}</h2>
+          <p>كل ما تحتاجه أصبح أوضح وأقرب. اختر وجهتك السريعة وابدأ مباشرة.</p>
+          <span>{grade}</span>
+        </div>
+        <div className="student-neo-quick-links" aria-label="وصول سريع">
+          {[
+            { key: 'home', label: 'الرئيسية', icon: 'home' },
+            { key: 'lectures', label: 'التعلّم', icon: 'learn' },
+            { key: 'exams', label: 'الاختبارات', icon: 'exam' }
+          ].map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              className={active === item.key ? 'is-active' : ''}
+              onClick={() => { setActive(item.key); setOpen(false); }}
+            >
+              <Icon name={item.icon} size={18} />
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
       <nav className="student-neo-nav" aria-label="تنقل الطالب">
         {tabs.map((tab) => (
