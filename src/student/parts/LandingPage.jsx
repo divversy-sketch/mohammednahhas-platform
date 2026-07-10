@@ -26,7 +26,6 @@ import InteractiveViewer from '../../features/content/InteractiveViewer';
 import { WhatsAppContactButton } from '../../shared/core/platformShared.jsx';
 import '../../styles/pages/landing.css';
 import nahhasLogo from '../../assets/nahhas-logo-transparent.png';
-import AnimatedLogo from '../../shared/ui/AnimatedLogo.jsx';
 
 const arabicLetters = ['أ', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي', 'لا', 'ة'];
 
@@ -79,12 +78,10 @@ function ThemeToggle({ theme, onToggle }) {
 
 function NeoLogo({ large = false }) {
   return (
-    <AnimatedLogo
-      src={nahhasLogo}
-      alt="منصة النحاس"
-      wrapperClassName={`neo-logo ${large ? 'neo-logo--large' : ''}`}
-      imgClassName="neo-logo-image"
-    />
+    <div className={`neo-logo ${large ? 'neo-logo--large' : ''}`} aria-label="منصة النحاس">
+      <img src={nahhasLogo} alt="منصة النحاس" className="neo-logo-image" />
+      <span className="neo-sr-only">منصة النحاس</span>
+    </div>
   );
 }
 

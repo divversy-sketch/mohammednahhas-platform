@@ -4,7 +4,6 @@ import { auth } from '@services/firebase';
 import SmartHomeworkScanner from '@features/homework/SmartHomeworkScanner.jsx';
 import '@styles/pages/student-neo.css';
 import nahhasLogo from '@assets/nahhas-logo-transparent.png';
-import AnimatedLogo from '@shared/ui/AnimatedLogo.jsx';
 import { GradeOptions, getGradeLabel } from '@shared/constants/grades';
 
 const SecureVideoPlayer = lazy(() => import('@features/video-security/player/SecureVideoPlayer.jsx'));
@@ -326,7 +325,7 @@ function Topbar({ ctx, theme, setTheme, currentTab, mobileOpen, setMobileOpen })
         <Icon name={mobileOpen ? 'close' : 'menu'} />
       </button>
       <div className="student-neo-topbar__title">
-        <AnimatedLogo src={nahhasLogo} alt="منصة النحاس" wrapperClassName="student-neo-topbar__logo-wrap" imgClassName="student-neo-topbar__logo" />
+        <img src={nahhasLogo} alt="منصة النحاس" className="student-neo-topbar__logo" />
         <div>
           <span>بوابة الطالب</span>
           <h1>{tabLabel}</h1>
@@ -357,7 +356,7 @@ function Sidebar({ ctx, active, setActive, open, setOpen }) {
   return (
     <aside className={`student-neo-sidebar ${open ? 'is-open' : ''}`}>
       <div className="student-neo-brand">
-        <AnimatedLogo src={nahhasLogo} alt="منصة النحاس" wrapperClassName="student-neo-brand__logo-wrap" imgClassName="student-neo-brand__logo" />
+        <img src={nahhasLogo} alt="منصة النحاس" className="student-neo-brand__logo" />
         <div>
           <span>منصة النحاس</span>
           <strong>بوابة الطالب</strong>

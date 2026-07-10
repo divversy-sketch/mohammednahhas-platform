@@ -25,7 +25,6 @@ import { platformNotify, WhatsAppContactButton } from '../core/platformShared.js
 import '../../styles/pages/landing.css';
 import '../../styles/pages/auth.css';
 import nahhasLogo from '../../assets/nahhas-logo-transparent.png';
-import AnimatedLogo from '../ui/AnimatedLogo.jsx';
 
 const arabicLetters = ['أ', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'س', 'ش', 'ص', 'ض', 'ط', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي', 'لا'];
 
@@ -214,7 +213,7 @@ export const AuthPage = ({ onBack, initialMode = 'login' }) => {
           transition={{ duration: 0.65, ease: 'easeOut', delay: 0.08 }}
         >
           <div className="neo-auth-card-head">
-            <AnimatedLogo src={nahhasLogo} alt="منصة النحاس" wrapperClassName="neo-logo neo-logo--auth" imgClassName="neo-logo-image" />
+            <div className="neo-logo neo-logo--auth"><img src={nahhasLogo} alt="منصة النحاس" className="neo-logo-image" /></div>
             <div>
               <span>{platformSettings.platformName || (isRegister ? 'إنشاء حساب' : 'تسجيل الدخول')}</span>
               <h2>{isRegister ? 'حساب طالب جديد' : 'مرحبًا بعودتك'}</h2>
