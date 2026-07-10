@@ -30,6 +30,7 @@ export const detectBranchFromText = (text = '') => {
 export const stripQuestionPrefix = (line = '') => cleanImportedLine(line)
   .replace(/^س(?:ؤال)?\s*\d*\s*[:：\-.)،]?\s*/i, '')
   .replace(/^Q\s*\d*\s*[:：\-.)]?\s*/i, '')
+  .replace(/^(?:\d{1,3}|[١-٩][٠-٩]?)\s*[\).:：\-،]\s*/u, '')
   .trim();
 
 export const stripMetaWrapper = (line = '') => cleanImportedLine(line).replace(/^\[/, '').replace(/\]$/, '').trim();
@@ -42,7 +43,7 @@ export const parseMetaLine = (line = '') => {
 
 export const parseOptionLine = (line = '') => {
   const text = cleanImportedLine(line);
-  const match = text.match(/^([أابجدهـهوA-Da-d])\s*[\)\].\-:：،]\s*(.+)$/u);
+  const match = text.match(/^([أابجدهـهوA-Fa-f١-٦1-6])\s*[\)\].\-:：،]\s*(.+)$/u);
   if (!match) return null;
   const rawLabel = match[1].toUpperCase();
   const label = rawLabel === 'ا' ? 'أ' : rawLabel;
@@ -60,7 +61,25 @@ export const labelToIndex = (label = '') => {
   return Math.max(0, safeNumber(normalized, 1) - 1);
 };
 
-export const readPlainTextFile = async (file) => file.text();
+export const normalizeImportedTextLayout = (value = '') => String(value)
+  .replace(/\r\n?/g, '\n')
+  .replace(/[\u200e\u200f\u202a-\u202e]/g, '')
+  // بعض ملفات PDF تُرجع الصفحة كلها كسطر واحد؛ نعيد إنشاء فواصل من العلامات الشائعة.
+  .replace(/\s+(?=(?:س(?:ؤال)?\s*\d+|Q\s*\d+|\d{1,3}\s*[\).:\-،])\s+)/gi, '\n')
+  .replace(/\s+(?=(?:[أابجدهـهوA-Fa-f]|[١-٦1-6])\s*[\)\].:\-،]\s+)/gu, '\n')
+  .replace(/\s+(?=(?:الإجابة|الاجابة|الإجابه|الإجابة الصحيحة|answer|correct|شرح|التعليل)\s*[:：\-])/gi, '\n')
+  .replace(/\n{3,}/g, '\n\n')
+  .trim();
+
+export const readPlainTextFile = async (file) => {
+  const buffer = await file.arrayBuffer();
+  // TextDecoder يتعامل مع UTF-8 BOM بصورة سليمة، مع fallback للقراءة العادية.
+  try {
+    return normalizeImportedTextLayout(new TextDecoder('utf-8', { fatal: false }).decode(buffer));
+  } catch {
+    return normalizeImportedTextLayout(await file.text());
+  }
+};
 
 export const readPdfTextFile = async (file) => {
   const buffer = await file.arrayBuffer();
@@ -68,10 +87,40 @@ export const readPdfTextFile = async (file) => {
   const pages = [];
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
     const page = await pdf.getPage(pageNumber);
-    const content = await page.getTextContent();
-    pages.push(content.items.map((item) => item.str).join(' '));
+    const content = await page.getTextContent({ normalizeWhitespace: true });
+    const items = content.items
+      .filter((item) => cleanImportedLine(item.str))
+      .map((item) => ({
+        text: cleanImportedLine(item.str),
+        x: Number(item.transform?.[4] || 0),
+        y: Number(item.transform?.[5] || 0),
+        width: Number(item.width || 0),
+      }));
+
+    // تجميع الكلمات حسب موضعها الرأسي بدل دمج الصفحة كلها في سطر واحد.
+    const rows = [];
+    const tolerance = 3;
+    for (const item of items) {
+      let row = rows.find((candidate) => Math.abs(candidate.y - item.y) <= tolerance);
+      if (!row) {
+        row = { y: item.y, items: [] };
+        rows.push(row);
+      }
+      row.items.push(item);
+    }
+    rows.sort((a, b) => b.y - a.y);
+    const pageLines = rows.map((row) => {
+      // ترتيب مرن: PDF العربي قد يخزن العناصر بالعكس. نختار التجميع الذي يحافظ على العلامات بصورة أفضل.
+      const asc = [...row.items].sort((a, b) => a.x - b.x).map((item) => item.text).join(' ');
+      const desc = [...row.items].sort((a, b) => b.x - a.x).map((item) => item.text).join(' ');
+      const score = (text) => ((text.match(/^(?:س|سؤال|Q|\d+[\).:\-]|[أابجدA-D][\).:\-])/giu) || []).length * 3) + text.length;
+      return cleanImportedLine(score(desc) > score(asc) ? desc : asc);
+    }).filter(Boolean);
+    pages.push(pageLines.join('\n'));
   }
-  return pages.join('\n');
+  const text = normalizeImportedTextLayout(pages.join('\n'));
+  if (!text) throw new Error('ملف PDF لا يحتوي على نص قابل للقراءة. لو الملف صور ممسوحة ضوئيًا، حوّله إلى PDF نصي أو DOCX/TXT أولًا.');
+  return text;
 };
 
 export const xmlChildrenByLocalName = (node, name) => Array.from(node.getElementsByTagName('*')).filter((el) => el.localName === name);
@@ -175,7 +224,7 @@ export const parseQuestionBankLines = (lines, settings) => {
       return;
     }
 
-    const startsQuestion = /^(س(?:ؤال)?\s*\d*\s*[:：\-.)،]?|Q\s*\d*\s*[:：\-.)]?)/i.test(rawText);
+    const startsQuestion = /^(?:س(?:ؤال)?\s*\d*\s*[:：\-.)،]?|Q\s*\d*\s*[:：\-.)]?|(?:\d{1,3}|[١-٩][٠-٩]?)\s*[\).:：\-،]\s*\S)/i.test(rawText);
     const option = parseOptionLine(rawText);
 
     if (startsQuestion) {
@@ -204,7 +253,7 @@ export const parseQuestionBankLines = (lines, settings) => {
       return;
     }
 
-    const answerMatch = rawText.match(/^(الإجابة|الاجابة|الإجابه|answer|correct)\s*[:：]\s*(.+)$/i);
+    const answerMatch = rawText.match(/^(الإجابة(?:\s+الصحيحة)?|الاجابة(?:\s+الصحيحة)?|الإجابه|الحل|answer|correct)\s*[:：\-]\s*(.+)$/i);
     if (answerMatch) {
       const answerValue = answerMatch[2].replace(/\*/g, '').trim();
       const byLabel = labelToIndex(answerValue);
