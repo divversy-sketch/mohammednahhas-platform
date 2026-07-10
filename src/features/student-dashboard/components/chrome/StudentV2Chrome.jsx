@@ -94,7 +94,7 @@ export function StudentV2Sidebar({
       {/* ── Icon Sidebar (md → lg) ── */}
       <aside className="nh-icon-sidebar" aria-label="قائمة الأقسام">
         <div className="nh-icon-sidebar__logo">
-          <ModernLogo size={44} strong />
+          <ModernLogo size={32} />
         </div>
         <nav className="nh-icon-sidebar__nav">
           {NAV_GROUPS.filter(canShow).flatMap(g => g.items).map(item => {
@@ -122,7 +122,7 @@ export function StudentV2Sidebar({
       {/* ── Text Sidebar (lg+) ── */}
       <aside className="nh-text-sidebar" aria-label="قائمة الأقسام الكاملة">
         <div className="nh-text-sidebar__header">
-          <ModernLogo size={52} strong />
+          <ModernLogo size={28} />
           <div className="nh-text-sidebar__brand">
             <span className="nh-text-sidebar__name">منصة النحاس</span>
             <span className="nh-text-sidebar__sub">

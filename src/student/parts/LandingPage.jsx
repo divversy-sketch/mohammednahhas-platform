@@ -25,7 +25,7 @@ import SecureVideoPlayer from '@features/video-security/player/SecureVideoPlayer
 import InteractiveViewer from '../../features/content/InteractiveViewer';
 import { WhatsAppContactButton } from '../../shared/core/platformShared.jsx';
 import '../../styles/pages/landing.css';
-import PlatformLogo from '../../shared/ui/PlatformLogo.jsx';
+import nahhasLogo from '../../assets/nahhas-logo-transparent.png';
 
 const arabicLetters = ['أ', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي', 'لا', 'ة'];
 
@@ -76,8 +76,13 @@ function ThemeToggle({ theme, onToggle }) {
   );
 }
 
-function NeoLogo() {
-  return <PlatformLogo variant="full" size="sm" className="neo-logo-image" />;
+function NeoLogo({ large = false }) {
+  return (
+    <div className={`neo-logo ${large ? 'neo-logo--large' : ''}`} aria-label="منصة النحاس">
+      <img src={nahhasLogo} alt="منصة النحاس" className="neo-logo-image" />
+      <span className="neo-sr-only">منصة النحاس</span>
+    </div>
+  );
 }
 
 function typeOfContent(item) {
@@ -97,7 +102,7 @@ function formatGrade(value) {
 
 const featureCards = [
   { icon: BrainCircuit, title: 'مسار تعلم ذكي', text: 'الطالب لا يرى محتوى عشوائيًا؛ يرى رحلة واضحة من الشرح للتدريب ثم المراجعة.' },
-  { icon: Feather, title: 'لغة عربية أخف', text: 'النحو والبلاغة والقراءة تُعرض كأنها منتج رقمي حديث، لا سبورة متعبة.' },
+  { icon: Feather, title: 'لغة عربية أخف', text: 'النحو والبلاغة والقراءة تُقدَّم في تجربة تفاعلية حديثة، لا بطريقة تقليدية مُرهِقة.' },
   { icon: Target, title: 'تقدّم واضح للطالب', text: 'كل خطوة داخل المنصة تقرّب الطالب من فهم أعمق، ومذاكرة أهدأ، وثقة أكبر قبل الامتحان.' }
 ];
 
@@ -202,11 +207,13 @@ export const LandingPage = ({ onAuthClick, onRegisterClick, installPrompt }) => 
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, ease: 'easeOut' }}
           >
-            <PlatformLogo variant="full" size="lg" strong className="neo-hero-brand" />
-            <span className="neo-pill"><Sparkles size={16} /> تعلّم العربية بفهم أعمق وثقة أكبر</span>
+            <span className="neo-pill"><Sparkles size={16} /> منصة تعليمية حديثة للغة العربية</span>
+            <div className="neo-hero-brand">
+              <img src={nahhasLogo} alt="شعار منصة النحاس" className="neo-hero-brand__image" />
+            </div>
             <h1>العربية أوضح، والتعلّم أذكى، والنتيجة أقرب.</h1>
             <p>
-              تجربة تعليمية متكاملة تشرح اللغة العربية ببساطة، ثم تنقل الطالب إلى التدريب والمراجعة بخطوات واضحة، حتى يصل إلى الفهم والثقة والتميز.
+              منصة النحاس تمنح الطالب تجربة تعليمية واضحة ومنظمة، تبدأ من فهم القاعدة، ثم التطبيق العملي، ثم المراجعة الذكية بثقة وهدوء.
             </p>
             <div className="neo-hero-actions">
               <button type="button" onClick={goRegister} className="neo-primary-button">

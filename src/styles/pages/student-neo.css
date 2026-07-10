@@ -123,20 +123,15 @@
 .student-neo-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 
-.student-neo-brand__mark {
-  display: grid;
-  place-items: center;
-  width: 52px;
-  height: 52px;
-  border-radius: 19px;
-  color: #08111f;
-  font-size: 28px;
-  font-weight: 900;
-  background: linear-gradient(135deg, var(--neo-gold), var(--neo-gold-2));
-  box-shadow: 0 12px 34px rgba(245, 184, 32, .34);
+.student-neo-brand__logo {
+  width: min(100%, 168px);
+  height: auto;
+  display: block;
+  object-fit: contain;
+  filter: drop-shadow(0 12px 24px rgba(168, 91, 28, 0.14));
 }
 
 .student-neo-brand span,
@@ -184,6 +179,15 @@
   color: var(--neo-gold-2);
   font-size: 26px;
   font-weight: 900;
+}
+
+.student-neo-profile-card__logo {
+  width: min(100%, 176px);
+  height: auto;
+  display: block;
+  margin: 2px 0 6px;
+  object-fit: contain;
+  filter: drop-shadow(0 12px 24px rgba(168, 91, 28, 0.12));
 }
 
 .student-neo-profile-card p,
@@ -286,6 +290,22 @@
 
 .student-neo-topbar__title {
   margin-inline-end: 4px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.student-neo-topbar__title > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.student-neo-topbar__logo {
+  width: min(100%, 160px);
+  height: auto;
+  display: block;
+  object-fit: contain;
+  filter: drop-shadow(0 12px 22px rgba(168, 91, 28, 0.14));
 }
 
 .student-neo-topbar__title h1 {
@@ -1355,13 +1375,15 @@
   .student-neo-avatar { display: none; }
 }
 
-/* Platform logo stays visually identical in light and dark modes */
-.student-neo-brand--logo { flex-direction: column; align-items: stretch; gap: 8px; }
-.student-neo-brand--logo .platform-logo { width: 100%; max-width: 176px; }
-.student-neo-brand--logo > strong { color: var(--neo-text); padding-inline: 6px; }
-.student-neo-topbar__title--brand { display: flex; align-items: center; gap: 12px; }
-.student-neo-topbar__title--brand h1 { margin: 0; }
-@media (max-width: 700px) {
-  .student-neo-topbar__title--brand .platform-logo { width: 112px; height: 46px; }
-  .student-neo-topbar__title--brand h1 { display: none; }
+@media (max-width: 900px) {
+  .student-neo-topbar__logo { width: 132px; }
+  .student-neo-brand__logo { width: 150px; }
+  .student-neo-profile-card__logo { width: 148px; }
+}
+
+@media (max-width: 640px) {
+  .student-neo-topbar__title { gap: 10px; }
+  .student-neo-topbar__logo { width: 118px; }
+  .student-neo-brand__logo { width: 138px; }
+  .student-neo-profile-card__logo { width: 136px; }
 }
