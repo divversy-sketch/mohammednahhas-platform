@@ -6,6 +6,7 @@ import {
   BookOpen,
   BrainCircuit,
   CheckCircle,
+  GraduationCap,
   DownloadCloud,
   Facebook,
   Feather,
@@ -177,12 +178,18 @@ export const LandingPage = ({ onAuthClick, onRegisterClick, installPrompt }) => 
       <div className="neo-orb neo-orb-three" />
       <WhatsAppContactButton />
 
-      <header className="neo-public-nav">
-        <NeoLogo />
+      <header className="neo-public-nav neo-public-nav--refined">
+        <div className="neo-nav-brand">
+          <NeoLogo />
+          <div className="neo-nav-brand__copy">
+            <strong>منصة النحاس</strong>
+            <span>تعليم اللغة العربية بوضوح</span>
+          </div>
+        </div>
         <nav className="neo-nav-links" aria-label="روابط الصفحة الرئيسية">
-          <a href="#experience">التجربة</a>
-          <a href="#content">المحتوى المفتوح</a>
-          <a href="#journey">رحلة الطالب</a>
+          <a href="#experience">الرئيسية</a>
+          <a href="#journey">كيف تتعلم؟</a>
+          <a href="#content">محتوى مجاني</a>
         </nav>
         <div className="neo-nav-actions">
           {installPrompt && (
@@ -191,11 +198,11 @@ export const LandingPage = ({ onAuthClick, onRegisterClick, installPrompt }) => 
               <span>ثبّت المنصة</span>
             </button>
           )}
-          <button type="button" onClick={openFacebook} className="neo-icon-button" aria-label="Facebook">
+          <button type="button" onClick={openFacebook} className="neo-icon-button neo-social-button" aria-label="Facebook">
             <Facebook size={18} />
           </button>
           <ThemeToggle theme={theme} onToggle={() => setTheme((value) => value === 'dark' ? 'light' : 'dark')} />
-          <button type="button" onClick={goLogin} className="neo-ghost-button">دخول</button>
+          <button type="button" onClick={goLogin} className="neo-ghost-button">دخول الطالب</button>
         </div>
       </header>
 
@@ -207,27 +214,29 @@ export const LandingPage = ({ onAuthClick, onRegisterClick, installPrompt }) => 
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, ease: 'easeOut' }}
           >
-            <span className="neo-pill"><Sparkles size={16} /> منصة تعليمية حديثة للغة العربية</span>
-            <div className="neo-hero-brand">
-              <img src={nahhasLogo} alt="شعار منصة النحاس" className="neo-hero-brand__image" />
-            </div>
-            <h1>العربية أوضح، والتعلّم أذكى، والنتيجة أقرب.</h1>
+            <span className="neo-pill"><Sparkles size={16} /> مع أ/ محمد النحاس</span>
+            <h1>اتعلّم العربي بخطوات واضحة.<br /><em>افهم، طبّق، وراجع.</em></h1>
             <p>
-              منصة النحاس تمنح الطالب تجربة تعليمية واضحة ومنظمة، تبدأ من فهم القاعدة، ثم التطبيق العملي، ثم المراجعة الذكية بثقة وهدوء.
+              شرح منظم، تدريبات متدرجة، ومراجعات تساعدك تعرف مستواك وتتقدم بثبات من أول درس حتى الامتحان.
             </p>
+            <div className="neo-hero-points" aria-label="مميزات سريعة">
+              <span><CheckCircle size={17} /> شرح مبسط ومنظم</span>
+              <span><CheckCircle size={17} /> تدريبات بعد كل درس</span>
+              <span><CheckCircle size={17} /> متابعة واضحة للتقدم</span>
+            </div>
             <div className="neo-hero-actions">
               <button type="button" onClick={goRegister} className="neo-primary-button">
-                إنشاء حساب طالب
+                ابدأ الآن مجانًا
                 <ArrowLeft size={19} />
               </button>
               <button type="button" onClick={goLogin} className="neo-secondary-button">
-                تسجيل الدخول
+                لدي حساب بالفعل
               </button>
             </div>
-            <div className="neo-stat-strip">
-              <div><strong>{liveItems.length || '—'}</strong><span>عنصر مفتوح من ملفات ومحتوى المنصة</span></div>
-              <div><strong>{videos.length || '—'}</strong><span>فيديوهات يمكن تجربتها قبل الدخول</span></div>
-              <div><strong>{interactiveItems.length || '—'}</strong><span>تدريبات وأنشطة تفاعلية متاحة</span></div>
+            <div className="neo-stat-strip neo-stat-strip--compact">
+              <div><strong>{liveItems.length || '—'}</strong><span>محتوى مفتوح</span></div>
+              <div><strong>{videos.length || '—'}</strong><span>فيديوهات تجريبية</span></div>
+              <div><strong>{interactiveItems.length || '—'}</strong><span>أنشطة تفاعلية</span></div>
             </div>
           </motion.div>
 
@@ -239,8 +248,8 @@ export const LandingPage = ({ onAuthClick, onRegisterClick, installPrompt }) => 
           >
             <div className="neo-showcase-glow" />
             <div className="neo-showcase-topline">
-              <span><Radio size={16} /> Live Content</span>
-              <strong>من داخل المنصة</strong>
+              <span><Radio size={16} /> معاينة حقيقية</span>
+              <strong>جانب من تجربة الطالب</strong>
             </div>
             <div className="neo-device-frame">
               <div className="neo-device-bar"><i /><i /><i /></div>
@@ -283,6 +292,23 @@ export const LandingPage = ({ onAuthClick, onRegisterClick, installPrompt }) => 
           ))}
         </section>
 
+        <section className="neo-process-section" id="journey">
+          <div className="neo-section-heading neo-section-heading--stacked">
+            <span>طريقة تعلم بسيطة وواضحة</span>
+            <h2>ثلاث خطوات فقط تنظم رحلة الطالب</h2>
+            <p>بدل التنقل العشوائي بين الملفات والدروس، كل مرحلة تقود للمرحلة التالية بشكل مفهوم.</p>
+          </div>
+          <div className="neo-journey">
+            {journey.map(([step, title, text]) => (
+              <article key={step}>
+                <span>{step}</span>
+                <h3>{title}</h3>
+                <p>{text}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
         <section className="neo-public-content" id="content">
           <div className="neo-section-heading">
             <span>جرّب المنصة من الداخل</span>
@@ -295,14 +321,15 @@ export const LandingPage = ({ onAuthClick, onRegisterClick, installPrompt }) => 
           </div>
         </section>
 
-        <section className="neo-journey" id="journey">
-          {journey.map(([step, title, text]) => (
-            <article key={step}>
-              <span>{step}</span>
-              <h3>{title}</h3>
-              <p>{text}</p>
-            </article>
-          ))}
+        <section className="neo-final-cta">
+          <div>
+            <span><GraduationCap size={20} /> جاهز تبدأ؟</span>
+            <h2>ادخل المنصة وابدأ أول خطوة في مذاكرة منظمة.</h2>
+          </div>
+          <div className="neo-final-cta__actions">
+            <button type="button" onClick={goRegister} className="neo-primary-button">إنشاء حساب طالب <ArrowLeft size={19} /></button>
+            <button type="button" onClick={goLogin} className="neo-secondary-button">تسجيل الدخول</button>
+          </div>
         </section>
       </main>
     </div>
