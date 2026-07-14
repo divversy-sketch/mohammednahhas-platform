@@ -27,8 +27,11 @@ export const detectBranchFromText = (text = '') => {
 };
 
 const ARABIC_DIGITS = '٠١٢٣٤٥٦٧٨٩';
-const toWesternDigits = (value = '') => String(value).replace(/[٠-٩]/g, (d) => String(ARABIC_DIGITS.indexOf(d)));
-const QUESTION_START_RE = /^\s*(?:[-–—ـ•●▪◦*]\s*)?(?:س(?:ؤال)?\s*)?(?:[\[(（{]\s*)?(\d{1,4}|[٠-٩]{1,4})(?:\s*[\])）}])?\s*(?:[-–—ـ.:：،؛/\\]|\)|\]|）)?\s*(.*)$/iu;
+const PERSIAN_DIGITS = '۰۱۲۳۴۵۶۷۸۹';
+const toWesternDigits = (value = '') => String(value)
+  .replace(/[٠-٩]/g, (d) => String(ARABIC_DIGITS.indexOf(d)))
+  .replace(/[۰-۹]/g, (d) => String(PERSIAN_DIGITS.indexOf(d)));
+const QUESTION_START_RE = /^\s*(?:[-–—ـ•●▪◦*]\s*)?(?:س(?:ؤال)?\s*)?(?:[\[(（{]\s*)?(\d{1,4}|[٠-٩]{1,4}|[۰-۹]{1,4})(?:\s*[\])）}])?\s*(?:[-–—ـ.:：،؛/\\]|\)|\]|）)?\s*(.*)$/iu;
 
 // قاعدة حاسمة: أي سطر يبدأ برقم هو رأس سؤال جديد، حتى لو لم توجد مسافة
 // بعد الرقم أو كان الرقم محاطًا بنقطة/شرطة/قوس أو سبقه رمز تعداد.
@@ -40,9 +43,16 @@ export const parseQuestionStart = (line = '') => {
   if (!Number.isFinite(number)) return null;
   return { number, text: cleanImportedLine(match[2] || '') };
 };
-const OPTION_LABEL_TOKEN = '[أإآاA-Ha-hبجدهـهووزحط١-٨1-8]';
-const OPTION_START_RE = new RegExp(`^\\s*(?:[-–—ـ•●▪◦*]\\s*)?(?:[\\[(（{]\\s*)?(${OPTION_LABEL_TOKEN})(?:\\s*[\\])）}])?\\s*(?:[-–—ـ.:：،؛/\\\\]|\\)|\\]|）)?\\s+(.*)$`, 'u');
-const INLINE_OPTION_RE = new RegExp(`(^|\\s)(?:[\\[(（{]\\s*)?(${OPTION_LABEL_TOKEN})(?:\\s*[\\])）}])?\\s*(?:[-–—ـ.:：،؛/\\\\]|\\)|\\]|）)\\s*`, 'gu');
+const OPTION_LABEL_TOKEN = '[أإآاA-Ha-hبجدهـهوزحط١-٨1-8]';
+const OPTION_START_RE = new RegExp(`^\\s*(?:[-–—ـ•●▪◦*]\\s*)?(?:[\\[(（{]\\s*)?(${OPTION_LABEL_TOKEN})(?:\\s*[\\])）}])?\\s*(?:[-–—ـ.:：،؛/\\\\]|\\)|\\]|）)\\s*(.*)$`, 'u');
+
+// يلتقط الاختيارات حتى عندما تكون كلها داخل فقرة واحدة مثل:
+// السؤال ... أ-الأول ب-الثاني ج-الثالث د-الرابع
+// ولا يشترط مسافة قبل الحرف، لكنه يشترط علامة اختيار بعده حتى لا يقطع الكلمات العربية.
+const INLINE_OPTION_RE = new RegExp(
+  `(?:^|[\\s،؛|])(?:[-–—ـ•●▪◦*]\\s*)?(?:[\\[(（{]\\s*)?(${OPTION_LABEL_TOKEN})(?:\\s*[\\])）}])?\\s*(?:[-–—ـ.:：،؛/\\\\]|\\)|\\]|）)\\s*`,
+  'gu',
+);
 
 export const stripQuestionPrefix = (line = '') => {
   const cleaned = cleanImportedLine(line);
@@ -120,25 +130,65 @@ const runIsMarked = (run) => {
   return underline || highlight || shading;
 };
 
-const splitRichLine = ({ text, runs = [], ...meta }) => {
-  const boundaries = [];
-  let match;
-  INLINE_OPTION_RE.lastIndex = 0;
-  while ((match = INLINE_OPTION_RE.exec(text)) !== null) {
-    const start = match.index + match[1].length;
-    if (start === 0 || start > 1) boundaries.push(start);
-  }
-  if (boundaries.length < 2) return [{ text: cleanImportedLine(text), runs, ...meta }];
-  const starts = [0, ...boundaries.filter((n) => n > 0)].sort((a, b) => a - b).filter((n, i, arr) => i === 0 || n !== arr[i - 1]);
-  const markedChars = [];
+const buildMarkedRanges = (runs = []) => {
+  const ranges = [];
   let cursor = 0;
-  runs.forEach((run) => { const end = cursor + run.text.length; if (run.marked) markedChars.push([cursor, end]); cursor = end; });
-  return starts.map((start, i) => {
-    const end = starts[i + 1] ?? text.length;
-    const segment = cleanImportedLine(text.slice(start, end));
-    const overlap = markedChars.reduce((sum, [a, b]) => sum + Math.max(0, Math.min(end, b) - Math.max(start, a)), 0);
-    return { text: segment, highlighted: segment.length > 0 && overlap / Math.max(1, end - start) >= 0.35, underlined: segment.length > 0 && overlap / Math.max(1, end - start) >= 0.35, ...meta };
-  }).filter((line) => line.text);
+  runs.forEach((run) => {
+    const start = cursor;
+    const end = start + String(run.text || '').length;
+    if (run.marked && end > start) ranges.push([start, end]);
+    cursor = end;
+  });
+  return ranges;
+};
+
+const segmentMarkRatio = (start, end, ranges = []) => {
+  const length = Math.max(1, end - start);
+  const overlap = ranges.reduce((sum, [a, b]) => sum + Math.max(0, Math.min(end, b) - Math.max(start, a)), 0);
+  return overlap / length;
+};
+
+const splitRichLine = ({ text, runs = [], ...meta }) => {
+  const source = String(text || '').replace(/[\u200e\u200f\u202a-\u202e]/g, '');
+  const matches = [];
+  INLINE_OPTION_RE.lastIndex = 0;
+  let match;
+  while ((match = INLINE_OPTION_RE.exec(source)) !== null) {
+    // بداية العلامة بعد المسافة/الفاصل الذي التقطه التعبير.
+    const whole = match[0];
+    const leading = whole.match(/^[\s،؛|]*/u)?.[0]?.length || 0;
+    const start = match.index + leading;
+    matches.push({ start, label: match[1], markerEnd: INLINE_OPTION_RE.lastIndex });
+    if (match[0].length === 0) INLINE_OPTION_RE.lastIndex += 1;
+  }
+
+  // لا نفصل الفقرة إلا إذا وجدنا اختيارين على الأقل، أو وجدنا اختيارًا بعد رأس سؤال رقمي.
+  const hasQuestionPrefix = Boolean(parseQuestionStart(source));
+  if (matches.length < 2 && !(hasQuestionPrefix && matches.length >= 1)) {
+    return [{ text: cleanImportedLine(source), runs, ...meta }];
+  }
+
+  const markedRanges = buildMarkedRanges(runs);
+  const segments = [];
+  const firstOptionStart = matches[0]?.start ?? source.length;
+  const questionPart = cleanImportedLine(source.slice(0, firstOptionStart));
+  if (questionPart) segments.push({ text: questionPart, highlighted: false, underlined: false, ...meta });
+
+  matches.forEach((entry, index) => {
+    const end = matches[index + 1]?.start ?? source.length;
+    const rawSegment = source.slice(entry.start, end);
+    const cleanedSegment = cleanImportedLine(rawSegment);
+    if (!cleanedSegment) return;
+    const ratio = segmentMarkRatio(entry.start, end, markedRanges);
+    segments.push({
+      text: cleanedSegment,
+      highlighted: ratio >= 0.12,
+      underlined: ratio >= 0.12,
+      ...meta,
+    });
+  });
+
+  return segments.length ? segments : [{ text: cleanImportedLine(source), runs, ...meta }];
 };
 
 export const readDocxParagraphs = async (file) => {
