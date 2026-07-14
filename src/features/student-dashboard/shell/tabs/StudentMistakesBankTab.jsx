@@ -38,7 +38,7 @@ const LazyPanel = ({ children }) => (
 
 function StudentPracticeBuilder({ userData, setActiveExam }) {
   const [questions, setQuestions] = useState([]);
-  const [form, setForm] = useState({ branch: '', topic: '', difficulty: '', count: 10 });
+  const [form, setForm] = useState({ branch: '', topic: '', difficulty: '', count: 10, search: '' });
   const grade = userData?.grade || '3sec';
   useEffect(() => {
     const q = query(collection(db, 'question_bank'), where('grade', '==', grade), limit(1000));
@@ -46,7 +46,15 @@ function StudentPracticeBuilder({ userData, setActiveExam }) {
   }, [grade]);
   const branches = useMemo(() => Array.from(new Set(questions.map((q) => q.branch).filter(Boolean))).sort(), [questions]);
   const topics = useMemo(() => Array.from(new Set(questions.filter((q) => !form.branch || q.branch === form.branch).map((q) => q.topic || q.lesson).filter(Boolean))).sort((a,b)=>String(a).localeCompare(String(b),'ar')), [questions, form.branch]);
-  const pool = useMemo(() => questions.filter((q) => (!form.branch || q.branch === form.branch) && (!form.topic || (q.topic || q.lesson) === form.topic) && (!form.difficulty || q.difficulty === form.difficulty)), [questions, form]);
+  const normalizeSearch = (value = '') => String(value).replace(/[إأآا]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[ًٌٍَُِّْـ]/g,'').replace(/\s+/g,' ').trim().toLowerCase();
+  const pool = useMemo(() => {
+    const wanted = normalizeSearch(form.search);
+    return questions.filter((q) => {
+      const topic = q.topic || q.lesson || q.sourceHeading || 'عام';
+      const searchable = normalizeSearch([topic, q.sourceHeading, q.questionStem, q.text, q.branch, ...(q.tags || [])].filter(Boolean).join(' '));
+      return (!form.branch || q.branch === form.branch) && (!form.topic || topic === form.topic) && (!form.difficulty || q.difficulty === form.difficulty) && (!wanted || searchable.includes(wanted));
+    });
+  }, [questions, form]);
   const startPractice = () => {
     if (!pool.length) return platformNotify('لا توجد أسئلة مطابقة لهذا الجزء حاليًا.');
     const picked = [...pool].sort(() => Math.random() - 0.5).slice(0, Math.min(Number(form.count) || 10, pool.length));
@@ -78,7 +86,7 @@ function StudentPracticeBuilder({ userData, setActiveExam }) {
   };
   return <section className="rounded-3xl border border-indigo-100 bg-gradient-to-l from-indigo-50 via-white to-white p-5 shadow-sm">
     <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between"><div><p className="text-xs font-black text-indigo-600">اختبار على الجزء الذي تختاره</p><h3 className="text-xl font-black text-slate-900">أنشئ تدريبك الذكي بنفسك</h3><p className="mt-1 text-sm font-bold text-slate-500">اختر مثلًا: البلاغة ← التشبيه، والمنصة تسحب لك أسئلة عشوائية مناسبة فورًا.</p></div><div className="rounded-2xl bg-indigo-600 px-4 py-3 text-center text-white"><p className="text-2xl font-black">{pool.length}</p><p className="text-xs font-bold">سؤال متاح</p></div></div>
-    <div className="grid gap-3 md:grid-cols-4">
+    <div className="mb-3"><input className="w-full rounded-xl border bg-white p-3 font-black" placeholder="اكتب اسم الدرس أو رأس الأسئلة مثل: التشبيه، المنادى، اسم التفضيل" value={form.search} onChange={(e)=>setForm({...form,search:e.target.value,topic:''})}/><p className="mt-1 text-xs font-bold text-slate-500">البحث يقرأ عنوان الدرس، رأس مجموعة الأسئلة، نص السؤال والوسوم، ثم يحوّل النتائج مباشرة إلى امتحان.</p></div><div className="grid gap-3 md:grid-cols-4">
       <select className="rounded-xl border bg-white p-3 font-black" value={form.branch} onChange={(e)=>setForm({...form,branch:e.target.value,topic:''})}><option value="">كل الفروع</option>{branches.map((b)=><option key={b}>{b}</option>)}</select>
       <select className="rounded-xl border bg-white p-3 font-black" value={form.topic} onChange={(e)=>setForm({...form,topic:e.target.value})}><option value="">كل الدروس</option>{topics.map((t)=><option key={t}>{t}</option>)}</select>
       <select className="rounded-xl border bg-white p-3 font-black" value={form.difficulty} onChange={(e)=>setForm({...form,difficulty:e.target.value})}><option value="">كل المستويات</option><option value="easy">سهل</option><option value="medium">متوسط</option><option value="hard">صعب</option></select>

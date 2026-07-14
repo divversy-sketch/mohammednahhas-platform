@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { addDoc, collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { AlertTriangle, BarChart3, BookOpen, CheckCircle, FileCheck, FileText, Filter, Layers, PenTool, PlusCircle, Search, Sparkles, Trash2, UploadCloud } from '@shared/icons/lucide-shim.jsx';
 import { db } from '@services/firebase';
 import { GradeOptions, getGradeLabel } from '@shared/constants/grades';
@@ -59,6 +59,7 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
   const [importSettings, setImportSettings] = useState({ grade: adminGradeFilter === 'all' ? '3sec' : adminGradeFilter, branchMode: 'auto', branch: 'النحو', difficulty: 'medium', tags: 'استيراد' });
   const [importPreview, setImportPreview] = useState([]);
   const [importWarnings, setImportWarnings] = useState([]);
+  const [importRejected, setImportRejected] = useState([]);
   const [importBusy, setImportBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [page, setPage] = useState(1);
@@ -94,7 +95,7 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
   }), [questions]);
 
   const processFile = async (file) => {
-    setImportBusy(true); setImportPreview([]); setImportWarnings([]);
+    setImportBusy(true); setImportPreview([]); setImportWarnings([]); setImportRejected([]);
     try {
       const lower = file.name.toLowerCase(); let parsedQuestions = []; let lines = [];
       if (lower.endsWith('.txt')) lines = (await readPlainTextFile(file)).split(/\r?\n/).map((text) => ({ text, highlighted: false }));
@@ -110,9 +111,9 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
       } else throw new Error('الصيغة غير مدعومة حاليًا. استخدم TXT أو DOCX أو PDF نصي أو CSV أو JSON أو HTML.');
       if (!parsedQuestions.length && lines.length) {
         const parsed = parseQuestionBankLines(lines, { ...importSettings, tags: importSettings.tags.split(',').map((t) => t.trim()).filter(Boolean) });
-        parsedQuestions = parsed.questions; setImportWarnings((prev) => [...prev, ...parsed.warnings]);
+        parsedQuestions = parsed.questions; setImportWarnings((prev) => [...prev, ...parsed.warnings]); setImportRejected(parsed.rejected || []);
       }
-      if (!parsedQuestions.length) throw new Error('تم فتح الملف لكن لم أجد أسئلة قابلة للتعرّف. استخدم ترقيمًا مثل 1- ثم ضع كل اختيار في سطر منفصل.');
+      if (!parsedQuestions.length) throw new Error('تم فتح الملف لكن لم أجد أسئلة قابلة للتعرّف. نزّل ملف الأسطر غير المقروءة وعدّله ثم أعد رفعه.');
       setImportPreview(parsedQuestions); setActiveTab('import'); platformNotify(`تم اكتشاف ${parsedQuestions.length} سؤال`);
     } catch (error) { console.error(error); platformNotify(error?.message || 'تعذر قراءة الملف'); }
     finally { setImportBusy(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
@@ -127,7 +128,7 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
     try {
       let batch = writeBatch(db); let counter = 0;
       for (const q of importPreview) { batch.set(doc(collection(db, 'question_bank')), { ...q, createdAt: serverTimestamp(), importedAt: serverTimestamp() }); counter += 1; if (counter % 400 === 0) { await batch.commit(); batch = writeBatch(db); } }
-      if (counter % 400 !== 0) await batch.commit(); setImportPreview([]); setImportWarnings([]); platformNotify('تم حفظ الأسئلة المستوردة بنجاح'); setActiveTab('browse');
+      if (counter % 400 !== 0) await batch.commit(); setImportPreview([]); setImportWarnings([]); setImportRejected([]); platformNotify('تم حفظ الأسئلة المستوردة بنجاح'); setActiveTab('browse');
     } catch (error) { platformNotify('تعذر حفظ الأسئلة: ' + (error?.message || 'خطأ غير معروف')); }
   };
 
@@ -142,6 +143,50 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
   const removeQuestion = async (question) => {
     if (!(await platformConfirm(`حذف السؤال: ${question.text.slice(0, 60)}؟`))) return;
     try { await deleteDoc(doc(db, 'question_bank', question.id)); platformNotify('تم حذف السؤال'); } catch (error) { platformNotify('تعذر حذف السؤال: ' + (error?.message || '')); }
+  };
+
+
+  const downloadRejectedQuestions = () => {
+    if (!importRejected.length) return platformNotify('لا توجد أسئلة غير مقروءة لتصديرها');
+    const body = importRejected.map((item, index) => [
+      `السؤال غير المقروء رقم ${index + 1}`,
+      `السبب: ${item.reason || 'تنسيق غير معروف'}`,
+      `رأس القسم: ${item.heading || 'غير محدد'}`,
+      item.question ? `نص السؤال: ${item.question}` : '',
+      Array.isArray(item.options) && item.options.length ? `الاختيارات:
+${item.options.map((option, i) => `${i + 1}- ${option}`).join('\n')}` : '',
+      Array.isArray(item.raw) && item.raw.length ? `النص الأصلي:
+${item.raw.join('\n')}` : '',
+      'صيغة مقترحة بعد التعديل:',
+      '1- اكتب نص السؤال هنا',
+      'أ- الاختيار الأول',
+      'ب- الاختيار الثاني',
+      'ج- الاختيار الثالث',
+      'د- الاختيار الرابع',
+      'الإجابة: أ',
+      '----------------------------------------',
+    ].filter(Boolean).join('\n')).join('\n\n');
+    const blob = new Blob([`تقرير الأسئلة التي تحتاج تعديلًا\n\n${body}`], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url; anchor.download = `questions-needing-review-${Date.now()}.txt`;
+    document.body.appendChild(anchor); anchor.click(); anchor.remove(); URL.revokeObjectURL(url);
+  };
+
+  const deleteAllQuestions = async () => {
+    if (!(await platformConfirm('سيتم حذف كل أسئلة بنك الأسئلة نهائيًا، وليس الصفحة الحالية فقط. هل أنت متأكد؟'))) return;
+    if (!(await platformConfirm('تأكيد أخير: لا يمكن التراجع بعد حذف جميع الأسئلة.'))) return;
+    try {
+      let deleted = 0;
+      while (true) {
+        const snap = await getDocs(query(collection(db, 'question_bank'), limit(400)));
+        if (snap.empty) break;
+        const batch = writeBatch(db);
+        snap.docs.forEach((item) => batch.delete(item.ref));
+        await batch.commit(); deleted += snap.size;
+      }
+      platformNotify(`تم حذف ${deleted} سؤال من بنك الأسئلة`);
+    } catch (error) { platformNotify('تعذر حذف كل الأسئلة: ' + (error?.message || 'خطأ غير معروف')); }
   };
 
   const createExamFromBank = async () => {
@@ -161,7 +206,7 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
       <div className="border-b border-slate-200 bg-gradient-to-l from-indigo-50 via-white to-white p-5 dark:border-slate-700 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div><div className="mb-2 flex items-center gap-2 text-xs font-black text-indigo-600 dark:text-indigo-300"><Sparkles className="h-4 w-4"/> QUESTION BANK V2</div><h2 className="flex items-center gap-2 text-2xl font-black"><Layers/> بنك الأسئلة الذكي</h2><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">إدارة، تصنيف، استيراد ومراجعة الأسئلة من مكان واحد.</p></div>
-          <div className="flex flex-wrap gap-2"><button onClick={() => setActiveTab('import')} className="rounded-xl bg-indigo-600 px-4 py-3 font-bold text-white hover:bg-indigo-700"><UploadCloud className="ml-2 inline h-5 w-5"/> استيراد ملف</button><button onClick={() => setActiveTab('manual')} className="rounded-xl border border-slate-200 bg-white px-4 py-3 font-bold dark:border-slate-700 dark:bg-slate-800"><PlusCircle className="ml-2 inline h-5 w-5"/> سؤال جديد</button></div>
+          <div className="flex flex-wrap gap-2"><button onClick={deleteAllQuestions} className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 font-bold text-red-700 hover:bg-red-100"><Trash2 className="ml-2 inline h-5 w-5"/> حذف كل الأسئلة</button><button onClick={() => setActiveTab('import')} className="rounded-xl bg-indigo-600 px-4 py-3 font-bold text-white hover:bg-indigo-700"><UploadCloud className="ml-2 inline h-5 w-5"/> استيراد ملف</button><button onClick={() => setActiveTab('manual')} className="rounded-xl border border-slate-200 bg-white px-4 py-3 font-bold dark:border-slate-700 dark:bg-slate-800"><PlusCircle className="ml-2 inline h-5 w-5"/> سؤال جديد</button></div>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3 p-4 md:grid-cols-4">
