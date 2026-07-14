@@ -71,7 +71,7 @@ function McqAnswerOptions({ question, answer, isSubmitted, onAnswer }) {
   return (
     <div className="space-y-4">
       {(Array.isArray(question.options) ? question.options : []).map((option, idx) => {
-        let optionClass = 'border-slate-200 hover:bg-slate-50 bg-white text-slate-700';
+        let optionClass = 'border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/60 bg-white text-slate-800';
         const isSelected = answer === idx;
 
         if (isSubmitted) {
@@ -79,12 +79,13 @@ function McqAnswerOptions({ question, answer, isSubmitted, onAnswer }) {
           else if (isSelected) optionClass = 'border-red-500 bg-red-50 text-red-900 shadow-md';
           else optionClass = 'border-slate-200 bg-slate-50 opacity-50';
         } else if (isSelected) {
-          optionClass = 'border-amber-500 bg-amber-50 text-amber-900 shadow-md transform scale-[1.02] ring-2 ring-amber-200';
+          optionClass = 'border-indigo-500 bg-gradient-to-l from-indigo-50 to-violet-50 text-indigo-950 shadow-md shadow-indigo-100 ring-2 ring-indigo-100';
         }
 
         return (
-          <div key={idx} onClick={() => onAnswer(question.id, idx)} className={`p-5 rounded-2xl border-2 cursor-pointer transition-all duration-200 flex items-center gap-4 ${optionClass}`}>
-            <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${isSelected || (isSubmitted && idx === question.correctIdx) ? 'border-transparent bg-current' : 'border-slate-300'}`}>
+          <div key={idx} onClick={() => onAnswer(question.id, idx)} className={`group p-4 md:p-5 rounded-2xl border cursor-pointer transition-all duration-200 flex items-center gap-4 ${optionClass}`}>
+            <div className={`w-10 h-10 rounded-full border-2 font-black text-base flex items-center justify-center shrink-0 transition-colors ${isSelected || (isSubmitted && idx === question.correctIdx) ? 'border-transparent bg-current' : 'border-slate-300'}`}>
+              {!isSubmitted && <span>{['أ','ب','ج','د','هـ','و'][idx] || idx + 1}</span>}
               {(isSubmitted && idx === question.correctIdx) && <Check size={16} className="text-white" />}
               {(isSubmitted && isSelected && idx !== question.correctIdx) && <X size={16} className="text-white" />}
             </div>
@@ -118,18 +119,18 @@ export default function ExamQuestionPanel({
   const questionNumber = flatQuestions.findIndex((origQ) => origQ.id === question.id) + 1;
   const hasBlockText = question?.blockText && question.blockText.trim().length > 0;
   return (
-    <div className={`flex-1 flex flex-col ${hasBlockText ? 'md:flex-row' : 'items-center'} h-full overflow-hidden bg-slate-100 w-full p-4 md:p-8 gap-6`}>
+    <div className={`flex-1 flex flex-col ${hasBlockText ? 'lg:flex-row' : 'items-center'} min-h-0 overflow-y-auto bg-transparent w-full p-3 md:p-6 lg:p-8 gap-6`}>
       {hasBlockText && (
-        <div className="flex-1 w-full bg-white p-6 md:p-10 overflow-y-auto rounded-3xl shadow-sm border border-slate-200">
+        <div className="flex-1 w-full bg-white/95 p-6 md:p-10 overflow-y-auto rounded-[28px] shadow-[0_18px_60px_rgba(15,23,42,0.08)] border border-slate-200/80">
           <h3 className="font-bold text-blue-900 mb-6 flex items-center gap-2 text-xl border-b border-blue-100 pb-4 font-['Cairo']"><FileText size={24} /> نص المراجعة / القراءة:</h3>
           <div className="leading-loose text-lg md:text-xl font-bold text-slate-700 font-['Cairo']">{renderBracketHighlightedText(question.blockText)}</div>
         </div>
       )}
 
-      <div className={`${hasBlockText ? 'flex-1' : 'w-full max-w-4xl mx-auto'} bg-white p-6 md:p-10 overflow-y-auto flex flex-col shadow-xl rounded-3xl h-full border border-slate-200 relative`}>
-        <div className="flex justify-between items-center mb-8 border-b border-slate-100 pb-6">
+      <div className={`${hasBlockText ? 'flex-1' : 'w-full max-w-5xl mx-auto'} bg-white/95 p-5 md:p-8 lg:p-10 overflow-y-auto flex flex-col shadow-[0_20px_70px_rgba(15,23,42,0.09)] rounded-[28px] min-h-full border border-slate-200/80 relative`}>
+        <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-5">
           <div className="flex items-center gap-3">
-            <span className="bg-slate-900 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-md font-['Cairo']">سؤال {questionNumber}</span>
+            <span className="bg-gradient-to-br from-indigo-500 to-violet-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md font-['Cairo']">سؤال {questionNumber}</span>
             {question.branch && question.branch !== 'عام' && (
               <span className="bg-blue-50 text-blue-700 px-4 py-2 rounded-xl text-sm font-bold border border-blue-100 flex items-center gap-2"><Layers size={16} /> {question.branch}</span>
             )}
@@ -144,8 +145,8 @@ export default function ExamQuestionPanel({
           )}
         </div>
 
-        <div className="bg-slate-50 p-6 md:p-8 rounded-2xl border border-slate-200 mb-8 shadow-inner text-center">
-          <h3 className="text-2xl md:text-3xl font-bold text-slate-900 leading-loose font-['Cairo'] drop-shadow-sm">
+        <div className="bg-gradient-to-l from-slate-50 to-indigo-50/60 p-6 md:p-8 rounded-2xl border border-slate-200 mb-7 text-right">
+          <h3 className="text-xl md:text-2xl lg:text-3xl font-black text-slate-950 leading-[2] font-['Cairo'] drop-shadow-sm">
             {String(question.text || '').split('|').map((part, i, arr) => (
               <React.Fragment key={i}>
                 {renderBracketHighlightedText(part.trim())}
@@ -184,9 +185,9 @@ export default function ExamQuestionPanel({
           </div>
         )}
 
-        <div className="mt-auto pt-10 flex justify-between">
-          <button disabled={currentQIndex === 0} onClick={onPrevious} className="px-8 py-4 rounded-xl bg-slate-200 text-slate-700 font-bold disabled:opacity-50 hover:bg-slate-300 transition shadow-sm font-['Cairo'] flex items-center gap-2"><ChevronRight size={20} /> السابق</button>
-          <button disabled={currentQIndex === displayQuestions.length - 1} onClick={onNext} className="px-8 py-4 rounded-xl bg-slate-900 text-white font-bold disabled:opacity-50 hover:bg-slate-800 transition shadow-lg font-['Cairo'] flex items-center gap-2">التالي <ChevronRight size={20} className="rotate-180" /></button>
+        <div className="mt-auto pt-8 flex items-center justify-between gap-3">
+          <button disabled={currentQIndex === 0} onClick={onPrevious} className="px-5 md:px-8 py-3.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold disabled:opacity-50 hover:bg-slate-300 transition shadow-sm font-['Cairo'] flex items-center gap-2"><ChevronRight size={20} /> السابق</button>
+          <button disabled={currentQIndex === displayQuestions.length - 1} onClick={onNext} className="px-5 md:px-8 py-3.5 rounded-xl bg-gradient-to-l from-indigo-600 to-violet-600 text-white font-bold disabled:opacity-50 hover:bg-slate-800 transition shadow-lg font-['Cairo'] flex items-center gap-2">التالي <ChevronRight size={20} className="rotate-180" /></button>
         </div>
       </div>
     </div>
