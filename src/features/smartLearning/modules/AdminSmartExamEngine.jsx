@@ -49,8 +49,9 @@ import { buildWeaknessMap } from './buildWeaknessMap.jsx';
 
 export function AdminSmartExamEngine({ adminGradeFilter = 'all', exams = [], examResults = [], userData }) {
   const [questions, setQuestions] = useState([]);
+  const [previewPage, setPreviewPage] = useState(1);
   const [form, setForm] = useState({ grade: adminGradeFilter === 'all' ? '3sec' : adminGradeFilter, branch: '', topics: '', difficulty: '', count: 20, duration: 40, title: '', mode: 'filters', shuffleOptions: true, publishDays: 7, accessCode: '' });
-  useEffect(() => onSnapshot(query(collection(db, 'question_bank'), orderBy('createdAt', 'desc'), limit(300)), (snap) => setQuestions(snap.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setQuestions([])), []);
+  useEffect(() => onSnapshot(query(collection(db, 'question_bank'), orderBy('createdAt', 'desc'), limit(1500)), (snap) => setQuestions(snap.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setQuestions([])), []);
   const weaknessMap = useMemo(() => buildWeaknessMap({ exams, examResults }), [exams, examResults]);
   const topics = useMemo(() => Array.from(new Set(questions.map(topicOf))).filter(Boolean).sort(), [questions]);
   const selectedTopics = form.topics.split(',').map(clean).filter(Boolean);
@@ -68,6 +69,10 @@ export function AdminSmartExamEngine({ adminGradeFilter = 'all', exams = [], exa
       : pool;
     return pickRandom(base.length ? base : pool, Math.min(Number(form.count) || 20, base.length || pool.length));
   }, [pool, form.mode, form.count, recommendedTopics.join('|')]);
+  const previewPageSize = 10;
+  const previewPages = Math.max(1, Math.ceil(generatedPreview.length / previewPageSize));
+  const previewItems = generatedPreview.slice((previewPage - 1) * previewPageSize, previewPage * previewPageSize);
+  useEffect(() => { setPreviewPage(1); }, [form.grade, form.branch, form.topics, form.difficulty, form.mode, form.count]);
 
   const createSmartExam = async () => {
     if (!generatedPreview.length) return platformNotify('لا توجد أسئلة مطابقة للاختيارات الحالية');
@@ -144,8 +149,9 @@ export function AdminSmartExamEngine({ adminGradeFilter = 'all', exams = [], exa
       <button onClick={createSmartExam} className="bg-purple-700 text-white px-6 py-3 rounded-2xl font-black flex items-center gap-2"><Sparkles/> إنشاء الامتحان الآن</button>
     </section>
     <section className="bg-white rounded-3xl border p-5">
-      <h3 className="font-black text-lg mb-3">معاينة الأسئلة المختارة</h3>
-      <div className="space-y-2 max-h-96 overflow-auto">{generatedPreview.map((q, i) => <div key={q.id} className="border rounded-2xl p-3"><p className="font-black">{i+1}. {q.text}</p><p className="text-xs text-slate-500 mt-1">{branchOf(q)} / {topicOf(q)} / {q.difficulty || 'medium'}</p></div>)}</div>
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-black text-lg">معاينة الأسئلة المختارة</h3><p className="text-sm font-bold text-slate-500">عرض منظم على صفحات، مع توضيح الإجابة الصحيحة قبل نشر الامتحان.</p></div><span className="rounded-full bg-purple-50 px-3 py-2 text-xs font-black text-purple-700">{generatedPreview.length} سؤالًا</span></div>
+      <div className="divide-y overflow-hidden rounded-2xl border">{previewItems.map((q, i) => <div key={q.id} className="p-4"><p className="font-black leading-7">{(previewPage-1)*previewPageSize+i+1}. {q.text}</p><p className="mt-1 text-xs font-bold text-slate-500">{branchOf(q)} / {topicOf(q)} / {q.difficulty || 'medium'}</p>{Array.isArray(q.options)&&q.options.length>0&&<p className="mt-2 text-sm text-emerald-700">الإجابة الصحيحة: <span className="font-black underline decoration-2 underline-offset-4">{q.options[Number(q.correctIdx??0)]||'—'}</span></p>}</div>)}</div>
+      {generatedPreview.length>previewPageSize&&<div className="mt-4 flex items-center justify-center gap-3"><button disabled={previewPage<=1} onClick={()=>setPreviewPage((p)=>Math.max(1,p-1))} className="rounded-xl border px-4 py-2 font-black disabled:opacity-40">السابق</button><span className="font-black">صفحة {previewPage} من {previewPages}</span><button disabled={previewPage>=previewPages} onClick={()=>setPreviewPage((p)=>Math.min(previewPages,p+1))} className="rounded-xl border px-4 py-2 font-black disabled:opacity-40">التالي</button></div>}
     </section>
   </div>;
 }
