@@ -1,4 +1,5 @@
-import { CheckCircle, Layout, Timer } from '../../../shared/icons/lucide-shim.jsx';
+import { Maximize2, Timer } from '../../../shared/icons/lucide-shim.jsx';
+import platformLogo from '../../../assets/nahhas-logo-transparent.png';
 
 function formatTime(timeLeft = 0) {
   const hours = Math.floor(timeLeft / 3600);
@@ -24,7 +25,9 @@ export default function ExamTopBar({
     <header className="relative z-50 border-b border-slate-200/80 bg-white/95 shadow-[0_10px_35px_rgba(15,23,42,0.06)] backdrop-blur-xl">
       <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-3 px-3 py-3 md:px-6 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 items-center gap-3 md:gap-4">
-          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-700 text-2xl text-white shadow-lg shadow-indigo-200">◆</div>
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-md shadow-slate-200/70 md:h-16 md:w-16">
+            <img src={platformLogo} alt="شعار المنصة" className="h-full w-full object-contain" draggable="false" />
+          </div>
           <div className="min-w-0">
             <h1 className="truncate text-base font-black text-slate-900 md:text-xl">
               {exam?.title || 'الامتحان'} {isSubmitted ? '— مراجعة الإجابات' : ''}
@@ -47,8 +50,8 @@ export default function ExamTopBar({
                 <div className="font-mono text-lg font-black tracking-wider text-indigo-600 md:text-xl">{formatTime(timeLeft)}</div>
               </div>
             </div>
-            <button onClick={onFullscreen} className="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700" title="ملء الشاشة">
-              <Layout size={19} />
+            <button onClick={onFullscreen} className="group grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-200" title="ملء الشاشة" aria-label="ملء الشاشة">
+              <Maximize2 size={22} strokeWidth={2.2} className="transition-transform group-hover:scale-110" />
             </button>
             <button onClick={onSubmit} className="rounded-xl border border-rose-200 bg-white px-4 py-2.5 text-sm font-black text-rose-600 transition hover:bg-rose-50">
               إنهاء الامتحان
