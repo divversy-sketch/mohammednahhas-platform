@@ -94,6 +94,52 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
     topics: new Set(questions.map((q) => q.topic || q.lesson).filter(Boolean)).size,
   }), [questions]);
 
+
+  const reviewImportQuestions = useMemo(() => importPreview
+    .map((question, index) => ({ question, index }))
+    .filter(({ question }) => question.importConfidence === 'review'), [importPreview]);
+  const readyImportQuestions = useMemo(() => importPreview
+    .map((question, index) => ({ question, index }))
+    .filter(({ question }) => question.importConfidence !== 'review'), [importPreview]);
+
+  const updateImportQuestion = (index, patch) => {
+    setImportPreview((current) => current.map((question, questionIndex) => (
+      questionIndex === index ? { ...question, ...patch } : question
+    )));
+  };
+
+  const updateImportOption = (questionIndex, optionIndex, value) => {
+    setImportPreview((current) => current.map((question, currentIndex) => {
+      if (currentIndex !== questionIndex) return question;
+      const options = [...(question.options || [])];
+      options[optionIndex] = value;
+      return { ...question, options };
+    }));
+  };
+
+  const removeImportQuestion = (index) => {
+    setImportPreview((current) => current.filter((_, questionIndex) => questionIndex !== index));
+  };
+
+  const splitAmbiguousOption = (index) => {
+    const target = importPreview[index];
+    const source = (target?.options || []).join(' - ');
+    const parts = source.split(/\s*[-–—ـ]\s*/u).map((part) => part.trim()).filter(Boolean);
+    if (parts.length < 2) return platformNotify('لم أجد فواصل كافية لتقسيم الاختيارات تلقائيًا');
+    updateImportQuestion(index, { options: parts, type: 'mcq', correctIdx: null, importConfidence: 'review' });
+    platformNotify(`تم تقسيم النص إلى ${parts.length} اختيارات. اختر الإجابة الصحيحة ثم اعتمد السؤال.`);
+  };
+
+  const approveImportQuestion = (index) => {
+    const target = importPreview[index];
+    const options = (target?.options || []).map((option) => String(option || '').trim()).filter(Boolean);
+    if (!String(target?.text || '').trim()) return platformNotify('اكتب نص السؤال أولًا');
+    if (options.length < 2) return platformNotify('السؤال الاختياري يحتاج اختيارين على الأقل');
+    if (!Number.isInteger(Number(target?.correctIdx)) || Number(target.correctIdx) < 0 || Number(target.correctIdx) >= options.length) return platformNotify('حدد الإجابة الصحيحة أولًا');
+    updateImportQuestion(index, { options, type: 'mcq', correctIdx: Number(target.correctIdx), importConfidence: 'high' });
+    platformNotify('تم اعتماد السؤال ونقله إلى قائمة الأسئلة الجاهزة');
+  };
+
   const processFile = async (file) => {
     setImportBusy(true); setImportPreview([]); setImportWarnings([]); setImportRejected([]);
     try {
@@ -123,12 +169,20 @@ export const QuestionBankManager = ({ adminGradeFilter }) => {
   const onDrop = (event) => { event.preventDefault(); setDragging(false); const file = event.dataTransfer.files?.[0]; if (file) processFile(file); };
 
   const saveImportedQuestions = async () => {
-    if (!importPreview.length) return platformNotify('لا توجد أسئلة جاهزة للحفظ');
-    if (!(await platformConfirm(`سيتم حفظ ${importPreview.length} سؤال. هل نكمل؟`))) return;
+    const readyQuestions = importPreview.filter((question) => question.importConfidence !== 'review');
+    const pendingCount = importPreview.length - readyQuestions.length;
+    if (!readyQuestions.length) return platformNotify('لا توجد أسئلة معتمدة وجاهزة للحفظ');
+    const message = pendingCount
+      ? `سيتم حفظ ${readyQuestions.length} سؤال معتمد، وسيبقى ${pendingCount} سؤال في قائمة المراجعة. هل نكمل؟`
+      : `سيتم حفظ ${readyQuestions.length} سؤال. هل نكمل؟`;
+    if (!(await platformConfirm(message))) return;
     try {
       let batch = writeBatch(db); let counter = 0;
-      for (const q of importPreview) { batch.set(doc(collection(db, 'question_bank')), { ...q, createdAt: serverTimestamp(), importedAt: serverTimestamp() }); counter += 1; if (counter % 400 === 0) { await batch.commit(); batch = writeBatch(db); } }
-      if (counter % 400 !== 0) await batch.commit(); setImportPreview([]); setImportWarnings([]); setImportRejected([]); platformNotify('تم حفظ الأسئلة المستوردة بنجاح'); setActiveTab('browse');
+      for (const q of readyQuestions) { batch.set(doc(collection(db, 'question_bank')), { ...q, createdAt: serverTimestamp(), importedAt: serverTimestamp() }); counter += 1; if (counter % 400 === 0) { await batch.commit(); batch = writeBatch(db); } }
+      if (counter % 400 !== 0) await batch.commit();
+      setImportPreview((current) => current.filter((question) => question.importConfidence === 'review'));
+      if (!pendingCount) { setImportWarnings([]); setImportRejected([]); setActiveTab('browse'); }
+      platformNotify(`تم حفظ ${readyQuestions.length} سؤال معتمد بنجاح`);
     } catch (error) { platformNotify('تعذر حفظ الأسئلة: ' + (error?.message || 'خطأ غير معروف')); }
   };
 
@@ -221,7 +275,17 @@ ${item.raw.join('\n')}` : '',
       <div onDragOver={(e)=>{e.preventDefault();setDragging(true)}} onDragLeave={()=>setDragging(false)} onDrop={onDrop} className={`rounded-2xl border-2 border-dashed p-8 text-center transition ${dragging?'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30':'border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/50'}`}><UploadCloud className="mx-auto mb-3 h-10 w-10 text-indigo-500"/><p className="font-black">اسحب ملف الأسئلة هنا</p><p className="mt-1 text-sm text-slate-500">TXT · DOCX · PDF نصي · CSV · JSON · HTML</p><input ref={fileInputRef} type="file" accept=".txt,.docx,.pdf,.csv,.json,.html,.htm" onChange={handleImportFile} className="hidden"/><button disabled={importBusy} onClick={()=>fileInputRef.current?.click()} className="mt-4 rounded-xl bg-indigo-600 px-5 py-3 font-bold text-white disabled:opacity-50">{importBusy?'جاري التحليل...':'اختيار ملف'}</button></div>
       <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-7 text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300"><b>المحلل الذكي:</b> يفهم ترقيم 1- أو -1، والاختيارات أ/ب/ج/د حتى لو جاءت في السطر نفسه أو انتقلت للصفحة التالية. في Word يتعرف على الإجابة التي تحتها خط أو المظللة، ويفهم أيضًا * أو «الإجابة: ب». يعرض أي سؤال غير مؤكد للمراجعة قبل الحفظ. ملفات PDF المصورة تحتاج OCR.</div>
       {!!importWarnings.length && <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200"><div className="mb-2 flex items-center gap-2 font-black"><AlertTriangle className="h-4 w-4"/> ملاحظات التحليل</div>{importWarnings.slice(0,8).map((w,i)=><p key={i}>• {w}</p>)}</div>}
-      {!!importPreview.length && <div className="mt-5"><div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><h4 className="font-black">معاينة {importPreview.length} سؤال</h4><button onClick={saveImportedQuestions} className="rounded-xl bg-emerald-600 px-5 py-3 font-black text-white"><FileCheck className="ml-2 inline h-5 w-5"/> حفظ الكل</button></div><div className="max-h-[520px] space-y-3 overflow-y-auto pr-1">{importPreview.map((q,idx)=><div key={`${q.text}_${idx}`} className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"><div className="mb-2 flex flex-wrap gap-2 text-[11px]"><span className="rounded-full bg-blue-100 px-2 py-1 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200">{q.branch}</span><span className="rounded-full bg-violet-100 px-2 py-1 text-violet-800 dark:bg-violet-900/30 dark:text-violet-200">{q.topic}</span><span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700 dark:bg-slate-700 dark:text-slate-200">{q.type==='mcq'?'اختياري':'مقالي'}</span>{q.importConfidence==='review'&&<span className="rounded-full bg-amber-100 px-2 py-1 font-black text-amber-800">يحتاج مراجعة</span>}</div><p className="font-black">{idx+1}. {q.text}</p>{q.options?.length>0&&<div className="mt-3 grid gap-2 md:grid-cols-2">{q.options.map((o,i)=><div key={i} className={`rounded-xl border p-2 text-sm ${i===q.correctIdx?'border-emerald-400 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200':'border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900'}`}>{OPTION_LABELS[i]||i+1}) {o}</div>)}</div>}</div>)}</div></div>}
+      {!!reviewImportQuestions.length && <div className="mt-5 rounded-2xl border-2 border-amber-300 bg-amber-50/70 p-4 dark:border-amber-700 dark:bg-amber-950/20">
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div><h4 className="flex items-center gap-2 text-lg font-black text-amber-900 dark:text-amber-200"><AlertTriangle className="h-5 w-5"/> قائمة منفصلة للمراجعة والإصلاح</h4><p className="text-sm text-amber-800/80 dark:text-amber-300">هذه الأسئلة لم تختلط بباقي الأسئلة. أصلحها هنا مباشرة ثم اضغط «اعتماد السؤال».</p></div><span className="w-fit rounded-full bg-amber-200 px-3 py-1 text-sm font-black text-amber-900 dark:bg-amber-900/60 dark:text-amber-100">{reviewImportQuestions.length} سؤال</span></div>
+        <div className="space-y-4">{reviewImportQuestions.map(({question:q,index:idx},reviewIndex)=><article key={`review_${idx}_${q.text}`} className="rounded-2xl border border-amber-300 bg-white p-4 shadow-sm dark:border-amber-700 dark:bg-slate-900">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div className="flex flex-wrap gap-2 text-[11px]"><span className="rounded-full bg-amber-100 px-2 py-1 font-black text-amber-800">مراجعة رقم {reviewIndex+1}</span><span className="rounded-full bg-blue-100 px-2 py-1 text-blue-800">{q.branch}</span><span className="rounded-full bg-violet-100 px-2 py-1 text-violet-800">{q.topic}</span></div><button type="button" onClick={()=>removeImportQuestion(idx)} className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-700"><Trash2 className="ml-1 inline h-4 w-4"/>حذف من المعاينة</button></div>
+          <label className="mb-2 block text-sm font-black">نص السؤال</label><textarea className={`${inputClass} min-h-24`} value={q.text} onChange={(e)=>updateImportQuestion(idx,{text:e.target.value})}/>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2"><label className="text-sm font-black">الاختيارات — اختر الدائرة أمام الإجابة الصحيحة</label>{(q.options||[]).length===1&&<button type="button" onClick={()=>splitAmbiguousOption(idx)} className="rounded-lg bg-indigo-50 px-3 py-2 text-xs font-black text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-200">تقسيم النص بالشرطات تلقائيًا</button>}</div>
+          <div className="mt-2 grid gap-2">{(q.options||[]).map((option,optionIndex)=><div key={optionIndex} className={`flex items-center gap-2 rounded-xl border p-2 ${Number(q.correctIdx)===optionIndex?'border-emerald-400 bg-emerald-50 dark:bg-emerald-950/20':'border-slate-200 dark:border-slate-700'}`}><input type="radio" name={`correct_${idx}`} checked={Number(q.correctIdx)===optionIndex} onChange={()=>updateImportQuestion(idx,{correctIdx:optionIndex})}/><span className="min-w-6 font-black">{OPTION_LABELS[optionIndex]||optionIndex+1})</span><input className={`${inputClass} py-2`} value={option} onChange={(e)=>updateImportOption(idx,optionIndex,e.target.value)}/><button type="button" onClick={()=>updateImportQuestion(idx,{options:(q.options||[]).filter((_,i)=>i!==optionIndex),correctIdx:null})} className="rounded-lg p-2 text-red-600"><Trash2 className="h-4 w-4"/></button></div>)}</div>
+          <div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={()=>updateImportQuestion(idx,{options:[...(q.options||[]),''],type:'mcq',correctIdx:q.correctIdx??null})} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-black dark:border-slate-700 dark:bg-slate-800"><PlusCircle className="ml-1 inline h-4 w-4"/>إضافة اختيار</button><button type="button" onClick={()=>approveImportQuestion(idx)} className="rounded-xl bg-emerald-600 px-5 py-2 text-sm font-black text-white"><CheckCircle className="ml-1 inline h-4 w-4"/>اعتماد السؤال</button></div>
+        </article>)}</div>
+      </div>}
+      {!!readyImportQuestions.length && <div className="mt-5"><div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h4 className="font-black">الأسئلة الجاهزة للحفظ: {readyImportQuestions.length}</h4>{reviewImportQuestions.length>0&&<p className="text-xs text-slate-500">لن يتم حفظ أسئلة المراجعة حتى تعتمدها.</p>}</div><button onClick={saveImportedQuestions} className="rounded-xl bg-emerald-600 px-5 py-3 font-black text-white"><FileCheck className="ml-2 inline h-5 w-5"/> حفظ الأسئلة الجاهزة</button></div><div className="max-h-[520px] space-y-3 overflow-y-auto pr-1">{readyImportQuestions.map(({question:q,index:idx},readyIndex)=><div key={`${q.text}_${idx}`} className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"><div className="mb-2 flex flex-wrap gap-2 text-[11px]"><span className="rounded-full bg-blue-100 px-2 py-1 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200">{q.branch}</span><span className="rounded-full bg-violet-100 px-2 py-1 text-violet-800 dark:bg-violet-900/30 dark:text-violet-200">{q.topic}</span><span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700 dark:bg-slate-700 dark:text-slate-200">{q.type==='mcq'?'اختياري':'مقالي'}</span></div><p className="font-black">{readyIndex+1}. {q.text}</p>{q.options?.length>0&&<div className="mt-3 grid gap-2 md:grid-cols-2">{q.options.map((o,i)=><div key={i} className={`rounded-xl border p-2 text-sm ${i===q.correctIdx?'border-emerald-400 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200':'border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900'}`}>{OPTION_LABELS[i]||i+1}) {o}</div>)}</div>}</div>)}</div></div>}
     </section>}
 
     {activeTab === 'manual' && <section className={`${panelClass} p-5`}><h3 className="mb-4 text-xl font-black">إضافة سؤال يدويًا</h3><form onSubmit={handleAddQuestion} className="grid gap-4"><div className="grid grid-cols-1 gap-3 md:grid-cols-5"><select className={inputClass} value={form.grade} onChange={(e)=>setForm({...form,grade:e.target.value})}><GradeOptions/></select><select className={inputClass} value={form.branch} onChange={(e)=>setForm({...form,branch:e.target.value})}><option>النحو</option><option>البلاغة</option></select><input className={inputClass} placeholder="الموضوع" value={form.topic} onChange={(e)=>setForm({...form,topic:e.target.value})}/><select className={inputClass} value={form.type} onChange={(e)=>setForm({...form,type:e.target.value,mark:e.target.value==='essay'?10:1})}><option value="mcq">اختياري</option><option value="essay">مقالي</option></select><select className={inputClass} value={form.difficulty} onChange={(e)=>setForm({...form,difficulty:e.target.value})}><option value="easy">سهل</option><option value="medium">متوسط</option><option value="hard">صعب</option></select></div><textarea className={`${inputClass} min-h-28`} placeholder="نص السؤال" value={form.text} onChange={(e)=>setForm({...form,text:e.target.value})}/>{form.type==='mcq'&&<textarea className={`${inputClass} min-h-36`} placeholder={'كل اختيار في سطر منفصل'} value={form.optionsText} onChange={(e)=>setForm({...form,optionsText:e.target.value})}/>}<div className="grid gap-3 md:grid-cols-3">{form.type==='mcq'&&<input type="number" min="0" className={inputClass} placeholder="رقم الإجابة الصحيحة يبدأ من 0" value={form.correctIdx} onChange={(e)=>setForm({...form,correctIdx:e.target.value})}/>}<input type="number" min="1" className={inputClass} placeholder="الدرجة" value={form.mark} onChange={(e)=>setForm({...form,mark:e.target.value})}/><input className={inputClass} placeholder="وسوم مفصولة بفاصلة" value={form.tags} onChange={(e)=>setForm({...form,tags:e.target.value})}/></div><textarea className={`${inputClass} min-h-24`} placeholder="شرح الإجابة" value={form.explanation} onChange={(e)=>setForm({...form,explanation:e.target.value})}/><button className="w-fit rounded-xl bg-indigo-600 px-6 py-3 font-black text-white">حفظ السؤال</button></form></section>}

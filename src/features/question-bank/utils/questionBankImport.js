@@ -52,38 +52,63 @@ const normalizedOptionLabel = (value = '') => {
   return ['ا', 'إ', 'آ'].includes(raw) ? 'أ' : raw;
 };
 
-// يكتشف علامات الاختيارات حتى مع اختلاف التنسيق داخل السؤال الواحد:
-// أ- ، أ) ، (أ) ، [أ] ، أ: ، أ/ ، ثم ب/ج/د بأي صيغة أخرى.
-// كما يقبل أن تكون الاختيارات ملتصقة بفاصل مثل: أ-الأول-ب-الثاني.
+const isPlausibleOptionSequence = (markers = []) => {
+  if (!markers.length) return false;
+  const indexes = markers.map((item) => item.index);
+  if (indexes[0] !== 0 && markers.length < 2) return false;
+  let expected = indexes[0];
+  let score = 0;
+  for (const index of indexes) {
+    if (index === expected) { score += 1; expected += 1; }
+    else if (index === expected - 1) score += 0.15; // يتحمل تكرار حرف بالخطأ داخل Word
+    else if (index > expected) { score -= (index - expected) * 0.4; expected = index + 1; }
+    else score -= 0.5;
+  }
+  return score >= Math.min(2, markers.length);
+};
+
+// يكتشف الاختيارات بصرف النظر عن الفاصل أو المسافة السابقة لها. هذا مهم لأن Word
+// كثيرًا ما يدمج نهاية الاختيار مع بداية التالي هكذا: "...شفاء؟ب – ...".
+// بعد الاكتشاف نختار أفضل سلسلة منطقية (أ، ب، ج، د...) حتى لا نعتبر حرفًا داخل كلمة اختيارًا.
 export const findOptionMarkers = (source = '') => {
   const text = String(source || '').replace(/[\u200e\u200f\u202a-\u202e]/g, '');
-  const re = new RegExp(`(?:^|[\\s،؛|]|[-–—ـ•●▪◦*])${OPTION_MARKER_BODY}\\s*`, 'gu');
+  const re = new RegExp(OPTION_MARKER_BODY, 'gu');
   const candidates = [];
   let match;
   while ((match = re.exec(text)) !== null) {
-    const whole = match[0];
     const label = normalizedOptionLabel(match[1] || match[2] || '');
-    const leading = whole.match(/^[\\s،؛|\-–—ـ•●▪◦*]*/u)?.[0]?.length || 0;
-    const markerStart = match.index + leading;
-    const contentStart = re.lastIndex;
     const index = labelToIndex(label);
-    if (index >= 0 && index <= 7) candidates.push({ markerStart, contentStart, label, index });
-    if (!whole.length) re.lastIndex += 1;
+    if (index < 0 || index > 7) continue;
+    candidates.push({ markerStart: match.index, contentStart: re.lastIndex, label, index });
+    if (!match[0].length) re.lastIndex += 1;
   }
 
-  // نختار سلسلة منطقية متزايدة (أ ثم ب ثم ج ثم د...) لمنع اعتبار حروف داخل النص اختيارات.
+  if (!candidates.length) return [];
+
   let best = [];
+  let bestScore = -Infinity;
   for (let i = 0; i < candidates.length; i += 1) {
     const chain = [candidates[i]];
     let expected = candidates[i].index + 1;
+    let score = candidates[i].index === 0 ? 2 : 0;
     for (let j = i + 1; j < candidates.length; j += 1) {
-      if (candidates[j].index === expected) {
-        chain.push(candidates[j]);
-        expected += 1;
+      const candidate = candidates[j];
+      if (candidate.index === expected) {
+        chain.push(candidate); score += 3; expected += 1;
+      } else if (candidate.index === expected - 1 && chain.length === 1) {
+        // بعض ملفات Word تكرر حرف الاختيار عند كسر السطر/الصفحة؛ نحتفظ به مؤقتًا
+        // لكن السلسلة المنتظمة تظل أعلى تقييمًا.
+        chain.push(candidate); score += 0.2;
+      } else if (candidate.index > expected && candidate.index - expected <= 1) {
+        chain.push(candidate); score += 1; expected = candidate.index + 1;
       }
     }
-    if (chain.length > best.length) best = chain;
+    if (chain.length >= 2 && isPlausibleOptionSequence(chain) && score > bestScore) {
+      best = chain; bestScore = score;
+    }
   }
+
+  // إذا كانت الفقرة تحتوي اختيارًا واحدًا فقط، parseOptionLine يتعامل معه لاحقًا.
   return best;
 };
 
@@ -196,13 +221,16 @@ const splitRichLine = ({ text, runs = [], ...meta }) => {
 
   matches.forEach((entry, index) => {
     const end = matches[index + 1]?.markerStart ?? source.length;
-    const optionText = cleanImportedLine(source.slice(entry.contentStart, end).replace(/^[-–—ـ•●▪◦*\s]+/u, ''));
+    const optionText = cleanImportedLine(source.slice(entry.contentStart, end)
+      .replace(/^[-–—ـ•●▪◦*\s]+/u, '')
+      .replace(/[\s|،؛\-–—ـ•●▪◦*]+$/u, ''));
     if (!optionText) return;
     const ratio = segmentMarkRatio(entry.contentStart, end, markedRanges);
     segments.push({
       text: `${entry.label}) ${optionText}`,
-      highlighted: ratio >= 0.04,
-      underlined: ratio >= 0.04,
+      highlighted: ratio > 0,
+      underlined: ratio > 0,
+      markScore: ratio,
       ...meta,
     });
   });
@@ -250,9 +278,14 @@ export const parseQuestionBankLines = (lines, settings) => {
     let correctIdx = question.correctIdx;
     let hasConfirmedAnswer = Number.isInteger(correctIdx) && correctIdx >= 0;
     if (options.length && (correctIdx === null || Number.isNaN(correctIdx))) {
-      const marked = question.options.map((option, index) => (option.correctByMarker || option.highlighted ? index : -1)).filter((index) => index >= 0);
-      if (marked.length === 1) { correctIdx = marked[0]; hasConfirmedAnswer = true; }
-      else { correctIdx = marked[0] ?? 0; warnings.push(`راجع إجابة السؤال: ${question.text.slice(0, 55)}${marked.length > 1 ? ' (أكثر من اختيار تحته خط)' : ' (لم أجد اختيارًا محددًا)'}`); rejected.push({ reason: marked.length > 1 ? 'أكثر من إجابة معلّمة' : 'لم تُكتشف الإجابة الصحيحة', question: question.text, options, heading: question.sourceHeading || currentHeading, raw: question.rawLines || [] }); }
+      const scored = question.options.map((option, index) => ({
+        index,
+        score: Math.max(Number(option.markScore || 0), option.correctByMarker || option.highlighted ? 0.0001 : 0),
+      })).filter((item) => item.score > 0).sort((a, b) => b.score - a.score);
+      const marked = scored.map((item) => item.index);
+      const topIsClearlyMarked = scored.length > 0 && (scored.length === 1 || scored[0].score > scored[1].score + 0.01 || scored[0].score >= scored[1].score * 1.35);
+      if (topIsClearlyMarked) { correctIdx = scored[0].index; hasConfirmedAnswer = true; }
+      else { correctIdx = marked[0] ?? 0; warnings.push(`راجع إجابة السؤال: ${question.text.slice(0, 55)}${marked.length > 1 ? ' (أكثر من اختيار تحته خط بنفس القوة)' : ' (لم أجد اختيارًا محددًا)'}`); rejected.push({ reason: marked.length > 1 ? 'أكثر من إجابة معلّمة بنفس القوة' : 'لم تُكتشف الإجابة الصحيحة', question: question.text, options, heading: question.sourceHeading || currentHeading, raw: question.rawLines || [] }); }
     }
     const branch = question.branch || currentBranch || settings.branch || detectBranchFromText(question.text) || 'النحو';
     const topic = question.topic || currentTopic || 'عام';
@@ -264,6 +297,7 @@ export const parseQuestionBankLines = (lines, settings) => {
   lines.forEach((lineObject) => {
     const rawText = cleanImportedLine(typeof lineObject === 'string' ? lineObject : lineObject.text);
     const highlighted = Boolean(typeof lineObject === 'object' && (lineObject.highlighted || lineObject.underlined));
+    const markScore = typeof lineObject === 'object' ? Number(lineObject.markScore || 0) : 0;
     if (!rawText) return;
 
     const meta = parseMetaLine(rawText);
@@ -303,7 +337,7 @@ export const parseQuestionBankLines = (lines, settings) => {
       return;
     }
 
-    if (option) { const correctByMarker = /\*/.test(option.text) || highlighted; const nextIndex = question.options.length; question.options.push({ ...option, text: option.text.replace(/\*/g, '').trim(), correctByMarker, highlighted }); if (correctByMarker) question.correctIdx = nextIndex; return; }
+    if (option) { const correctByMarker = /\*/.test(option.text) || highlighted; const nextIndex = question.options.length; question.options.push({ ...option, text: option.text.replace(/\*/g, '').trim(), correctByMarker, highlighted, markScore }); if (correctByMarker) question.correctIdx = nextIndex; return; }
     const answerMatch = rawText.match(answerRegex); if (answerMatch) { const value = answerMatch[2].replace(/\*/g, '').trim(); const byText = question.options.findIndex((item) => normalizeArabicKey(item.text) === normalizeArabicKey(value)); question.correctIdx = byText >= 0 ? byText : labelToIndex(value); return; }
     const explanationMatch = rawText.match(explanationRegex); if (explanationMatch) { question.explanation = [question.explanation, explanationMatch[2]].filter(Boolean).join('\n'); return; }
 
