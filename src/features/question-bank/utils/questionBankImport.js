@@ -180,12 +180,18 @@ export const readPdfTextFile = async (file) => {
 
 export const xmlChildrenByLocalName = (node, name) => Array.from(node.getElementsByTagName('*')).filter((el) => el.localName === name);
 const attr = (node, name) => node?.getAttribute(`w:${name}`) || node?.getAttribute(name) || '';
-const runIsMarked = (run) => {
-  const underline = xmlChildrenByLocalName(run, 'u').some((node) => !['none', '0', 'false'].includes((attr(node, 'val') || 'single').toLowerCase()));
-  const highlight = xmlChildrenByLocalName(run, 'highlight').some((node) => attr(node, 'val') && attr(node, 'val') !== 'none');
-  const shading = xmlChildrenByLocalName(run, 'shd').some((node) => { const fill = attr(node, 'fill').toUpperCase(); return fill && !['AUTO', 'FFFFFF', '000000'].includes(fill); });
+const nodeIsMarked = (node) => {
+  if (!node) return false;
+  const underline = xmlChildrenByLocalName(node, 'u').some((item) => !['none', '0', 'false'].includes((attr(item, 'val') || 'single').toLowerCase()));
+  const highlight = xmlChildrenByLocalName(node, 'highlight').some((item) => attr(item, 'val') && attr(item, 'val') !== 'none');
+  const shading = xmlChildrenByLocalName(node, 'shd').some((item) => {
+    const fill = attr(item, 'fill').toUpperCase();
+    return fill && !['AUTO', 'FFFFFF', '000000'].includes(fill);
+  });
   return underline || highlight || shading;
 };
+
+const runIsMarked = (run, paragraphMarked = false) => paragraphMarked || nodeIsMarked(run);
 
 const buildMarkedRanges = (runs = []) => {
   const ranges = [];
@@ -205,15 +211,24 @@ const segmentMarkRatio = (start, end, ranges = []) => {
   return overlap / length;
 };
 
-const splitRichLine = ({ text, runs = [], ...meta }) => {
+const splitRichLine = ({ text, runs = [], paragraphMarked = false, ...meta }) => {
   const source = String(text || '').replace(/[\u200e\u200f\u202a-\u202e]/g, '');
   const matches = findOptionMarkers(source);
+  const markedRanges = buildMarkedRanges(runs);
+  const wholeLineMarkRatio = segmentMarkRatio(0, source.length, markedRanges);
+  const wholeLineMarked = paragraphMarked || wholeLineMarkRatio > 0;
 
   // نفصل إذا وجدنا اختيارين متتابعين على الأقل. أما اختيار واحد في فقرة منفصلة
-  // فيتعامل معه parseOptionLine لاحقًا، حتى لا نقطع نص السؤال خطأً.
-  if (matches.length < 2) return [{ text: cleanImportedLine(source), runs, ...meta }];
+  // فنحافظ معه على علامة التسطير/التظليل الخاصة بالفقرة أو الـrun كاملة.
+  if (matches.length < 2) return [{
+    text: cleanImportedLine(source),
+    runs,
+    highlighted: wholeLineMarked,
+    underlined: wholeLineMarked,
+    markScore: wholeLineMarked ? Math.max(wholeLineMarkRatio, paragraphMarked ? 1 : 0.01) : 0,
+    ...meta,
+  }];
 
-  const markedRanges = buildMarkedRanges(runs);
   const segments = [];
   const firstOptionStart = matches[0]?.markerStart ?? source.length;
   const questionPart = cleanImportedLine(source.slice(0, firstOptionStart));
@@ -246,10 +261,19 @@ export const readDocxParagraphs = async (file) => {
   const paragraphs = xmlChildrenByLocalName(xml, 'p');
   const output = [];
   paragraphs.forEach((paragraph, paragraphIndex) => {
-    const runs = xmlChildrenByLocalName(paragraph, 'r').map((run) => ({ text: xmlChildrenByLocalName(run, 't').map((node) => node.textContent || '').join(''), marked: runIsMarked(run) })).filter((run) => run.text);
+    // Word قد يضع التسطير في خصائص الفقرة pPr/rPr بدل خصائص الـrun نفسه.
+    // لذلك نقرأ الوراثة من الفقرة، وإلا ستضيع معظم الإجابات الصحيحة المسطرة.
+    const paragraphProperties = xmlChildrenByLocalName(paragraph, 'pPr')[0];
+    const paragraphMarked = nodeIsMarked(paragraphProperties);
+    const runs = xmlChildrenByLocalName(paragraph, 'r')
+      .map((run) => ({
+        text: xmlChildrenByLocalName(run, 't').map((node) => node.textContent || '').join(''),
+        marked: runIsMarked(run, paragraphMarked),
+      }))
+      .filter((run) => run.text);
     const text = runs.map((run) => run.text).join('');
     if (!cleanImportedLine(text)) return;
-    output.push(...splitRichLine({ text, runs, paragraphIndex, sourceFormat: 'docx' }));
+    output.push(...splitRichLine({ text, runs, paragraphMarked, paragraphIndex, sourceFormat: 'docx' }));
   });
   return output;
 };
