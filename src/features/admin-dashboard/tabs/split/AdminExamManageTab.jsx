@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { CheckCircle, Lock, X, AlertTriangle, Trash2, Eye, ShieldAlert, Phone, Edit, KeyRound, Send, MessageCircle, ClipboardList, Unlock, Layout, Bell, Download, Calendar, Clock, Upload, Users, RefreshCw, FileCheck, Crown, Key } from '@shared/icons/lucide-shim.jsx';
 import { AdminReviewQuizPanel } from '@features/review/ReviewQuizSystem.jsx';
 import { GradeOptions, getGradeLabel } from '@shared/constants/grades';
@@ -26,6 +26,33 @@ import AdminAllUsersTab from '@features/admin-dashboard/tabs/users/AdminAllUsers
 import AdminDashboardOverviewTab from '@features/admin-dashboard/tabs/dashboard/AdminDashboardOverviewTab.jsx';
 
 export default function AdminExamManageTab({ ctx }) {
+  const bulkTextRef = useRef(null);
+
+  const highlightSelectedPassageText = () => {
+    const textarea = bulkTextRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart ?? 0;
+    const end = textarea.selectionEnd ?? 0;
+    const selected = bulkText.slice(start, end);
+
+    if (!selected.trim()) {
+      platformNotify('حدد أولًا الكلمة أو الجملة داخل القطعة ثم اضغط «تظليل المحدد».');
+      textarea.focus();
+      return;
+    }
+
+    const before = bulkText.slice(0, start);
+    const after = bulkText.slice(end);
+    const wrapped = `[${selected}]`;
+    setBulkText(`${before}${wrapped}${after}`);
+
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + 1, start + 1 + selected.length);
+    });
+  };
+
   const {
     adminReviewExamData,
     setAdminReviewExamData,
@@ -290,7 +317,26 @@ export default function AdminExamManageTab({ ctx }) {
                           </div>
                       </div>
                       <div className="bg-slate-50 p-4 rounded-xl border mb-6">
-                          <textarea className="w-full border p-4 rounded-lg h-96 font-mono text-sm" placeholder="اكتب الأسئلة هنا...&#10;(هام 1: افصل بين كل سؤال والذي يليه بسطر فارغ تماماً، وضع علامة * قبل الإجابة الصحيحة)&#10;(هام 2: لتحديد فرع، اكتب #فرع: اسم_الفرع في سطر لوحده)&#10;(هام 3: للسؤال المقالي اكتب #مقالي: نص السؤال)" value={bulkText} onChange={e=>setBulkText(e.target.value)}/>
+                          <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-xs md:text-sm leading-7 text-slate-600">
+                            <p className="font-black text-amber-800 mb-1">طريقة كتابة أسئلة الامتحان</p>
+                            <p>(هام 1: افصل بين كل سؤال والذي يليه بسطر فارغ تمامًا، وضع علامة * قبل الإجابة الصحيحة)</p>
+                            <p>(هام 2: لتحديد فرع، اكتب #فرع: اسم_الفرع في سطر منفصل)</p>
+                            <p>(هام 3: للسؤال المقالي اكتب #مقالي: نص السؤال)</p>
+                            <p>(هام 4: في أسئلة معنى كلمة أو علاقة جملة بما قبلها، حدّد الكلمة أو الجملة داخل القطعة ثم اضغط «تظليل المحدد»، أو ضعها يدويًا بين قوسين مربعين مثل: [الكلمة المطلوبة])</p>
+                          </div>
+                          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                            <span className="text-xs font-bold text-slate-500">أداة تمييز موضع السؤال داخل القطعة</span>
+                            <button
+                              type="button"
+                              onClick={highlightSelectedPassageText}
+                              className="inline-flex items-center gap-2 rounded-lg border border-yellow-400 bg-yellow-200 px-4 py-2 text-sm font-black text-yellow-950 shadow-sm transition hover:bg-yellow-300"
+                              title="حدد كلمة أو جملة من النص ثم اضغط هنا"
+                            >
+                              <span className="inline-block h-3 w-3 rounded-sm border border-yellow-600 bg-yellow-300" />
+                              تظليل المحدد
+                            </button>
+                          </div>
+                          <textarea ref={bulkTextRef} className="w-full border p-4 rounded-lg h-96 font-mono text-sm" placeholder="اكتب الأسئلة هنا...&#10;لإضافة قطعة: اكتب بداية القطعة ثم النص ثم نهاية القطعة.&#10;ولتظليل كلمة أو جملة داخل القطعة ضعها بين [ ] أو حدّدها واضغط زر تظليل المحدد." value={bulkText} onChange={e=>setBulkText(e.target.value)}/>
                           <button onClick={parseExam} className="mt-4 w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-green-500/50 transition">نشر</button>
                       </div>
                   </div>

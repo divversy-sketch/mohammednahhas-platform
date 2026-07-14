@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { Edit, UploadCloud, X } from '@shared/icons/lucide-shim.jsx';
 import { GradeOptions } from '@shared/constants/grades';
-import { platformNotify, safeNumber } from '@shared/core/platformShared.jsx';
+import { platformNotify, renderBracketHighlightedText, safeNumber } from '@shared/core/platformShared.jsx';
 import { uploadToCloudinary } from '@services/cloudinaryUpload';
 import ImageFitControls from '@shared/ui/ImageFitControls.jsx';
 
@@ -162,7 +162,7 @@ export default function AdminFullExamEditorModal({
                     <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded font-bold">{q.branch || 'عام'}</span>
                     <span className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded font-bold">{q.type === 'essay' ? 'مقالي' : 'اختياري'}</span>
                   </div>
-                  <p className="font-bold text-slate-800 leading-relaxed">{String(q.text || '').replaceAll('|', ' / ')}</p>
+                  <p className="font-bold text-slate-800 leading-relaxed">{renderBracketHighlightedText(String(q.text || '').replaceAll('|', ' / '))}</p>
                 </div>
               </div>
 
