@@ -28,15 +28,26 @@ export const detectBranchFromText = (text = '') => {
 
 const ARABIC_DIGITS = '٠١٢٣٤٥٦٧٨٩';
 const toWesternDigits = (value = '') => String(value).replace(/[٠-٩]/g, (d) => String(ARABIC_DIGITS.indexOf(d)));
-const QUESTION_START_RE = /^\s*(?:[-–—ـ•●▪◦*]\s*)?(?:س(?:ؤال)?\s*)?(?:[\[(（{]\s*)?(\d{1,4}|[٠-٩]{1,4})(?:\s*[\])）}])?\s*(?:[-–—ـ.:：،؛/\\]|\)|\]|）)?\s+(.*)$/iu;
+const QUESTION_START_RE = /^\s*(?:[-–—ـ•●▪◦*]\s*)?(?:س(?:ؤال)?\s*)?(?:[\[(（{]\s*)?(\d{1,4}|[٠-٩]{1,4})(?:\s*[\])）}])?\s*(?:[-–—ـ.:：،؛/\\]|\)|\]|）)?\s*(.*)$/iu;
+
+// قاعدة حاسمة: أي سطر يبدأ برقم هو رأس سؤال جديد، حتى لو لم توجد مسافة
+// بعد الرقم أو كان الرقم محاطًا بنقطة/شرطة/قوس أو سبقه رمز تعداد.
+export const parseQuestionStart = (line = '') => {
+  const cleaned = cleanImportedLine(line);
+  const match = cleaned.match(QUESTION_START_RE);
+  if (!match) return null;
+  const number = Number(toWesternDigits(match[1]));
+  if (!Number.isFinite(number)) return null;
+  return { number, text: cleanImportedLine(match[2] || '') };
+};
 const OPTION_LABEL_TOKEN = '[أإآاA-Ha-hبجدهـهووزحط١-٨1-8]';
 const OPTION_START_RE = new RegExp(`^\\s*(?:[-–—ـ•●▪◦*]\\s*)?(?:[\\[(（{]\\s*)?(${OPTION_LABEL_TOKEN})(?:\\s*[\\])）}])?\\s*(?:[-–—ـ.:：،؛/\\\\]|\\)|\\]|）)?\\s+(.*)$`, 'u');
 const INLINE_OPTION_RE = new RegExp(`(^|\\s)(?:[\\[(（{]\\s*)?(${OPTION_LABEL_TOKEN})(?:\\s*[\\])）}])?\\s*(?:[-–—ـ.:：،؛/\\\\]|\\)|\\]|）)\\s*`, 'gu');
 
 export const stripQuestionPrefix = (line = '') => {
   const cleaned = cleanImportedLine(line);
-  const m = cleaned.match(QUESTION_START_RE);
-  if (m) return cleanImportedLine(m[2]);
+  const m = parseQuestionStart(cleaned);
+  if (m) return cleanImportedLine(m.text);
   return cleaned.replace(/^س(?:ؤال)?\s*\d*\s*[:：\-–—.)،]?\s*/iu, '').replace(/^Q\s*\d*\s*[:：\-–—.)]?\s*/i, '').trim();
 };
 
@@ -149,7 +160,7 @@ export const readDocxParagraphs = async (file) => {
 const isUnitHeader = (text = '') => /^(?:الوحدة|الباب|الفصل|الدرس|الموضوع|الجزئية|التدريب|تدريبات)\s*(?:[:：\-–—])?\s*(?:الأولى|الاولى|الثانية|الثالثة|الرابعة|الخامسة|السادسة|السابعة|الثامنة|التاسعة|العاشرة|\d+|.+)$/u.test(cleanImportedLine(text));
 const looksLikeTopicHeader = (text = '') => {
   const value = cleanImportedLine(text);
-  if (!value || value.length > 110 || QUESTION_START_RE.test(value) || parseOptionLine(value)) return false;
+  if (!value || value.length > 110 || parseQuestionStart(value) || parseOptionLine(value)) return false;
   if (/^(?:الوحدة|الباب|الفصل|الدرس|الموضوع|الجزئية|تدريبات?|أسئلة|اسئلة|مراجعة|اختبار)/u.test(value)) return true;
   if (/[:：]$/.test(value) && !/[؟?]/.test(value)) return true;
   return /^(?:التشبيه|الاستعارة|الكناية|المجاز|المنادى|الاستثناء|التعجب|اسم التفضيل|اسم الفاعل|اسم المفعول|المصدر|الممنوع من الصرف|النواسخ|الجملة الاسمية|الجملة الفعلية|النحو|البلاغة|الأدب|القصة)$/u.test(value);
@@ -191,12 +202,37 @@ export const parseQuestionBankLines = (lines, settings) => {
     const headerMatch = rawText.match(/^(#{1,6}|[-=]{2,})\s*(.+)$/); if (headerMatch) { const header = cleanImportedLine(headerMatch[2]); const found = detectBranchFromText(header); if (found) currentBranch = found; else currentTopic = header; return; }
     if (/^(النحو|نحو|البلاغة|بلاغة|الأدب|ادب|القصة)$/i.test(rawText)) { currentBranch = detectBranchFromText(rawText) || rawText; return; }
 
-    const questionMatch = rawText.match(QUESTION_START_RE);
+    const questionStart = parseQuestionStart(rawText);
     const option = parseOptionLine(rawText);
-    if (questionMatch) { finalizeQuestion(); question = { text: cleanImportedLine(questionMatch[2]), number: Number(toWesternDigits(questionMatch[1])), options: [], correctIdx: null, explanation: '', branch: currentBranch, topic: currentTopic, sourceHeading: currentHeading, grade: currentGrade, difficulty: currentDifficulty, rawLines: [rawText] }; return; }
+    if (questionStart) {
+      finalizeQuestion();
+      question = {
+        text: questionStart.text,
+        number: questionStart.number,
+        options: [],
+        correctIdx: null,
+        explanation: '',
+        branch: currentBranch,
+        topic: currentTopic,
+        sourceHeading: currentHeading,
+        grade: currentGrade,
+        difficulty: currentDifficulty,
+        rawLines: [rawText],
+        waitingForQuestionText: !questionStart.text,
+      };
+      return;
+    }
     if (!question) return;
 
     question.rawLines = [...(question.rawLines || []), rawText];
+
+    // بعض ملفات Word تضع الرقم وحده في سطر، ثم رأس السؤال في السطر التالي.
+    if (question.waitingForQuestionText && !option) {
+      question.text = rawText;
+      question.waitingForQuestionText = false;
+      return;
+    }
+
     if (option) { const correctByMarker = /\*/.test(option.text) || highlighted; const nextIndex = question.options.length; question.options.push({ ...option, text: option.text.replace(/\*/g, '').trim(), correctByMarker, highlighted }); if (correctByMarker) question.correctIdx = nextIndex; return; }
     const answerMatch = rawText.match(answerRegex); if (answerMatch) { const value = answerMatch[2].replace(/\*/g, '').trim(); const byText = question.options.findIndex((item) => normalizeArabicKey(item.text) === normalizeArabicKey(value)); question.correctIdx = byText >= 0 ? byText : labelToIndex(value); return; }
     const explanationMatch = rawText.match(explanationRegex); if (explanationMatch) { question.explanation = [question.explanation, explanationMatch[2]].filter(Boolean).join('\n'); return; }
