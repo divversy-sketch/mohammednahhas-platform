@@ -43,16 +43,49 @@ export const parseQuestionStart = (line = '') => {
   if (!Number.isFinite(number)) return null;
   return { number, text: cleanImportedLine(match[2] || '') };
 };
-const OPTION_LABEL_TOKEN = '[أإآاA-Ha-hبجدهـهوزحط١-٨1-8]';
-const OPTION_START_RE = new RegExp(`^\\s*(?:[-–—ـ•●▪◦*]\\s*)?(?:[\\[(（{]\\s*)?(${OPTION_LABEL_TOKEN})(?:\\s*[\\])）}])?\\s*(?:[-–—ـ.:：،؛/\\\\]|\\)|\\]|）)\\s*(.*)$`, 'u');
+const OPTION_LABEL_TOKEN = '[أإآاابجدهـهوزحطA-Ha-h١-٨1-8]';
+const OPTION_MARKER_BODY = `(?:[\\[(（{]\\s*(${OPTION_LABEL_TOKEN})\\s*[\\])）}]|(${OPTION_LABEL_TOKEN})\\s*(?:[-–—ـ.:：،؛/\\\\]|\\)|\\]|）))`;
+const OPTION_START_RE = new RegExp(`^\\s*(?:[-–—ـ•●▪◦*]\\s*)?${OPTION_MARKER_BODY}\\s*(.*)$`, 'u');
 
-// يلتقط الاختيارات حتى عندما تكون كلها داخل فقرة واحدة مثل:
-// السؤال ... أ-الأول ب-الثاني ج-الثالث د-الرابع
-// ولا يشترط مسافة قبل الحرف، لكنه يشترط علامة اختيار بعده حتى لا يقطع الكلمات العربية.
-const INLINE_OPTION_RE = new RegExp(
-  `(?:^|[\\s،؛|])(?:[-–—ـ•●▪◦*]\\s*)?(?:[\\[(（{]\\s*)?(${OPTION_LABEL_TOKEN})(?:\\s*[\\])）}])?\\s*(?:[-–—ـ.:：،؛/\\\\]|\\)|\\]|）)\\s*`,
-  'gu',
-);
+const normalizedOptionLabel = (value = '') => {
+  const raw = cleanImportedLine(value).toUpperCase();
+  return ['ا', 'إ', 'آ'].includes(raw) ? 'أ' : raw;
+};
+
+// يكتشف علامات الاختيارات حتى مع اختلاف التنسيق داخل السؤال الواحد:
+// أ- ، أ) ، (أ) ، [أ] ، أ: ، أ/ ، ثم ب/ج/د بأي صيغة أخرى.
+// كما يقبل أن تكون الاختيارات ملتصقة بفاصل مثل: أ-الأول-ب-الثاني.
+export const findOptionMarkers = (source = '') => {
+  const text = String(source || '').replace(/[\u200e\u200f\u202a-\u202e]/g, '');
+  const re = new RegExp(`(?:^|[\\s،؛|]|[-–—ـ•●▪◦*])${OPTION_MARKER_BODY}\\s*`, 'gu');
+  const candidates = [];
+  let match;
+  while ((match = re.exec(text)) !== null) {
+    const whole = match[0];
+    const label = normalizedOptionLabel(match[1] || match[2] || '');
+    const leading = whole.match(/^[\\s،؛|\-–—ـ•●▪◦*]*/u)?.[0]?.length || 0;
+    const markerStart = match.index + leading;
+    const contentStart = re.lastIndex;
+    const index = labelToIndex(label);
+    if (index >= 0 && index <= 7) candidates.push({ markerStart, contentStart, label, index });
+    if (!whole.length) re.lastIndex += 1;
+  }
+
+  // نختار سلسلة منطقية متزايدة (أ ثم ب ثم ج ثم د...) لمنع اعتبار حروف داخل النص اختيارات.
+  let best = [];
+  for (let i = 0; i < candidates.length; i += 1) {
+    const chain = [candidates[i]];
+    let expected = candidates[i].index + 1;
+    for (let j = i + 1; j < candidates.length; j += 1) {
+      if (candidates[j].index === expected) {
+        chain.push(candidates[j]);
+        expected += 1;
+      }
+    }
+    if (chain.length > best.length) best = chain;
+  }
+  return best;
+};
 
 export const stripQuestionPrefix = (line = '') => {
   const cleaned = cleanImportedLine(line);
@@ -71,10 +104,9 @@ export const parseMetaLine = (line = '') => {
 export const parseOptionLine = (line = '') => {
   const text = cleanImportedLine(line);
   const match = text.match(OPTION_START_RE);
-  if (!match || !cleanImportedLine(match[2])) return null;
-  const rawLabel = match[1].toUpperCase();
-  const label = ['ا', 'إ'].includes(rawLabel) ? 'أ' : rawLabel;
-  return { label, text: cleanImportedLine(match[2]) };
+  const body = cleanImportedLine(match?.[3] || '');
+  if (!match || !body) return null;
+  return { label: normalizedOptionLabel(match[1] || match[2]), text: body };
 };
 
 export const labelToIndex = (label = '') => {
@@ -150,40 +182,27 @@ const segmentMarkRatio = (start, end, ranges = []) => {
 
 const splitRichLine = ({ text, runs = [], ...meta }) => {
   const source = String(text || '').replace(/[\u200e\u200f\u202a-\u202e]/g, '');
-  const matches = [];
-  INLINE_OPTION_RE.lastIndex = 0;
-  let match;
-  while ((match = INLINE_OPTION_RE.exec(source)) !== null) {
-    // بداية العلامة بعد المسافة/الفاصل الذي التقطه التعبير.
-    const whole = match[0];
-    const leading = whole.match(/^[\s،؛|]*/u)?.[0]?.length || 0;
-    const start = match.index + leading;
-    matches.push({ start, label: match[1], markerEnd: INLINE_OPTION_RE.lastIndex });
-    if (match[0].length === 0) INLINE_OPTION_RE.lastIndex += 1;
-  }
+  const matches = findOptionMarkers(source);
 
-  // لا نفصل الفقرة إلا إذا وجدنا اختيارين على الأقل، أو وجدنا اختيارًا بعد رأس سؤال رقمي.
-  const hasQuestionPrefix = Boolean(parseQuestionStart(source));
-  if (matches.length < 2 && !(hasQuestionPrefix && matches.length >= 1)) {
-    return [{ text: cleanImportedLine(source), runs, ...meta }];
-  }
+  // نفصل إذا وجدنا اختيارين متتابعين على الأقل. أما اختيار واحد في فقرة منفصلة
+  // فيتعامل معه parseOptionLine لاحقًا، حتى لا نقطع نص السؤال خطأً.
+  if (matches.length < 2) return [{ text: cleanImportedLine(source), runs, ...meta }];
 
   const markedRanges = buildMarkedRanges(runs);
   const segments = [];
-  const firstOptionStart = matches[0]?.start ?? source.length;
+  const firstOptionStart = matches[0]?.markerStart ?? source.length;
   const questionPart = cleanImportedLine(source.slice(0, firstOptionStart));
   if (questionPart) segments.push({ text: questionPart, highlighted: false, underlined: false, ...meta });
 
   matches.forEach((entry, index) => {
-    const end = matches[index + 1]?.start ?? source.length;
-    const rawSegment = source.slice(entry.start, end);
-    const cleanedSegment = cleanImportedLine(rawSegment);
-    if (!cleanedSegment) return;
-    const ratio = segmentMarkRatio(entry.start, end, markedRanges);
+    const end = matches[index + 1]?.markerStart ?? source.length;
+    const optionText = cleanImportedLine(source.slice(entry.contentStart, end).replace(/^[-–—ـ•●▪◦*\s]+/u, ''));
+    if (!optionText) return;
+    const ratio = segmentMarkRatio(entry.contentStart, end, markedRanges);
     segments.push({
-      text: cleanedSegment,
-      highlighted: ratio >= 0.12,
-      underlined: ratio >= 0.12,
+      text: `${entry.label}) ${optionText}`,
+      highlighted: ratio >= 0.04,
+      underlined: ratio >= 0.04,
       ...meta,
     });
   });
@@ -229,15 +248,16 @@ export const parseQuestionBankLines = (lines, settings) => {
     const options = question.options.map((option) => cleanImportedLine(option.text.replace(/\*/g, '')));
     if (!question.text.trim()) { rejected.push({ reason: 'سؤال بلا نص', raw: question.rawLines || [] }); question = null; return; }
     let correctIdx = question.correctIdx;
+    let hasConfirmedAnswer = Number.isInteger(correctIdx) && correctIdx >= 0;
     if (options.length && (correctIdx === null || Number.isNaN(correctIdx))) {
       const marked = question.options.map((option, index) => (option.correctByMarker || option.highlighted ? index : -1)).filter((index) => index >= 0);
-      if (marked.length === 1) correctIdx = marked[0];
+      if (marked.length === 1) { correctIdx = marked[0]; hasConfirmedAnswer = true; }
       else { correctIdx = marked[0] ?? 0; warnings.push(`راجع إجابة السؤال: ${question.text.slice(0, 55)}${marked.length > 1 ? ' (أكثر من اختيار تحته خط)' : ' (لم أجد اختيارًا محددًا)'}`); rejected.push({ reason: marked.length > 1 ? 'أكثر من إجابة معلّمة' : 'لم تُكتشف الإجابة الصحيحة', question: question.text, options, heading: question.sourceHeading || currentHeading, raw: question.rawLines || [] }); }
     }
     const branch = question.branch || currentBranch || settings.branch || detectBranchFromText(question.text) || 'النحو';
     const topic = question.topic || currentTopic || 'عام';
     if (options.length === 1) rejected.push({ reason: 'تم اكتشاف اختيار واحد فقط', question: question.text, options, heading: question.sourceHeading || currentHeading, raw: question.rawLines || [] });
-    results.push({ text: question.text.trim(), questionStem: question.text.trim().split(/\n/)[0], sourceHeading: question.sourceHeading || currentHeading || topic, grade: question.grade || currentGrade, branch, topic, lesson: topic, type: options.length ? 'mcq' : 'essay', difficulty: question.difficulty || currentDifficulty, options, correctIdx: options.length ? Math.max(0, Math.min(options.length - 1, safeNumber(correctIdx, 0))) : 0, explanation: question.explanation.trim(), mark: options.length ? 1 : 10, tags: Array.from(new Set([branch, topic, ...(settings.tags || [])].filter(Boolean))), source: 'question_bank_import', importConfidence: options.length >= 4 && correctIdx !== null ? 'high' : 'review' });
+    results.push({ text: question.text.trim(), questionStem: question.text.trim().split(/\n/)[0], sourceHeading: question.sourceHeading || currentHeading || topic, grade: question.grade || currentGrade, branch, topic, lesson: topic, type: options.length ? 'mcq' : 'essay', difficulty: question.difficulty || currentDifficulty, options, correctIdx: options.length ? Math.max(0, Math.min(options.length - 1, safeNumber(correctIdx, 0))) : 0, explanation: question.explanation.trim(), mark: options.length ? 1 : 10, tags: Array.from(new Set([branch, topic, ...(settings.tags || [])].filter(Boolean))), source: 'question_bank_import', importConfidence: options.length >= 2 && hasConfirmedAnswer ? 'high' : 'review' });
     question = null;
   };
 
