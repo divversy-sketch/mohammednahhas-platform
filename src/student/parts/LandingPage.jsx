@@ -81,9 +81,9 @@ function ThemeToggle({ theme, onToggle }) {
 function NeoLogo({ large = false }) {
   return (
     <div className={`neo-logo ${large ? 'neo-logo--large' : ''}`} aria-label="منصة النحاس">
-      <img src={nahhasLogo} alt="منصة النحاس" className="neo-logo-image neo-logo-image--light" />
-      <img src={nahhasLogoDark} alt="منصة النحاس" className="neo-logo-image neo-logo-image--dark" />
-      <span className="neo-sr-only">منصة النحاس</span>
+      <img src={nahhasLogo} alt="" aria-hidden="true" className="neo-logo-image neo-logo-image--light" />
+      <img src={nahhasLogoDark} alt="" aria-hidden="true" className="neo-logo-image neo-logo-image--dark" />
+      <span className="neo-logo-copy"><strong>منصة النحاس</strong><small>ALNAHHAS</small></span>
     </div>
   );
 }

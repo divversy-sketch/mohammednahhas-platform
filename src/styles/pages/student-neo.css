@@ -1739,3 +1739,34 @@
     font-size: 38px;
   }
 }
+
+/* Final logo treatment: transparent icon + native readable labels in dark mode. */
+.student-neo-brand__logo,
+.student-neo-topbar__logo {
+  width: 76px !important;
+  max-width: 76px !important;
+  height: 58px !important;
+  object-fit: contain !important;
+  padding: 5px;
+  border-radius: 16px;
+  background: rgba(255,255,255,.92);
+  border: 1px solid rgba(217,119,6,.18);
+  box-shadow: 0 8px 20px rgba(0,0,0,.14);
+  filter: none !important;
+}
+.student-neo-shell--dark .student-neo-brand__logo,
+.student-neo-shell--dark .student-neo-topbar__logo {
+  background: linear-gradient(145deg, rgba(27,41,61,.96), rgba(9,17,30,.96));
+  border-color: rgba(245,158,11,.35);
+  box-shadow: 0 10px 24px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.06);
+}
+.student-neo-shell--dark .student-neo-brand span,
+.student-neo-shell--dark .student-neo-topbar__title span {
+  color:#fbbf24 !important;
+  text-shadow:none !important;
+}
+.student-neo-shell--dark .student-neo-brand strong,
+.student-neo-shell--dark .student-neo-topbar__title h1 {
+  color:#f8fafc !important;
+  text-shadow:none !important;
+}
