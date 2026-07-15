@@ -1,7 +1,7 @@
 /* منصة النحاس التعليمية - Safe PWA Service Worker */
-const APP_VERSION = "2026.05.12.phase3";
+const APP_VERSION = "2026.07.15.brand4";
 const CACHE_NAME = `nahhas-platform-${APP_VERSION}`;
-const ASSET_CACHE = ["/", "/offline.html", "/manifest.json", "/favicon.ico", "/icons/icon-192.png", "/icons/icon-512.png"];
+const ASSET_CACHE = ["/", "/offline.html", "/manifest.json?v=20260715-brand4", "/favicon.ico?v=20260715-brand4", "/icons/alnahhas-app-192-v4.png", "/icons/alnahhas-app-512-v4.png"];
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -26,10 +26,10 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   const isSafeAsset = url.origin === location.origin && (url.pathname.startsWith("/icons/") || url.pathname === "/favicon.ico" || url.pathname === "/manifest.json" || url.pathname.startsWith("/assets/"));
   if (isSafeAsset) {
-    event.respondWith(caches.match(request).then((cached) => cached || fetch(request).then((response) => {
+    event.respondWith(fetch(request).then((response) => {
       const clone = response.clone();
       caches.open(CACHE_NAME).then((cache) => cache.put(request, clone)).catch(() => null);
       return response;
-    })));
+    }).catch(() => caches.match(request)));
   }
 });

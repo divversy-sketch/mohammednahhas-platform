@@ -1,22 +1,29 @@
 {
+  "id": "/alnahhas-platform-v4",
   "short_name": "منصة النحاس",
   "name": "منصة النحاس التعليمية",
   "description": "منصة النحاس التعليمية للغة العربية - أ/ محمد النحاس",
   "icons": [
     {
-      "src": "/icons/icon-192.png?v=20260715-brand2",
+      "src": "/icons/alnahhas-app-192-v4.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "/icons/icon-512.png?v=20260715-brand2",
+      "src": "/icons/alnahhas-app-512-v4.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/alnahhas-app-512-v4.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
-  "start_url": "/?source=pwa",
+  "start_url": "/?source=pwa&brand=v4",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",

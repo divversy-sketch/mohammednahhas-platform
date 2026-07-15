@@ -1770,3 +1770,28 @@
   color:#f8fafc !important;
   text-shadow:none !important;
 }
+
+/* Brand v4: full wordmark, automatic light/dark adaptation. */
+.student-neo-responsive-logo {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+.student-neo-responsive-logo > img { grid-area: 1 / 1; object-fit: contain; }
+.student-neo-logo--dark { display: none; }
+.student-neo-shell--dark .student-neo-logo--light { display: none; }
+.student-neo-shell--dark .student-neo-logo--dark { display: block; }
+.student-neo-topbar__logo { width: clamp(150px, 16vw, 230px) !important; height: 64px !important; }
+.student-neo-brand__logo { width: min(210px, 100%) !important; height: 76px !important; }
+.student-neo-shell--dark .student-neo-responsive-logo {
+  padding: 5px 9px;
+  border: 1px solid rgba(245, 158, 11, .22);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(19,31,50,.88), rgba(7,14,25,.78));
+  box-shadow: 0 10px 26px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.05);
+}
+@media (max-width: 720px) {
+  .student-neo-topbar__logo { width: 132px !important; height: 52px !important; }
+  .student-neo-brand__logo { width: 168px !important; height: 62px !important; }
+}

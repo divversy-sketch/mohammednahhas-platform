@@ -26,6 +26,7 @@ import '../../styles/pages/landing.css';
 import '../../styles/pages/auth.css';
 import nahhasLogo from '../../assets/nahhas-logo-transparent.png';
 import nahhasLogoDark from '../../assets/nahhas-logo-dark.png';
+import { getSystemTheme, subscribeToSystemTheme } from '../utils/systemTheme.js';
 
 const arabicLetters = ['أ', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'س', 'ش', 'ص', 'ض', 'ط', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي', 'لا'];
 
@@ -75,7 +76,7 @@ function AuthInput({ icon: Icon, ...props }) {
 
 export const AuthPage = ({ onBack, initialMode = 'login' }) => {
   const [isRegister, setIsRegister] = useState(() => initialMode === 'register');
-  const [theme, setTheme] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('nahhas-public-theme') : null) || 'light');
+  const [theme, setTheme] = useState(getSystemTheme);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({ email: '', password: '', name: '', grade: '1sec', phone: '', parentPhone: '' });
   const [platformSettings, setPlatformSettings] = useState({ registrationOpen: true, platformName: 'منصة النحاس التعليمية', welcomeMessage: '' });
@@ -84,8 +85,10 @@ export const AuthPage = ({ onBack, initialMode = 'login' }) => {
     setIsRegister(initialMode === 'register');
   }, [initialMode]);
 
+  useEffect(() => subscribeToSystemTheme(setTheme), []);
+
   useEffect(() => {
-    if (typeof window !== 'undefined') localStorage.setItem('nahhas-public-theme', theme);
+    if (typeof document !== 'undefined') document.documentElement.style.colorScheme = theme;
   }, [theme]);
 
   useEffect(() => {

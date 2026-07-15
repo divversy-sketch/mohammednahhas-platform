@@ -733,3 +733,17 @@ button.neo-learning-card:hover { transform: translateY(-3px) scale(1.01); box-sh
 .neo-public-page:not(.neo-public-light) .neo-logo-copy strong { color:#f8fafc; text-shadow:none; }
 .neo-public-page:not(.neo-public-light) .neo-logo-copy small { color:#fbbf24; }
 .neo-public-page:not(.neo-public-light) .neo-logo-image { filter:drop-shadow(0 8px 18px rgba(245,158,11,.2)); }
+
+/* Brand v4: preserve the approved complete wordmark and adapt it to system theme. */
+.neo-logo-image { max-width: none !important; width: clamp(170px, 18vw, 285px) !important; height: auto !important; aspect-ratio: auto !important; }
+.neo-logo--large .neo-logo-image { width: clamp(240px, 34vw, 480px) !important; }
+.neo-logo--auth .neo-logo-image { width: clamp(210px, 26vw, 360px) !important; }
+.neo-logo-copy { display: none !important; }
+.neo-public-dark .neo-logo-image--light { display: none !important; }
+.neo-public-dark .neo-logo-image--dark { display: block !important; }
+.neo-public-light .neo-logo-image--dark { display: none !important; }
+.neo-public-light .neo-logo-image--light { display: block !important; }
+@media (max-width: 720px) {
+  .neo-logo-image { width: 162px !important; }
+  .neo-logo--auth .neo-logo-image { width: 210px !important; }
+}

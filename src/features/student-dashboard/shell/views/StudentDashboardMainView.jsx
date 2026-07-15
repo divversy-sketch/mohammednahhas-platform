@@ -4,6 +4,8 @@ import { auth } from '@services/firebase';
 import SmartHomeworkScanner from '@features/homework/SmartHomeworkScanner.jsx';
 import '@styles/pages/student-neo.css';
 import nahhasLogo from '@assets/nahhas-logo-transparent.png';
+import nahhasLogoDark from '@assets/nahhas-logo-dark.png';
+import { getSystemTheme, subscribeToSystemTheme } from '@shared/utils/systemTheme.js';
 import { GradeOptions, getGradeLabel } from '@shared/constants/grades';
 
 const SecureVideoPlayer = lazy(() => import('@features/video-security/player/SecureVideoPlayer.jsx'));
@@ -325,7 +327,7 @@ function Topbar({ ctx, theme, setTheme, currentTab, mobileOpen, setMobileOpen })
         <Icon name={mobileOpen ? 'close' : 'menu'} />
       </button>
       <div className="student-neo-topbar__title">
-        <img src={nahhasLogo} alt="منصة النحاس" className="student-neo-topbar__logo" />
+        <span className="student-neo-responsive-logo" aria-label="منصة النحاس"><img src={nahhasLogo} alt="" className="student-neo-topbar__logo student-neo-logo--light" /><img src={nahhasLogoDark} alt="" className="student-neo-topbar__logo student-neo-logo--dark" /></span>
         <div>
           <span>بوابة الطالب</span>
           <h1>{tabLabel}</h1>
@@ -356,7 +358,7 @@ function Sidebar({ ctx, active, setActive, open, setOpen }) {
   return (
     <aside className={`student-neo-sidebar ${open ? 'is-open' : ''}`}>
       <div className="student-neo-brand">
-        <img src={nahhasLogo} alt="منصة النحاس" className="student-neo-brand__logo" />
+        <span className="student-neo-responsive-logo" aria-label="منصة النحاس"><img src={nahhasLogo} alt="" className="student-neo-brand__logo student-neo-logo--light" /><img src={nahhasLogoDark} alt="" className="student-neo-brand__logo student-neo-logo--dark" /></span>
         <div>
           <span>منصة النحاس</span>
           <strong>بوابة الطالب</strong>
@@ -790,14 +792,13 @@ function ActiveView({ active, ctx }) {
 }
 
 export const StudentDashboardMainView = ({ ctx }) => {
-  const [theme, setTheme] = useState(() => {
-    if (typeof window === 'undefined') return 'light';
-    return window.localStorage.getItem('studentNeoTheme') || 'light';
-  });
+  const [theme, setTheme] = useState(getSystemTheme);
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  useEffect(() => subscribeToSystemTheme(setTheme), []);
+
   useEffect(() => {
-    if (typeof window !== 'undefined') window.localStorage.setItem('studentNeoTheme', theme);
+    if (typeof document !== 'undefined') document.documentElement.style.colorScheme = theme;
   }, [theme]);
 
   const active = useMemo(() => {
