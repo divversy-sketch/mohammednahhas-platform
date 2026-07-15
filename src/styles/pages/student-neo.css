@@ -1795,3 +1795,100 @@
   .student-neo-topbar__logo { width: 132px !important; height: 52px !important; }
   .student-neo-brand__logo { width: 168px !important; height: 62px !important; }
 }
+
+/* Brand v5: larger and clearer platform wordmark. */
+.student-neo-topbar__logo {
+  width: clamp(210px, 22vw, 320px) !important;
+  max-width: none !important;
+  height: 88px !important;
+  padding: 3px !important;
+}
+.student-neo-brand__logo {
+  width: clamp(220px, 24vw, 340px) !important;
+  max-width: none !important;
+  height: 96px !important;
+  padding: 3px !important;
+}
+.student-neo-responsive-logo {
+  min-width: 0;
+  overflow: visible;
+}
+.student-neo-shell--dark .student-neo-responsive-logo {
+  padding: 4px 7px;
+}
+@media (max-width: 900px) {
+  .student-neo-topbar__logo {
+    width: clamp(180px, 31vw, 250px) !important;
+    height: 76px !important;
+  }
+  .student-neo-brand__logo {
+    width: clamp(195px, 34vw, 270px) !important;
+    height: 82px !important;
+  }
+}
+@media (max-width: 720px) {
+  .student-neo-topbar__logo {
+    width: clamp(168px, 40vw, 220px) !important;
+    height: 70px !important;
+  }
+  .student-neo-brand__logo {
+    width: clamp(184px, 44vw, 235px) !important;
+    height: 76px !important;
+  }
+}
+@media (max-width: 430px) {
+  .student-neo-topbar__logo {
+    width: 156px !important;
+    height: 64px !important;
+  }
+  .student-neo-brand__logo {
+    width: 176px !important;
+    height: 70px !important;
+  }
+}
+
+
+/* Brand sizing v6: prominent, clear logo only inside the student portal. */
+.student-neo-topbar__logo {
+  width: clamp(250px, 25vw, 390px) !important;
+  height: 108px !important;
+  object-fit: contain !important;
+}
+.student-neo-brand__logo {
+  width: clamp(260px, 27vw, 410px) !important;
+  height: 116px !important;
+  object-fit: contain !important;
+}
+.student-neo-responsive-logo {
+  flex-shrink: 0;
+}
+@media (max-width: 900px) {
+  .student-neo-topbar__logo {
+    width: clamp(210px, 38vw, 300px) !important;
+    height: 88px !important;
+  }
+  .student-neo-brand__logo {
+    width: clamp(225px, 41vw, 315px) !important;
+    height: 94px !important;
+  }
+}
+@media (max-width: 720px) {
+  .student-neo-topbar__logo {
+    width: clamp(178px, 46vw, 238px) !important;
+    height: 76px !important;
+  }
+  .student-neo-brand__logo {
+    width: clamp(194px, 50vw, 255px) !important;
+    height: 82px !important;
+  }
+}
+@media (max-width: 430px) {
+  .student-neo-topbar__logo {
+    width: 170px !important;
+    height: 70px !important;
+  }
+  .student-neo-brand__logo {
+    width: 188px !important;
+    height: 76px !important;
+  }
+}

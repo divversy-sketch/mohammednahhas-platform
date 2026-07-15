@@ -28,7 +28,7 @@ import { WhatsAppContactButton } from '../../shared/core/platformShared.jsx';
 import '../../styles/pages/landing.css';
 import nahhasLogo from '../../assets/nahhas-logo-transparent.png';
 import nahhasLogoDark from '../../assets/nahhas-logo-dark.png';
-import { getSystemTheme, subscribeToSystemTheme } from '../../shared/utils/systemTheme.js';
+
 
 const arabicLetters = ['أ', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي', 'لا', 'ة'];
 
@@ -117,13 +117,12 @@ const journey = [
 ];
 
 export const LandingPage = ({ onAuthClick, onRegisterClick, installPrompt }) => {
-  const [theme, setTheme] = useState(getSystemTheme);
+  const [theme, setTheme] = useState('light');
   const [publicContent, setPublicContent] = useState([]);
   const [publicFiles, setPublicFiles] = useState([]);
   const [playingVideo, setPlayingVideo] = useState(null);
   const [playingHtml, setPlayingHtml] = useState(null);
 
-  useEffect(() => subscribeToSystemTheme(setTheme), []);
 
   useEffect(() => {
     if (typeof document !== 'undefined') {

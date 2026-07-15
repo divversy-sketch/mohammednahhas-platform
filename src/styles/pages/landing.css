@@ -747,3 +747,49 @@ button.neo-learning-card:hover { transform: translateY(-3px) scale(1.01); box-sh
   .neo-logo-image { width: 162px !important; }
   .neo-logo--auth .neo-logo-image { width: 210px !important; }
 }
+
+
+/* Brand sizing v6: keep authentication pages balanced; large branding is reserved for the student portal. */
+.neo-auth-card-head .neo-logo--auth {
+  flex: 0 0 auto;
+  width: 118px;
+  min-width: 118px;
+  max-width: 118px;
+  padding: 5px 7px;
+  border-radius: 16px;
+  overflow: hidden;
+}
+.neo-auth-card-head .neo-logo--auth .neo-logo-image {
+  display: block;
+  width: 104px !important;
+  max-width: 104px !important;
+  height: 62px !important;
+  object-fit: contain;
+  margin: 0 auto;
+}
+.neo-auth-card-head {
+  align-items: center;
+  gap: 16px;
+}
+.neo-auth-card-head > div:last-child {
+  min-width: 0;
+  flex: 1;
+}
+.neo-auth-card-head > div:last-child > span {
+  display: block;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .neo-auth-card-head .neo-logo--auth {
+    width: 96px;
+    min-width: 96px;
+    max-width: 96px;
+  }
+  .neo-auth-card-head .neo-logo--auth .neo-logo-image {
+    width: 84px !important;
+    max-width: 84px !important;
+    height: 54px !important;
+  }
+  .neo-auth-card-head { gap: 12px; }
+}

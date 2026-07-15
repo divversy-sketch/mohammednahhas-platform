@@ -5,7 +5,7 @@ import SmartHomeworkScanner from '@features/homework/SmartHomeworkScanner.jsx';
 import '@styles/pages/student-neo.css';
 import nahhasLogo from '@assets/nahhas-logo-transparent.png';
 import nahhasLogoDark from '@assets/nahhas-logo-dark.png';
-import { getSystemTheme, subscribeToSystemTheme } from '@shared/utils/systemTheme.js';
+
 import { GradeOptions, getGradeLabel } from '@shared/constants/grades';
 
 const SecureVideoPlayer = lazy(() => import('@features/video-security/player/SecureVideoPlayer.jsx'));
@@ -792,10 +792,9 @@ function ActiveView({ active, ctx }) {
 }
 
 export const StudentDashboardMainView = ({ ctx }) => {
-  const [theme, setTheme] = useState(getSystemTheme);
+  const [theme, setTheme] = useState('light');
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  useEffect(() => subscribeToSystemTheme(setTheme), []);
 
   useEffect(() => {
     if (typeof document !== 'undefined') document.documentElement.style.colorScheme = theme;
