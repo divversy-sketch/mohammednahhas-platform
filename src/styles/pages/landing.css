@@ -682,3 +682,41 @@ button.neo-learning-card:hover { transform: translateY(-3px) scale(1.01); box-sh
   .neo-stat-strip--compact span { font-size: .66rem; line-height: 1.4; }
   .neo-final-cta__actions > * { width: 100%; flex-basis: 100%; }
 }
+
+/* Dark-mode brand integration: transparent artwork, proper surface and legible platform name. */
+.neo-logo {
+  isolation: isolate;
+  border-radius: 20px;
+  padding: 7px 10px;
+  background: transparent;
+}
+.neo-logo-image--dark { display: none; }
+.neo-public-page:not(.neo-public-light) .neo-logo {
+  background: linear-gradient(145deg, rgba(20, 32, 52, .88), rgba(8, 15, 27, .72));
+  border: 1px solid rgba(245, 158, 11, .22);
+  box-shadow: 0 12px 30px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.06);
+}
+.neo-public-page:not(.neo-public-light) .neo-logo::after {
+  content: '';
+  position: absolute;
+  inset: auto 12% -1px 12%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(245,158,11,.75), transparent);
+  box-shadow: 0 0 12px rgba(245,158,11,.42);
+  pointer-events: none;
+}
+.neo-public-page:not(.neo-public-light) .neo-logo-image--light { display: none; }
+.neo-public-page:not(.neo-public-light) .neo-logo-image--dark { display: block; }
+.neo-public-page:not(.neo-public-light) .neo-logo-image {
+  filter: drop-shadow(0 10px 22px rgba(0,0,0,.42));
+}
+.neo-public-page:not(.neo-public-light) .neo-nav-brand__copy strong,
+.neo-public-page:not(.neo-public-light) .neo-auth-card-head > div:last-child > span {
+  color: #fbbf24;
+  text-shadow: 0 1px 10px rgba(245,158,11,.22);
+}
+.neo-public-page:not(.neo-public-light) .neo-nav-brand__copy span {
+  color: #d4dde9;
+}
+.neo-nav-brand .neo-logo { padding: 5px 9px; border-radius: 16px; }
+.neo-logo--auth { padding: 8px 12px; }
