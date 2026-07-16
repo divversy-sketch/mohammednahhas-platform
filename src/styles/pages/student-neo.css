@@ -1892,3 +1892,111 @@
     height: 76px !important;
   }
 }
+
+/* Student portal brand layout v7: prevent logo overlap while keeping it clear. */
+.student-neo-brand,
+.student-neo-topbar__title {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.student-neo-brand {
+  display: grid;
+  grid-template-columns: minmax(0, 136px) minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.student-neo-topbar__title {
+  display: grid;
+  grid-template-columns: minmax(0, 190px) minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  flex: 1 1 auto;
+}
+
+.student-neo-responsive-logo {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.student-neo-topbar__logo,
+.student-neo-brand__logo {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: 72px !important;
+  padding: 2px !important;
+  display: block;
+  object-fit: contain !important;
+  object-position: center;
+}
+
+.student-neo-brand__logo {
+  max-height: 66px !important;
+}
+
+.student-neo-topbar__title > div,
+.student-neo-brand > div {
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.student-neo-topbar__title h1,
+.student-neo-topbar__title span,
+.student-neo-brand span,
+.student-neo-brand strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-neo-shell--dark .student-neo-responsive-logo {
+  padding: 5px 7px;
+}
+
+@media (max-width: 1180px) {
+  .student-neo-topbar__title {
+    grid-template-columns: minmax(0, 176px) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .student-neo-topbar {
+    gap: 8px;
+  }
+
+  .student-neo-topbar__title {
+    grid-template-columns: minmax(0, 145px) minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .student-neo-topbar__logo {
+    max-height: 58px !important;
+  }
+
+  .student-neo-topbar__title h1 {
+    font-size: clamp(18px, 5vw, 25px);
+  }
+}
+
+@media (max-width: 520px) {
+  .student-neo-topbar__title {
+    grid-template-columns: minmax(0, 118px) minmax(0, 1fr);
+  }
+
+  .student-neo-topbar__logo {
+    max-height: 50px !important;
+  }
+
+  .student-neo-topbar__title > div > span {
+    font-size: 10px;
+  }
+
+  .student-neo-topbar__title h1 {
+    font-size: 18px;
+  }
+}
