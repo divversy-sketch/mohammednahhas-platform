@@ -2000,3 +2000,138 @@
     font-size: 18px;
   }
 }
+
+
+/* === Final hotfix: student portal brand layout cleanup === */
+.student-neo-responsive-logo {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.student-neo-topbar__title {
+  display: flex !important;
+  align-items: center;
+  gap: 12px !important;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.student-neo-topbar__title > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.student-neo-topbar__title > div > span {
+  display: block !important;
+  font-size: 13px !important;
+  font-weight: 800;
+  color: #c87a17;
+  margin-bottom: 2px;
+}
+
+.student-neo-topbar__title h1 {
+  margin: 0;
+  font-size: clamp(24px, 2.1vw, 36px) !important;
+  line-height: 1.1;
+}
+
+.student-neo-topbar__logo {
+  width: clamp(136px, 14vw, 180px) !important;
+  max-width: 180px !important;
+  height: auto !important;
+  max-height: 64px !important;
+  object-fit: contain !important;
+  display: block !important;
+  flex-shrink: 0;
+}
+
+.student-neo-brand {
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 8px !important;
+  overflow: hidden;
+}
+
+.student-neo-brand > div {
+  min-width: 0;
+  width: 100%;
+}
+
+.student-neo-brand span,
+.student-neo-brand strong {
+  display: block;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+}
+
+.student-neo-brand span {
+  font-size: 14px !important;
+  font-weight: 800;
+  color: #c87a17;
+  margin-bottom: 2px;
+}
+
+.student-neo-brand strong {
+  font-size: clamp(30px, 3vw, 44px);
+  line-height: 1.05;
+}
+
+.student-neo-brand__logo {
+  width: min(220px, 100%) !important;
+  max-width: 220px !important;
+  height: auto !important;
+  max-height: 88px !important;
+  object-fit: contain !important;
+  display: block !important;
+}
+
+.student-neo-shell--dark .student-neo-brand,
+.student-neo-shell--dark .student-neo-topbar__title {
+  color: #f8fafc;
+}
+
+@media (max-width: 900px) {
+  .student-neo-topbar__title {
+    gap: 10px !important;
+  }
+  .student-neo-topbar__logo {
+    width: 128px !important;
+    max-width: 128px !important;
+    max-height: 54px !important;
+  }
+  .student-neo-topbar__title h1 {
+    font-size: 24px !important;
+  }
+  .student-neo-brand__logo {
+    width: min(190px, 100%) !important;
+    max-width: 190px !important;
+    max-height: 76px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .student-neo-topbar__title > div > span {
+    font-size: 11px !important;
+  }
+  .student-neo-topbar__title h1 {
+    font-size: 20px !important;
+  }
+  .student-neo-topbar__logo {
+    width: 108px !important;
+    max-width: 108px !important;
+    max-height: 46px !important;
+  }
+  .student-neo-brand__logo {
+    width: min(170px, 100%) !important;
+    max-width: 170px !important;
+    max-height: 66px !important;
+  }
+}
