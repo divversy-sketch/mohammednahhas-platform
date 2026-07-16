@@ -2251,3 +2251,15 @@
     max-height: 44px !important;
   }
 }
+
+
+/* === Single visible logo fix === */
+.student-neo-logo--light{display:block!important;}
+.student-neo-logo--dark{display:none!important;}
+.student-neo-shell--dark .student-neo-logo--light{display:none!important;}
+.student-neo-shell--dark .student-neo-logo--dark{display:block!important;}
+.student-neo-shell--light .student-neo-logo--light{display:block!important;}
+.student-neo-shell--light .student-neo-logo--dark{display:none!important;}
+.student-neo-responsive-logo img+img{margin-inline-start:0!important;}
+.student-neo-topbar__title .student-neo-responsive-logo,.student-neo-brand .student-neo-responsive-logo{position:relative!important;}
+.student-neo-topbar__title .student-neo-logo--light,.student-neo-topbar__title .student-neo-logo--dark,.student-neo-brand .student-neo-logo--light,.student-neo-brand .student-neo-logo--dark{grid-area:auto!important;position:relative!important;}
