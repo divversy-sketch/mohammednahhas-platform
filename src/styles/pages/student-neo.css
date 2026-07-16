@@ -2135,3 +2135,119 @@
     max-height: 66px !important;
   }
 }
+
+
+/* === Final logo visibility + sizing correction === */
+.student-neo-responsive-logo {
+  display: block !important;
+  width: auto !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: visible !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  flex: 0 0 auto !important;
+}
+
+.student-neo-logo--light {
+  display: block !important;
+}
+.student-neo-logo--dark {
+  display: none !important;
+}
+.student-neo-shell--dark .student-neo-logo--light {
+  display: none !important;
+}
+.student-neo-shell--dark .student-neo-logo--dark {
+  display: block !important;
+}
+
+.student-neo-topbar__title {
+  display: flex !important;
+  align-items: center !important;
+  gap: 14px !important;
+  overflow: visible !important;
+}
+.student-neo-topbar__logo {
+  width: 178px !important;
+  max-width: 178px !important;
+  min-width: 178px !important;
+  height: 68px !important;
+  max-height: 68px !important;
+  object-fit: contain !important;
+  object-position: center !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 14px !important;
+}
+
+.student-neo-brand {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  overflow: visible !important;
+}
+.student-neo-brand__logo {
+  width: 190px !important;
+  max-width: 190px !important;
+  min-width: 190px !important;
+  height: 76px !important;
+  max-height: 76px !important;
+  object-fit: contain !important;
+  object-position: center !important;
+  padding: 0 !important;
+  margin: 0 auto !important;
+  border-radius: 14px !important;
+}
+
+@media (max-width: 1180px) {
+  .student-neo-topbar__logo {
+    width: 158px !important;
+    max-width: 158px !important;
+    min-width: 158px !important;
+    height: 60px !important;
+    max-height: 60px !important;
+  }
+  .student-neo-brand__logo {
+    width: 174px !important;
+    max-width: 174px !important;
+    min-width: 174px !important;
+    height: 70px !important;
+    max-height: 70px !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .student-neo-topbar__title {
+    gap: 10px !important;
+  }
+  .student-neo-topbar__logo {
+    width: 126px !important;
+    max-width: 126px !important;
+    min-width: 126px !important;
+    height: 50px !important;
+    max-height: 50px !important;
+  }
+  .student-neo-brand__logo {
+    width: 160px !important;
+    max-width: 160px !important;
+    min-width: 160px !important;
+    height: 64px !important;
+    max-height: 64px !important;
+  }
+}
+
+@media (max-width: 520px) {
+  .student-neo-topbar__logo {
+    width: 108px !important;
+    max-width: 108px !important;
+    min-width: 108px !important;
+    height: 44px !important;
+    max-height: 44px !important;
+  }
+}
