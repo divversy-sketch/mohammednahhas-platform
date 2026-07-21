@@ -6,6 +6,15 @@ import { parseQuestionBankLines, readDocxParagraphs } from '@features/question-b
 import { platformNotify } from '@shared/core/platformShared.jsx';
 import './smart-teacher.css';
 
+const GRADE_ITEMS = [
+  { value: '1prep', label: 'الصف الأول الإعدادي' },
+  { value: '2prep', label: 'الصف الثاني الإعدادي' },
+  { value: '3prep', label: 'الصف الثالث الإعدادي' },
+  { value: '1sec', label: 'الصف الأول الثانوي' },
+  { value: '2sec', label: 'الصف الثاني الثانوي' },
+  { value: '3sec', label: 'الصف الثالث الثانوي' },
+];
+
 const branches = ['النحو','البلاغة','الأدب','القصة','القراءة','التعبير'];
 
 export default function AdminSmartTeacherManager(){
@@ -31,7 +40,7 @@ export default function AdminSmartTeacherManager(){
   return <div className="st-admin" dir="rtl"><div className="st-admin-hero"><div className="st-logo">ن<span>✦</span></div><div><small>منصة النحاس</small><h2>المعلم الذكي</h2><p>بنك أسئلة تكيفي وفيديوهات تفاعلية بدون خدمات مدفوعة.</p></div></div>
     <div className="st-tabs"><button className={tab==='groups'?'active':''} onClick={()=>setTab('groups')}>مجموعات التدريب</button><button className={tab==='help'?'active':''} onClick={()=>setTab('help')}>بطاقة مساعدة الدرس</button></div>
     <section className="st-card"><div className="st-grid"><label>عنوان المجموعة<input value={title} onChange={e=>setTitle(e.target.value)} placeholder="تدريبات اسم الفاعل"/></label><label>الفرع<select value={branch} onChange={e=>setBranch(e.target.value)}>{branches.map(x=><option key={x}>{x}</option>)}</select></label><label>اسم الدرس<input value={lesson} onChange={e=>setLesson(e.target.value)} placeholder="اسم الفاعل"/></label><label>عدد أسئلة الجلسة<input type="number" min="1" max="50" value={perSession} onChange={e=>setPerSession(e.target.value)}/></label></div>
-      <div className="st-grade-box"><strong>تظهر للصفوف:</strong>{GradeOptions.map(g=><button key={g.value} className={grades.includes(g.value)?'active':''} onClick={()=>toggleGrade(g.value)}>{g.label}</button>)}</div>
+      <div className="st-grade-box"><strong>تظهر للصفوف:</strong>{GRADE_ITEMS.map(g=><button key={g.value} className={grades.includes(g.value)?'active':''} onClick={()=>toggleGrade(g.value)}>{g.label}</button>)}</div>
       <div className="st-help-grid"><label>التلميح العام<textarea value={hint} onChange={e=>setHint(e.target.value)} placeholder="اسأل نفسك: من الذي قام بالفعل؟"/></label><label>القاعدة المختصرة<textarea value={rule} onChange={e=>setRule(e.target.value)} placeholder="يُصاغ اسم الفاعل..."/></label><label>مثال<textarea value={example} onChange={e=>setExample(e.target.value)} placeholder="كتب ← كاتب"/></label><label>خطأ شائع<textarea value={commonMistake} onChange={e=>setCommonMistake(e.target.value)} placeholder="الخلط بين اسم الفاعل واسم المفعول"/></label></div>
       <div className="st-import"><h3>نفس مستورد بنك الأسئلة</h3><textarea value={raw} onChange={e=>setRaw(e.target.value)} placeholder="الصق مجموعة الأسئلة كاملة هنا بنفس التنسيق المعتاد..."/><div><button onClick={handlePaste}>تحليل النص</button><label className="st-file">رفع Word أو TXT<input type="file" accept=".docx,.txt" onChange={handleFile}/></label></div></div>
       {(parsed.length>0||rejected.length>0)&&<div className="st-review"><b>تم التعرف على {parsed.length} سؤال</b><span>{rejected.length} يحتاج مراجعة</span><div className="st-preview">{parsed.slice(0,8).map((q,i)=><article key={i}><strong>{i+1}. {q.text}</strong><small>{q.options?.join(' • ')}</small></article>)}</div></div>}

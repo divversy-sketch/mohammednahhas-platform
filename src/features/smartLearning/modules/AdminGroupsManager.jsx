@@ -7,6 +7,15 @@ import { platformNotify } from '@shared/core/platformShared.jsx';
 import PageHeader from '@shared/ui/PageHeader.jsx';
 import EmptyState from '@shared/ui/EmptyState.jsx';
 
+const GRADE_ITEMS = [
+  { value: '1prep', label: 'الصف الأول الإعدادي' },
+  { value: '2prep', label: 'الصف الثاني الإعدادي' },
+  { value: '3prep', label: 'الصف الثالث الإعدادي' },
+  { value: '1sec', label: 'الصف الأول الثانوي' },
+  { value: '2sec', label: 'الصف الثاني الثانوي' },
+  { value: '3sec', label: 'الصف الثالث الثانوي' },
+];
+
 const clamp = (n, min = 0, max = 100) => Math.max(min, Math.min(max, Number(n) || 0));
 const clean = (v) => String(v || '').trim();
 const arabicDate = (v) => {
@@ -154,7 +163,7 @@ export function AdminGroupsManager({ users = [], userData }) {
     {mode === 'members' && <>
       <form onSubmit={createGroup} className="bg-white rounded-3xl border p-5 grid md:grid-cols-4 gap-3">
         <input className="border rounded-xl p-3 font-bold" placeholder="اسم المجموعة" value={form.name} onChange={(e)=>setForm({...form, name:e.target.value})}/>
-        <select className="border rounded-xl p-3 font-bold" value={form.grade} onChange={(e)=>setForm({...form, grade:e.target.value})}>{GradeOptions.map((grade) => <option key={grade.value} value={grade.value}>{grade.label}</option>)}</select>
+        <select className="border rounded-xl p-3 font-bold" value={form.grade} onChange={(e)=>setForm({...form, grade:e.target.value})}>{GRADE_ITEMS.map((grade) => <option key={grade.value} value={grade.value}>{grade.label}</option>)}</select>
         <input className="border rounded-xl p-3 font-bold" placeholder="وصف مختصر" value={form.description} onChange={(e)=>setForm({...form, description:e.target.value})}/>
         <button className="bg-blue-700 text-white rounded-xl font-black">إنشاء مجموعة</button>
       </form>
