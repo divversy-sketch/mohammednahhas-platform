@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where, limit } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where, limit, writeBatch } from 'firebase/firestore';
 import { db } from '@services/firebase';
 import { BarChart3, ClipboardList, CreditCard, Download, Lock, MessageSquare, PlayCircle, Save, Send, Shield, Sparkles, Target, Trash2, Users, Wand2 } from '@shared/icons/lucide-shim.jsx';
 import { GradeOptions, getGradeLabel } from '@shared/constants/grades.jsx';
@@ -50,6 +50,11 @@ export function AdminGroupsManager({ users = [], userData }) {
   const [groups, setGroups] = useState([]);
   const [form, setForm] = useState({ name: '', grade: '3sec', description: '' });
   const [selectedGroup, setSelectedGroup] = useState('');
+  const [mode, setMode] = useState('members');
+  const [attendanceDate, setAttendanceDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [sessionTitle, setSessionTitle] = useState('');
+  const [attendanceMap, setAttendanceMap] = useState({});
+  const [attendanceSaving, setAttendanceSaving] = useState(false);
   useEffect(() => onSnapshot(query(collection(db, 'student_groups'), orderBy('createdAt')), (snap) => setGroups(snap.docs.map((d) => ({ id: d.id, ...d.data() })).reverse()), () => setGroups([])), []);
   const createGroup = async (e) => {
     e.preventDefault();
@@ -84,17 +89,110 @@ export function AdminGroupsManager({ users = [], userData }) {
     await updateDoc(doc(db, 'users', id), { groupIds: nextGroupIds, updatedAt: serverTimestamp() });
   };
   const group = groups.find((g) => g.id === selectedGroup) || groups[0];
+  const groupMembers = (Array.isArray(group?.members) ? group.members : [])
+    .map((id) => users.find((user) => (user.id || user.uid) === id))
+    .filter(Boolean);
+
+  useEffect(() => {
+    if (!group?.id || !attendanceDate) return undefined;
+    const q = query(collection(db, 'attendance_records'), where('groupId', '==', group.id), where('dateKey', '==', attendanceDate));
+    return onSnapshot(q, (snap) => {
+      const next = {};
+      snap.docs.forEach((record) => {
+        const data = record.data();
+        if (data.studentId) next[data.studentId] = data.status || 'present';
+      });
+      setAttendanceMap(next);
+    }, () => setAttendanceMap({}));
+  }, [group?.id, attendanceDate]);
+
+  const setAllAttendance = (status) => {
+    const next = {};
+    groupMembers.forEach((student) => { next[student.id || student.uid] = status; });
+    setAttendanceMap(next);
+  };
+
+  const saveAttendance = async () => {
+    if (!group?.id) return platformNotify('اختر مجموعة أولًا', 'error');
+    if (!groupMembers.length) return platformNotify('المجموعة لا تحتوي على طلاب', 'error');
+    if (!clean(sessionTitle)) return platformNotify('اكتب اسم الحصة', 'error');
+    setAttendanceSaving(true);
+    try {
+      const batch = writeBatch(db);
+      groupMembers.forEach((student) => {
+        const studentId = student.id || student.uid;
+        const status = attendanceMap[studentId] || 'present';
+        const recordId = `${group.id}_${attendanceDate}_${studentId}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+        batch.set(doc(db, 'attendance_records', recordId), {
+          studentId,
+          studentName: student.name || student.displayName || student.email || 'طالب',
+          groupId: group.id,
+          groupName: group.name || '',
+          sessionTitle: clean(sessionTitle),
+          status,
+          dateKey: attendanceDate,
+          date: new Date(`${attendanceDate}T12:00:00`),
+          updatedAt: serverTimestamp(),
+          recordedBy: userData?.email || 'admin',
+        }, { merge: true });
+      });
+      await batch.commit();
+      platformNotify('تم حفظ كشف الحضور والغياب بنجاح');
+    } catch (error) {
+      platformNotify(error.message || 'تعذر حفظ الحضور', 'error');
+    } finally {
+      setAttendanceSaving(false);
+    }
+  };
   return <div className="space-y-6" dir="rtl">
-    <PageHeader title="المجموعات والدفعات" description="قسّم الطلاب إلى دفعات ومجموعات، وبعدها اربط الامتحانات والرسائل والكورسات بالمجموعة بدل الاختيار اليدوي كل مرة." icon={<Users className="text-blue-600"/>}/>
-    <form onSubmit={createGroup} className="bg-white rounded-3xl border p-5 grid md:grid-cols-4 gap-3">
-      <input className="border rounded-xl p-3 font-bold" placeholder="اسم المجموعة" value={form.name} onChange={(e)=>setForm({...form, name:e.target.value})}/>
-      <select className="border rounded-xl p-3 font-bold" value={form.grade} onChange={(e)=>setForm({...form, grade:e.target.value})}><GradeOptions/></select>
-      <input className="border rounded-xl p-3 font-bold" placeholder="وصف مختصر" value={form.description} onChange={(e)=>setForm({...form, description:e.target.value})}/>
-      <button className="bg-blue-700 text-white rounded-xl font-black">إنشاء مجموعة</button>
-    </form>
-    <div className="grid lg:grid-cols-3 gap-5">
-      <div className="bg-white rounded-3xl border p-4 space-y-2">{groups.map((g)=> <div key={g.id} className={`flex items-center gap-2 rounded-2xl p-2 ${group?.id===g.id?'bg-blue-50':'bg-slate-50'}`}><button type="button" onClick={()=>setSelectedGroup(g.id)} className={`flex-1 text-right p-2 rounded-xl font-black ${group?.id===g.id?'text-blue-700':'text-slate-800'}`}>{g.name}<span className="block text-xs text-slate-500">{(g.members||[]).length} طالب</span></button><button type="button" title="حذف المجموعة" onClick={()=>deleteGroup(g)} className="shrink-0 rounded-xl border border-red-100 bg-red-50 p-2 text-red-700 hover:bg-red-100"><Trash2 size={18}/></button></div>)}{!groups.length && <EmptyState title="لا توجد مجموعات" icon="👥"/>}</div>
-      <div className="lg:col-span-2 bg-white rounded-3xl border p-4"><h3 className="font-black mb-3">طلاب المجموعة: {group?.name || '—'}</h3><div className="grid md:grid-cols-2 gap-2 max-h-[520px] overflow-auto">{users.map((u)=>{ const id = u.id || u.uid; const active = (group?.members || []).includes(id); return <button key={id} disabled={!group} onClick={()=>toggleMember(group,u)} className={`text-right border rounded-2xl p-3 ${active?'bg-emerald-50 border-emerald-200':'bg-slate-50'}`}><p className="font-black">{u.name || u.displayName || u.email}</p><p className="text-xs text-slate-500">{u.email}</p><p className={`text-xs font-black ${active?'text-emerald-700':'text-slate-400'}`}>{active?'داخل المجموعة':'اضغط للإضافة'}</p></button>})}</div></div>
+    <PageHeader title="المجموعات والدفعات" description="اختر المجموعة مرة واحدة، نظّم طلابها، وسجّل الحضور والغياب من كشف سريع بدون بحث عن كل طالب." icon={<Users className="text-blue-600"/>}/>
+    <div className="bg-white rounded-3xl border p-2 flex gap-2 w-fit">
+      <button type="button" onClick={() => setMode('members')} className={`px-5 py-3 rounded-2xl font-black ${mode === 'members' ? 'bg-blue-700 text-white' : 'bg-slate-50 text-slate-700'}`}>إدارة طلاب المجموعة</button>
+      <button type="button" onClick={() => setMode('attendance')} className={`px-5 py-3 rounded-2xl font-black ${mode === 'attendance' ? 'bg-amber-500 text-slate-950' : 'bg-slate-50 text-slate-700'}`}>الحضور والغياب</button>
     </div>
+
+    {mode === 'members' && <>
+      <form onSubmit={createGroup} className="bg-white rounded-3xl border p-5 grid md:grid-cols-4 gap-3">
+        <input className="border rounded-xl p-3 font-bold" placeholder="اسم المجموعة" value={form.name} onChange={(e)=>setForm({...form, name:e.target.value})}/>
+        <select className="border rounded-xl p-3 font-bold" value={form.grade} onChange={(e)=>setForm({...form, grade:e.target.value})}>{GradeOptions.map((grade) => <option key={grade.value} value={grade.value}>{grade.label}</option>)}</select>
+        <input className="border rounded-xl p-3 font-bold" placeholder="وصف مختصر" value={form.description} onChange={(e)=>setForm({...form, description:e.target.value})}/>
+        <button className="bg-blue-700 text-white rounded-xl font-black">إنشاء مجموعة</button>
+      </form>
+      <div className="grid lg:grid-cols-3 gap-5">
+        <div className="bg-white rounded-3xl border p-4 space-y-2">{groups.map((g)=> <div key={g.id} className={`flex items-center gap-2 rounded-2xl p-2 ${group?.id===g.id?'bg-blue-50':'bg-slate-50'}`}><button type="button" onClick={()=>setSelectedGroup(g.id)} className={`flex-1 text-right p-2 rounded-xl font-black ${group?.id===g.id?'text-blue-700':'text-slate-800'}`}>{g.name}<span className="block text-xs text-slate-500">{(Array.isArray(g.members) ? g.members : []).length} طالب</span></button><button type="button" title="حذف المجموعة" onClick={()=>deleteGroup(g)} className="shrink-0 rounded-xl border border-red-100 bg-red-50 p-2 text-red-700 hover:bg-red-100"><Trash2 size={18}/></button></div>)}{!groups.length && <EmptyState title="لا توجد مجموعات" icon="👥"/>}</div>
+        <div className="lg:col-span-2 bg-white rounded-3xl border p-4"><h3 className="font-black mb-3">طلاب المجموعة: {group?.name || '—'}</h3><div className="grid md:grid-cols-2 gap-2 max-h-[520px] overflow-auto">{users.map((u)=>{ const id = u.id || u.uid; const active = (Array.isArray(group?.members) ? group.members : []).includes(id); return <button key={id} disabled={!group} onClick={()=>toggleMember(group,u)} className={`text-right border rounded-2xl p-3 ${active?'bg-emerald-50 border-emerald-200':'bg-slate-50'}`}><p className="font-black">{u.name || u.displayName || u.email}</p><p className="text-xs text-slate-500">{u.email}</p><p className={`text-xs font-black ${active?'text-emerald-700':'text-slate-400'}`}>{active?'داخل المجموعة':'اضغط للإضافة'}</p></button>})}</div></div>
+      </div>
+    </>}
+
+    {mode === 'attendance' && <div className="grid lg:grid-cols-[280px_1fr] gap-5">
+      <aside className="bg-white rounded-3xl border p-4 space-y-2 h-fit">
+        <h3 className="font-black mb-3">اختر المجموعة</h3>
+        {groups.map((g) => <button key={g.id} type="button" onClick={() => setSelectedGroup(g.id)} className={`w-full text-right p-3 rounded-2xl font-black ${group?.id === g.id ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-slate-50 text-slate-700'}`}><span>{g.name}</span><small className="block mt-1 text-slate-500">{(Array.isArray(g.members) ? g.members : []).length} طالب</small></button>)}
+      </aside>
+      <section className="bg-white rounded-3xl border p-5">
+        <div className="flex flex-wrap items-end gap-3 border-b pb-5 mb-5">
+          <label className="font-black text-sm">تاريخ الحصة<input type="date" className="block mt-2 border rounded-xl p-3 font-bold" value={attendanceDate} onChange={(e) => setAttendanceDate(e.target.value)} /></label>
+          <label className="font-black text-sm flex-1 min-w-[220px]">اسم الحصة<input className="block mt-2 w-full border rounded-xl p-3 font-bold" value={sessionTitle} onChange={(e) => setSessionTitle(e.target.value)} placeholder="مثال: حصة اسم الفاعل" /></label>
+          <button type="button" onClick={() => setAllAttendance('present')} className="bg-emerald-600 text-white px-4 py-3 rounded-xl font-black">الكل حاضر</button>
+          <button type="button" onClick={() => setAllAttendance('absent')} className="bg-red-50 text-red-700 border border-red-200 px-4 py-3 rounded-xl font-black">الكل غائب</button>
+        </div>
+        <div className="flex items-center justify-between mb-4"><div><small className="font-black text-amber-700">كشف الحضور</small><h3 className="text-2xl font-black">{group?.name || 'اختر مجموعة'}</h3></div><span className="bg-slate-100 rounded-full px-4 py-2 font-black">{groupMembers.length} طالب</span></div>
+        {!groupMembers.length ? <EmptyState title="لا يوجد طلاب داخل هذه المجموعة" icon="🧑‍🎓"/> : <div className="space-y-2 max-h-[560px] overflow-auto pr-1">{groupMembers.map((student, index) => {
+          const id = student.id || student.uid;
+          const status = attendanceMap[id] || 'present';
+          return <article key={id} className="grid md:grid-cols-[48px_1fr_auto] items-center gap-3 border rounded-2xl p-3 bg-slate-50">
+            <b className="w-10 h-10 rounded-xl bg-white border grid place-items-center">{index + 1}</b>
+            <div><strong className="block">{student.name || student.displayName || student.email}</strong><small className="text-slate-500">{student.phone || student.email || getGradeLabel(student.grade)}</small></div>
+            <div className="flex gap-2">
+              {[['present','حاضر','bg-emerald-600 text-white'],['late','متأخر','bg-amber-400 text-slate-950'],['absent','غائب','bg-red-600 text-white']].map(([value,label,activeClass]) => <button type="button" key={value} onClick={() => setAttendanceMap((current) => ({ ...current, [id]: value }))} className={`px-3 py-2 rounded-xl font-black border ${status === value ? activeClass : 'bg-white text-slate-600'}`}>{label}</button>)}
+            </div>
+          </article>;
+        })}</div>}
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 bg-slate-900 text-white rounded-2xl p-4">
+          <div className="flex gap-4 text-sm font-black"><span>حاضر: {groupMembers.filter((s) => (attendanceMap[s.id || s.uid] || 'present') === 'present').length}</span><span>متأخر: {groupMembers.filter((s) => attendanceMap[s.id || s.uid] === 'late').length}</span><span>غائب: {groupMembers.filter((s) => attendanceMap[s.id || s.uid] === 'absent').length}</span></div>
+          <button type="button" disabled={attendanceSaving || !groupMembers.length} onClick={saveAttendance} className="bg-amber-400 text-slate-950 px-6 py-3 rounded-xl font-black disabled:opacity-50">{attendanceSaving ? 'جاري الحفظ...' : 'حفظ كشف الحضور'}</button>
+        </div>
+      </section>
+    </div>}
   </div>;
 }

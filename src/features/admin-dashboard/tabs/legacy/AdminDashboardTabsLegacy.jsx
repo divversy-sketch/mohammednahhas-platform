@@ -43,6 +43,8 @@ import AdminV2PageFrame from '@admin/v2/AdminV2PageFrame.jsx';
 import AdminStudentSuccessSuite from '@features/studentSuccess/StudentSuccessAdminSuite.jsx';
 import { AdminGlobalSearch, AdminLiveClassesPanel, AdminCertificatesPanel, AdminCommandQuickActions } from '@features/product/ProductExperienceSuite.jsx';
 import AdminAllUsersTab from '../users/AdminAllUsersTab.jsx';
+import AdminSmartTeacherManager from '@features/smart-teacher/AdminSmartTeacherManager.jsx';
+import AdminParentLinkManager from '@features/smart-teacher/AdminParentLinkManager.jsx';
 import AdminDashboardOverviewTab from '../dashboard/AdminDashboardOverviewTab.jsx';
 
 import AdminDashboardTab from '../split/AdminDashboardTab.jsx';
@@ -73,7 +75,6 @@ import AdminMistakesTab from '../split/AdminMistakesTab.jsx';
 import AdminContentTab from '../split/AdminContentTab.jsx';
 import AdminNotificationsTab from '../split/AdminNotificationsTab.jsx';
 import AdminNotificationsGrowthTab from '../split/AdminNotificationsGrowthTab.jsx';
-import AdminSmartTeacherManager from '@features/smart-teacher/AdminSmartTeacherManager.jsx';
 
 
 // Render-only split from AdminDashboard.jsx.
@@ -360,6 +361,8 @@ export default function AdminDashboardTabs({ ctx }) {
           <AdminQuestionBankTab ctx={tabCtx} />
 
           {activeTab === 'smart_teacher' && <AdminSmartTeacherManager />}
+
+          {activeTab === 'parent_portal' && <AdminParentLinkManager />}
 
           <AdminSmartExamEngineTab ctx={tabCtx} />
 
