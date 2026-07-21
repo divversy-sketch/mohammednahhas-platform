@@ -73,6 +73,7 @@ import AdminMistakesTab from '../split/AdminMistakesTab.jsx';
 import AdminContentTab from '../split/AdminContentTab.jsx';
 import AdminNotificationsTab from '../split/AdminNotificationsTab.jsx';
 import AdminNotificationsGrowthTab from '../split/AdminNotificationsGrowthTab.jsx';
+import AdminSmartTeacherManager from '@features/smart-teacher/AdminSmartTeacherManager.jsx';
 
 
 // Render-only split from AdminDashboard.jsx.
@@ -357,6 +358,8 @@ export default function AdminDashboardTabs({ ctx }) {
           <AdminSmartHomeworkTab ctx={tabCtx} />
 
           <AdminQuestionBankTab ctx={tabCtx} />
+
+          {activeTab === 'smart_teacher' && <AdminSmartTeacherManager />}
 
           <AdminSmartExamEngineTab ctx={tabCtx} />
 

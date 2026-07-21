@@ -92,6 +92,21 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == userId;
     }
 
+    function isParentAccount() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'parent';
+    }
+
+    function isParentOf(studentId) {
+      return isParentAccount()
+        && (
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.linkedStudentId == studentId
+          || (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.linkedStudentIds is list
+            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.linkedStudentIds.hasAny([studentId]))
+        );
+    }
+
     function ownUserIdOnCreate() {
       return signedIn()
         && request.resource.data.userId == request.auth.uid;
@@ -153,7 +168,7 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
+      allow read: if isOwner(userId) || isAdmin() || isParentOf(userId);
       allow create: if isOwner(userId)
         && request.resource.data.role == 'student'
         && request.resource.data.status in ['pending', 'active'];
@@ -211,7 +226,7 @@ service cloud.firestore {
     }
 
     match /exam_results/{docId} {
-      allow read: if isAdmin() || (signedIn() && resource.data.studentId == request.auth.uid);
+      allow read: if isAdmin() || (signedIn() && resource.data.studentId == request.auth.uid) || isParentOf(resource.data.studentId);
       allow create: if ownStudentIdOnCreate();
       allow update: if canManageExams() || safeStudentExamResultUpdate();
       allow delete: if canManageExams();
@@ -240,7 +255,7 @@ service cloud.firestore {
     }
 
     match /homework_results/{docId} {
-      allow read: if isAdmin() || (signedIn() && resource.data.studentId == request.auth.uid);
+      allow read: if isAdmin() || (signedIn() && resource.data.studentId == request.auth.uid) || isParentOf(resource.data.studentId);
       // نتائج واجب QR تكتب من Cloud Function فقط حتى لا يرى الطالب نموذج الإجابة ولا يزوّر الدرجة.
       allow create, update, delete: if canManageHomework();
     }
@@ -251,10 +266,15 @@ service cloud.firestore {
     }
 
     match /assignment_submissions/{docId} {
-      allow read: if isAdmin() || (signedIn() && resource.data.studentId == request.auth.uid);
+      allow read: if isAdmin() || (signedIn() && resource.data.studentId == request.auth.uid) || isParentOf(resource.data.studentId);
       allow create: if ownStudentIdOnCreate();
       allow update: if canManageHomework() || safeStudentExamResultUpdate();
       allow delete: if canManageHomework();
+    }
+
+    match /attendance_records/{docId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.studentId == request.auth.uid) || isParentOf(resource.data.studentId);
+      allow create, update, delete: if canManageUsers();
     }
 
     match /video_views/{docId} {
@@ -470,6 +490,24 @@ service cloud.firestore {
     match /rafiq_interactions/{document=**} { allow read, write: if false; }
     match /rafiq_student_weak_points/{document=**} { allow read, write: if false; }
     match /student_questions_log/{document=**} { allow read, write: if false; }
+
+
+    // المعلم الذكي وبوابة ولي الأمر
+    match /smart_teacher_groups/{groupId} {
+      allow read: if signedIn();
+      allow create, update, delete: if canManageContent() || canManageExams();
+    }
+
+    match /smart_teacher_attempts/{attemptId} {
+      allow create: if signedIn() && request.resource.data.studentId == request.auth.uid;
+      allow read: if isAdmin() || (signedIn() && resource.data.studentId == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    match /parent_links/{phone} {
+      allow read: if isAdmin() || (signedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.phone == phone);
+      allow write: if isAdmin();
+    }
 
     match /{document=**} {
       allow read, write: if false;

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">منصة النحاس</string>
+    <string name="title_activity_main">منصة النحاس</string>
+    <string name="package_name">com.nahhas.platform</string>
+    <string name="custom_url_scheme">com.nahhas.platform</string>
+</resources>

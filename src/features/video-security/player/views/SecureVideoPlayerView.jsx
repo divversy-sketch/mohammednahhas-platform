@@ -4,6 +4,7 @@ import { safeNumber } from '@shared/utils/media';
 import { clampPercent } from '../utils/progress.js';
 import VideoNotesPanel from '@features/video-security/player/components/VideoNotesPanel.jsx';
 import VideoPlayerControls from '@features/video-security/player/components/VideoPlayerControls.jsx';
+import SmartVideoCheckpoint from '@features/smart-teacher/SmartVideoCheckpoint.jsx';
 
 export function SecureVideoPlayerView({ ctx }) {
   const {
@@ -58,6 +59,7 @@ export function SecureVideoPlayerView({ ctx }) {
               <span>جاري تحميل جزء من الفيديو...</span>
             </div>
           )}
+          <SmartVideoCheckpoint video={video} videoRef={videoRef} user={user} />
           <div className={`lecture-media-frame ${isZoomed ? 'is-zoomed' : ''}`}>
             {videoId ? (
               <div className="relative w-full h-full">

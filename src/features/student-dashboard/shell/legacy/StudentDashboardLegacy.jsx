@@ -53,6 +53,7 @@ import StudentAssignmentsTab from '../tabs/StudentAssignmentsTab.jsx';
 import StudentSmartHomeworkResultsTab from '../tabs/StudentSmartHomeworkResultsTab.jsx';
 import StudentSettingsTab from '../tabs/StudentSettingsTab.jsx';
 import StudentDashboardMainView from '../views/StudentDashboardMainView.jsx';
+import StudentSmartTeacherPopup from '@features/smart-teacher/StudentSmartTeacherPopup.jsx';
 
 
 const SecureVideoPlayer = lazy(() => import('@features/video-security/player/SecureVideoPlayer.jsx'));
@@ -494,7 +495,10 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
     startExamWithCode,
   };
 
-  return <StudentDashboardMainView ctx={studentTabCtx} />;
+  return <>
+    <StudentDashboardMainView ctx={studentTabCtx} />
+    <StudentSmartTeacherPopup user={user} userData={userData} />
+  </>;
 };
 
 export default StudentDashboard;

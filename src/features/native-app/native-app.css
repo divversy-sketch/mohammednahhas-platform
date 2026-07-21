@@ -1,0 +1,5 @@
+.nahhas-connectivity-banner{position:fixed;left:50%;bottom:18px;z-index:99999;transform:translateX(-50%);display:flex;align-items:center;gap:10px;max-width:min(92vw,700px);padding:11px 16px;border-radius:18px;font-family:inherit;box-shadow:0 16px 40px rgba(15,23,42,.24);backdrop-filter:blur(14px)}
+.nahhas-connectivity-banner.is-offline{background:rgba(127,29,29,.94);color:#fff;border:1px solid rgba(254,202,202,.35)}
+.nahhas-connectivity-banner.is-syncing{background:rgba(6,78,59,.94);color:#fff;border:1px solid rgba(167,243,208,.35)}
+.nahhas-connectivity-banner span{font-size:13px;font-weight:700}.nahhas-connectivity-banner small{opacity:.72}.nahhas-app-backgrounded body>*{filter:blur(22px)!important;pointer-events:none!important;user-select:none!important}
+@media(max-width:640px){.nahhas-connectivity-banner{flex-direction:column;align-items:flex-start;gap:3px;bottom:10px;padding:10px 14px}.nahhas-connectivity-banner span{font-size:12px}}

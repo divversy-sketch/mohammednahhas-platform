@@ -8,6 +8,7 @@ import StudentLayout from '../../layouts/StudentLayout.jsx';
 const StudentDashboardPage = lazy(() => import('../../pages/student/DashboardPage.jsx'));
 const LandingPage = lazy(() => import('../../pages/public/LandingPage.jsx'));
 const AuthPage = lazy(() => import('../../pages/public/AuthPage.jsx'));
+const ParentDashboardPage = lazy(() => import('../../pages/parent/ParentDashboardPage.jsx'));
 
 function StudentRouteFallback() {
   return (
@@ -58,6 +59,8 @@ function StudentApp() {
                 initialMode={viewMode === 'auth-register' ? 'register' : 'login'}
                 onBack={() => setViewMode('landing')}
               />
+        ) : userData?.role === 'parent' ? (
+          <ParentDashboardPage key="parent" user={user} userData={userData} />
         ) : (
           <StudentDashboardPage key="student" user={user} userData={userData} installPrompt={installPrompt} />
         )}
