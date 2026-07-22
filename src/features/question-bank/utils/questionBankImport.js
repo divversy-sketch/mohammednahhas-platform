@@ -265,15 +265,21 @@ export const readDocxParagraphs = async (file) => {
     // لذلك نقرأ الوراثة من الفقرة، وإلا ستضيع معظم الإجابات الصحيحة المسطرة.
     const paragraphProperties = xmlChildrenByLocalName(paragraph, 'pPr')[0];
     const paragraphMarked = nodeIsMarked(paragraphProperties);
+    const paragraphStyleNode = xmlChildrenByLocalName(paragraphProperties || paragraph, 'pStyle')[0];
+    const paragraphStyle = attr(paragraphStyleNode, 'val') || '';
     const runs = xmlChildrenByLocalName(paragraph, 'r')
       .map((run) => ({
         text: xmlChildrenByLocalName(run, 't').map((node) => node.textContent || '').join(''),
         marked: runIsMarked(run, paragraphMarked),
+        bold: xmlChildrenByLocalName(run, 'b').some((node) => !['0', 'false', 'none'].includes((attr(node, 'val') || 'true').toLowerCase())),
       }))
       .filter((run) => run.text);
     const text = runs.map((run) => run.text).join('');
     if (!cleanImportedLine(text)) return;
-    output.push(...splitRichLine({ text, runs, paragraphMarked, paragraphIndex, sourceFormat: 'docx' }));
+    const boldChars = runs.filter((run) => run.bold).reduce((sum, run) => sum + run.text.length, 0);
+    const boldRatio = text.length ? boldChars / text.length : 0;
+    const isHeading = /(?:heading|title|subtitle|عنوان|رئيسي)/i.test(paragraphStyle) || boldRatio >= 0.72;
+    output.push(...splitRichLine({ text, runs, paragraphMarked, paragraphIndex, sourceFormat: 'docx', paragraphStyle, boldRatio, isHeading }));
   });
   return output;
 };
