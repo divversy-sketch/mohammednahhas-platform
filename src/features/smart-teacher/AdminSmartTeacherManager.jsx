@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { collection, doc, onSnapshot, query, serverTimestamp, where, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDocs, onSnapshot, query, serverTimestamp, where, writeBatch } from 'firebase/firestore';
 import { db } from '@services/firebase';
 import { getGradeLabel } from '@shared/constants/grades';
 import {
@@ -101,6 +101,12 @@ export default function AdminSmartTeacherManager() {
   const [sections, setSections] = useState([]);
   const [saving, setSaving] = useState(false);
   const [permissionMessage, setPermissionMessage] = useState('');
+  const [managedGroup, setManagedGroup] = useState(null);
+  const [managedQuestions, setManagedQuestions] = useState([]);
+  const [loadingQuestions, setLoadingQuestions] = useState(false);
+  const [editingQuestion, setEditingQuestion] = useState(null);
+  const [groupDraft, setGroupDraft] = useState(null);
+  const [managementSaving, setManagementSaving] = useState(false);
 
   useEffect(() => {
     const groupsQuery = query(collection(db, 'content'), where('contentType', '==', 'smart_teacher_group'));
@@ -160,6 +166,157 @@ export default function AdminSmartTeacherManager() {
       setParsed((current) => current.map((question) => question.sectionId === id
         ? { ...question, sectionTitle: value }
         : question));
+    }
+  };
+
+
+
+  const openGroupManager = async (group) => {
+    setManagedGroup(group);
+    setGroupDraft({
+      title: group.title || '',
+      branch: group.branch || 'النحو',
+      lesson: group.lesson || '',
+      questionsPerSession: Number(group.questionsPerSession || 10),
+      hint: group.hint || '',
+      rule: group.rule || '',
+      example: group.example || '',
+      commonMistake: group.commonMistake || '',
+      grades: Array.isArray(group.grades) ? group.grades : (group.grade ? [group.grade] : []),
+      sections: Array.isArray(group.sections) ? group.sections : [],
+    });
+    setLoadingQuestions(true);
+    try {
+      const snapshot = await getDocs(query(collection(db, 'content'), where('smartTeacherGroupId', '==', group.id)));
+      const questions = snapshot.docs
+        .map((item) => ({ id: item.id, ...item.data() }))
+        .filter((item) => item.contentType === 'smart_teacher_question');
+      setManagedQuestions(questions);
+    } catch (error) {
+      platformNotify(error?.code === 'permission-denied' ? 'لا توجد صلاحية لقراءة أسئلة المجموعة.' : 'تعذر تحميل أسئلة المجموعة', 'error');
+      setManagedQuestions([]);
+    } finally {
+      setLoadingQuestions(false);
+    }
+  };
+
+  const closeGroupManager = () => {
+    setManagedGroup(null);
+    setManagedQuestions([]);
+    setEditingQuestion(null);
+    setGroupDraft(null);
+  };
+
+  const saveGroupChanges = async () => {
+    if (!managedGroup || !groupDraft?.title?.trim() || !groupDraft?.lesson?.trim()) return;
+    setManagementSaving(true);
+    try {
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'content', managedGroup.id), {
+        title: groupDraft.title.trim(),
+        branch: groupDraft.branch,
+        lesson: groupDraft.lesson.trim(),
+        topic: groupDraft.lesson.trim(),
+        questionsPerSession: Number(groupDraft.questionsPerSession) || 10,
+        hint: groupDraft.hint.trim(),
+        rule: groupDraft.rule.trim(),
+        example: groupDraft.example.trim(),
+        commonMistake: groupDraft.commonMistake.trim(),
+        grades: groupDraft.grades,
+        sections: groupDraft.sections,
+        questionCount: managedQuestions.length,
+        updatedAt: serverTimestamp(),
+      });
+      await batch.commit();
+      setGroups((current) => current.map((item) => item.id === managedGroup.id ? { ...item, ...groupDraft, questionCount: managedQuestions.length } : item));
+      setManagedGroup((current) => ({ ...current, ...groupDraft, questionCount: managedQuestions.length }));
+      platformNotify('تم حفظ تعديلات المجموعة');
+    } catch (error) {
+      platformNotify(error?.message || 'تعذر حفظ تعديلات المجموعة', 'error');
+    } finally {
+      setManagementSaving(false);
+    }
+  };
+
+  const saveQuestionChanges = async () => {
+    if (!editingQuestion?.id || !editingQuestion?.text?.trim()) return;
+    setManagementSaving(true);
+    try {
+      const batch = writeBatch(db);
+      const payload = {
+        text: editingQuestion.text.trim(),
+        options: Array.isArray(editingQuestion.options) ? editingQuestion.options.map((item) => cleanImportedLine(item)).filter(Boolean) : [],
+        correctAnswer: editingQuestion.correctAnswer,
+        correctIndex: Number.isInteger(Number(editingQuestion.correctIndex)) ? Number(editingQuestion.correctIndex) : editingQuestion.correctIndex,
+        sectionTitle: editingQuestion.sectionTitle || 'تدريبات عامة',
+        sectionAliases: Array.isArray(editingQuestion.sectionAliases) ? editingQuestion.sectionAliases : [],
+        updatedAt: serverTimestamp(),
+      };
+      batch.update(doc(db, 'content', editingQuestion.id), payload);
+      if (editingQuestion.bankQuestionId) batch.update(doc(db, 'question_bank', editingQuestion.bankQuestionId), payload);
+      await batch.commit();
+      setManagedQuestions((current) => current.map((item) => item.id === editingQuestion.id ? { ...item, ...payload } : item));
+      setEditingQuestion(null);
+      platformNotify('تم تعديل السؤال في المعلم الذكي وبنك الأسئلة');
+    } catch (error) {
+      platformNotify(error?.message || 'تعذر تعديل السؤال', 'error');
+    } finally {
+      setManagementSaving(false);
+    }
+  };
+
+  const deleteQuestion = async (question) => {
+    if (!window.confirm('حذف هذا السؤال من المعلم الذكي وبنك الأسئلة؟')) return;
+    setManagementSaving(true);
+    try {
+      const batch = writeBatch(db);
+      batch.delete(doc(db, 'content', question.id));
+      if (question.bankQuestionId) batch.delete(doc(db, 'question_bank', question.bankQuestionId));
+      batch.update(doc(db, 'content', managedGroup.id), {
+        questionCount: Math.max(0, managedQuestions.length - 1),
+        updatedAt: serverTimestamp(),
+      });
+      await batch.commit();
+      setManagedQuestions((current) => current.filter((item) => item.id !== question.id));
+      setGroups((current) => current.map((item) => item.id === managedGroup.id ? { ...item, questionCount: Math.max(0, managedQuestions.length - 1) } : item));
+      platformNotify('تم حذف السؤال');
+    } catch (error) {
+      platformNotify(error?.message || 'تعذر حذف السؤال', 'error');
+    } finally {
+      setManagementSaving(false);
+    }
+  };
+
+  const deleteGroup = async (group) => {
+    if (!window.confirm(`حذف مجموعة «${group.title}» وكل أسئلتها من المعلم الذكي وبنك الأسئلة؟`)) return;
+    setManagementSaving(true);
+    try {
+      const snapshot = await getDocs(query(collection(db, 'content'), where('smartTeacherGroupId', '==', group.id)));
+      const docsToDelete = snapshot.docs.filter((item) => item.data()?.contentType === 'smart_teacher_question');
+      let batch = writeBatch(db);
+      let count = 0;
+      const commitIfNeeded = async (force = false) => {
+        if (count >= 400 || (force && count > 0)) {
+          await batch.commit();
+          batch = writeBatch(db);
+          count = 0;
+        }
+      };
+      for (const item of docsToDelete) {
+        const data = item.data();
+        batch.delete(item.ref); count += 1;
+        if (data.bankQuestionId) { batch.delete(doc(db, 'question_bank', data.bankQuestionId)); count += 1; }
+        await commitIfNeeded(false);
+      }
+      batch.delete(doc(db, 'content', group.id)); count += 1;
+      await commitIfNeeded(true);
+      setGroups((current) => current.filter((item) => item.id !== group.id));
+      closeGroupManager();
+      platformNotify('تم حذف المجموعة وكل أسئلتها');
+    } catch (error) {
+      platformNotify(error?.message || 'تعذر حذف المجموعة', 'error');
+    } finally {
+      setManagementSaving(false);
     }
   };
 
@@ -277,6 +434,16 @@ export default function AdminSmartTeacherManager() {
       <button className="st-publish" disabled={saving} onClick={saveGroup}>{saving ? 'جاري الحفظ...' : 'حفظ ونشر المجموعة الذكية'}</button>
     </section>
 
-    <section className="st-card"><h3>المجموعات المنشورة</h3><div className="st-groups">{groups.map((group) => { const gradeList = Array.isArray(group.grades) ? group.grades : (group.grade ? [group.grade] : []); return <article key={group.id}><b>{group.title}</b><span>{group.branch} • {group.lesson}</span><small>{group.questionCount || 0} سؤال — {(group.sections || []).length} جزئية — {gradeList.map(getGradeLabel).join('، ') || 'غير محدد'}</small></article>; })}{!groups.length && <p className="st-muted">لا توجد مجموعات بعد.</p>}</div></section>
+    <section className="st-card"><div className="st-management-head"><div><h3>المجموعات المنشورة</h3><p>افتح أي مجموعة لتعديل بياناتها وأسئلتها أو حذفها.</p></div></div><div className="st-groups">{groups.map((group) => { const gradeList = Array.isArray(group.grades) ? group.grades : (group.grade ? [group.grade] : []); const sectionList = Array.isArray(group.sections) ? group.sections : []; return <article key={group.id} className="st-group-card"><b>{group.title}</b><span>{group.branch} • {group.lesson}</span><small>{group.questionCount || 0} سؤال — {sectionList.length} جزئية — {gradeList.map(getGradeLabel).join('، ') || 'غير محدد'}</small><div className="st-group-actions"><button type="button" onClick={() => openGroupManager(group)}>إدارة وتعديل</button><button type="button" className="danger" onClick={() => deleteGroup(group)}>حذف المجموعة</button></div></article>; })}{!groups.length && <p className="st-muted">لا توجد مجموعات بعد.</p>}</div></section>
+
+    {managedGroup && groupDraft && <div className="st-manage-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeGroupManager(); }}><section className="st-manage-modal"><button className="st-manage-close" type="button" onClick={closeGroupManager}>×</button><header><div className="st-mini-logo">ن✦</div><div><small>إدارة المعلم الذكي</small><h2>{managedGroup.title}</h2><p>تعديل المجموعة والأسئلة بدون إعادة رفع الملف.</p></div></header>
+      <div className="st-manage-tabs-content">
+        <div className="st-card st-edit-group-card"><h3>بيانات المجموعة</h3><div className="st-grid"><label>العنوان<input value={groupDraft.title} onChange={(e) => setGroupDraft({ ...groupDraft, title: e.target.value })} /></label><label>الفرع<select value={groupDraft.branch} onChange={(e) => setGroupDraft({ ...groupDraft, branch: e.target.value })}>{branches.map((item) => <option key={item}>{item}</option>)}</select></label><label>اسم الدرس<input value={groupDraft.lesson} onChange={(e) => setGroupDraft({ ...groupDraft, lesson: e.target.value })} /></label><label>أسئلة كل جلسة<input type="number" min="1" max="50" value={groupDraft.questionsPerSession} onChange={(e) => setGroupDraft({ ...groupDraft, questionsPerSession: e.target.value })} /></label></div><div className="st-help-grid"><label>التلميح<textarea value={groupDraft.hint} onChange={(e) => setGroupDraft({ ...groupDraft, hint: e.target.value })} /></label><label>القاعدة<textarea value={groupDraft.rule} onChange={(e) => setGroupDraft({ ...groupDraft, rule: e.target.value })} /></label><label>مثال<textarea value={groupDraft.example} onChange={(e) => setGroupDraft({ ...groupDraft, example: e.target.value })} /></label><label>خطأ شائع<textarea value={groupDraft.commonMistake} onChange={(e) => setGroupDraft({ ...groupDraft, commonMistake: e.target.value })} /></label></div><button type="button" className="st-save-changes" disabled={managementSaving} onClick={saveGroupChanges}>حفظ بيانات المجموعة</button></div>
+
+        <div className="st-card"><div className="st-question-manager-head"><div><h3>أسئلة المجموعة</h3><p>{managedQuestions.length} سؤال — يمكنك التعديل أو النقل لعنوان آخر أو الحذف.</p></div></div>{loadingQuestions ? <p className="st-muted">جاري تحميل الأسئلة...</p> : <div className="st-question-manager-list">{managedQuestions.map((question, index) => <article key={question.id}><div className="st-question-number">{index + 1}</div><div className="st-question-body"><em>{question.sectionTitle || 'تدريبات عامة'}</em><strong>{question.text}</strong><small>{Array.isArray(question.options) ? question.options.join(' • ') : ''}</small></div><div className="st-question-actions"><button type="button" onClick={() => setEditingQuestion({ ...question, options: Array.isArray(question.options) ? question.options : [] })}>تعديل</button><button type="button" className="danger" onClick={() => deleteQuestion(question)}>حذف</button></div></article>)}{!managedQuestions.length && <p className="st-muted">لا توجد أسئلة داخل المجموعة.</p>}</div>}</div>
+      </div>
+    </section></div>}
+
+    {editingQuestion && <div className="st-manage-backdrop st-question-edit-backdrop"><section className="st-question-edit-modal"><button className="st-manage-close" type="button" onClick={() => setEditingQuestion(null)}>×</button><h3>تعديل السؤال</h3><label>نص السؤال<textarea value={editingQuestion.text || ''} onChange={(e) => setEditingQuestion({ ...editingQuestion, text: e.target.value })} /></label><label>عنوان الجزئية<select value={editingQuestion.sectionTitle || ''} onChange={(e) => { const section = (groupDraft?.sections || []).find((item) => item.title === e.target.value); setEditingQuestion({ ...editingQuestion, sectionTitle: e.target.value, sectionId: section?.id || editingQuestion.sectionId, sectionAliases: section?.aliases || [] }); }}>{(groupDraft?.sections || []).map((section) => <option key={section.id} value={section.title}>{section.title}</option>)}</select></label><div className="st-options-editor">{(editingQuestion.options || []).map((option, index) => <label key={index}><span>اختيار {index + 1}</span><input value={option} onChange={(e) => setEditingQuestion({ ...editingQuestion, options: editingQuestion.options.map((item, optionIndex) => optionIndex === index ? e.target.value : item) })} /></label>)}</div><label>رقم الإجابة الصحيحة<select value={Number(editingQuestion.correctIndex ?? 0)} onChange={(e) => setEditingQuestion({ ...editingQuestion, correctIndex: Number(e.target.value), correctAnswer: editingQuestion.options?.[Number(e.target.value)] || '' })}>{(editingQuestion.options || []).map((option, index) => <option key={index} value={index}>{index + 1} — {option}</option>)}</select></label><div className="st-edit-actions"><button type="button" onClick={() => setEditingQuestion(null)}>إلغاء</button><button type="button" className="primary" disabled={managementSaving} onClick={saveQuestionChanges}>حفظ التعديل</button></div></section></div>}
   </div>;
 }
