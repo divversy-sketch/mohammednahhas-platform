@@ -18,7 +18,7 @@ import { ExamRunnerView } from '@features/exams/runner/views/ExamRunnerView.jsx'
 
 export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult = null }) => {
   const [activeView, setActiveView] = useState(isReviewMode || existingResult ? 'dashboard' : 'questions');
-  const [currentQIndex, setCurrentQIndex] = useState(0);
+  const [currentQIndex, setCurrentQIndex] = useState(() => Math.max(0, safeNumber(exam.resumeData?.currentQIndex, 0)));
   const autosaveKey = makeExamAutosaveKey(user, exam);
   const localExamBackup = readLocalExamBackup(autosaveKey);
   const [answers, setAnswers] = useState(existingResult?.answers || exam.resumeData?.answers || localExamBackup?.answers || {});
@@ -302,7 +302,6 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
             answers: nextAnswers,
             remainingTime: timeLeft,
             currentQIndex,
-            status: 'in_progress',
             startedAtMillis: startTime,
             lastSavedAt: serverTimestamp()
           }, { merge: true }).catch((e) => console.warn('answer autosave blocked:', e?.message));
@@ -323,14 +322,13 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
   useEffect(() => {
     if (!isOnline || isReviewMode || isSubmitted || !exam.attemptId || exam.id === 'custom_mistakes_exam') return;
     const backup = readLocalExamBackup(autosaveKey);
-    if (!backup?.answers) return;
+    if (!backup?.answers || exam.resumeData) return;
     setDoc(doc(db, 'exam_results', exam.attemptId), {
       answers: backup.answers,
       remainingTime: backup.remainingTime,
       currentQIndex: backup.currentQIndex,
       localDraftSyncedAt: serverTimestamp(),
       lastSavedAt: serverTimestamp(),
-      status: 'in_progress',
       startedAtMillis: startTime
     }, { merge: true }).catch((e) => console.warn('local backup sync failed:', e?.message));
   }, [isOnline, isReviewMode, isSubmitted, autosaveKey, exam.attemptId, exam.id]);

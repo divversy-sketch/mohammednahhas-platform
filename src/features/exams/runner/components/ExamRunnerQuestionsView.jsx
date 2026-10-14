@@ -30,8 +30,8 @@ export const ExamRunnerQuestionsView = (props) => {
       <ExamTopBar exam={exam} isSubmitted={isSubmitted} timeLeft={timeLeft} activeBranchTab={activeBranchTab} uniqueBranches={uniqueBranches} onDashboard={onDashboard} onSubmit={onConfirmSubmit} onBranchChange={onBranchChange} onFullscreen={() => document.documentElement.requestFullscreen?.().catch(() => platformNotify('لو ملء الشاشة لم يعمل، افتح المنصة من المتصفح مباشرة وليس داخل تطبيق خارجي.'))} />
 
       {!isSubmitted && (
-        <div className="relative z-50 border-b border-slate-200/70 bg-white/70 px-3 py-3 backdrop-blur md:px-6">
-          <div className="mx-auto flex max-w-[1700px] items-center gap-4 rounded-2xl border border-white bg-white/90 px-4 py-3 shadow-sm">
+        <div className="relative z-50 border-b border-slate-200/70 bg-white/70 px-2 py-1.5 backdrop-blur md:px-6 md:py-3">
+          <div className="mx-auto flex max-w-[1700px] items-center gap-2 rounded-xl border border-white bg-white/90 px-3 py-2 md:gap-4 md:rounded-2xl md:px-4 md:py-3 shadow-sm">
             <span className="whitespace-nowrap text-xs font-black text-slate-600 md:text-sm">التقدم في الامتحان</span>
             <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-gradient-to-l from-indigo-500 to-violet-600 transition-all duration-500" style={{ width: `${progress}%` }} /></div>
             <span className="min-w-10 text-left text-sm font-black text-indigo-600">{progress}%</span>

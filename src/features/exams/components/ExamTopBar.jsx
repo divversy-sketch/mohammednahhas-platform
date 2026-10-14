@@ -56,16 +56,16 @@ export default function ExamTopBar({
 
   return (
     <header className="relative z-50 border-b border-slate-200/80 bg-white/95 shadow-[0_10px_35px_rgba(15,23,42,0.06)] backdrop-blur-xl">
-      <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-3 px-3 py-3 md:px-6 lg:flex-row lg:items-center lg:justify-between">
+      <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-1.5 px-3 py-1.5 md:gap-3 md:px-6 md:py-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 items-center gap-3 md:gap-4">
-          <div className="flex h-[68px] w-[68px] shrink-0 items-center justify-center overflow-hidden rounded-[20px] border border-orange-200/70 bg-gradient-to-br from-orange-50 to-white p-2 shadow-[0_8px_24px_rgba(194,65,12,0.14)] md:h-[76px] md:w-[76px]">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-[20px] border border-orange-200/70 bg-gradient-to-br from-orange-50 to-white p-2 shadow-[0_8px_24px_rgba(194,65,12,0.14)] md:h-[76px] md:w-[76px]">
             <img src={activePlatformLogo} alt={`شعار ${platformIdentity.platformName}`} className="block h-full w-full select-none object-contain" draggable="false" onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = fallbackPlatformLogo; }} />
           </div>
           <div className="min-w-0">
-            <h1 className="truncate text-base font-black text-slate-900 md:text-xl">
+            <h1 className="truncate text-sm font-black text-slate-900 md:text-xl">
               {exam?.title || 'الامتحان'} {isSubmitted ? '— مراجعة الإجابات' : ''}
             </h1>
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-bold text-slate-500 md:text-sm">
+            <div className="mt-1 hidden flex-wrap items-center md:flex gap-x-3 gap-y-1 text-xs font-bold text-slate-500 md:text-sm">
               {exam?.grade && <span>{exam.grade}</span>}
               {exam?.subject && <><span className="text-slate-300">•</span><span>{exam.subject}</span></>}
               {questionCount > 0 && <><span className="text-slate-300">•</span><span>{questionCount} سؤال</span></>}
@@ -75,18 +75,18 @@ export default function ExamTopBar({
         </div>
 
         {!isSubmitted ? (
-          <div className="flex flex-wrap items-center justify-between gap-2 lg:justify-end">
-            <div className="order-2 flex min-w-[156px] items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-center lg:order-none">
+          <div className="flex flex-wrap items-center justify-between gap-1.5 lg:justify-end">
+            <div className="order-2 flex min-w-[125px] items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-2 py-1 text-center md:px-4 md:py-2 lg:order-none">
               <Timer size={20} className="text-slate-600" />
               <div>
                 <div className="text-[11px] font-bold text-slate-500">الوقت المتبقي</div>
                 <div className="font-mono text-lg font-black tracking-wider text-indigo-600 md:text-xl">{formatTime(timeLeft)}</div>
               </div>
             </div>
-            <button type="button" onClick={onFullscreen} className="group inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border-2 border-slate-300 bg-white text-slate-800 shadow-sm transition hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100" title="فتح وضع ملء الشاشة" aria-label="فتح وضع ملء الشاشة">
+            <button type="button" onClick={onFullscreen} className="group inline-flex h-9 w-9 md:h-12 md:w-12 shrink-0 items-center justify-center rounded-xl border-2 border-slate-300 bg-white text-slate-800 shadow-sm transition hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100" title="فتح وضع ملء الشاشة" aria-label="فتح وضع ملء الشاشة">
               <span className="transition-transform duration-200 group-hover:scale-110"><FullscreenIcon /></span>
             </button>
-            <button onClick={onSubmit} className="rounded-xl border border-rose-200 bg-white px-4 py-2.5 text-sm font-black text-rose-600 transition hover:bg-rose-50">
+            <button onClick={onSubmit} className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs md:px-4 md:py-2.5 md:text-sm font-black text-rose-600 transition hover:bg-rose-50">
               إنهاء الامتحان
             </button>
           </div>

@@ -137,6 +137,7 @@ export const createExamSecurityActions = (ctx) => {
       adminSecurityAction: 'continue',
       securityReleased: true,
       resumeApproved: true,
+      antiCheatWarnings: 0,
       resumeApprovedAt: serverTimestamp(),
       remainingTime: safeRemainingTime,
       currentQIndex: safeNumber(result.currentQIndex, 0),

@@ -83,13 +83,13 @@ function McqAnswerOptions({ question, answer, isSubmitted, onAnswer }) {
         }
 
         return (
-          <div key={idx} onClick={() => onAnswer(question.id, idx)} className={`group p-4 md:p-5 rounded-2xl border cursor-pointer transition-all duration-200 flex items-center gap-4 ${optionClass}`}>
+          <div key={idx} onClick={() => onAnswer(question.id, idx)} className={`group p-3 md:p-5 rounded-2xl border cursor-pointer transition-all duration-200 flex items-center gap-4 ${optionClass}`}>
             <div className={`w-10 h-10 rounded-full border-2 font-black text-base flex items-center justify-center shrink-0 transition-colors ${isSelected || (isSubmitted && idx === question.correctIdx) ? 'border-transparent bg-current' : 'border-slate-300'}`}>
               {!isSubmitted && <span>{['أ','ب','ج','د','هـ','و'][idx] || idx + 1}</span>}
               {(isSubmitted && idx === question.correctIdx) && <Check size={16} className="text-white" />}
               {(isSubmitted && isSelected && idx !== question.correctIdx) && <X size={16} className="text-white" />}
             </div>
-            <span className="font-['Cairo'] text-xl font-bold leading-relaxed">{option}</span>
+            <span className="font-['Cairo'] text-base md:text-xl font-bold leading-relaxed">{option}</span>
             {isSubmitted && idx === question.correctIdx && <span className="mr-auto text-green-600 bg-green-100 px-3 py-1 rounded-lg text-xs font-bold">الإجابة الصحيحة</span>}
             {isSubmitted && isSelected && idx !== question.correctIdx && <span className="mr-auto text-red-600 bg-red-100 px-3 py-1 rounded-lg text-xs font-bold">إجابتك (خطأ)</span>}
           </div>
@@ -119,16 +119,16 @@ export default function ExamQuestionPanel({
   const questionNumber = flatQuestions.findIndex((origQ) => origQ.id === question.id) + 1;
   const hasBlockText = question?.blockText && question.blockText.trim().length > 0;
   return (
-    <div className={`flex-1 flex flex-col ${hasBlockText ? 'lg:flex-row' : 'items-center'} min-h-0 overflow-y-auto bg-transparent w-full p-3 md:p-6 lg:p-8 gap-6`}>
+    <div className={`flex-1 flex flex-col ${hasBlockText ? 'lg:flex-row' : 'items-center'} min-h-0 overflow-y-auto bg-transparent w-full p-2 md:p-6 lg:p-8 gap-3 md:gap-6`}>
       {hasBlockText && (
-        <div className="flex-1 w-full bg-white/95 p-6 md:p-10 overflow-y-auto rounded-[28px] shadow-[0_18px_60px_rgba(15,23,42,0.08)] border border-slate-200/80">
+        <div className="flex-1 w-full bg-white/95 p-3 md:p-10 overflow-y-auto rounded-[28px] shadow-[0_18px_60px_rgba(15,23,42,0.08)] border border-slate-200/80">
           <h3 className="font-bold text-blue-900 mb-6 flex items-center gap-2 text-xl border-b border-blue-100 pb-4 font-['Cairo']"><FileText size={24} /> نص المراجعة / القراءة:</h3>
           <div className="leading-loose text-lg md:text-xl font-bold text-slate-700 font-['Cairo']">{renderBracketHighlightedText(question.blockText)}</div>
         </div>
       )}
 
-      <div className={`${hasBlockText ? 'flex-1' : 'w-full max-w-5xl mx-auto'} bg-white/95 p-5 md:p-8 lg:p-10 overflow-y-auto flex flex-col shadow-[0_20px_70px_rgba(15,23,42,0.09)] rounded-[28px] min-h-full border border-slate-200/80 relative`}>
-        <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-5">
+      <div className={`${hasBlockText ? 'flex-1' : 'w-full max-w-5xl mx-auto'} bg-white/95 p-3 md:p-8 lg:p-10 overflow-y-auto flex flex-col shadow-[0_20px_70px_rgba(15,23,42,0.09)] rounded-2xl md:rounded-[28px] min-h-full border border-slate-200/80 relative`}>
+        <div className="flex flex-wrap justify-between items-center gap-2 mb-3 border-b border-slate-100 pb-2 md:mb-6 md:pb-5">
           <div className="flex items-center gap-3">
             <span className="bg-gradient-to-br from-indigo-500 to-violet-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md font-['Cairo']">سؤال {questionNumber}</span>
             {question.branch && question.branch !== 'عام' && (
@@ -139,14 +139,14 @@ export default function ExamQuestionPanel({
             )}
           </div>
           {!isSubmitted && (
-            <button onClick={() => onFlagToggle(question.id)} className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold transition shadow-sm ${flagged[question.id] ? 'bg-amber-100 text-amber-700 border border-amber-300' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200'}`}>
+            <button onClick={() => onFlagToggle(question.id)} className={`flex items-center gap-2 px-2 py-1.5 rounded-xl text-xs md:px-5 md:py-2 md:text-sm font-bold transition shadow-sm ${flagged[question.id] ? 'bg-amber-100 text-amber-700 border border-amber-300' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200'}`}>
               <Flag size={16} /> {flagged[question.id] ? 'محدد للمراجعة' : 'تحديد لمراجعته لاحقاً'}
             </button>
           )}
         </div>
 
-        <div className="bg-gradient-to-l from-slate-50 to-indigo-50/60 p-6 md:p-8 rounded-2xl border border-slate-200 mb-7 text-right">
-          <h3 className="text-xl md:text-2xl lg:text-3xl font-black text-slate-950 leading-[2] font-['Cairo'] drop-shadow-sm">
+        <div className="bg-gradient-to-l from-slate-50 to-indigo-50/60 p-3 md:p-8 rounded-2xl border border-slate-200 mb-4 md:mb-7 text-right">
+          <h3 className="text-lg md:text-2xl lg:text-3xl font-black text-slate-950 leading-[2] font-['Cairo'] drop-shadow-sm">
             {String(question.text || '').split('|').map((part, i, arr) => (
               <React.Fragment key={i}>
                 {renderBracketHighlightedText(part.trim())}

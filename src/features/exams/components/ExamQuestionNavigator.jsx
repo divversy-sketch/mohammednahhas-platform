@@ -22,18 +22,18 @@ export default function ExamQuestionNavigator({ displayQuestions = [], flatQuest
   const flaggedCount = displayQuestions.filter((question) => flagged?.[question.id]).length;
 
   return (
-    <aside className="order-2 flex w-full shrink-0 flex-col border-t border-slate-200 bg-white/90 p-3 shadow-[0_-8px_28px_rgba(15,23,42,0.05)] backdrop-blur md:order-none md:w-72 md:border-l md:border-t-0 md:p-5 md:shadow-[-8px_0_28px_rgba(15,23,42,0.04)]">
+    <aside className="order-2 flex w-full shrink-0 flex-col border-t border-slate-200 bg-white/90 p-1.5 shadow-[0_-8px_28px_rgba(15,23,42,0.05)] backdrop-blur md:order-none md:w-72 md:border-l md:border-t-0 md:p-5 md:shadow-[-8px_0_28px_rgba(15,23,42,0.04)]">
       <div className="mb-4 hidden md:block">
         <h2 className="text-center text-base font-black text-slate-900">التنقل بين الأسئلة</h2>
         <p className="mt-1 text-center text-xs font-bold text-slate-500">اختر رقم السؤال للانتقال إليه</p>
       </div>
 
-      <div className="grid max-h-28 grid-flow-col grid-rows-2 gap-2 overflow-x-auto pb-1 md:max-h-none md:flex-1 md:grid-flow-row md:grid-cols-5 md:grid-rows-none md:content-start md:overflow-y-auto md:overflow-x-hidden md:pb-4 scrollbar-hide">
+      <div className="flex max-h-12 gap-1.5 overflow-x-auto pb-1 md:max-h-none md:flex-1 md:grid-flow-row md:grid-cols-5 md:grid-rows-none md:content-start md:overflow-y-auto md:overflow-x-hidden md:pb-4 scrollbar-hide">
         {displayQuestions.map((question, idx) => {
           const originalIndex = flatQuestions.findIndex((origQ) => origQ.id === question.id) + 1;
           const statusClass = getQuestionStatusClass({ question, answers, flagged, isSubmitted, isCurrent: currentQIndex === idx });
           return (
-            <button key={question.id || idx} onClick={() => onSelectQuestion(idx)} className={`relative h-10 min-w-10 rounded-xl border text-sm font-black transition-all md:aspect-square md:h-auto md:min-w-0 ${statusClass}`} aria-label={`السؤال ${originalIndex}`}>
+            <button key={question.id || idx} onClick={() => onSelectQuestion(idx)} className={`relative h-9 min-w-9 rounded-lg border text-sm font-black transition-all md:aspect-square md:h-auto md:min-w-0 ${statusClass}`} aria-label={`السؤال ${originalIndex}`}>
               {originalIndex}
               {flagged?.[question.id] && !isSubmitted && currentQIndex !== idx && <span className="absolute -left-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-amber-500" />}
             </button>
