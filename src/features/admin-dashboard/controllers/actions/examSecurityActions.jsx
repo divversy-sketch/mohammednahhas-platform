@@ -1,6 +1,6 @@
 import { doc, setDoc, getDoc, getDocs, collection, addDoc, query, where, updateDoc, deleteDoc, serverTimestamp, writeBatch, increment } from 'firebase/firestore';
 
-import { db } from '@services/firebase';
+import { db, auth } from '@services/firebase';
 import { validateEgyptianPhones } from '@shared/utils/phone';
 import { FloatingArabicBackground } from '@features/home/HomeWidgets';
 import { uploadToFirebaseContent, detectContentType, readHtmlFileAsInlineContent } from '@services/firebaseContentUpload';
@@ -126,6 +126,11 @@ export const createExamSecurityActions = (ctx) => {
 
   const handleApproveSecurityContinue = async (result) => {
     if (!result?.id) return;
+    const adminUser = auth.currentUser;
+    if (!adminUser) {
+      platformNotify('انتهت جلسة تسجيل الدخول. سجل الدخول مرة أخرى قبل اعتماد قرار الامتحان.');
+      return;
+    }
     if (!platformConfirm(`السماح للطالب ${result.studentName || ''} باستكمال الامتحان بنفس الإجابات والوقت المتبقي؟`)) return;
 
     const fullSeconds = safeNumber(result.totalTime, 60) * 60;
@@ -142,11 +147,11 @@ export const createExamSecurityActions = (ctx) => {
       remainingTime: safeRemainingTime,
       currentQIndex: safeNumber(result.currentQIndex, 0),
       answers: result.answers || {},
-      adminApprovedBy: user.email || user.uid,
+      adminApprovedBy: adminUser.email || adminUser.uid,
       adminApprovedAt: serverTimestamp(),
       antiCheatLog: [
         ...(result.antiCheatLog || []),
-        { type: 'admin_allowed_continue', at: new Date().toISOString(), admin: user.email || user.uid }
+        { type: 'admin_allowed_continue', at: new Date().toISOString(), admin: adminUser.email || adminUser.uid }
       ]
     };
     await updateDoc(doc(db, 'exam_results', result.id), payload);
@@ -158,6 +163,11 @@ export const createExamSecurityActions = (ctx) => {
 
   const handleApproveSecurityRestart = async (result) => {
     if (!result?.id) return;
+    const adminUser = auth.currentUser;
+    if (!adminUser) {
+      platformNotify('انتهت جلسة تسجيل الدخول. سجل الدخول مرة أخرى قبل اعتماد قرار الامتحان.');
+      return;
+    }
     if (!platformConfirm(`السماح للطالب ${result.studentName || ''} بإعادة الامتحان من البداية؟ سيتم مسح الإجابات الحالية وإرجاع الوقت كاملًا.`)) return;
     const fullSeconds = safeNumber(result.totalTime, 60) * 60;
     const payload = {
@@ -170,11 +180,11 @@ export const createExamSecurityActions = (ctx) => {
       currentQIndex: 0,
       antiCheatWarnings: 0,
       restartCount: increment(1),
-      adminApprovedBy: user.email || user.uid,
+      adminApprovedBy: adminUser.email || adminUser.uid,
       adminApprovedAt: serverTimestamp(),
       antiCheatLog: [
         ...(result.antiCheatLog || []),
-        { type: 'admin_allowed_restart', at: new Date().toISOString(), admin: user.email || user.uid }
+        { type: 'admin_allowed_restart', at: new Date().toISOString(), admin: adminUser.email || adminUser.uid }
       ]
     };
     await updateDoc(doc(db, 'exam_results', result.id), payload);
