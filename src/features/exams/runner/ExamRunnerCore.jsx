@@ -9,7 +9,7 @@ import { uploadToCloudinary } from '@services/cloudinaryUpload';
 
 import { platformNotify, safeNumber, calculateDetailedExamMetrics } from '@shared/core/platformShared.jsx';
 
-import { makeExamAutosaveKey, readLocalExamBackup, writeLocalExamBackupToStorage, clearLocalExamBackup, flattenExamQuestions } from '@shared/exam/examState.js';
+import { makeExamAutosaveKey, readLocalExamBackup, writeLocalExamBackupToStorage, clearLocalExamBackup, flattenExamQuestions, restoreExamRemainingTime } from '@shared/exam/examState.js';
 import { useOnlineStatus } from '@shared/ui/ConnectionStatusBanner.jsx';
 import { ExamEmptyState, ExamCheatingScreen } from '@features/exams/runner/components/ExamRunnerStateScreens.jsx';
 import { ExamRunnerView } from '@features/exams/runner/views/ExamRunnerView.jsx';
@@ -18,12 +18,21 @@ import { ExamRunnerView } from '@features/exams/runner/views/ExamRunnerView.jsx'
 
 export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult = null }) => {
   const [activeView, setActiveView] = useState(isReviewMode || existingResult ? 'dashboard' : 'questions');
-  const [currentQIndex, setCurrentQIndex] = useState(() => Math.max(0, safeNumber(exam.resumeData?.currentQIndex, 0)));
+  const [currentQIndex, setCurrentQIndex] = useState(() => Math.max(0, safeNumber(exam.resumeData?.currentQIndex ?? readLocalExamBackup(makeExamAutosaveKey(user, exam))?.currentQIndex, 0)));
   const autosaveKey = makeExamAutosaveKey(user, exam);
   const localExamBackup = readLocalExamBackup(autosaveKey);
   const [answers, setAnswers] = useState(existingResult?.answers || exam.resumeData?.answers || localExamBackup?.answers || {});
   const [flagged, setFlagged] = useState({});
-  const [timeLeft, setTimeLeft] = useState(safeNumber(existingResult?.remainingTime ?? exam.resumeData?.remainingTime ?? localExamBackup?.remainingTime, exam.duration * 60));
+  const [timeLeft, setTimeLeft] = useState(() => {
+    const draft = existingResult || exam.resumeData || localExamBackup;
+    if (!draft || draft.remainingTime == null) return Math.max(0, safeNumber(exam.duration, 0) * 60);
+    return restoreExamRemainingTime({
+      remainingTime: draft.remainingTime,
+      savedAt: draft.lastSavedAt || draft.savedAt,
+      duration: exam.duration,
+      paused: draft.status === 'security_hold' || draft.resumeApproved === true,
+    });
+  });
   const [isCheating, setIsCheating] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(isReviewMode || existingResult !== null);
   const [score, setScore] = useState(existingResult?.score || 0);
@@ -40,6 +49,10 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
   const [showAntiCheatChoice, setShowAntiCheatChoice] = useState(false);
   const [securityLockReason, setSecurityLockReason] = useState('');
   const [lastLocalSaveAt, setLastLocalSaveAt] = useState('');
+  const [submissionError, setSubmissionError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
+  const deadlineRef = useRef(Date.now() + timeLeft * 1000);
   const isOnline = useOnlineStatus();
 
   const fileDialogBypassRef = useRef(false);
@@ -150,6 +163,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
     setCurrentQIndex(0);
     setScore(0);
     setTimeLeft(exam.duration * 60);
+    deadlineRef.current = Date.now() + exam.duration * 60 * 1000;
     const freshStartTime = Date.now();
     setStartTime(freshStartTime);
     setAntiCheatWarnings(0);
@@ -218,7 +232,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
     const handleBeforeUnload = (e) => {
       if (!stateRefs.current.isSubmitted) {
         e.preventDefault();
-        e.returnValue = "هل أنت متأكد؟ الخروج سيمنعك من العودة للامتحان!";
+        e.returnValue = "سيتم الاحتفاظ بآخر إجابات محفوظة. هل تريد المغادرة؟";
         return e.returnValue;
       }
     };
@@ -260,7 +274,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
     window.addEventListener('beforeunload', handleBeforeUnload);
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("blur", handleAntiCheat);
-    window.addEventListener("pagehide", handleAntiCheat);
+    // Closing or reloading a page is not by itself evidence of cheating.
     document.addEventListener('contextmenu', blockContextMenu);
     document.addEventListener('copy', handleBlockedClipboard);
     document.addEventListener('cut', handleBlockedClipboard);
@@ -272,7 +286,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("blur", handleAntiCheat);
-      window.removeEventListener("pagehide", handleAntiCheat);
+
       document.removeEventListener('contextmenu', blockContextMenu);
       document.removeEventListener('copy', handleBlockedClipboard);
       document.removeEventListener('cut', handleBlockedClipboard);
@@ -283,14 +297,16 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
   }, [isReviewMode, mcqQuestions.length, exam.attemptId, exam.id, exam.duration, startTime, user.uid, user.displayName, showAntiCheatChoice]);
 
   useEffect(() => {
-    if (isReviewMode || isSubmitted) return;
-    if (timeLeft > 0 && !isCheating) {
-      const timer = setInterval(() => setTimeLeft((p) => p - 1), 1000);
-      return () => clearInterval(timer);
-    } else if (timeLeft === 0) {
-      handleSubmit(true);
-    }
-  }, [timeLeft, isSubmitted, isCheating, isReviewMode]);
+    if (isReviewMode || isSubmitted || isCheating) return;
+    const tick = () => setTimeLeft(Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000)));
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [isSubmitted, isCheating, isReviewMode]);
+
+  useEffect(() => {
+    if (timeLeft === 0 && !isSubmitted && !isReviewMode && !submissionError && !submitting) handleSubmit(true);
+  }, [timeLeft, isSubmitted, isReviewMode, submissionError, submitting]);
 
   const handleAnswer = (qId, value) => {
     if (!isReviewMode && !isSubmitted && !showAntiCheatChoice) {
@@ -363,6 +379,10 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
   const confirmSubmit = () => setShowSubmitConfirm(true);
 
   const handleSubmit = async (auto = false) => {
+    if (submittingRef.current || isSubmitted) return;
+    submittingRef.current = true;
+    setSubmitting(true);
+    setSubmissionError('');
     setShowSubmitConfirm(false);
     const finalScore = calculateScore();
     const timeTaken = Math.round((Date.now() - startTime) / 1000);
@@ -380,9 +400,6 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
       }])
     );
 
-    setScore(finalScore);
-    setIsSubmitted(true);
-    setActiveView('dashboard');
 
     const batch = writeBatch(db);
 
@@ -392,7 +409,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
       const isCorrect = studentAns === q.correctIdx;
 
       if (isAnswered && !isCorrect) {
-        const mistakeRef = doc(collection(db, 'student_mistakes'));
+        const mistakeRef = exam.attemptId ? doc(db, 'student_mistakes', `${exam.attemptId}_${String(q.id).replaceAll('/', '_')}`) : doc(collection(db, 'student_mistakes'));
         batch.set(mistakeRef, {
           userId: user.uid,
           examTitle: exam.title,
@@ -451,11 +468,17 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
     try {
       await batch.commit();
       clearLocalExamBackup(autosaveKey);
+      setScore(finalScore);
+      setIsSubmitted(true);
+      setActiveView('dashboard');
       platformNotify(auto ? 'انتهى الوقت وتم تسليم الامتحان تلقائيًا. تم حفظ الإجابات.' : 'تم تسليم الامتحان وحفظ النتيجة بنجاح.');
     } catch (err) {
       console.error("Error saving results or mistakes", err);
-      writeLocalExamBackup(answers, { status: 'completed_locally', submittedLocallyAt: new Date().toISOString() });
-      platformNotify('تعذر رفع النتيجة للسيرفر الآن. تم حفظ نسخة محلية، لا تغلق الجهاز وحاول الاتصال بالإنترنت.');
+      writeLocalExamBackup(answers);
+      setSubmissionError('تعذر رفع النتيجة إلى السيرفر. إجاباتك محفوظة على هذا الجهاز؛ تحقق من الاتصال ثم أعد المحاولة.');
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
     }
   };
 
@@ -501,7 +524,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
     flatQuestions, answers, onClose, setActiveView, confirmSubmit, totalQs,
     percentage, solvedQs, correctQs, wrongQs, essayAnswered, essayQuestions,
     antiCheatWarnings, branchStats, setActiveBranchTab, wmPositions, isOnline,
-    lastLocalSaveAt, showAntiCheatChoice, showSubmitConfirm, handleSubmit,
+    lastLocalSaveAt, showAntiCheatChoice, showSubmitConfirm, handleSubmit, submissionError, submitting,
     setShowSubmitConfirm, activeBranchTab, uniqueBranches, displayQuestions,
     flagged, currentQIndex, setCurrentQIndex, currentQObj, handleAnswer,
     setFlagged, handleEssayImageUpload, fileDialogBypassRef,

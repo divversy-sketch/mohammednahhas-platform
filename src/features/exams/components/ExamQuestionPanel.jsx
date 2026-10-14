@@ -69,7 +69,7 @@ function EssayAnswerEditor({ question, answer, isSubmitted, onAnswer, onImageUpl
 
 function McqAnswerOptions({ question, answer, isSubmitted, onAnswer }) {
   return (
-    <div className="space-y-4">
+    <div role="radiogroup" aria-label="خيارات الإجابة" className="space-y-3 md:space-y-4">
       {(Array.isArray(question.options) ? question.options : []).map((option, idx) => {
         let optionClass = 'border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/60 bg-white text-slate-800';
         const isSelected = answer === idx;
@@ -83,13 +83,13 @@ function McqAnswerOptions({ question, answer, isSubmitted, onAnswer }) {
         }
 
         return (
-          <div key={idx} onClick={() => onAnswer(question.id, idx)} className={`group p-3 md:p-5 rounded-2xl border cursor-pointer transition-all duration-200 flex items-center gap-4 ${optionClass}`}>
+          <div key={idx} onClick={() => !isSubmitted && onAnswer(question.id, idx)} role="radio" aria-checked={isSelected} tabIndex={isSubmitted ? -1 : 0} onKeyDown={(e) => { if (!isSubmitted && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onAnswer(question.id, idx); } }} className={`group p-3 md:p-5 rounded-2xl border cursor-pointer transition-all duration-200 flex items-center gap-4 ${optionClass}`}>
             <div className={`w-10 h-10 rounded-full border-2 font-black text-base flex items-center justify-center shrink-0 transition-colors ${isSelected || (isSubmitted && idx === question.correctIdx) ? 'border-transparent bg-current' : 'border-slate-300'}`}>
               {!isSubmitted && <span>{['أ','ب','ج','د','هـ','و'][idx] || idx + 1}</span>}
               {(isSubmitted && idx === question.correctIdx) && <Check size={16} className="text-white" />}
               {(isSubmitted && isSelected && idx !== question.correctIdx) && <X size={16} className="text-white" />}
             </div>
-            <span className="font-['Cairo'] text-base md:text-xl font-bold leading-relaxed">{option}</span>
+            <span className="font-['Cairo'] text-base md:text-xl font-bold leading-relaxed break-words min-w-0">{option}</span>
             {isSubmitted && idx === question.correctIdx && <span className="mr-auto text-green-600 bg-green-100 px-3 py-1 rounded-lg text-xs font-bold">الإجابة الصحيحة</span>}
             {isSubmitted && isSelected && idx !== question.correctIdx && <span className="mr-auto text-red-600 bg-red-100 px-3 py-1 rounded-lg text-xs font-bold">إجابتك (خطأ)</span>}
           </div>
@@ -119,7 +119,7 @@ export default function ExamQuestionPanel({
   const questionNumber = flatQuestions.findIndex((origQ) => origQ.id === question.id) + 1;
   const hasBlockText = question?.blockText && question.blockText.trim().length > 0;
   return (
-    <div className={`flex-1 flex flex-col ${hasBlockText ? 'lg:flex-row' : 'items-center'} min-h-0 overflow-y-auto bg-transparent w-full p-2 md:p-6 lg:p-8 gap-3 md:gap-6`}>
+    <div className={`flex-1 flex flex-col ${hasBlockText ? 'xl:flex-row' : 'items-center'} min-h-0 overflow-y-auto bg-transparent w-full p-2 sm:p-4 md:p-6 lg:p-8 gap-3 md:gap-6`}>
       {hasBlockText && (
         <div className="flex-1 w-full bg-white/95 p-3 md:p-10 overflow-y-auto rounded-[28px] shadow-[0_18px_60px_rgba(15,23,42,0.08)] border border-slate-200/80">
           <h3 className="font-bold text-blue-900 mb-6 flex items-center gap-2 text-xl border-b border-blue-100 pb-4 font-['Cairo']"><FileText size={24} /> نص المراجعة / القراءة:</h3>
@@ -127,7 +127,7 @@ export default function ExamQuestionPanel({
         </div>
       )}
 
-      <div className={`${hasBlockText ? 'flex-1' : 'w-full max-w-5xl mx-auto'} bg-white/95 p-3 md:p-8 lg:p-10 overflow-y-auto flex flex-col shadow-[0_20px_70px_rgba(15,23,42,0.09)] rounded-2xl md:rounded-[28px] min-h-full border border-slate-200/80 relative`}>
+      <div className={`${hasBlockText ? 'flex-1' : 'w-full max-w-5xl mx-auto'} bg-white/95 p-3 md:p-8 lg:p-10 overflow-y-auto flex flex-col shadow-[0_20px_70px_rgba(15,23,42,0.09)] rounded-2xl md:rounded-[28px] min-h-fit border border-slate-200/80 relative`}>
         <div className="flex flex-wrap justify-between items-center gap-2 mb-3 border-b border-slate-100 pb-2 md:mb-6 md:pb-5">
           <div className="flex items-center gap-3">
             <span className="bg-gradient-to-br from-indigo-500 to-violet-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md font-['Cairo']">سؤال {questionNumber}</span>
@@ -186,8 +186,8 @@ export default function ExamQuestionPanel({
         )}
 
         <div className="mt-auto pt-8 flex items-center justify-between gap-3">
-          <button disabled={currentQIndex === 0} onClick={onPrevious} className="px-5 md:px-8 py-3.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold disabled:opacity-50 hover:bg-slate-300 transition shadow-sm font-['Cairo'] flex items-center gap-2"><ChevronRight size={20} /> السابق</button>
-          <button disabled={currentQIndex === displayQuestions.length - 1} onClick={onNext} className="px-5 md:px-8 py-3.5 rounded-xl bg-gradient-to-l from-indigo-600 to-violet-600 text-white font-bold disabled:opacity-50 hover:bg-slate-800 transition shadow-lg font-['Cairo'] flex items-center gap-2">التالي <ChevronRight size={20} className="rotate-180" /></button>
+          <button disabled={currentQIndex === 0} onClick={onPrevious} className="min-h-12 px-4 sm:px-6 md:px-8 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold disabled:opacity-50 hover:bg-slate-300 transition shadow-sm font-['Cairo'] flex items-center gap-2"><ChevronRight size={20} /> السابق</button>
+          <button disabled={currentQIndex === displayQuestions.length - 1} onClick={onNext} className="min-h-12 px-4 sm:px-6 md:px-8 py-3 rounded-xl bg-gradient-to-l from-indigo-600 to-violet-600 text-white font-bold disabled:opacity-50 hover:bg-slate-800 transition shadow-lg font-['Cairo'] flex items-center gap-2">التالي <ChevronRight size={20} className="rotate-180" /></button>
         </div>
       </div>
     </div>

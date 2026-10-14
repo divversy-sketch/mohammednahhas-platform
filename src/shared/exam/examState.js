@@ -1,3 +1,12 @@
+// Reconcile a recovered draft with elapsed real time instead of resetting the countdown.
+export const restoreExamRemainingTime = ({ remainingTime, savedAt, duration, paused = false, now = Date.now() }) => {
+  const cap = Math.max(0, Number(duration) * 60 || 0);
+  const remaining = Math.min(cap, Math.max(0, Number(remainingTime) || 0));
+  const timestamp = typeof savedAt?.toDate === 'function' ? savedAt.toDate().getTime() : new Date(savedAt || 0).getTime();
+  if (paused || !Number.isFinite(timestamp) || timestamp <= 0) return remaining;
+  return Math.max(0, remaining - Math.max(0, Math.floor((now - timestamp) / 1000)));
+};
+
 export const makeExamAutosaveKey = (user, exam) => (
   `nahhas_exam_backup_${user?.uid || 'guest'}_${exam?.attemptId || exam?.id || 'exam'}`
 );

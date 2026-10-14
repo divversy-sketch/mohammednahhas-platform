@@ -7,7 +7,7 @@ export function ExamRunnerView({ ctx }) {
     flatQuestions, answers, onClose, setActiveView, confirmSubmit, totalQs,
     percentage, solvedQs, correctQs, wrongQs, essayAnswered, essayQuestions,
     antiCheatWarnings, branchStats, setActiveBranchTab, wmPositions, isOnline,
-    lastLocalSaveAt, showAntiCheatChoice, showSubmitConfirm, handleSubmit,
+    lastLocalSaveAt, showAntiCheatChoice, showSubmitConfirm, handleSubmit, submissionError, submitting,
     setShowSubmitConfirm, activeBranchTab, uniqueBranches, displayQuestions,
     flagged, currentQIndex, setCurrentQIndex, currentQObj, handleAnswer,
     setFlagged, handleEssayImageUpload, fileDialogBypassRef,
@@ -51,6 +51,8 @@ export function ExamRunnerView({ ctx }) {
       wmPositions={wmPositions}
       isOnline={isOnline}
       lastLocalSaveAt={lastLocalSaveAt}
+      submissionError={submissionError}
+      submitting={submitting}
       showAntiCheatChoice={showAntiCheatChoice}
       onClose={onClose}
       showSubmitConfirm={showSubmitConfirm}
