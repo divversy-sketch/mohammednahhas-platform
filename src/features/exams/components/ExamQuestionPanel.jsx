@@ -119,15 +119,15 @@ export default function ExamQuestionPanel({
   const questionNumber = flatQuestions.findIndex((origQ) => origQ.id === question.id) + 1;
   const hasBlockText = question?.blockText && question.blockText.trim().length > 0;
   return (
-    <div className={`flex-1 flex flex-col ${hasBlockText ? 'xl:flex-row' : 'items-center'} min-h-0 overflow-y-auto bg-transparent w-full p-2 sm:p-4 md:p-6 lg:p-8 gap-3 md:gap-6`}>
+    <div className={`flex-1 flex flex-col ${hasBlockText ? 'xl:flex-row' : 'items-center'} min-h-0 overflow-y-auto overscroll-contain bg-transparent w-full p-2 sm:p-4 md:p-6 lg:p-8 gap-3 md:gap-6`}>
       {hasBlockText && (
-        <div className="flex-1 w-full bg-white/95 p-3 md:p-10 overflow-y-auto rounded-[28px] shadow-[0_18px_60px_rgba(15,23,42,0.08)] border border-slate-200/80">
+        <div className="flex-none w-full h-[48dvh] min-h-[260px] max-h-[520px] xl:h-auto xl:max-h-none xl:min-h-0 xl:flex-1 bg-white/95 p-4 sm:p-5 md:p-10 overflow-y-auto overscroll-contain rounded-[28px] shadow-[0_18px_60px_rgba(15,23,42,0.08)] border border-slate-200/80">
           <h3 className="font-bold text-blue-900 mb-6 flex items-center gap-2 text-xl border-b border-blue-100 pb-4 font-['Cairo']"><FileText size={24} /> نص المراجعة / القراءة:</h3>
-          <div className="leading-loose text-lg md:text-xl font-bold text-slate-700 font-['Cairo']">{renderBracketHighlightedText(question.blockText)}</div>
+          <div className="leading-[2] text-base sm:text-lg md:text-xl font-bold text-slate-700 whitespace-pre-wrap break-words font-['Cairo']">{renderBracketHighlightedText(question.blockText)}</div>
         </div>
       )}
 
-      <div className={`${hasBlockText ? 'flex-1' : 'w-full max-w-5xl mx-auto'} bg-white/95 p-3 md:p-8 lg:p-10 overflow-y-auto flex flex-col shadow-[0_20px_70px_rgba(15,23,42,0.09)] rounded-2xl md:rounded-[28px] min-h-fit border border-slate-200/80 relative`}>
+      <div className={`${hasBlockText ? 'flex-none xl:flex-1' : 'w-full max-w-5xl mx-auto'} bg-white/95 p-3 md:p-8 lg:p-10 overflow-y-auto flex flex-col shadow-[0_20px_70px_rgba(15,23,42,0.09)] rounded-2xl md:rounded-[28px] min-h-fit border border-slate-200/80 relative`}>
         <div className="flex flex-wrap justify-between items-center gap-2 mb-3 border-b border-slate-100 pb-2 md:mb-6 md:pb-5">
           <div className="flex items-center gap-3">
             <span className="bg-gradient-to-br from-indigo-500 to-violet-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md font-['Cairo']">سؤال {questionNumber}</span>
