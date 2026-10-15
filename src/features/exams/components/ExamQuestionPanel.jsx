@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Check, ChevronRight, FileText, Flag, HelpCircle, Layers, PenTool, UploadCloud, X } from '../../../shared/icons/lucide-shim.jsx';
 import { LocalEssayReviewBox, LocalQuestionExplanation, renderBracketHighlightedText } from '../../../shared/core/platformShared.jsx';
 
@@ -115,16 +115,50 @@ export default function ExamQuestionPanel({
   onPrevious,
   onNext,
 }) {
+  const [passageOpen, setPassageOpen] = useState(false);
+  useEffect(() => { setPassageOpen(false); }, [question?.id]);
+  useEffect(() => {
+    if (!passageOpen) return undefined;
+    const onEscape = (event) => { if (event.key === 'Escape') setPassageOpen(false); };
+    document.addEventListener('keydown', onEscape);
+    return () => document.removeEventListener('keydown', onEscape);
+  }, [passageOpen]);
   const answer = answers?.[question.id];
   const questionNumber = flatQuestions.findIndex((origQ) => origQ.id === question.id) + 1;
   const hasBlockText = question?.blockText && question.blockText.trim().length > 0;
   return (
     <div className={`flex-1 flex flex-col ${hasBlockText ? 'xl:flex-row' : 'items-center'} min-h-0 overflow-y-auto overscroll-contain bg-transparent w-full p-2 sm:p-4 md:p-6 lg:p-8 gap-3 md:gap-6`}>
       {hasBlockText && (
-        <div className="flex-none w-full h-[48dvh] min-h-[260px] max-h-[520px] xl:h-auto xl:max-h-none xl:min-h-0 xl:flex-1 bg-white/95 p-4 sm:p-5 md:p-10 overflow-y-auto overscroll-contain rounded-[28px] shadow-[0_18px_60px_rgba(15,23,42,0.08)] border border-slate-200/80">
+        <div className="hidden xl:block flex-none w-full h-[48dvh] min-h-[260px] max-h-[520px] xl:h-auto xl:max-h-none xl:min-h-0 xl:flex-1 bg-white/95 p-4 sm:p-5 md:p-10 overflow-y-auto overscroll-contain rounded-[28px] shadow-[0_18px_60px_rgba(15,23,42,0.08)] border border-slate-200/80">
           <h3 className="font-bold text-blue-900 mb-6 flex items-center gap-2 text-xl border-b border-blue-100 pb-4 font-['Cairo']"><FileText size={24} /> نص المراجعة / القراءة:</h3>
           <div className="leading-[2] text-base sm:text-lg md:text-xl font-bold text-slate-700 whitespace-pre-wrap break-words font-['Cairo']">{renderBracketHighlightedText(question.blockText)}</div>
         </div>
+      )}
+
+      {hasBlockText && (
+        <>
+          <button
+            type="button"
+            onClick={() => setPassageOpen(true)}
+            className="xl:hidden sticky top-0 z-40 flex w-full shrink-0 items-center justify-center gap-3 rounded-2xl bg-indigo-700 px-4 py-4 text-lg font-black text-white shadow-lg border border-indigo-800"
+            aria-label="فتح القطعة لقراءتها كاملة"
+          >
+            <FileText size={22} /> قراءة القطعة كاملة
+          </button>
+          {passageOpen && (
+            <div className="xl:hidden fixed inset-0 z-[100] flex flex-col bg-white" role="dialog" aria-modal="true" aria-label="نص القطعة" dir="rtl">
+              <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-200 bg-indigo-700 px-4 py-3 text-white">
+                <strong className="text-lg font-black">نص القراءة / النصوص</strong>
+                <button type="button" onClick={() => setPassageOpen(false)} className="flex min-h-12 items-center gap-2 rounded-xl bg-white px-4 py-2 font-black text-indigo-800" aria-label="إغلاق القطعة والعودة للسؤال">
+                  <X size={20} /> العودة للسؤال
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-6 pb-12 text-right text-lg font-bold leading-[2.2] text-slate-900 whitespace-pre-wrap break-words [-webkit-overflow-scrolling:touch]" style={{ touchAction: 'pan-y' }}>
+                {renderBracketHighlightedText(question.blockText)}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       <div className={`${hasBlockText ? 'flex-none xl:flex-1' : 'w-full max-w-5xl mx-auto'} bg-white/95 p-3 md:p-8 lg:p-10 overflow-y-auto flex flex-col shadow-[0_20px_70px_rgba(15,23,42,0.09)] rounded-2xl md:rounded-[28px] min-h-fit border border-slate-200/80 relative`}>
