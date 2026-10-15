@@ -1,34 +1,18 @@
 import { useEffect, useState } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc, collection, addDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
-import { motion } from 'framer-motion';
-import {
-  ArrowLeft,
-  BrainCircuit,
-  ChevronRight,
-  GraduationCap,
-  KeyRound,
-  Loader2,
-  Lock,
-  Mail,
-  Moon,
-  Phone,
-  Shield,
-  Sparkles,
-  Sun,
-  User
-} from '../icons/lucide-shim.jsx';
 import { auth, db } from '../../services/firebase';
 import { GradeOptions } from '../constants/grades';
 import { normalizeEgyptPhone, validateEgyptianPhones } from '../utils/phone';
-import { platformNotify, WhatsAppContactButton } from '../core/platformShared.jsx';
-import '../../styles/pages/landing.css';
-import '../../styles/pages/auth.css';
-import nahhasLogo from '../../assets/nahhas-logo-transparent.png';
-import nahhasLogoDark from '../../assets/nahhas-logo-dark.png';
+import { platformNotify } from '../core/platformShared.jsx';
+import { openPlatformWhatsApp } from '../core/platform/media.js';
+import { Icon, KhatamStar } from '@v2/ui/Icon.jsx';
+import { Button, IconButton } from '@v2/ui/kit.jsx';
+import { usePrefs } from '@v2/prefs.js';
+import '@v2/styles/auth.css';
+import nahhasLogo from '../../assets/nahhas-logo-transparent.webp';
+import nahhasLogoDark from '../../assets/nahhas-logo-dark.webp';
 
-
-const arabicLetters = ['أ', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'س', 'ش', 'ص', 'ض', 'ط', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي', 'لا'];
 
 const getFriendlyAuthError = (error) => {
   const code = error?.code || '';
@@ -45,38 +29,19 @@ const getFriendlyAuthError = (error) => {
   return messages[code] || 'حدث خطأ غير متوقع. جرّب مرة أخرى أو تواصل مع الإدارة.';
 };
 
-function ArabicLettersField() {
+function Field({ icon, label, ...props }) {
   return (
-    <div className="neo-arabic-field neo-auth-letters" aria-hidden="true">
-      {arabicLetters.map((letter, index) => (
-        <span key={`${letter}-${index}`} style={{ '--i': index, '--x': `${(index * 8.2) % 108 - 8}%`, '--y': `${(index * 13.7) % 104 - 2}%` }}>{letter}</span>
-      ))}
-    </div>
-  );
-}
-
-function ThemeToggle({ theme, onToggle }) {
-  const isDark = theme === 'dark';
-  return (
-    <button type="button" onClick={onToggle} className="neo-theme-toggle" aria-label="تبديل الوضع النهاري والليلي">
-      {isDark ? <Sun size={18} /> : <Moon size={18} />}
-      <span>{isDark ? 'نهاري' : 'ليلي'}</span>
-    </button>
-  );
-}
-
-function AuthInput({ icon: Icon, ...props }) {
-  return (
-    <label className="neo-auth-input">
-      <Icon size={18} />
-      <input {...props} />
+    <label className="nx-field">
+      <span>{label}</span>
+      <span className="nx-input"><Icon name={icon} />{props.children || <input {...props} />}</span>
     </label>
   );
 }
 
 export const AuthPage = ({ onBack, initialMode = 'login' }) => {
   const [isRegister, setIsRegister] = useState(() => initialMode === 'register');
-  const [theme, setTheme] = useState('light');
+  const { theme, toggleTheme } = usePrefs();
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({ email: '', password: '', name: '', grade: '1sec', phone: '', parentPhone: '' });
   const [platformSettings, setPlatformSettings] = useState({ registrationOpen: true, platformName: 'منصة النحاس التعليمية', welcomeMessage: '' });
@@ -86,9 +51,6 @@ export const AuthPage = ({ onBack, initialMode = 'login' }) => {
   }, [initialMode]);
 
 
-  useEffect(() => {
-    if (typeof document !== 'undefined') document.documentElement.style.colorScheme = theme;
-  }, [theme]);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'platform_settings', 'main'), (snap) => {
@@ -172,96 +134,81 @@ export const AuthPage = ({ onBack, initialMode = 'login' }) => {
     }
   };
 
-  const headline = isRegister ? 'افتح بوابة الطالب الجديدة.' : 'ارجع لمساحتك الدراسية.';
-  const subtitle = isRegister
-    ? 'سجّل بياناتك الأساسية، وبعد موافقة الإدارة تبدأ رحلة منظمة مبنية على الصف والمحتوى المتاح لك.'
-    : 'كل درس وواجب واختبار في لوحة واحدة واضحة — لأن المتاهات مكانها الروايات مش منصة تعليمية.';
+  const set = (patch) => setFormData((prev) => ({ ...prev, ...patch }));
+  const closed = isRegister && platformSettings.registrationOpen === false;
 
   return (
-    <div className={`neo-public-page neo-auth-page neo-public-${theme}`} dir="rtl">
-      <ArabicLettersField />
-      <div className="neo-orb neo-orb-one" />
-      <div className="neo-orb neo-orb-two" />
-      <WhatsAppContactButton />
+    <div className="nx ax" dir="rtl">
+      <aside className="ax-story">
+        <div className="lx-mesh" aria-hidden="true"><i /><i /><i /></div>
+        <KhatamStar className="ax-story__star" />
+        <div className="ax-story__top">
+          <button type="button" className="ax-back" onClick={onBack}><Icon name="chevronRight" />الرئيسية</button>
+          <IconButton icon={theme === 'dark' ? 'sun' : 'moon'} label={theme === 'dark' ? 'الوضع النهاري' : 'الوضع الليلي'} plain onClick={toggleTheme} />
+        </div>
+        <div className="ax-story__copy">
+          <img src={nahhasLogoDark} alt="منصة النحاس" className="ax-story__logo" />
+          <h1>{isRegister ? <>ابدأ <span className="cal lx-sheen">صح</span> من النهارده</> : <>أهلاً بيك <span className="cal lx-sheen">تاني</span></>}</h1>
+          <p>{isRegister ? 'سجّل بياناتك، وبعد موافقة الإدارة هتلاقي محاضرات صفّك وامتحاناته مستنياك.' : 'كمّل من مكان ما وقفت: المحاضرة اللي ما خلصتهاش، والامتحان اللي جاي، ومستواك.'}</p>
+          <ul className="ax-points">
+            <li><Icon name="shield" />حسابك محمي وبيتراجع من الإدارة</li>
+            <li><Icon name="chart" />مستواك ونقط ضعفك قدامك على طول</li>
+            <li><Icon name="users" />ولي الأمر يتابع برقم موبايله</li>
+          </ul>
+        </div>
+      </aside>
 
-      <header className="neo-auth-header">
-        <button type="button" onClick={onBack} className="neo-back-button">
-          <ChevronRight size={18} />
-          الصفحة الرئيسية
-        </button>
-        <ThemeToggle theme={theme} onToggle={() => setTheme((value) => value === 'dark' ? 'light' : 'dark')} />
-      </header>
-
-      <main className="neo-auth-shell">
-        <motion.aside
-          className="neo-auth-story"
-          initial={{ opacity: 0, x: 28 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.65, ease: 'easeOut' }}
-        >
-          <span className="neo-pill"><Sparkles size={16} /> بوابة الطالب الجديدة</span>
-          <h1>{headline}</h1>
-          <p>{subtitle}</p>
-          <div className="neo-auth-points">
-            <div><Shield size={20} /><span>حسابات محمية ومراجعة من الإدارة</span></div>
-            <div><BrainCircuit size={20} /><span>متابعة ذكية لمستوى الطالب</span></div>
-            <div><KeyRound size={20} /><span>استعادة كلمة السر بطلب مباشر</span></div>
-          </div>
-        </motion.aside>
-
-        <motion.section
-          className="neo-auth-card"
-          initial={{ opacity: 0, y: 26, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.65, ease: 'easeOut', delay: 0.08 }}
-        >
-          <div className="neo-auth-card-head">
-            <div className="neo-logo neo-logo--auth">
-              <img src={nahhasLogo} alt="منصة النحاس" className="neo-logo-image neo-logo-image--light" />
-              <img src={nahhasLogoDark} alt="منصة النحاس" className="neo-logo-image neo-logo-image--dark" />
-            </div>
-            <div>
-              <span>{platformSettings.platformName || (isRegister ? 'إنشاء حساب' : 'تسجيل الدخول')}</span>
-              <h2>{isRegister ? 'حساب طالب جديد' : 'مرحبًا بعودتك'}</h2>
-            </div>
+      <main className="ax-main">
+        <section className="ax-card">
+          <img src={theme === 'dark' ? nahhasLogoDark : nahhasLogo} alt="منصة النحاس" className="ax-card__logo" />
+          <div className="ax-card__head">
+            <h2>{isRegister ? 'حساب طالب جديد' : 'تسجيل الدخول'}</h2>
+            <p className="muted">{platformSettings.welcomeMessage || (isRegister ? 'البيانات دي بتوصل للإدارة عشان تفعّل حسابك.' : 'ادخل بالإيميل وكلمة السر.')}</p>
           </div>
 
-          {platformSettings.welcomeMessage && <p className="neo-auth-message">{platformSettings.welcomeMessage}</p>}
-          {isRegister && platformSettings.registrationOpen === false && <div className="neo-auth-alert">التسجيل مغلق حاليًا من الإدارة.</div>}
-
-          <div className="neo-auth-tabs" role="tablist" aria-label="اختيار نوع العملية">
-            <button type="button" className={!isRegister ? 'active' : ''} onClick={() => setIsRegister(false)}>دخول</button>
-            <button type="button" className={isRegister ? 'active' : ''} onClick={() => setIsRegister(true)}>حساب جديد</button>
+          <div className="ax-tabs" role="tablist" aria-label="نوع العملية">
+            <button type="button" role="tab" aria-selected={!isRegister} onClick={() => setIsRegister(false)}>دخول</button>
+            <button type="button" role="tab" aria-selected={isRegister} onClick={() => setIsRegister(true)}>حساب جديد</button>
+            <span className="ax-tabs__thumb" style={{ transform: isRegister ? 'translateX(-100%)' : 'none' }} aria-hidden="true" />
           </div>
 
-          <form onSubmit={handleSubmit} className="neo-auth-form">
+          {closed && <div className="ax-alert" role="alert"><Icon name="lock" />التسجيل مقفول دلوقتي من الإدارة. كلّمهم على واتساب لو محتاج حساب.</div>}
+
+          <form onSubmit={handleSubmit} className="ax-form" key={isRegister ? 'r' : 'l'}>
             {isRegister && (
               <>
-                <AuthInput icon={User} required type="text" placeholder="اسم الطالب ثلاثي" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
-                <AuthInput icon={Phone} required type="tel" placeholder="رقم هاتف الطالب" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: normalizeEgyptPhone(e.target.value) })} />
-                <AuthInput icon={Phone} required type="tel" placeholder="رقم ولي الأمر" value={formData.parentPhone} onChange={(e) => setFormData({ ...formData, parentPhone: normalizeEgyptPhone(e.target.value) })} />
-                <label className="neo-auth-input">
-                  <GraduationCap size={18} />
-                  <select value={formData.grade} onChange={(e) => setFormData({ ...formData, grade: e.target.value })}>
-                    <GradeOptions />
-                  </select>
-                </label>
+                <Field icon="user" label="اسم الطالب ثلاثي" required type="text" autoComplete="name" value={formData.name} onChange={(e) => set({ name: e.target.value })} />
+                <div className="ax-row">
+                  <Field icon="phone" label="موبايل الطالب" required type="tel" inputMode="tel" autoComplete="tel" dir="ltr" value={formData.phone} onChange={(e) => set({ phone: normalizeEgyptPhone(e.target.value) })} placeholder="01xxxxxxxxx" />
+                  <Field icon="phone" label="موبايل ولي الأمر" required type="tel" inputMode="tel" dir="ltr" value={formData.parentPhone} onChange={(e) => set({ parentPhone: normalizeEgyptPhone(e.target.value) })} placeholder="01xxxxxxxxx" />
+                </div>
+                <Field icon="grade" label="الصف">
+                  <select value={formData.grade} onChange={(e) => set({ grade: e.target.value })}><GradeOptions /></select>
+                </Field>
               </>
             )}
-            <AuthInput icon={Mail} required type="email" placeholder="البريد الإلكتروني" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
-            <AuthInput icon={Lock} required type="password" placeholder="كلمة السر" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
+            <Field icon="mail" label="الإيميل" required type="email" inputMode="email" autoComplete="email" dir="ltr" value={formData.email} onChange={(e) => set({ email: e.target.value })} placeholder="name@example.com" />
+            <label className="nx-field">
+              <span>كلمة السر</span>
+              <span className="nx-input">
+                <Icon name="lock" />
+                <input required type={showPassword ? 'text' : 'password'} autoComplete={isRegister ? 'new-password' : 'current-password'} dir="ltr" value={formData.password} onChange={(e) => set({ password: e.target.value })} minLength={6} />
+                <button type="button" className="nx-iconbtn nx-iconbtn--plain" aria-label={showPassword ? 'اخفي كلمة السر' : 'اظهر كلمة السر'} onClick={() => setShowPassword((v) => !v)}><Icon name="eye" /></button>
+              </span>
+              {isRegister && <small>٦ حروف أو أرقام على الأقل.</small>}
+            </label>
 
             {!isRegister && (
-              <button type="button" onClick={handleForgotPassword} disabled={loading} className="neo-forgot-button">
-                طلب تغيير كلمة السر من الإدارة
-              </button>
+              <button type="button" onClick={handleForgotPassword} disabled={loading} className="ax-link">نسيت كلمة السر؟ ابعت طلب للإدارة</button>
             )}
 
-            <button disabled={loading} className="neo-primary-button neo-auth-submit">
-              {loading ? <Loader2 className="animate-spin" /> : <>{isRegister ? 'إنشاء الحساب' : 'الدخول للمنصة'} <ArrowLeft size={19} /></>}
-            </button>
+            <Button type="submit" variant="pri" size="l" block disabled={loading || closed} iconEnd={loading ? undefined : 'arrowLeft'} haptics="medium">
+              {loading ? <span className="nx-spinner" style={{ width: 22, height: 22, borderWidth: 2.5 }} /> : isRegister ? 'اعمل الحساب' : 'ادخل'}
+            </Button>
           </form>
-        </motion.section>
+
+          <button type="button" className="ax-help" onClick={() => openPlatformWhatsApp()}><Icon name="whatsapp" />محتاج مساعدة؟ كلّم الإدارة على واتساب</button>
+        </section>
       </main>
     </div>
   );

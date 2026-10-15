@@ -1,6 +1,18 @@
-import React, { useEffect, useState } from 'react';
-import { Check, ChevronRight, FileText, Flag, HelpCircle, Layers, PenTool, UploadCloud, X } from '../../../shared/icons/lucide-shim.jsx';
+import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Check, ChevronRight, FileText, Flag, HelpCircle, Layers, Maximize2, PenTool, UploadCloud, X } from '../../../shared/icons/lucide-shim.jsx';
 import { LocalEssayReviewBox, LocalQuestionExplanation, renderBracketHighlightedText } from '../../../shared/core/platformShared.jsx';
+
+const PASSAGE_FONT_KEY = 'exam-passage-font-size';
+const PASSAGE_FONT_SIZES = ['text-sm leading-[1.9]', 'text-base leading-[2]', 'text-lg leading-[2.1]', 'text-xl leading-[2.2]', 'text-2xl leading-[2.2]'];
+
+function readPassageFontIdx() {
+  try {
+    const stored = Number(localStorage.getItem(PASSAGE_FONT_KEY));
+    if (Number.isInteger(stored) && stored >= 0 && stored < PASSAGE_FONT_SIZES.length) return stored;
+  } catch { /* storage unavailable */ }
+  return 1;
+}
 
 function EssayAnswerEditor({ question, answer, isSubmitted, onAnswer, onImageUpload, onFileDialogOpen }) {
   if (isSubmitted) {
@@ -115,19 +127,38 @@ export default function ExamQuestionPanel({
   onPrevious,
   onNext,
 }) {
+  const scrollRef = useRef(null);
   const [passageOpen, setPassageOpen] = useState(false);
-  useEffect(() => { setPassageOpen(false); }, [question?.id]);
+  const [passageCollapsed, setPassageCollapsed] = useState(false);
+  const [passageFontIdx, setPassageFontIdx] = useState(readPassageFontIdx);
+  const blockText = question?.blockText || '';
+  const hasBlockText = blockText.trim().length > 0;
+
+  // Back to the top of the panel on every question so the passage and question start in view.
+  useEffect(() => {
+    setPassageOpen(false);
+    scrollRef.current?.scrollTo?.({ top: 0 });
+  }, [question?.id]);
+  // A new passage always opens expanded; questions sharing the same passage keep the student's choice.
+  useEffect(() => { setPassageCollapsed(false); }, [blockText]);
   useEffect(() => {
     if (!passageOpen) return undefined;
     const onEscape = (event) => { if (event.key === 'Escape') setPassageOpen(false); };
     document.addEventListener('keydown', onEscape);
     return () => document.removeEventListener('keydown', onEscape);
   }, [passageOpen]);
+  const changePassageFont = (delta) => {
+    setPassageFontIdx((current) => {
+      const next = Math.min(PASSAGE_FONT_SIZES.length - 1, Math.max(0, current + delta));
+      try { localStorage.setItem(PASSAGE_FONT_KEY, String(next)); } catch { /* storage unavailable */ }
+      return next;
+    });
+  };
+  const passageFontClass = PASSAGE_FONT_SIZES[passageFontIdx];
   const answer = answers?.[question.id];
   const questionNumber = flatQuestions.findIndex((origQ) => origQ.id === question.id) + 1;
-  const hasBlockText = question?.blockText && question.blockText.trim().length > 0;
   return (
-    <div className={`flex-1 flex flex-col ${hasBlockText ? 'xl:flex-row' : 'items-center'} min-h-0 overflow-y-auto overscroll-contain bg-transparent w-full p-2 sm:p-4 md:p-6 lg:p-8 gap-3 md:gap-6`}>
+    <div ref={scrollRef} className={`flex-1 flex flex-col ${hasBlockText ? 'xl:flex-row' : 'items-center'} min-h-0 overflow-y-auto overscroll-contain bg-transparent w-full p-2 sm:p-4 md:p-6 lg:p-8 gap-3 md:gap-6`}>
       {hasBlockText && (
         <div className="hidden xl:block flex-none w-full h-[48dvh] min-h-[260px] max-h-[520px] xl:h-auto xl:max-h-none xl:min-h-0 xl:flex-1 bg-white/95 p-4 sm:p-5 md:p-10 overflow-y-auto overscroll-contain rounded-[28px] shadow-[0_18px_60px_rgba(15,23,42,0.08)] border border-slate-200/80">
           <h3 className="font-bold text-blue-900 mb-6 flex items-center gap-2 text-xl border-b border-blue-100 pb-4 font-['Cairo']"><FileText size={24} /> نص المراجعة / القراءة:</h3>
@@ -137,15 +168,40 @@ export default function ExamQuestionPanel({
 
       {hasBlockText && (
         <>
-          <button
-            type="button"
-            onClick={() => setPassageOpen(true)}
-            className="xl:hidden sticky top-0 z-40 flex w-full shrink-0 items-center justify-center gap-3 rounded-2xl bg-indigo-700 px-4 py-4 text-lg font-black text-white shadow-lg border border-indigo-800"
-            aria-label="فتح القطعة لقراءتها كاملة"
-          >
-            <FileText size={22} /> قراءة القطعة كاملة
-          </button>
-          {passageOpen && (
+          {/* Phones and tablets: the passage is shown by default above the question and stays pinned while scrolling the answers. */}
+          <section className="xl:hidden sticky -top-2 sm:-top-4 md:-top-6 lg:-top-8 z-40 w-full shrink-0 overflow-hidden rounded-2xl border border-indigo-200 bg-white shadow-lg" aria-label="نص القراءة">
+            <div className="flex items-center gap-1.5 bg-indigo-700 px-2 py-1.5 text-white">
+              <button
+                type="button"
+                onClick={() => setPassageCollapsed((value) => !value)}
+                className="flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-xl px-2 text-right font-black"
+                aria-expanded={!passageCollapsed}
+              >
+                <FileText size={18} className="shrink-0" />
+                <span className="truncate text-sm sm:text-base">نص القراءة</span>
+                <span className="mr-auto shrink-0 rounded-lg bg-white/15 px-2 py-1 text-xs">{passageCollapsed ? 'إظهار النص' : 'تصغير'}</span>
+              </button>
+              {!passageCollapsed && (
+                <>
+                  <button type="button" onClick={() => changePassageFont(-1)} disabled={passageFontIdx === 0} className="h-10 w-10 shrink-0 rounded-xl bg-white/15 text-sm font-black disabled:opacity-40" aria-label="تصغير خط النص">أ-</button>
+                  <button type="button" onClick={() => changePassageFont(1)} disabled={passageFontIdx === PASSAGE_FONT_SIZES.length - 1} className="h-10 w-10 shrink-0 rounded-xl bg-white/15 text-base font-black disabled:opacity-40" aria-label="تكبير خط النص">أ+</button>
+                </>
+              )}
+              <button type="button" onClick={() => setPassageOpen(true)} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-indigo-800" aria-label="فتح النص في شاشة كاملة">
+                <Maximize2 size={18} />
+              </button>
+            </div>
+            {!passageCollapsed && (
+              <div
+                className={`max-h-[30dvh] sm:max-h-[38dvh] overflow-y-auto overscroll-contain px-4 py-3 text-right font-bold text-slate-800 whitespace-pre-wrap break-words font-['Cairo'] [-webkit-overflow-scrolling:touch] ${passageFontClass}`}
+                style={{ touchAction: 'pan-y' }}
+              >
+                {renderBracketHighlightedText(blockText)}
+              </div>
+            )}
+          </section>
+          {/* Portal to <body> so the reader sits above the exam header instead of under it. */}
+          {passageOpen && createPortal(
             <div className="xl:hidden fixed inset-0 z-[100] flex flex-col bg-white" role="dialog" aria-modal="true" aria-label="نص القطعة" dir="rtl">
               <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-200 bg-indigo-700 px-4 py-3 text-white">
                 <strong className="text-lg font-black">نص القراءة / النصوص</strong>
@@ -153,10 +209,11 @@ export default function ExamQuestionPanel({
                   <X size={20} /> العودة للسؤال
                 </button>
               </div>
-              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-6 pb-12 text-right text-lg font-bold leading-[2.2] text-slate-900 whitespace-pre-wrap break-words [-webkit-overflow-scrolling:touch]" style={{ touchAction: 'pan-y' }}>
-                {renderBracketHighlightedText(question.blockText)}
+              <div className={`min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-6 pb-12 text-right font-bold text-slate-900 whitespace-pre-wrap break-words font-['Cairo'] [-webkit-overflow-scrolling:touch] ${passageFontClass}`} style={{ touchAction: 'pan-y' }}>
+                {renderBracketHighlightedText(blockText)}
               </div>
-            </div>
+            </div>,
+            document.body,
           )}
         </>
       )}

@@ -54,15 +54,6 @@ const DesignSystemLoader = () => {
       }
     }, 450);
 
-    if (!document.getElementById('cairo-font')) {
-      const link = document.createElement('link'); link.id = 'cairo-font'; link.rel = 'stylesheet'; link.href = "https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Aref+Ruqaa:wght@400;700&display=swap"; document.head.appendChild(link);
-    }
-    if (!document.getElementById('html2pdf-script')) {
-        const script = document.createElement('script'); script.id = 'html2pdf-script'; script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"; script.defer = true; document.head.appendChild(script);
-    }
-    if (!document.getElementById('pwa-manifest')) {
-        const manifest = document.createElement('link'); manifest.id = 'pwa-manifest'; manifest.rel = 'manifest'; manifest.href = '/manifest.webmanifest'; document.head.appendChild(manifest);
-    }
     if (!document.querySelector('meta[name="theme-color"]')) {
         const meta = document.createElement('meta'); meta.name = 'theme-color'; meta.content = '#d97706'; document.head.appendChild(meta);
     }

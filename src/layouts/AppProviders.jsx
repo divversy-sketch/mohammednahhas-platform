@@ -1,5 +1,5 @@
 import { AnimatePresence } from 'framer-motion';
-import { ToastCenter } from '../shared/core/platformShared.jsx';
+import { NxPromptCenter, NxToastCenter } from '../v2/ui/Overlays.jsx';
 import { DebugCollector } from '../shared/core/debugTools.jsx';
 import DesignSystemLoader from '../shared/components/DesignSystemLoader.jsx';
 import MobileExamHelperStyles from '../shared/components/MobileExamHelperStyles.jsx';
@@ -7,7 +7,8 @@ import MobileExamHelperStyles from '../shared/components/MobileExamHelperStyles.
 export default function AppProviders({ children, user, performanceBooster = null }) {
   return (
     <>
-      <ToastCenter />
+      <NxToastCenter />
+      <NxPromptCenter />
       <AnimatePresence mode="wait">
         <DesignSystemLoader />
         <DebugCollector user={user} />

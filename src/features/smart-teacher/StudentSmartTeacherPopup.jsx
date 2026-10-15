@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { addDoc, collection, getDocs, onSnapshot, query, serverTimestamp, where } from 'firebase/firestore';
 import { db } from '@services/firebase';
-import nahhasLogo from '@assets/nahhas-logo-transparent.png';
+import nahhasLogo from '@assets/nahhas-logo-transparent.webp';
 import './smart-teacher.css';
 
 const shuffle = (items) => [...items].sort(() => Math.random() - 0.5);

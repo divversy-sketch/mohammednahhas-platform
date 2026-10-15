@@ -19,6 +19,24 @@ export const platformPrompt = (message, defaultValue = '') => {
   return window.prompt(message, defaultValue);
 };
 
+// Promise-based prompt/confirm drawn inside the app (v2). Falls back to the browser dialogs
+// when the v2 overlay is not mounted (for example inside the admin dashboard).
+export const platformPromptAsync = (message, options = {}) => {
+  if (typeof window === 'undefined') return Promise.resolve(null);
+  if (!window.__nxPromptReady) return Promise.resolve(window.prompt(message, options.defaultValue || ''));
+  return new Promise((resolve) => {
+    window.dispatchEvent(new CustomEvent('nahhas-prompt', { detail: { kind: 'prompt', message, ...options, resolve } }));
+  });
+};
+
+export const platformConfirmAsync = (message, options = {}) => {
+  if (typeof window === 'undefined') return Promise.resolve(false);
+  if (!window.__nxPromptReady) return Promise.resolve(window.confirm(message));
+  return new Promise((resolve) => {
+    window.dispatchEvent(new CustomEvent('nahhas-prompt', { detail: { kind: 'confirm', message, ...options, resolve } }));
+  });
+};
+
 export const ToastCenter = () => {
   const [items, setItems] = useState([]);
   useEffect(() => {

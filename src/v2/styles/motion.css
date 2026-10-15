@@ -1,0 +1,66 @@
+/* Motion vocabulary. Every animation here has a job: show that something happened or where to look. */
+@keyframes nx-shimmer { 0%, 55% { left: -70%; } 100% { left: 130%; } }
+@keyframes nx-sheen { 0%, 100% { background-position: 100% 0; } 50% { background-position: 0 0; } }
+@keyframes nx-spin { to { transform: rotate(360deg); } }
+@keyframes nx-drift-a { to { transform: translate(-14%, 18%) scale(1.15); } }
+@keyframes nx-drift-b { to { transform: translate(16%, -12%) scale(.9); } }
+@keyframes nx-drift-c { to { transform: translate(-18%, -16%) scale(1.2); } }
+@keyframes nx-float { 50% { transform: translateY(-8px); } }
+@keyframes nx-bob { 50% { transform: translateY(-12px); } }
+@keyframes nx-pulse { 50% { transform: scale(1.1); opacity: .7; } }
+@keyframes nx-blink { 50% { opacity: .35; } }
+@keyframes nx-flick { 50% { transform: scale(1.14) rotate(-6deg); } }
+@keyframes nx-pop { from { transform: scale(.45); opacity: .3; } }
+@keyframes nx-grow-x { from { transform: scaleX(0); } }
+@keyframes nx-grow-y { from { transform: scaleY(0); } }
+@keyframes nx-draw { from { stroke-dashoffset: var(--nx-dash, 900); } }
+@keyframes nx-skel { from { background-position: 100% 0; } to { background-position: -200% 0; } }
+@keyframes nx-ripple { to { transform: scale(2.6); opacity: 0; } }
+@keyframes nx-fade-in { from { opacity: 0; } }
+@keyframes nx-fade-out { to { opacity: 0; } }
+@keyframes nx-rise { from { transform: translateY(18px); opacity: 0; } }
+@keyframes nx-slide-down { from { transform: translateY(-100%); } }
+@keyframes nx-sheet-in { from { transform: translateY(100%); } }
+@keyframes nx-sheet-out { to { transform: translateY(100%); } }
+@keyframes nx-dialog-in { from { transform: scale(.92); opacity: 0; } }
+@keyframes nx-dialog-out { to { transform: scale(.95); opacity: 0; } }
+@keyframes nx-toast-in { from { transform: translateY(-120%) scale(.96); opacity: 0; } }
+@keyframes nx-toast-out { to { transform: translateY(-120%) scale(.96); opacity: 0; } }
+@keyframes nx-snack-in { from { transform: translateY(40px); opacity: 0; } }
+@keyframes nx-snack-out { to { transform: translateY(20px); opacity: 0; } }
+@keyframes nx-ring { 10%, 30% { transform: rotate(14deg); } 20%, 40% { transform: rotate(-14deg); } 50% { transform: none; } }
+@keyframes nx-burst { 0% { transform: translate(0, 0) rotate(0); opacity: 1; } 100% { transform: translate(var(--x), var(--y)) rotate(var(--r)); opacity: 0; } }
+@keyframes nx-tick { 0%, 20% { transform: translateY(0); } 25%, 45% { transform: translateY(-100%); } 50%, 70% { transform: translateY(-200%); } 75%, 95% { transform: translateY(-300%); } 100% { transform: translateY(-400%); } }
+
+/* page transitions: iOS pushes sideways, Android uses Material "fade through", desktop a soft rise */
+.nx-page { animation: nx-page-in .42s var(--nx-ease) both; }
+@keyframes nx-page-in { from { opacity: 0; transform: translateY(10px); } }
+:root[data-platform="ios"] .nx-page { animation-name: nx-page-ios; }
+@keyframes nx-page-ios { from { opacity: 0; transform: translateX(-24px); } }
+:root[data-platform="android"] .nx-page { animation-name: nx-page-md; animation-duration: .3s; }
+@keyframes nx-page-md { from { opacity: 0; transform: scale(.97); } }
+
+/* staggered entrance for lists and grids (plays once, content starts visible after .5s at most) */
+.nx-stagger > * { animation: nx-rise .55s var(--nx-ease) both; }
+.nx-stagger > *:nth-child(2) { animation-delay: .05s; }
+.nx-stagger > *:nth-child(3) { animation-delay: .1s; }
+.nx-stagger > *:nth-child(4) { animation-delay: .15s; }
+.nx-stagger > *:nth-child(5) { animation-delay: .2s; }
+.nx-stagger > *:nth-child(6) { animation-delay: .25s; }
+.nx-stagger > *:nth-child(n+7) { animation-delay: .3s; }
+
+.nx-anim-bell { transform-origin: 50% 10%; animation: nx-ring 1.2s ease both .8s; }
+.nx-confetti { position: fixed; inset: 0; pointer-events: none; z-index: 2000; overflow: hidden; }
+.nx-confetti i { position: absolute; width: 8px; height: 12px; border-radius: 2px; animation: nx-burst 1.9s cubic-bezier(.15, .7, .3, 1) forwards; }
+
+/* low power / reduced motion: keep transitions that confirm actions, drop ambient loops */
+:root[data-motion="reduced"] .nx *, :root[data-motion="reduced"] .nx *::before, :root[data-motion="reduced"] .nx *::after {
+  animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) .nx *, :root:not([data-motion="full"]) .nx *::before, :root:not([data-motion="full"]) .nx *::after {
+    animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important;
+  }
+}
+:root.perf-low .nx-night__glow, :root.perf-low .nx-night__star, :root.perf-low .nx-mesh i { animation: none !important; }
+:root.is-tab-hidden .nx * { animation-play-state: paused !important; }

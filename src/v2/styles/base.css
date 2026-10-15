@@ -1,0 +1,44 @@
+/* Base layer for every v2 surface. Everything is scoped under .nx so legacy screens are untouched. */
+html[data-nx] body {
+  margin: 0;
+  background: var(--nx-bg);
+  color: var(--nx-ink);
+  font-family: var(--nx-f-ui);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  text-rendering: optimizeLegibility;
+}
+
+.nx {
+  font-family: var(--nx-f-ui);
+  font-size: var(--nx-fs-m);
+  line-height: 1.7;
+  color: var(--nx-ink);
+  font-variant-numeric: tabular-nums;
+  -webkit-text-size-adjust: 100%;
+}
+.nx *, .nx *::before, .nx *::after { box-sizing: border-box; }
+:where(.nx) h1, :where(.nx) h2, :where(.nx) h3, :where(.nx) h4 { margin: 0; line-height: 1.32; text-wrap: balance; font-weight: 700; letter-spacing: 0; }
+:where(.nx) p { margin: 0; }
+:where(.nx) button, :where(.nx) input, :where(.nx) select, :where(.nx) textarea { font: inherit; color: inherit; }
+:where(.nx) button { cursor: pointer; }
+:where(.nx) img { max-width: 100%; }
+:where(.nx) a { color: inherit; }
+.nx :focus-visible { outline: 2px solid var(--nx-copper); outline-offset: 2px; }
+.nx ::selection { background: var(--nx-copper-soft); color: var(--nx-ink); }
+.nx .cal { font-family: var(--nx-f-cal); font-weight: 700; }
+.nx .muted { color: var(--nx-ink-3); }
+.nx .dim { color: var(--nx-ink-2); }
+.nx .num { font-variant-numeric: tabular-nums; }
+.nx .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* scrollbars on pointer devices */
+@media (pointer: fine) {
+  .nx ::-webkit-scrollbar { width: 10px; height: 10px; }
+  .nx ::-webkit-scrollbar-track { background: transparent; }
+  .nx ::-webkit-scrollbar-thumb { background: var(--nx-line-strong); border-radius: 10px; border: 3px solid var(--nx-bg); }
+  .nx ::-webkit-scrollbar-thumb:hover { background: var(--nx-ink-3); }
+}
+
+.nx-ico { width: 1.15em; height: 1.15em; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+html[data-nx] { background: var(--nx-bg) !important; }

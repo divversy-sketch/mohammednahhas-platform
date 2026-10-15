@@ -1,4 +1,6 @@
 import '../../styles/pages/app-loading.css';
+import logoDark from '../../assets/nahhas-logo-dark.webp';
+import { KhatamStar } from '@v2/ui/Icon.jsx';
 
 const loadingLetters = ['ن', 'ح', 'و', 'ص', 'ر', 'ف'];
 
@@ -30,6 +32,17 @@ export const AppLoadingScreen = ({
   variant = 'student'
 }) => {
   const isAdmin = variant === 'admin';
+  if (!isAdmin) {
+    // v2 splash: same night copper as the app header, so opening the app feels continuous
+    return (
+      <div className="nx nx-splash" dir="rtl" role="status" aria-live="polite" aria-label={message || title}>
+        <KhatamStar className="nx-splash__star" />
+        <img src={logoDark} alt={title} className="nx-splash__logo" />
+        <span className="nx-splash__bar"><i /></span>
+        <span className="nx-splash__msg">{message}</span>
+      </div>
+    );
+  }
   const finalMessage = message || (isAdmin ? 'جاري تجهيز لوحة الإدارة...' : 'جاري تجهيز مساحة الطالب...');
 
   return (

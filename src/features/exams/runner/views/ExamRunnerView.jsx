@@ -1,7 +1,14 @@
+import { useEffect, useRef } from 'react';
+import { burstConfetti } from '@v2/ui/kit.jsx';
 import ExamDashboardView from '@features/exams/components/ExamDashboardView.jsx';
 import ExamRunnerQuestionsView from '@features/exams/runner/components/ExamRunnerQuestionsView.jsx';
 
+// v2: the runner keeps its own layout; .nx-bridge maps its Tailwind colours to the platform theme (light/dark).
 export function ExamRunnerView({ ctx }) {
+  return <div className="nx nx-bridge nx-exam-host" dir="rtl"><ExamRunnerScreens ctx={ctx} /></div>;
+}
+
+function ExamRunnerScreens({ ctx }) {
   const {
     exam, user, activeView, isSubmitted, timeLeft, score, mcqQuestions,
     flatQuestions, answers, onClose, setActiveView, confirmSubmit, totalQs,
@@ -12,6 +19,13 @@ export function ExamRunnerView({ ctx }) {
     flagged, currentQIndex, setCurrentQIndex, currentQObj, handleAnswer,
     setFlagged, handleEssayImageUpload, fileDialogBypassRef,
   } = ctx;
+
+  // celebrate a good result once, right after submitting (not when reopening an old result)
+  const wasSubmitted = useRef(isSubmitted);
+  useEffect(() => {
+    if (!wasSubmitted.current && isSubmitted && Number(percentage) >= 75) burstConfetti(Number(percentage) >= 90 ? 70 : 42);
+    wasSubmitted.current = isSubmitted;
+  }, [isSubmitted, percentage]);
 
   const canReview = exam.id === 'custom_mistakes_exam' || Date.now() > new Date(exam.endTime).getTime();
   if (activeView === 'dashboard') {

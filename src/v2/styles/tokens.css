@@ -1,0 +1,148 @@
+/*
+ * Nahhas v2 design tokens.
+ * Night-copper identity: copper (action), gold (achievement), patina green (progress / correct),
+ * ink night bands. Light theme is the default; dark is set by data-theme="dark" on <html>.
+ * Platform (data-platform = ios | android | web) and form factor (data-form = phone | tablet | desktop)
+ * only tune shape and density; colours stay the same everywhere.
+ */
+:root {
+  --nx-bg: #FAF6F1;
+  --nx-bg-2: #F5EFE7;
+  --nx-surface: #FFFFFF;
+  --nx-surface-2: #FDFBF8;
+  --nx-sunk: #F2ECE4;
+  --nx-line: #E8DED2;
+  --nx-line-strong: #D9CBBB;
+  --nx-ink: #1A120D;
+  --nx-ink-2: #5E5148;
+  --nx-ink-3: #8F8173;
+  --nx-copper: #C0592A;
+  --nx-copper-2: #E68A4E;
+  --nx-copper-deep: #9A3F18;
+  --nx-copper-soft: #FBE7DA;
+  --nx-on-copper: #FFFFFF;
+  --nx-gold: #B97F14;
+  --nx-gold-2: #F2C063;
+  --nx-gold-soft: #FCEFD3;
+  --nx-patina: #13806F;
+  --nx-patina-2: #4CCDB4;
+  --nx-patina-soft: #D9F0EB;
+  --nx-danger: #C0303F;
+  --nx-danger-soft: #FBE3E5;
+  --nx-info: #2C6FB7;
+  --nx-info-soft: #E1EDF9;
+
+  /* night bands keep the same look in both themes */
+  --nx-night: #0C0907;
+  --nx-night-2: #18110C;
+  --nx-night-3: #231912;
+  --nx-night-line: rgba(255, 220, 190, .12);
+  --nx-night-ink: #F7EFE7;
+  --nx-night-dim: #B7A595;
+
+  --nx-glass: rgba(255, 255, 255, .78);
+  --nx-glass-line: rgba(26, 18, 13, .08);
+  --nx-scrim: rgba(12, 9, 7, .48);
+
+  --nx-shadow-1: 0 1px 2px rgba(70, 35, 10, .05), 0 2px 8px -2px rgba(70, 35, 10, .06);
+  --nx-shadow-2: 0 2px 4px rgba(70, 35, 10, .05), 0 18px 40px -18px rgba(70, 35, 10, .28);
+  --nx-shadow-3: 0 30px 70px -24px rgba(40, 18, 5, .45);
+  --nx-glow: 0 10px 30px -10px rgba(192, 89, 42, .55);
+
+  --nx-f-ui: 'Readex Pro', 'IBM Plex Sans Arabic', system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif;
+  --nx-f-cal: 'Aref Ruqaa', 'Readex Pro', serif;
+  --nx-f-read: 'Readex Pro', system-ui, sans-serif;
+
+  --nx-text-scale: 1;
+  --nx-fs-xs: calc(11.5px * var(--nx-text-scale));
+  --nx-fs-s: calc(13px * var(--nx-text-scale));
+  --nx-fs-m: calc(15px * var(--nx-text-scale));
+  --nx-fs-l: calc(17px * var(--nx-text-scale));
+  --nx-fs-xl: calc(21px * var(--nx-text-scale));
+  --nx-fs-2xl: calc(27px * var(--nx-text-scale));
+  --nx-fs-3xl: calc(34px * var(--nx-text-scale));
+
+  --nx-r-xs: 8px;
+  --nx-r-s: 12px;
+  --nx-r-m: 16px;
+  --nx-r-l: 22px;
+  --nx-r-xl: 28px;
+  --nx-r-pill: 999px;
+
+  --nx-gap: 16px;
+  --nx-pad: 16px;
+  --nx-content-max: 1280px;
+  --nx-tap: 44px;
+
+  --nx-ease: cubic-bezier(.2, .8, .2, 1);
+  --nx-ease-in: cubic-bezier(.4, 0, 1, 1);
+  --nx-spring: cubic-bezier(.3, 1.45, .5, 1);
+  --nx-dur-1: .16s;
+  --nx-dur-2: .28s;
+  --nx-dur-3: .5s;
+
+  --nx-safe-top: env(safe-area-inset-top, 0px);
+  --nx-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --nx-safe-left: env(safe-area-inset-left, 0px);
+  --nx-safe-right: env(safe-area-inset-right, 0px);
+
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --nx-bg: #0F0B09;
+  --nx-bg-2: #140F0C;
+  --nx-surface: #1A1410;
+  --nx-surface-2: #1F1813;
+  --nx-sunk: #241C16;
+  --nx-line: #33281F;
+  --nx-line-strong: #46382C;
+  --nx-ink: #F6EEE6;
+  --nx-ink-2: #C4B5A7;
+  --nx-ink-3: #8E8073;
+  --nx-copper: #EE8450;
+  --nx-copper-2: #F6A56E;
+  --nx-copper-deep: #C0592A;
+  --nx-copper-soft: #3B2216;
+  --nx-on-copper: #1A0E07;
+  --nx-gold: #F2C063;
+  --nx-gold-2: #F6D28A;
+  --nx-gold-soft: #3A2C12;
+  --nx-patina: #4CCDB4;
+  --nx-patina-2: #7FE0CC;
+  --nx-patina-soft: #133029;
+  --nx-danger: #F27F8B;
+  --nx-danger-soft: #3B1A1F;
+  --nx-info: #7EB6F2;
+  --nx-info-soft: #16263A;
+  --nx-glass: rgba(26, 20, 16, .78);
+  --nx-glass-line: rgba(255, 230, 210, .08);
+  --nx-scrim: rgba(0, 0, 0, .62);
+  --nx-shadow-1: 0 1px 2px rgba(0, 0, 0, .4);
+  --nx-shadow-2: 0 2px 4px rgba(0, 0, 0, .4), 0 18px 40px -18px rgba(0, 0, 0, .8);
+  --nx-shadow-3: 0 30px 70px -24px rgba(0, 0, 0, .9);
+  --nx-glow: 0 10px 30px -10px rgba(238, 132, 80, .45);
+  color-scheme: dark;
+}
+
+/* ── platform shape language ── */
+:root[data-platform="ios"] {
+  --nx-r-m: 18px;
+  --nx-r-l: 24px;
+  --nx-tap: 44px;
+}
+:root[data-platform="android"] {
+  --nx-r-m: 16px;
+  --nx-r-l: 24px;
+  --nx-r-xl: 28px;
+  --nx-tap: 48px;
+}
+
+/* ── form factor density ── */
+:root[data-form="tablet"] { --nx-gap: 18px; --nx-pad: 24px; }
+:root[data-form="desktop"] { --nx-gap: 20px; --nx-pad: 28px; }
+
+/* text size preference */
+:root[data-text="small"] { --nx-text-scale: .93; }
+:root[data-text="large"] { --nx-text-scale: 1.1; }
+:root[data-text="xlarge"] { --nx-text-scale: 1.22; }

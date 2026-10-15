@@ -1,0 +1,15 @@
+/* Hand-written additions to the generated bridge: global helper classes used by older panels. */
+.nx-bridge .glass-panel,
+.nx-bridge .feature-card {
+  background: var(--nx-surface) !important;
+  border-color: var(--nx-line) !important;
+  color: var(--nx-ink);
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+  box-shadow: var(--nx-shadow-1);
+}
+.nx-bridge { font-family: var(--nx-f-ui); }
+.nx-bridge input, .nx-bridge select, .nx-bridge textarea { background-color: var(--nx-surface-2); color: var(--nx-ink); border-color: var(--nx-line); }
+.nx-bridge input::placeholder, .nx-bridge textarea::placeholder { color: var(--nx-ink-3); }
+.nx-bridge [class*="font-['Cairo']"] { font-family: var(--nx-f-ui) !important; }
+.nx-exam-host { line-height: 1.6; }
+.nx-bridge .watermark-text { color: color-mix(in srgb, var(--nx-ink) 8%, transparent) !important; text-shadow: none !important; }

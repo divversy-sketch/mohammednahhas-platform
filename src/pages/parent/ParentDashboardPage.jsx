@@ -2,7 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { collection, doc, onSnapshot, query, where } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { auth, db } from '../../services/firebase';
-import nahhasLogo from '../../assets/nahhas-logo-transparent.png';
+import nahhasLogo from '../../assets/nahhas-logo-transparent.webp';
+import nahhasLogoDark from '../../assets/nahhas-logo-dark.webp';
+import { getGradeLabel } from '@shared/constants/grades';
+import { usePrefs } from '@v2/prefs.js';
+import { ScoreChart } from '@v2/student/parts.jsx';
+import { scoreSeries } from '@v2/student/insights.js';
 import '../../styles/pages/parent-dashboard.css';
 
 const asDate = (value) => {
@@ -22,6 +27,7 @@ const percentOf = (row) => {
 function Stat({ label, value, tone = '' }) { return <div className={`parent-stat ${tone}`}><strong>{value}</strong><span>{label}</span></div>; }
 
 export default function ParentDashboardPage({ user, userData }) {
+  const { theme } = usePrefs();
   const [phoneLinkedIds, setPhoneLinkedIds] = useState([]);
   const linkedIds = useMemo(() => [...new Set([...(Array.isArray(userData?.linkedStudentIds) ? userData.linkedStudentIds : []), userData?.linkedStudentId, ...phoneLinkedIds].filter(Boolean))], [userData, phoneLinkedIds]);
   const [children, setChildren] = useState([]);
@@ -67,11 +73,12 @@ export default function ParentDashboardPage({ user, userData }) {
   const sortedResults = [...completedResults].sort((a, b) => (asDate(b.submittedAt || b.createdAt)?.getTime() || 0) - (asDate(a.submittedAt || a.createdAt)?.getTime() || 0));
   const sortedAttendance = [...attendance].sort((a, b) => (asDate(b.date || b.createdAt)?.getTime() || 0) - (asDate(a.date || a.createdAt)?.getTime() || 0));
 
-  return <main className="parent-page" dir="rtl">
-    <header className="parent-header"><div className="parent-brand"><img src={nahhasLogo} alt="منصة النحاس" /><div><span>منصة النحاس</span><h1>متابعة ولي الأمر</h1></div></div><div className="parent-header-actions"><span>{userData?.name || user?.email || 'ولي الأمر'}</span><button onClick={() => signOut(auth)}>تسجيل الخروج</button></div></header>
+  return <main className="nx parent-page" dir="rtl">
+    <header className="parent-header"><div className="parent-brand"><img src={theme === 'dark' ? nahhasLogoDark : nahhasLogo} alt="منصة النحاس" /><div><span>منصة النحاس</span><h1>متابعة ولي الأمر</h1></div></div><div className="parent-header-actions"><span>{userData?.name || user?.email || 'ولي الأمر'}</span><button onClick={() => signOut(auth)}>تسجيل الخروج</button></div></header>
     {!linkedIds.length ? <section className="parent-empty"><h2>الحساب غير مربوط بطالب حتى الآن</h2><p>تأكد أن رقم موبايل الحساب هو نفس رقم ولي الأمر المسجل لدى الإدارة. الربط يتم برقم الهاتف فقط.</p></section> : loading ? <section className="parent-empty">جاري تحميل بيانات الطالب...</section> : <>
-      <section className="parent-child-bar"><div><small>الطالب المرتبط</small><h2>{child?.name || 'الطالب'}</h2><p>{child?.grade || ''} {child?.phone ? `• ${child.phone}` : ''}</p></div>{children.length > 1 && <select value={selectedId} onChange={(e) => setSelectedId(e.target.value)}>{children.map((item) => <option key={item.id} value={item.id}>{item.name || item.email}</option>)}</select>}</section>
+      <section className="parent-child-bar"><div><small>الطالب المرتبط</small><h2>{child?.name || 'الطالب'}</h2><p>{child?.grade ? getGradeLabel(child.grade) : ''} {child?.phone ? `• ${child.phone}` : ''}</p></div>{children.length > 1 && <select value={selectedId} onChange={(e) => setSelectedId(e.target.value)}>{children.map((item) => <option key={item.id} value={item.id}>{item.name || item.email}</option>)}</select>}</section>
       <section className="parent-stats"><Stat label="متوسط الامتحانات" value={`${average}%`} tone="blue" /><Stat label="مرات الحضور" value={present.length} tone="green" /><Stat label="مرات الغياب" value={absences.length} tone="red" /><Stat label="مرات التأخير" value={late.length} tone="amber" /><Stat label="الواجبات المسلمة" value={submissions.length} /></section>
+      <section className="parent-trend"><div className="parent-card-title"><h3>مستوى الطالب في آخر الامتحانات</h3></div><ScoreChart series={scoreSeries({ examResults: completedResults.map((r) => ({ ...r, status: 'completed' })) }, 8)} /></section>
       <section className="parent-grid"><article className="parent-card"><div className="parent-card-title"><h3>آخر نتائج الامتحانات</h3><span>{completedResults.length} نتيجة</span></div>{sortedResults.length ? <div className="parent-list">{sortedResults.slice(0, 12).map((row) => <div className="parent-result" key={row.id}><div><strong>{row.examTitle || row.title || 'امتحان'}</strong><small>{dateLabel(row.submittedAt || row.createdAt)}</small></div><b className={percentOf(row) >= 60 ? 'good' : 'weak'}>{percentOf(row)}%</b></div>)}</div> : <p className="parent-muted">لا توجد نتائج امتحانات بعد.</p>}</article>
       <article className="parent-card"><div className="parent-card-title"><h3>الحضور والغياب</h3><span>{attendance.length} حصة</span></div>{sortedAttendance.length ? <div className="parent-list">{sortedAttendance.slice(0, 14).map((row) => <div className="parent-attendance" key={row.id}><div><strong>{row.sessionTitle || row.lessonTitle || 'حصة دراسية'}</strong><small>{dateLabel(row.date || row.createdAt)}</small></div><b className={row.status}>{row.status === 'absent' ? 'غائب' : row.status === 'late' ? 'متأخر' : 'حاضر'}</b></div>)}</div> : <p className="parent-muted">لم تُسجل بيانات حضور لهذا الطالب بعد.</p>}</article></section>
     </>}

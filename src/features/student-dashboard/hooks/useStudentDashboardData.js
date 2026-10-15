@@ -15,8 +15,15 @@ export function useStudentDashboardData({ user, userData, setScanningHwId, setEd
   const [hasNewNotif, setHasNewNotif] = useState(false);
   const [examAccessOverrides, setExamAccessOverrides] = useState([]);
 
+  const hasProfile = Boolean(userData);
+  const uid = user?.uid;
+  const email = user?.email;
+  const grade = userData?.grade;
+
+  // Listeners depend only on who the student is and their grade. Re-running on every
+  // profile snapshot (lastLoginAt, deviceInfo...) used to tear down and re-read 11 collections.
   useEffect(() => {
-    if (!userData || !user?.uid) return undefined;
+    if (!hasProfile || !uid) return undefined;
 
     const urlParams = new URLSearchParams(window.location.search);
     const hwParam = urlParams.get('hw');
@@ -26,8 +33,8 @@ export function useStudentDashboardData({ user, userData, setScanningHwId, setEd
     }
 
     const subscriptions = subscribeStudentDashboardData({
-      user,
-      userData,
+      user: { uid, email },
+      userData: { grade },
       handlers: {
         setContent,
         setExams,
@@ -41,15 +48,25 @@ export function useStudentDashboardData({ user, userData, setScanningHwId, setEd
         setExamAccessOverrides
       },
       onLatestNotification: (latest) => {
+        // Only alert for a notification the student has not been alerted about on this device.
+        const key = `nahhas_last_notif_${uid}`;
+        const latestId = latest?.id || `${latest?.title}-${latest?.text}`;
+        let lastSeen = null;
+        try { lastSeen = localStorage.getItem(key); } catch { /* storage blocked */ }
+        if (lastSeen === latestId) return;
+        try { localStorage.setItem(key, latestId); } catch { /* storage blocked */ }
         setHasNewNotif(true);
-        if (latest?.text) sendSystemNotification(latest.title || 'تنبيه جديد 🔔', latest.text);
+        if (lastSeen && latest?.text) sendSystemNotification(latest.title || 'تنبيه جديد', latest.text);
       }
     });
 
-    setEditFormData({ name: userData?.name, phone: userData.phone, parentPhone: userData.parentPhone, grade: userData?.grade });
-
     return () => subscriptions.forEach((unsubscribe) => unsubscribe?.());
-  }, [userData, user, setScanningHwId, setEditFormData]);
+  }, [hasProfile, uid, email, grade, setScanningHwId]);
+
+  useEffect(() => {
+    if (!userData) return;
+    setEditFormData({ name: userData?.name, phone: userData.phone, parentPhone: userData.parentPhone, grade: userData?.grade });
+  }, [userData?.name, userData?.phone, userData?.parentPhone, userData?.grade, setEditFormData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     content,

@@ -1,31 +1,9 @@
 import { useState, lazy, Suspense } from 'react';
 import { signOut } from 'firebase/auth';
 import { addDoc, collection, doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { PlayCircle, FileText, LogOut, User, Lock, Menu, X, Loader2, Phone, MessageSquare, BookOpen, ClipboardList, Unlock, Settings, Bell, Download, Code, Sparkles, Ban, RefreshCw, Link as LinkIcon, QrCode, FileCheck, BarChart3, BrainCircuit, Headphones, DownloadCloud, Play, Target, Crown, CreditCard, Key } from '@shared/icons/lucide-shim.jsx';
-import { motion } from 'framer-motion';
 import { auth, db } from '@services/firebase';
-import MobileStudentBottomNav from '@features/student/MobileStudentBottomNav';
-
-
-import { GradeOptions, getGradeLabel } from '@shared/constants/grades';
-import { PWAInstallBox, ModernLogo, FloatingArabicBackground } from '@features/home/HomeWidgets';
-import PomodoroFocusMode from '@features/study/PomodoroFocusMode';
-
-
-import { platformNotify, platformPrompt, generatePDF, safeNumber, getResultPercentage, VIDEO_EXAM_UNLOCK_PERCENT } from '@shared/core/platformShared.jsx';
-
-
-import PerformanceOverview from '@features/student-dashboard/components/PerformanceOverview.jsx';
+import { platformNotify, platformPromptAsync, safeNumber, VIDEO_EXAM_UNLOCK_PERCENT } from '@shared/core/platformShared.jsx';
 import { useStudentDashboardData } from '@features/student-dashboard/hooks/useStudentDashboardData.js';
-import { StudentUnifiedHomeDashboard } from '@features/student-dashboard/components/home/StudentHomeCards.jsx';
-import { LearningHubTabs } from '@features/student-dashboard/components/layout/StudentLayoutParts.jsx';
-import { StudentV2SectionTitle, StudentV2Sidebar, StudentV2Topbar } from '@features/student-dashboard/components/chrome/StudentV2Chrome.jsx';
-import StudentAssignmentsPanel from '@features/admin-dashboard/legacy/parts/StudentAssignmentsPanel.jsx';
-import StudentSuccessPanel from '@features/studentSuccess/StudentSuccessPanel.jsx';
-import { imagePlacementStyle } from '@shared/utils/imagePlacement.js';
-import { StudentLiveClassesPanel, StudentExamReviewCenter, StudentCertificatePanel } from '@features/product/ProductExperienceSuite.jsx';
-import { StudentReviewQuiz } from '@features/review/ReviewQuizSystem.jsx';
-import { useBrowserBackTab } from '@features/student-dashboard/hooks/useBrowserBackTab.js';
 import { useStudentPaymentActions } from '@features/student-dashboard/hooks/useStudentPaymentActions.js';
 import { useStudentProfileActions } from '@features/student-dashboard/hooks/useStudentProfileActions.js';
 import { useStudentSubscriptionActions } from '@features/student-dashboard/hooks/useStudentSubscriptionActions.js';
@@ -33,54 +11,14 @@ import { useStudentSupportActions } from '@features/student-dashboard/hooks/useS
 import { useStudentVideoProgress } from '@features/student-dashboard/hooks/useStudentVideoProgress.js';
 import { getStudentAssignmentSummary, getStudentContentBuckets, getStudentPerformanceSummary, getSubscriptionDaysLeft, getVideoCompletionSummary, getWeakBranches } from '@features/student-dashboard/selectors.js';
 import { resolveStudentExamAccessState } from '@features/exams/utils/studentExamAccess.js';
-
-import StudentHomeTab from '../tabs/StudentHomeTab.jsx';
-import StudentPerformanceTab from '../tabs/StudentPerformanceTab.jsx';
-import StudentSubscriptionTab from '../tabs/StudentSubscriptionTab.jsx';
-import StudentMistakesBankTab from '../tabs/StudentMistakesBankTab.jsx';
-import StudentCoursesTab from '../tabs/StudentCoursesTab.jsx';
-import StudentReviewQuizTab from '../tabs/StudentReviewQuizTab.jsx';
-import StudentLearningPathTab from '../tabs/StudentLearningPathTab.jsx';
-import StudentRemediationTab from '../tabs/StudentRemediationTab.jsx';
-import StudentMessagesTab from '../tabs/StudentMessagesTab.jsx';
-import StudentSupportTab from '../tabs/StudentSupportTab.jsx';
-import StudentVideosTab from '../tabs/StudentVideosTab.jsx';
-import StudentFilesTab from '../tabs/StudentFilesTab.jsx';
-import StudentHtmlsTab from '../tabs/StudentHtmlsTab.jsx';
-import StudentInteractiveExamsTab from '../tabs/StudentInteractiveExamsTab.jsx';
-import StudentExamsTab from '../tabs/StudentExamsTab.jsx';
-import StudentAssignmentsTab from '../tabs/StudentAssignmentsTab.jsx';
-import StudentSmartHomeworkResultsTab from '../tabs/StudentSmartHomeworkResultsTab.jsx';
-import StudentSettingsTab from '../tabs/StudentSettingsTab.jsx';
-import StudentDashboardMainView from '../views/StudentDashboardMainView.jsx';
 import StudentSmartTeacherPopup from '@features/smart-teacher/StudentSmartTeacherPopup.jsx';
+import StudentAppV2 from '@v2/student/StudentAppV2.jsx';
+import { AccountStatusScreen, AppLoading } from '@v2/student/AccountStatusScreen.jsx';
 
-
-const SecureVideoPlayer = lazy(() => import('@features/video-security/player/SecureVideoPlayer.jsx'));
-const InteractiveViewer = lazy(() => import('@features/content/InteractiveViewer'));
 const ExamRunner = lazy(() => import('@features/exams/runner/ExamRunner.jsx'));
-const StudentGrowthPanel = lazy(() => import('@features/insights/StudentGrowthPanel.jsx'));
-const StudentLearningPath = lazy(() => import('@features/student/StudentLearningPath.jsx'));
-const StudentCoursesHub = lazy(() => import('@features/courses/CourseSystem').then((module) => ({ default: module.StudentCoursesHub })));
-const StudentMessagesInbox = lazy(() => import('@features/smartLearning/SmartLearningEngine.jsx').then((module) => ({ default: module.StudentMessagesInbox })));
-const StudentRemediationCenter = lazy(() => import('@features/smartLearning/SmartLearningEngine.jsx').then((module) => ({ default: module.StudentRemediationCenter })));
-const ExamPreStartPanel = lazy(() => import('@features/smartLearning/SmartLearningEngine.jsx').then((module) => ({ default: module.ExamPreStartPanel })));
+const PomodoroFocusMode = lazy(() => import('@features/study/PomodoroFocusMode'));
 
-const LazyPanelFallback = () => (
-  <div className="rounded-3xl border border-amber-100 bg-white/80 p-6 text-center text-sm font-bold text-amber-700 shadow-sm">
-    جاري تحميل الجزء المطلوب...
-  </div>
-);
-
-const LazyPanel = ({ children }) => (
-  <Suspense fallback={<LazyPanelFallback />}>
-    {children}
-  </Suspense>
-);
-
-
-
-
+const LazyPanel = ({ children }) => <Suspense fallback={<AppLoading />}>{children}</Suspense>;
 
 export const StudentDashboard = ({ user, userData, installPrompt }) => {
   userData = userData || {
@@ -123,7 +61,6 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
     setAssignments, setAssignmentSubmissions, setVideoViews, setMistakes, setNotifications, setHasNewNotif
   } = useStudentDashboardData({ user, userData, setScanningHwId, setEditFormData });
 
-  useBrowserBackTab({ activeTab, setActiveTab, setMobileMenu, fallbackTab: 'home' });
 
   // بيانات الطالب الحية انتقلت إلى useStudentDashboardData.
 
@@ -196,59 +133,9 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
   const smartWeakBranches = getWeakBranches({ completedExamResults });
   const weakBranches = smartWeakBranches;
 
-  const nextStudyAction = (() => {
-      if (latestVideoActivity && !latestVideoActivity.isCompleted) {
-          return {
-              title: 'استكمل آخر محاضرة',
-              text: latestVideoActivity.video?.title || 'محاضرة محفوظة',
-              action: () => setPlayingVideo(latestVideoActivity.video),
-              button: 'استكمال الآن',
-              icon: <Play size={18} fill="currentColor" />,
-              tone: 'from-amber-400 to-orange-500 text-slate-950'
-          };
-      }
-      if (inProgressExam) {
-          return {
-              title: 'استكمل امتحانك',
-              text: inProgressExam.title || 'امتحان محفوظ',
-              action: () => startExamWithCode(inProgressExam, { skipCode: true }),
-              button: 'دخول الامتحان',
-              icon: <ClipboardList size={18} />,
-              tone: 'from-blue-500 to-indigo-600 text-white'
-          };
-      }
-      if (nextOpenExam) {
-          return {
-              title: 'امتحان متاح الآن',
-              text: nextOpenExam.title || 'ادخل قبل انتهاء الوقت',
-              action: () => setActiveTab('exams'),
-              button: 'فتح صفحة الامتحانات',
-              icon: <ClipboardList size={18} />,
-              tone: 'from-purple-600 to-indigo-700 text-white'
-          };
-      }
-      if (pendingAssignments[0]) {
-          return {
-              title: 'عندك واجب مطلوب',
-              text: pendingAssignments[0].title || 'واجب جديد',
-              action: () => setActiveTab('assignments'),
-              button: 'فتح الواجبات',
-              icon: <QrCode size={18} />,
-              tone: 'from-emerald-500 to-teal-600 text-white'
-          };
-      }
-      return {
-          title: 'ابدأ خطوة جديدة',
-          text: videos[0]?.title || 'افتح المحاضرات المتاحة لك',
-          action: () => setActiveTab('videos'),
-          button: 'فتح المحاضرات',
-          icon: <PlayCircle size={18} />,
-          tone: 'from-slate-900 to-slate-700 text-white'
-      };
-  })();
 
   if (activeExam) return <LazyPanel><ExamRunner exam={activeExam} user={user} onClose={() => setActiveExam(null)} /></LazyPanel>;
-  if (showFocusMode) return <PomodoroFocusMode onClose={() => setShowFocusMode(false)} />;
+  if (showFocusMode) return <LazyPanel><PomodoroFocusMode onClose={() => setShowFocusMode(false)} /></LazyPanel>;
   if (reviewingExam) {
       const result = examResults.find(r => r.examId === reviewingExam.id);
       return <LazyPanel><ExamRunner exam={reviewingExam} user={user} onClose={() => setReviewingExam(null)} isReviewMode={true} existingResult={result} /></LazyPanel>;
@@ -258,11 +145,9 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
   const isBannedExam = userData.status === 'banned_exam' || userData.status === 'banned_cheating'; 
   const isBannedContent = userData.status === 'banned_content';
 
-  if(userData.status === 'pending') return <div className="h-screen flex items-center justify-center bg-amber-50 text-center p-4"><div className="bg-white p-8 rounded-2xl shadow-xl"><h2 className="text-2xl font-bold mb-2">طلبك قيد المراجعة ⏳</h2><button onClick={()=>signOut(auth)} className="mt-4 text-red-500 underline">خروج</button></div></div>;
-  if(userData.status === 'rejected') return <div className="h-screen flex items-center justify-center bg-red-50"><div className="text-red-600 font-bold">تم رفض طلبك</div><button onClick={()=>signOut(auth)} className="ml-4 bg-white px-4 py-1 rounded">خروج</button></div>;
-  if (isBannedAll) return (
-      <div className="h-screen flex flex-col items-center justify-center bg-red-50 text-center p-6"><Ban size={80} className="text-red-600 mb-4" /><h2 className="text-3xl font-bold text-red-800 mb-2 font-arabic">تم حظر حسابك</h2><p className="text-red-600 mb-6 font-bold">يرجى التواصل مع الإدارة أو المستر لمعرفة السبب.</p><button onClick={()=>signOut(auth)} className="bg-white text-red-600 px-6 py-2 rounded-full font-bold shadow-md hover:bg-red-100">تسجيل الخروج</button></div>
-  );
+  if (userData.status === 'pending') return <AccountStatusScreen kind="pending" onSignOut={() => signOut(auth)} />;
+  if (userData.status === 'rejected') return <AccountStatusScreen kind="rejected" onSignOut={() => signOut(auth)} />;
+  if (isBannedAll) return <AccountStatusScreen kind="banned" onSignOut={() => signOut(auth)} />;
 
   const getExamAccessState = (exam) => resolveStudentExamAccessState({
     exam,
@@ -371,8 +256,13 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
     const now = new Date(); const start = new Date(exam.startTime); const end = new Date(exam.endTime);
     if (now < start) return platformNotify(`الامتحان لم يبدأ بعد. موعد البدء: ${start.toLocaleString('ar-EG')}`);
     if (now > end) return platformNotify("عفواً، انتهى وقت الامتحان.");
-    const code = options.skipCode ? exam.accessCode : platformPrompt("أدخل كود الامتحان:");
-    if (options.skipCode || code === exam.accessCode) {
+    let code = exam.accessCode;
+    if (!options.skipCode && exam.accessCode) {
+      code = await platformPromptAsync(`اكتب كود «${exam.title || 'الامتحان'}» اللي المستر إداه لك.`, { title: 'كود الامتحان', placeholder: 'الكود', icon: 'key', confirmLabel: 'ابدأ الامتحان' });
+      if (code === null || code === undefined) return;
+      code = String(code).trim();
+    }
+    if (options.skipCode || !exam.accessCode || code === String(exam.accessCode).trim()) {
         try {
             const attemptRef = await addDoc(collection(db, 'exam_results'), {
               examId: exam.id,
@@ -387,7 +277,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
             });
             setActiveExam({ ...exam, attemptId: attemptRef.id, sourceVideoId: options.sourceVideoId || null });
         } catch (error) { console.error("Error creating attempt record:", error); platformNotify("حدث خطأ أثناء بدء الامتحان. حاول مرة أخرى."); }
-    } else { platformNotify("كود خاطئ!"); }
+    } else { platformNotify("الكود غلط. اتأكد منه وجرّب تاني."); }
   };
 
 
@@ -496,7 +386,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
   };
 
   return <>
-    <StudentDashboardMainView ctx={studentTabCtx} />
+    <StudentAppV2 ctx={studentTabCtx} />
     <StudentSmartTeacherPopup user={user} userData={userData} />
   </>;
 };

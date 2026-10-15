@@ -978,3 +978,89 @@ exports.recordSystemMigrationReport = functions
     await writeAudit("recordSystemMigrationReport", adminUser, { reportId: ref.id, title });
     return { ok: true, reportId: ref.id };
   });
+
+/**
+ * Public leaderboard. Students cannot read each other's exam_results, so every time a result
+ * changes we recompute that one student's summary into leaderboard_entries/{uid}.
+ * Only a short display name, grade, average and count are published.
+ */
+const lbNumber = (value, fallback = 0) => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : fallback;
+};
+const lbPercent = (result) => {
+  if (lbNumber(result.percentage, -1) >= 0) return lbNumber(result.percentage, 0);
+  const total = lbNumber(result.total != null ? result.total : result.totalPossible, 0);
+  return total > 0 ? Math.round((lbNumber(result.score != null ? result.score : result.totalScore, 0) / total) * 100) : 0;
+};
+const lbShortName = (name) => {
+  const parts = String(name || "طالب").trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return parts[0] || "طالب";
+  return `${parts[0]} ${parts[1].charAt(0)}.`;
+};
+
+async function rebuildLeaderboardEntry(studentId) {
+  if (!studentId) return;
+  const [userSnap, resultsSnap] = await Promise.all([
+    db.collection("users").doc(studentId).get(),
+    db.collection("exam_results").where("studentId", "==", studentId).where("status", "==", "completed").get()
+  ]);
+  const ref = db.collection("leaderboard_entries").doc(studentId);
+  const user = userSnap.exists ? userSnap.data() : null;
+  if (!user || user.role !== "student" || user.hideFromLeaderboard === true || resultsSnap.empty) {
+    await ref.delete().catch(() => null);
+    return;
+  }
+  // best attempt per exam, so a retake never pulls the average down
+  const bestByExam = new Map();
+  resultsSnap.forEach((doc) => {
+    const r = doc.data();
+    const pct = Math.max(0, Math.min(100, lbPercent(r)));
+    const key = r.examId || doc.id;
+    bestByExam.set(key, Math.max(bestByExam.get(key) || 0, pct));
+  });
+  const values = Array.from(bestByExam.values());
+  const average = Math.round(values.reduce((sum, v) => sum + v, 0) / values.length);
+  await ref.set({
+    studentId,
+    displayName: lbShortName(user.name),
+    grade: user.grade || "",
+    average,
+    completed: values.length,
+    // ties: more exams wins
+    rankScore: average * 1000 + Math.min(values.length, 999),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+}
+
+exports.syncLeaderboardEntry = functions
+  .region("us-central1")
+  .firestore.document("exam_results/{resultId}")
+  .onWrite(async (change) => {
+    const before = change.before.exists ? change.before.data() : null;
+    const after = change.after.exists ? change.after.data() : null;
+    const studentId = (after && after.studentId) || (before && before.studentId);
+    const relevant = !before || !after
+      || before.status !== after.status
+      || before.score !== after.score
+      || before.percentage !== after.percentage
+      || before.total !== after.total;
+    if (!relevant) return null;
+    await rebuildLeaderboardEntry(studentId);
+    return null;
+  });
+
+/** One-off backfill for results that existed before the leaderboard: admins call it once. */
+exports.rebuildLeaderboard = functions
+  .region("us-central1")
+  .runWith({ timeoutSeconds: 540, memory: "512MB" })
+  .https
+  .onCall(async (data, context) => {
+    await assertAdmin(context, "manage_exams");
+    const snap = await db.collection("exam_results").where("status", "==", "completed").select("studentId").get();
+    const ids = Array.from(new Set(snap.docs.map((d) => d.get("studentId")).filter(Boolean)));
+    for (let i = 0; i < ids.length; i += 20) {
+      await Promise.all(ids.slice(i, i + 20).map((id) => rebuildLeaderboardEntry(id)));
+    }
+    return { ok: true, students: ids.length };
+  });

@@ -344,6 +344,12 @@ service cloud.firestore {
     }
 
 
+    // Written only by the syncLeaderboardEntry Cloud Function: short name, grade, average.
+    match /leaderboard_entries/{studentId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
     match /live_classes/{classId} {
       allow read: if signedIn();
       allow create, update, delete: if canManageContent();

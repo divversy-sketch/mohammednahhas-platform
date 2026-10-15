@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { Timer } from '../../../shared/icons/lucide-shim.jsx';
 import { db } from '../../../services/firebase.js';
-import fallbackPlatformLogo from '../../../assets/nahhas-exam-logo.png';
+import fallbackPlatformLogo from '../../../assets/nahhas-exam-logo.webp';
 
 function formatTime(timeLeft = 0) {
   const hours = Math.floor(timeLeft / 3600);
@@ -62,7 +62,7 @@ export default function ExamTopBar({
             <img src={activePlatformLogo} alt={`شعار ${platformIdentity.platformName}`} className="block h-full w-full select-none object-contain" draggable="false" onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = fallbackPlatformLogo; }} />
           </div>
           <div className="min-w-0">
-            <h1 className="truncate text-sm font-black text-slate-900 md:text-xl">
+            <h1 className="truncate !text-base !leading-snug font-black text-slate-900 md:!text-xl">
               {exam?.title || 'الامتحان'} {isSubmitted ? '— مراجعة الإجابات' : ''}
             </h1>
             <div className="mt-1 hidden flex-wrap items-center md:flex gap-x-3 gap-y-1 text-xs font-bold text-slate-500 md:text-sm">
@@ -79,7 +79,7 @@ export default function ExamTopBar({
             <div className="order-2 flex min-w-[125px] items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-2 py-1 text-center md:px-4 md:py-2 lg:order-none">
               <Timer size={20} className="text-slate-600" />
               <div>
-                <div className="text-[11px] font-bold text-slate-500">الوقت المتبقي</div>
+                <div className="hidden text-[11px] font-bold text-slate-500 md:block">الوقت المتبقي</div>
                 <div className="font-mono text-lg font-black tracking-wider text-indigo-600 md:text-xl">{formatTime(timeLeft)}</div>
               </div>
             </div>

@@ -3,6 +3,10 @@ import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import './index.css';
 import './styles/v2-redesign.css';
+import './v2/styles/index.css';
+import { startDeviceWatcher } from './v2/device/device.js';
+import { loadNativePlugins } from './v2/device/native.js';
+import { startPrefs } from './v2/prefs.js';
 import { registerPWAUpdate } from './pwaUpdate.js';
 import { installGlobalErrorLogger } from './services/monitoring/errorLogger.js';
 
@@ -36,10 +40,25 @@ if (import.meta.env.VITE_RECAPTCHA_V3_SITE_KEY) {
 
 installGlobalErrorLogger();
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-)
+// v2 design: device form/platform and display preferences go on <html> before the first paint.
+document.documentElement.dataset.nx = '2';
+startDeviceWatcher();
+startPrefs();
+loadNativePlugins().then(startPrefs);
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('nxPreview')) {
+  // dev-only screen previews with sample data
+  const which = new URLSearchParams(window.location.search).get('nxPreview');
+  Promise.all([({ exam: () => import('./v2/dev/ExamPreview.jsx'), landing: () => import('./v2/public/LandingV2.jsx'), auth: () => import('./shared/platformParts/AuthPage.jsx') }[which] || (() => import('./v2/dev/StudentPreview.jsx')))(), import('./v2/ui/Overlays.jsx')]).then(([{ default: Preview }, { NxToastCenter, NxPromptCenter }]) => {
+    root.render(<><NxToastCenter /><NxPromptCenter /><Preview /></>);
+  });
+} else {
+  root.render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>,
+  );
+}
 
 registerPWAUpdate()
