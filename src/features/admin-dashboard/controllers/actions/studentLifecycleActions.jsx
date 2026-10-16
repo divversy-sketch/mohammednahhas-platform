@@ -2,6 +2,7 @@ import { doc, setDoc, getDoc, getDocs, collection, addDoc, query, where, updateD
 
 import { db } from '@services/firebase';
 import { validateEgyptianPhones } from '@shared/utils/phone';
+import { openWhatsApp, reserveWhatsAppWindow, toWhatsAppPhone } from '@shared/utils/whatsapp.js';
 import { FloatingArabicBackground } from '@features/home/HomeWidgets';
 import { uploadToFirebaseContent, detectContentType, readHtmlFileAsInlineContent } from '@services/firebaseContentUpload';
 import { uploadToCloudinary } from '@services/cloudinaryUpload';
@@ -154,15 +155,36 @@ export const createStudentLifecycleActions = (ctx) => {
       await audit('student_status_changed', { title: 'تغيير حالة طالب', severity: String(newStatus || '').startsWith('banned') ? 'warning' : 'info', targetUserId: id, targetEmail: student.email || '', before: { status: student.status || '' }, after: { status: newStatus } });
   };
 
-  const sendWhatsAppToParent = (result) => {
-      const student = activeUsersList.find(u => u.id === result.studentId);
-      if (!student || !student.parentPhone) return platformNotify("لا يوجد رقم ولي أمر مسجل لهذا الطالب!");
-      let phone = student.parentPhone.trim();
-      if (phone.startsWith('0')) phone = '20' + phone.substring(1);
-      const examName = examsList.find(e => e.id === result.examId)?.title || 'اختبار';
-      const message = `مرحباً ولي أمر الطالب/ة: *${result.studentName}* 🎓\n\nنحيط سيادتكم علماً بنتيجة امتحان: *${examName}*\nالدرجة التي حصل عليها: *${result.score}* من *${result.total}* 📊\n\nمع خالص تحيات إدارة منصة النحاس - أ/ محمد النحاس.`;
-      const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-      window.open(whatsappUrl, '_blank');
+  const sendWhatsAppToParent = async (result) => {
+      if (!result) return;
+      const studentId = result.studentId || result.userId || '';
+      const known = [...activeUsersList, ...pendingUsers].find((u) => u.id === studentId || u.uid === studentId);
+      // The admin list only holds the latest 500 students, so older students are read directly.
+      const reserved = known?.parentPhone ? null : reserveWhatsAppWindow();
+      let student = known;
+      if (!student?.parentPhone && studentId) {
+          try {
+              const snap = await getDoc(doc(db, 'users', studentId));
+              if (snap.exists()) student = { id: snap.id, ...snap.data() };
+          } catch (error) { console.error('Error loading student for parent message:', error); }
+      }
+      const parentPhone = student?.parentPhone || result.parentPhone || '';
+      if (!toWhatsAppPhone(parentPhone)) {
+          try { reserved?.close(); } catch { /* ignore */ }
+          return platformNotify('لا يوجد رقم ولي أمر صحيح مسجل لهذا الطالب. عدّل بيانات الطالب وأضف الرقم.', 'error');
+      }
+      const exam = examsList.find((e) => e.id === result.examId);
+      const examName = exam?.title || result.examTitle || 'اختبار';
+      const score = safeNumber(result.score, 0);
+      const total = safeNumber(result.totalPossible ?? result.total, 0);
+      const percent = total > 0 ? Math.round((score / total) * 100) : safeNumber(result.percentage, 0);
+      const date = result.submittedAt?.toDate ? result.submittedAt.toDate().toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' }) : '';
+      const name = result.studentName || student?.name || 'الطالب';
+      const message = `مرحباً ولي أمر الطالب/ة: *${name}*\n\nنحيط سيادتكم علماً بنتيجة امتحان: *${examName}*${date ? ` (${date})` : ''}\nالدرجة: *${score}* من *${total}*${total > 0 ? ` (${percent}%)` : ''}\n\nمع خالص تحيات إدارة منصة النحاس - أ/ محمد النحاس.`;
+      openWhatsApp(parentPhone, message, reserved);
+      try {
+          await addDoc(collection(db, 'parent_message_log'), { studentId, studentName: name, parentPhone, channel: 'whatsapp', kind: 'exam_result', examId: result.examId || '', resultId: result.id || '', message, status: 'sent', createdAt: serverTimestamp(), sentAt: serverTimestamp() });
+      } catch (error) { console.error('Could not log parent message:', error); }
   };
 
   const openStudentProfile = async (student) => {

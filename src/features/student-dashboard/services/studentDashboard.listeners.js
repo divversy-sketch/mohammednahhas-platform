@@ -1,4 +1,4 @@
-import { collection, limit, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { db } from '@services/firebase';
 import { COLLECTIONS } from '@config/collections';
 import { mapDocs, sortByCreatedAtDesc, sortBySubmittedAtDesc, sortByTimestampDesc } from '@shared/firebase/firestoreMaps';
@@ -22,7 +22,7 @@ export function subscribeStudentDashboardData({ user, userData, handlers, onLate
       handlers.setContent(visibleContent);
     }, emptyOnBlocked('content', handlers.setContent)),
 
-    onSnapshot(query(collection(db, COLLECTIONS.EXAMS), where('grade', '==', userData?.grade), limit(200)), (snapshot) => handlers.setExams(mapDocs(snapshot)), emptyOnBlocked('exams', handlers.setExams)),
+    onSnapshot(query(collection(db, COLLECTIONS.EXAMS), where('grade', '==', userData?.grade), limit(200)), (snapshot) => handlers.setExams(mapDocs(snapshot).filter((exam) => exam.isPublished !== false)), emptyOnBlocked('exams', handlers.setExams)),
 
     onSnapshot(query(collection(db, COLLECTIONS.EXAM_RESULTS), where('studentId', '==', user.uid), limit(300)), (snapshot) => { examResultBuckets.canonical = mapDocs(snapshot).map((row) => normalizeResult(row, COLLECTIONS.EXAM_RESULTS)); setUnifiedStudentResults(); }, emptyOnBlocked('exam_results', handlers.setExamResults)),
 
@@ -32,7 +32,7 @@ export function subscribeStudentDashboardData({ user, userData, handlers, onLate
 
     onSnapshot(query(collection(db, COLLECTIONS.STUDENT_MISTAKES), where('userId', '==', user.uid), limit(300)), (snapshot) => handlers.setMistakes(sortByTimestampDesc(mapDocs(snapshot))), emptyOnBlocked('student_mistakes', handlers.setMistakes)),
 
-    onSnapshot(query(collection(db, COLLECTIONS.NOTIFICATIONS), where('grade', 'in', ['all', userData?.grade]), limit(10)), (snapshot) => {
+    onSnapshot(query(collection(db, COLLECTIONS.NOTIFICATIONS), where('audience', 'in', ['all', userData?.grade || 'all', `user:${user.uid}`]), orderBy('createdAt', 'desc'), limit(20)), (snapshot) => {
       const newNotifs = sortByCreatedAtDesc(mapDocs(snapshot));
       handlers.setNotifications(newNotifs);
       if (newNotifs.length > 0) onLatestNotification?.(newNotifs[0]);

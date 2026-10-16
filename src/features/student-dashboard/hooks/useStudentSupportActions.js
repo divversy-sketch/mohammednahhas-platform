@@ -9,7 +9,7 @@ export function useStudentSupportActions({ user, userData }) {
   const [isSendingSupport, setIsSendingSupport] = useState(false);
 
   const handleSendSupportTicket = async (event) => {
-    event.preventDefault();
+    event?.preventDefault?.();
     const validationMessage = validateSupportDraft(supportDraft);
     if (validationMessage) return platformNotify(validationMessage);
     setIsSendingSupport(true);

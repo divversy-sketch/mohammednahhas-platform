@@ -1,8 +1,10 @@
 import { auth } from './firebase';
+import { apiUrl } from './callFunction.js';
 
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-const SIGNATURE_ENDPOINT = import.meta.env.VITE_CLOUDINARY_SIGNATURE_ENDPOINT || '/api/cloudinary-signature';
+const RAW_SIGNATURE_ENDPOINT = import.meta.env.VITE_CLOUDINARY_SIGNATURE_ENDPOINT || '/api/cloudinary-signature';
+const SIGNATURE_ENDPOINT = RAW_SIGNATURE_ENDPOINT.startsWith('/') ? apiUrl(RAW_SIGNATURE_ENDPOINT) : RAW_SIGNATURE_ENDPOINT;
 const ALLOW_UNSIGNED_FALLBACK = String(import.meta.env.VITE_CLOUDINARY_ALLOW_UNSIGNED_FALLBACK || '').toLowerCase() === 'true';
 
 export const CLOUDINARY_LIMITS = {

@@ -154,7 +154,7 @@ export const createExamSecurityActions = (ctx) => {
         { type: 'admin_allowed_continue', at: new Date().toISOString(), admin: adminUser.email || adminUser.uid }
       ]
     };
-    await updateDoc(doc(db, 'exam_results', result.id), payload);
+    await updateDoc(doc(db, result.sourceCollection || 'exam_results', result.id), payload);
     const updated = { ...result, ...payload, remainingTime: safeRemainingTime, currentQIndex: safeNumber(result.currentQIndex, 0), answers: result.answers || {} };
     setExamResults(prev => prev.map(r => r.id === result.id ? updated : r));
     if (viewingResult?.id === result.id) setViewingResult(updated);
@@ -187,7 +187,7 @@ export const createExamSecurityActions = (ctx) => {
         { type: 'admin_allowed_restart', at: new Date().toISOString(), admin: adminUser.email || adminUser.uid }
       ]
     };
-    await updateDoc(doc(db, 'exam_results', result.id), payload);
+    await updateDoc(doc(db, result.sourceCollection || 'exam_results', result.id), payload);
     const updated = { ...result, ...payload, restartCount: safeNumber(result.restartCount, 0) + 1 };
     setExamResults(prev => prev.map(r => r.id === result.id ? updated : r));
     if (viewingResult?.id === result.id) setViewingResult(updated);

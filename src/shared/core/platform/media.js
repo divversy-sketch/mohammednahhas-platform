@@ -1,3 +1,4 @@
+import { openWhatsApp } from '@shared/utils/whatsapp.js';
 export const formatWatchTime = (totalSeconds) => {
     if (!totalSeconds || totalSeconds < 0) return 'أقل من ثانية';
     const h = Math.floor(totalSeconds / 3600);
@@ -31,6 +32,6 @@ export const getYouTubeID = (url) => {
 export const PLATFORM_WHATSAPP_NUMBER = '201500076322';
 
 export const openPlatformWhatsApp = (text = 'السلام عليكم، محتاج أتواصل مع إدارة منصة النحاس.') => {
-    window.open(`https://wa.me/${PLATFORM_WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`, '_blank');
+    openWhatsApp(PLATFORM_WHATSAPP_NUMBER, text);
 };
 

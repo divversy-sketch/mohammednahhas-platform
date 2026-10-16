@@ -20,7 +20,7 @@ const GROUPS = [
   { title: 'الاختبارات', tabs: ['exams', 'question_bank', 'smart_teacher', 'smart_exam_engine', 'mistakes_admin', 'student_reports'] },
   { title: 'الماليات', tabs: ['payments', 'subscriptions_legacy', 'finance_dashboard'] },
   { title: 'التواصل', tabs: ['messages_center', 'notifications_admin'] },
-  { title: 'النظام', tabs: ['security_center', 'video_security', 'app_convert', 'admin_roles', 'audit_logs'] },
+  { title: 'النظام', tabs: ['security_center', 'video_security', 'admin_roles', 'audit_logs'] },
 ];
 
 const getLabel = (tab) => ADMIN_TABS.find(([key]) => key === tab)?.[1] || tab;

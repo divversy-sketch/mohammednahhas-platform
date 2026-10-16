@@ -155,6 +155,7 @@ export const createEssayGradingActions = (ctx) => {
       ), 0);
       const mcqScore = typeof resultDoc.mcqScore === 'number' ? resultDoc.mcqScore : fallbackMcqScore;
 
+      const mcqMaxTotal = mcqQuestions.reduce((sum, q) => sum + safeNumber(getQuestionMaxScore(q), 1), 0);
       const essayTotal = essayQuestions.reduce((sum, q) => sum + Number(nextEssayScores[q.id] || 0), 0);
       const essayMaxTotal = essayQuestions.reduce((sum, q) => sum + Number(nextEssayMaxScores[q.id] || 0), 0);
 
@@ -168,12 +169,14 @@ export const createEssayGradingActions = (ctx) => {
           reviewedEssayCount,
           hasEssay: essayQuestions.length > 0,
           score: mcqScore + essayTotal,
-          total: mcqQuestions.length + essayMaxTotal,
+          total: mcqMaxTotal + essayMaxTotal,
+          totalPossible: mcqMaxTotal + essayMaxTotal,
+          percentage: (mcqMaxTotal + essayMaxTotal) > 0 ? Math.round(((mcqScore + essayTotal) / (mcqMaxTotal + essayMaxTotal)) * 100) : 0,
           essayReviewedAt: serverTimestamp()
       };
 
       try {
-          await updateDoc(doc(db, 'exam_results', resultDoc.id), payload);
+          await updateDoc(doc(db, resultDoc.sourceCollection || 'exam_results', resultDoc.id), payload);
           const nextViewingResult = { ...resultDoc, ...payload };
           setViewingResult(nextViewingResult);
           setExamResults((prev) => prev.map((res) => res.id === resultDoc.id ? nextViewingResult : res));

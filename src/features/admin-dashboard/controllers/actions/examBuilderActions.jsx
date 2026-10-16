@@ -275,7 +275,7 @@ export const createExamBuilderActions = (ctx) => {
         questions: finalBlocks, createdAt: serverTimestamp() 
     });
 
-    await addDoc(collection(db, 'notifications'), { text: `امتحان جديد: ${examBuilder.title}`, grade: examBuilder.grade, createdAt: serverTimestamp() });
+    await addDoc(collection(db, 'notifications'), { text: `امتحان جديد: ${examBuilder.title}`, grade: examBuilder.grade, audience: examBuilder.grade || 'all', createdAt: serverTimestamp() });
     setBulkText(""); 
     platformNotify(`تم نشر الامتحان بنجاح!`);
   };

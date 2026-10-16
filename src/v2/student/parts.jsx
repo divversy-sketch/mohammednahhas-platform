@@ -3,6 +3,7 @@ import { Icon } from '../ui/Icon.jsx';
 import { Bar, Button, Chip, Empty, Sheet, formatDuration, formatNumber } from '../ui/kit.jsx';
 import { arabicDate, arabicDateTime, attemptState, normalizeArabic, percentOf, searchIndex, thumbOf, titleOf, textOf } from './insights.js';
 import { haptic } from '../device/native.js';
+import { platformNotify } from '@shared/core/platform/notifications.jsx';
 
 export function SectionHead({ title, icon, action, onAction, count }) {
   return (
@@ -83,7 +84,7 @@ export function ExamCard({ entry, ctx, now, mode = 'open' }) {
             {ctx.isBannedExam ? 'محظور' : !access.allowed ? 'مقفول' : state ? 'كمّل الامتحان' : 'ادخل الامتحان'}
           </Button>
         )}
-        {mode === 'upcoming' && <Button variant="soft" icon="bell" onClick={() => ctx.notify?.(`هنفكرك لما «${exam.title || 'الامتحان'}» يفتح ${arabicDateTime(start)}.`)}>هيفتح {arabicDate(start)}</Button>}
+        {mode === 'upcoming' && <Button variant="soft" icon="bell" onClick={() => platformNotify(`«${exam.title || 'الامتحان'}» هيفتح ${arabicDateTime(start)}.`)}>هيفتح {arabicDate(start)}</Button>}
         {mode === 'done' && (
           <>
             <Button variant="soft" icon="eye" disabled={!canReview} onClick={() => ctx.setReviewingExam?.(exam)}>{canReview ? 'راجع إجاباتك' : 'المراجعة بعد قفل الامتحان'}</Button>

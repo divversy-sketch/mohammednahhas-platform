@@ -27,7 +27,7 @@ export function subscribeAdminDashboardData(handlers) {
     onSnapshot(query(collection(db, COLLECTIONS.QUOTES), limit(100)), (snapshot) => handlers.setQuotesList(mapDocs(snapshot))),
     onSnapshot(query(collection(db, COLLECTIONS.SMART_HOMEWORKS), orderBy('createdAt', 'desc'), limit(200)), (snapshot) => handlers.setSmartHomeworks(mapDocs(snapshot))),
     onSnapshot(query(collection(db, COLLECTIONS.HOMEWORK_RESULTS), orderBy('submittedAt', 'desc'), limit(500)), (snapshot) => handlers.setHwResults(mapDocs(snapshot))),
-    onSnapshot(query(collection(db, COLLECTIONS.SUBSCRIPTION_CODES), orderBy('createdAt', 'desc'), limit(300)), (snapshot) => handlers.setSubscriptionCodes(mapDocs(snapshot))),
+    onSnapshot(query(collection(db, COLLECTIONS.SUBSCRIPTION_CODES), orderBy('createdAt', 'desc'), limit(300)), (snapshot) => handlers.setSubscriptionCodes(mapDocs(snapshot).map((c) => ({ ...c, days: c.days ?? c.durationDays, used: Boolean(c.used || c.isUsed) })))),
     onSnapshot(query(collection(db, COLLECTIONS.ASSIGNMENTS), orderBy('createdAt', 'desc'), limit(200)), (snapshot) => handlers.setAssignments?.(mapDocs(snapshot))),
     onSnapshot(query(collection(db, COLLECTIONS.ASSIGNMENT_SUBMISSIONS), orderBy('submittedAt', 'desc'), limit(500)), (snapshot) => handlers.setAssignmentSubmissions?.(mapDocs(snapshot))),
     onSnapshot(query(collection(db, COLLECTIONS.STUDENT_MISTAKES), limit(500)), (snapshot) => handlers.setMistakes?.(mapDocs(snapshot))),

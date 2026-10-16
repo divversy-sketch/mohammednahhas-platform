@@ -6,7 +6,8 @@ import { GradeOptions, getGradeLabel } from '@shared/constants/grades.jsx';
 import { platformNotify, platformConfirm } from '@shared/core/platformShared.jsx';
 import EmptyState from '@shared/ui/EmptyState.jsx';
 import PageHeader from '@shared/ui/PageHeader.jsx';
-import { defaultImagePlacement, normalizeImagePlacement } from '@shared/utils/imagePlacement.js';
+import { defaultImagePlacement, imagePlacementStyle, normalizeImagePlacement } from '@shared/utils/imagePlacement.js';
+import { formatClock, parseLessonChapters } from '../utils/lessonChapters.js';
 import { ImgInput } from '../components/ImgInput.jsx';
 import { ytId, pct, clean, randomCode, userLabel, userIdOf } from '../utils/courseAdminUtils.js';
 
@@ -22,7 +23,9 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
   const emptyCourseForm = { title: '', description: '', price: '', teacher: 'مستر النحاس', coverImage: '', coverImagePlacement: defaultImagePlacement, grade: '3sec', isPublished: false, unlockMode: 'sequential', visibleFrom: '', visibleUntil: '', defaultAccessDays: '', permanentAccess: true };
   const [cf, setCf] = useState(emptyCourseForm);
   const [mf, setMf] = useState({ title: '', order: 1 });
-  const [lf, setLf] = useState({ title: '', videoUrl: '', pdfUrl: '', pdfImage: '', examUrl: '', examId: '', examImage: '', lessonImage: '', lessonImagePlacement: defaultImagePlacement, pdfImagePlacement: defaultImagePlacement, examImagePlacement: defaultImagePlacement, icon: '📘', order: 1, isFree: false, unlockAt: '', requiredPreviousLessonId: '', examRequiresWatchPercent: 75, nextLessonRequiresExamScore: 60 });
+  const [lf, setLf] = useState({ title: '', videoUrl: '', pdfUrl: '', pdfImage: '', examUrl: '', examId: '', examImage: '', lessonImage: '', lessonImagePlacement: defaultImagePlacement, pdfImagePlacement: defaultImagePlacement, examImagePlacement: defaultImagePlacement, icon: '📘', order: 1, isFree: false, unlockAt: '', requiredPreviousLessonId: '', examRequiresWatchPercent: 75, nextLessonRequiresExamScore: 60, chaptersText: '' });
+  const [partsLessonId, setPartsLessonId] = useState('');
+  const [partsText, setPartsText] = useState('');
   const [of, setOf] = useState({ userId: '', lessonId: '', reason: '' });
   const [manual, setManual] = useState({ userId: '', courseId: '', expiresInDays: '', permanent: true });
   const [codeForm, setCodeForm] = useState({ courseId: '', count: 1, expiresInDays: '', permanent: true });
@@ -89,6 +92,8 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
     if (!course || !mod || !lf.title.trim()) return platformNotify('اختار كورس ووحدة واكتب الدرس', 'error');
     await addDoc(collection(db, 'courses', course, 'modules', mod, 'lessons'), {
       title: lf.title,
+      chaptersText: lf.chaptersText || '',
+      chapters: parseLessonChapters(lf.chaptersText),
       videoUrl: lf.videoUrl,
       youtubeVideoId: ytId(lf.videoUrl),
       pdfUrl: lf.pdfUrl,
@@ -108,7 +113,7 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
       unlockRules: { examRequiresWatchPercent: Number(lf.examRequiresWatchPercent || 75), nextLessonRequiresWatchPercent: 75, nextLessonRequiresExamScore: Number(lf.nextLessonRequiresExamScore || 60) },
       createdAt: serverTimestamp(),
     });
-    setLf({ ...lf, title: '', videoUrl: '', pdfUrl: '', pdfImage: '', examUrl: '', examId: '', examImage: '', lessonImage: '', icon: '📘', order: lessons.length + 2 });
+    setLf({ ...lf, chaptersText: '', title: '', videoUrl: '', pdfUrl: '', pdfImage: '', examUrl: '', examId: '', examImage: '', lessonImage: '', icon: '📘', order: lessons.length + 2 });
   };
   const saveOver = async () => {
     if (!course || !mod || !of.userId || !of.lessonId) return platformNotify('اختار الطالب والدرس', 'error');
@@ -229,7 +234,30 @@ export function AdminCoursesManager({ users = [], exams = [], adminUser }) {
             <option value="">لا يوجد درس سابق</option>
             {lessons.map((l) => <option key={l.id} value={l.id}>{l.order} - {l.title}</option>)}
           </select>
+          <label className="block text-xs font-black text-slate-600">أجزاء الدرس بالدقايق (اختياري، زي وصف اليوتيوب: سطر لكل جزء)
+            <textarea className="mt-1 w-full p-3 rounded-xl border font-mono text-sm" rows={4} dir="rtl" placeholder={'0:00 المقدمة\n6:20 أركان التشبيه\n15:30 أنواع التشبيه'} value={lf.chaptersText} onChange={(e) => setLf({ ...lf, chaptersText: e.target.value })} />
+          </label>
+          {parseLessonChapters(lf.chaptersText).length > 0 && <p className="text-xs font-bold text-emerald-700">اتقرا {parseLessonChapters(lf.chaptersText).length} جزء.</p>}
           <button onClick={saveLesson} className="bg-blue-600 text-white px-5 py-3 rounded-xl font-black flex gap-2"><Save /> حفظ الدرس</button>
+          {lessons.length > 0 && (
+            <div className="border-t pt-3 space-y-2">
+              <h4 className="font-black text-sm">تعديل أجزاء درس موجود</h4>
+              <select className="w-full p-3 rounded-xl border" value={partsLessonId} onChange={(e) => { const l = lessons.find((x) => x.id === e.target.value); setPartsLessonId(e.target.value); setPartsText(l?.chaptersText || (l?.chapters || []).map((c) => `${formatClock(c.start)} ${c.title}`).join('\n')); }}>
+                <option value="">اختار الدرس</option>
+                {lessons.map((l) => <option key={l.id} value={l.id}>{l.order} - {l.title}{l.chapters?.length ? ` (${l.chapters.length} جزء)` : ''}</option>)}
+              </select>
+              {partsLessonId && <>
+                <textarea className="w-full p-3 rounded-xl border font-mono text-sm" rows={5} value={partsText} onChange={(e) => setPartsText(e.target.value)} placeholder={'0:00 المقدمة\n6:20 أركان التشبيه'} />
+                <button onClick={async () => {
+                  const chapters = parseLessonChapters(partsText);
+                  try {
+                    await updateDoc(doc(db, 'courses', course, 'modules', mod, 'lessons', partsLessonId), { chaptersText: partsText, chapters, updatedAt: serverTimestamp() });
+                    platformNotify(`تم حفظ ${chapters.length} جزء للدرس`, 'success');
+                  } catch (error) { platformNotify(error.message || 'تعذر حفظ الأجزاء', 'error'); }
+                }} className="bg-slate-800 text-white px-4 py-2 rounded-xl font-black">حفظ الأجزاء</button>
+              </>}
+            </div>
+          )}
         </section>
       </div>
 

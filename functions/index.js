@@ -393,7 +393,7 @@ exports.createSubscriptionCode = functions
   .onCall(async (data, context) => {
     const adminUser = await assertAdmin(context, "manage_subscriptions");
     const code = requireString(data && data.code, "code").toUpperCase();
-    const payload = cleanObject(data || {}, ["grade", "durationDays", "type", "note", "value"]);
+    const payload = cleanObject(data || {}, ["grade", "durationDays", "days", "type", "note", "value"]);
 
     await db.collection("subscription_codes").doc(code).set({
       ...payload,
@@ -851,6 +851,47 @@ exports.redeemSubscriptionCode = functions
     return { ok: true, days, expiry: expiryDate.toISOString() };
   });
 
+// Opens a course for the signed-in student with a one-time course access code.
+// Runs on the server so students can't read other codes or mark themselves as paid.
+exports.redeemCourseAccessCode = functions
+  .region("us-central1")
+  .https
+  .onCall(async (data, context) => {
+    const uid = context.auth && context.auth.uid;
+    if (!uid) throw new functions.https.HttpsError("unauthenticated", "يجب تسجيل الدخول أولاً.");
+    const code = requireString(data && data.code, "code").toUpperCase();
+    const courseId = requireString(data && data.courseId, "courseId");
+    const snap = await db.collection("courseAccessCodes").where("code", "==", code).limit(1).get();
+    if (snap.empty) throw new functions.https.HttpsError("not-found", "الكود غير صحيح.");
+    const codeRef = snap.docs[0].ref;
+    let expiresAt = null;
+    await db.runTransaction(async (tx) => {
+      const fresh = (await tx.get(codeRef)).data() || {};
+      if (fresh.isUsed === true || fresh.used === true) throw new functions.https.HttpsError("failed-precondition", "الكود مستخدم بالفعل.");
+      if (fresh.expiresAt && new Date(fresh.expiresAt) < new Date()) throw new functions.https.HttpsError("failed-precondition", "انتهت صلاحية هذا الكود.");
+      if (fresh.courseId !== courseId) throw new functions.https.HttpsError("failed-precondition", "الكود لا يخص هذا الكورس.");
+      const days = Number(fresh.validityDays || 0);
+      if (fresh.permanentAccess === false && days > 0) expiresAt = new Date(Date.now() + days * 86400000).toISOString();
+      const enrollmentRef = db.collection("enrollments").doc(`${uid}_${courseId}`);
+      const existing = await tx.get(enrollmentRef);
+      tx.set(enrollmentRef, {
+        userId: uid,
+        courseId,
+        status: "active",
+        paid: true,
+        joinedAt: existing.exists && existing.data().joinedAt ? existing.data().joinedAt : admin.firestore.FieldValue.serverTimestamp(),
+        progress: existing.exists ? Number(existing.data().progress || 0) : 0,
+        openedBy: "access-code",
+        accessCode: code,
+        permanentAccess: !expiresAt,
+        expiresAt,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+      tx.set(codeRef, { isUsed: true, usedBy: uid, usedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    });
+    return { ok: true, expiresAt };
+  });
+
 // -----------------------------------------------------------------------------
 // Operational hardening callable functions - server-side audit source of truth
 // -----------------------------------------------------------------------------
@@ -1048,6 +1089,17 @@ exports.syncLeaderboardEntry = functions
     if (!relevant) return null;
     await rebuildLeaderboardEntry(studentId);
     return null;
+  });
+
+/** Lets a student refresh their own leaderboard row right after an exam (works without Firestore triggers). */
+exports.syncMyLeaderboardEntry = functions
+  .region("us-central1")
+  .https
+  .onCall(async (data, context) => {
+    const uid = context.auth && context.auth.uid;
+    if (!uid) throw new functions.https.HttpsError("unauthenticated", "يجب تسجيل الدخول أولاً.");
+    await rebuildLeaderboardEntry(uid);
+    return { ok: true };
   });
 
 /** One-off backfill for results that existed before the leaderboard: admins call it once. */

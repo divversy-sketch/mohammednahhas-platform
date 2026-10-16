@@ -158,11 +158,12 @@ export const createAdminDeleteActions = (ctx) => {
   const handleDeleteAnnouncement = async (id) => { if(platformConfirm("حذف الإعلان؟")) await adminSecureFunctions.deleteAdminDocument('announcements', id); };
   const handleDeleteResult = async (resultId) => {
     if (!platformConfirm("حذف النتيجة؟")) return;
+    const sourceCollection = examResults.find((r) => r.id === resultId)?.sourceCollection || 'exam_results';
     try {
-      await adminSecureFunctions.deleteAdminDocument('exam_results', resultId);
+      await adminSecureFunctions.deleteAdminDocument(sourceCollection, resultId);
     } catch (error) {
       console.warn('delete result callable failed; trying direct Firestore delete:', error?.message);
-      await deleteDoc(doc(db, 'exam_results', resultId));
+      await deleteDoc(doc(db, sourceCollection, resultId));
     }
     await audit('exam_result_deleted', { title: 'حذف نتيجة امتحان', severity: 'warning', targetCollection: 'exam_results', targetDocId: resultId });
     platformNotify('تم حذف النتيجة.');

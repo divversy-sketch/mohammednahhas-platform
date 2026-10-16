@@ -41,6 +41,7 @@ const AdminFollowUpPanel = ({ users = [], exams = [], examResults = [], assignme
       body: `راجع خطتك: ${row.recommendations.join('، ')}`,
       target: 'user',
       userId: row.studentId,
+      audience: `user:${row.studentId}`,
       grade: row.grade || 'all',
       clickUrl: '/',
       createdAt: serverTimestamp(),

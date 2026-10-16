@@ -134,6 +134,12 @@ export async function assertAuthenticatedRequest(req) {
 }
 
 export function requirePost(req) {
+  // CORS preflight from the mobile app: answered with 204 by sendApiError.
+  if (req.method === 'OPTIONS') {
+    const error = new Error('');
+    error.statusCode = 204;
+    throw error;
+  }
   if (req.method !== 'POST') {
     const error = new Error('Method not allowed');
     error.statusCode = 405;
@@ -152,6 +158,7 @@ export function requireString(value, fieldName) {
 
 export function sendApiError(res, error) {
   const statusCode = error?.statusCode || 500;
+  if (statusCode === 204) return res.status(204).end();
   return res.status(statusCode).json({
     ok: false,
     message: error?.message || 'حدث خطأ غير متوقع.'

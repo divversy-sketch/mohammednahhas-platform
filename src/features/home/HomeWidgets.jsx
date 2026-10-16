@@ -64,7 +64,7 @@ const getGradeBadge = (percentage) => {
     return { text: 'يحتاج مراجعة', tone: 'text-red-700 bg-red-50 border-red-200' };
 };
 
-const getUnreviewedEssayCount = (result, exam) => {
+export const getUnreviewedEssayCount = (result, exam) => {
     const questions = extractAllQuestions(exam || {});
     const essayQuestions = questions.filter(q => q.type === 'essay');
     if (essayQuestions.length === 0) return 0;

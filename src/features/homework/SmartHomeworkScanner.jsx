@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { doc, getDoc } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
-import { db, functions } from '../../services/firebase';
+import { db } from '../../services/firebase';
+import { callFunction } from '../../services/callFunction.js';
 import { Loader2, QrCode, Camera, CheckCircle, AlertTriangle } from '../../shared/icons/lucide-shim.jsx';
 
 const toDate = (value) => {
@@ -79,9 +79,8 @@ const SmartHomeworkScanner = ({ hwId, user, onClose }) => {
         setError('');
         try {
             const base64Data = imageSrc.split(',')[1];
-            const callable = httpsCallable(functions, 'correctSmartHomework');
-            const response = await callable({ homeworkId: homeworkData.id, imageBase64: base64Data, mimeType: 'image/jpeg' });
-            setResult(response.data?.result || response.data || {});
+            const data = await callFunction('correctSmartHomework', { homeworkId: homeworkData.id, imageBase64: base64Data, mimeType: 'image/jpeg' });
+            setResult(data?.result || data || {});
         } catch (error) {
             console.error('Smart homework correction error:', error);
             setError(error?.message || 'حدث خطأ أثناء التصحيح. تأكد من وضوح الصورة.');

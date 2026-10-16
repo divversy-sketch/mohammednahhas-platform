@@ -3,7 +3,7 @@ import { buildStudentProfileUpdatePayload, updateStudentProfile } from '@feature
 
 export function useStudentProfileActions({ user, userData, editFormData }) {
   const handleUpdateMyProfile = async (event) => {
-    event.preventDefault();
+    event?.preventDefault?.();
     const { payload, isGradeChange, error } = buildStudentProfileUpdatePayload({ editFormData, userData });
     if (error) return platformNotify(error);
 

@@ -143,7 +143,7 @@ export const createCommunicationActions = (ctx) => {
   const handleAddAnnouncement = async () => {
       if(!newAnnouncement.trim()) return;
       await addDoc(collection(db, 'announcements'), { text: newAnnouncement, createdAt: serverTimestamp() });
-      await addDoc(collection(db, 'notifications'), { text: `تنبيه هام: ${newAnnouncement}`, grade: 'all', createdAt: serverTimestamp() });
+      await addDoc(collection(db, 'notifications'), { text: `تنبيه هام: ${newAnnouncement}`, grade: 'all', audience: 'all', createdAt: serverTimestamp() });
       setNewAnnouncement("");
       platformNotify("تم نشر الإعلان");
   };
@@ -157,6 +157,7 @@ export const createCommunicationActions = (ctx) => {
         text: newStudentNotification.text.trim(),
         body: newStudentNotification.text.trim(),
         grade: newStudentNotification.grade || 'all',
+        audience: newStudentNotification.grade || 'all',
         clickUrl: newStudentNotification.clickUrl || '/',
         pushStatus: 'pending',
         createdAt: serverTimestamp(),

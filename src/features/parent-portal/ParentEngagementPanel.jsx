@@ -3,7 +3,8 @@ import {
   addDoc, collection, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc,
 } from 'firebase/firestore';
 import { db } from '@services/firebase';
-import { normalizeEgyptPhone } from '@shared/utils/phone';
+import { openWhatsApp, toWhatsAppPhone } from '@shared/utils/whatsapp.js';
+import { platformNotify } from '@shared/core/platform/notifications.jsx';
 
 const monthKey = () => new Date().toISOString().slice(0, 7);
 const dateText = (value) => {
@@ -14,11 +15,6 @@ const dateText = (value) => {
 };
 const money = (value) => new Intl.NumberFormat('ar-EG').format(Number(value || 0));
 const randomCode = () => String(Math.floor(100000 + Math.random() * 900000));
-const whatsappPhone = (value) => {
-  const phone = normalizeEgyptPhone(value || '').replace(/^0/, '20');
-  return phone.startsWith('20') ? phone : `20${phone}`;
-};
-
 function useLiveCollection(name) {
   const [items, setItems] = useState([]);
   useEffect(() => {
@@ -68,7 +64,7 @@ export default function ParentEngagementPanel({ users = [], adminProfile = {} })
   };
 
   const createAccessCode = async () => {
-    if (!student || !student.parentPhone) return window.alert('رقم ولي الأمر غير مسجل لهذا الطالب.');
+    if (!student || !student.parentPhone) return platformNotify('رقم ولي الأمر غير مسجل لهذا الطالب.', 'error');
     const code = randomCode();
     await setDoc(doc(db, 'parent_access_codes', studentId), {
       studentId,
@@ -84,7 +80,10 @@ export default function ParentEngagementPanel({ users = [], adminProfile = {} })
   };
 
   const queueMessage = async () => {
-    if (!student || !message.trim()) return window.alert('اختر الطالب واكتب الرسالة أولًا.');
+    if (!student || !message.trim()) return platformNotify('اختر الطالب واكتب الرسالة أولًا.', 'error');
+    if (channel === 'whatsapp' && !toWhatsAppPhone(student.parentPhone)) return platformNotify('لا يوجد رقم ولي أمر صحيح لهذا الطالب.', 'error');
+    // WhatsApp has to open while the click is still fresh, before any await, or the browser blocks it.
+    if (channel === 'whatsapp') openWhatsApp(student.parentPhone, message.trim());
     setSaving(true);
     try {
       await addDoc(collection(db, 'parent_message_log'), {
@@ -98,10 +97,10 @@ export default function ParentEngagementPanel({ users = [], adminProfile = {} })
         createdByName: adminProfile.name || adminProfile.email || 'الإدارة',
         createdAt: serverTimestamp(),
       });
-      if (channel === 'whatsapp') {
-        const phone = whatsappPhone(student.parentPhone || '');
-        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message.trim())}`, '_blank', 'noopener,noreferrer');
-      }
+      if (channel !== 'whatsapp') platformNotify('تم حفظ الرسالة في السجل.', 'success');
+    } catch (error) {
+      console.error(error);
+      platformNotify('تعذر حفظ الرسالة في السجل.', 'error');
     } finally { setSaving(false); }
   };
 

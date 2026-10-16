@@ -304,7 +304,7 @@ export const createContentManagementActions = (ctx) => {
       await audit('content_created', { title: 'إضافة محتوى جديد', targetCollection: 'content', targetDocId: addedContentRef.id, after: { title: newContent.title, type: contentData.type, grade: contentData.grade, isPremium: contentData.isPremium } });
       
       if (allowedEmailsArray.length === 0) {
-          await addDoc(collection(db, 'notifications'), { text: `تم إضافة درس جديد: ${newContent.title}`, grade: newContent.grade, createdAt: serverTimestamp() });
+          await addDoc(collection(db, 'notifications'), { text: `تم إضافة درس جديد: ${newContent.title}`, grade: newContent.grade, audience: newContent.grade || 'all', createdAt: serverTimestamp() });
       } 
       
       platformNotify("تم النشر!"); 

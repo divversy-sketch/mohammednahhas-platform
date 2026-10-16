@@ -1,3 +1,4 @@
+import { buildWhatsAppUrl } from '@shared/utils/whatsapp.js';
 const toDate = (value) => {
   if (!value) return null;
   if (value?.toDate) return value.toDate();
@@ -133,8 +134,5 @@ export function buildParentReportText(student, insight, options = {}) {
 }
 
 export function buildWhatsAppLink(phone, text) {
-  let p = String(phone || '').replace(/\D/g, '');
-  if (p.startsWith('0')) p = `20${p.slice(1)}`;
-  if (p && !p.startsWith('20') && p.length === 10) p = `20${p}`;
-  return p ? `https://wa.me/${p}?text=${encodeURIComponent(text)}` : '';
+  return buildWhatsAppUrl(phone, text);
 }

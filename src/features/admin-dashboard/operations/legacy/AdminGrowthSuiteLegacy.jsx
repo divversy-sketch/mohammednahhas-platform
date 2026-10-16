@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@services/firebase';
 import { downloadXlsx } from '@shared/utils/exportData.js';
 import { usePagination } from '@shared/hooks/usePagination.js';
@@ -171,16 +171,27 @@ export function AdminGrowthSuite({ users = [], exams = [], examResults = [], con
   };
 
   const decidePayment = async (payment, status) => {
-    const days = Number(payment.days || payment.planDays || 30);
-    const expiry = new Date(Date.now() + days * 86400000);
+    const days = Number(payment.durationDays || payment.days || payment.planDays || 30);
+    if ((payment.status || 'pending') !== 'pending') return platformNotify('الطلب ده اتراجع قبل كده.', 'error');
     setBusy(true);
     try {
+      // extend from the current expiry so a renewal never cuts remaining days
+      let base = Date.now();
+      if (status === 'approved' && payment.userId) {
+        const current = (await getDoc(doc(db, 'users', payment.userId))).data()?.subscriptionExpiry;
+        const currentMs = current?.toDate ? current.toDate().getTime() : (current ? new Date(current).getTime() : 0);
+        if (currentMs > base) base = currentMs;
+      }
+      const expiry = new Date(base + days * 86400000);
       await updateDoc(doc(db, 'payment_requests', payment.id), { status, reviewedAt: serverTimestamp(), reviewedBy: userData?.email || '' });
       if (status === 'approved' && payment.userId) {
         await setDoc(doc(db, 'users', payment.userId), { subscriptionStatus: 'premium', subscriptionExpiry: expiry, subscriptionUpdatedAt: serverTimestamp(), subscriptionSource: 'payment_request' }, { merge: true });
       }
       await writeLog(status === 'approved' ? 'payment_approved' : 'payment_rejected', status === 'approved' ? 'قبول طلب دفع' : 'رفض طلب دفع', { paymentId: payment.id, userId: payment.userId || '', amount: payment.amount || payment.price || '', days, severity: status === 'approved' ? 'info' : 'warning' });
       platformNotify(status === 'approved' ? 'تم قبول الدفع وتفعيل الاشتراك.' : 'تم رفض طلب الدفع.');
+    } catch (error) {
+      console.error(error);
+      platformNotify(error?.message || 'تعذر تنفيذ العملية.', 'error');
     } finally { setBusy(false); }
   };
 
@@ -399,7 +410,7 @@ export function AdminGrowthSuite({ users = [], exams = [], examResults = [], con
         plans, subscriptionCodes, planDraft, setPlanDraft, busy, savePlan,
         notifyExpiringSubscriptions, togglePlan, deletePlan, paymentFilter,
         setPaymentFilter, exportPayments, visiblePayments, paymentsPagination,
-        statusLabel, toInputDate, decidePayment, units, content, exams, unitDraft,
+        statusLabel, toInputDate, decidePayment, saveQuestion, units, content, exams, unitDraft,
         setUnitDraft, saveUnit, questions, filteredQuestions, questionDraft,
         setQuestionDraft, bulkQuestions, setBulkQuestions, importQuestions,
         examDraft, setExamDraft, buildExamFromBank, exportQuestionBank,

@@ -254,8 +254,9 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
     }
 
     const now = new Date(); const start = new Date(exam.startTime); const end = new Date(exam.endTime);
-    if (now < start) return platformNotify(`الامتحان لم يبدأ بعد. موعد البدء: ${start.toLocaleString('ar-EG')}`);
-    if (now > end) return platformNotify("عفواً، انتهى وقت الامتحان.");
+    // Lesson exams open by the course's own rules (watch percentage), not by the exam's public window.
+    if (!options.fromCourse && now < start) return platformNotify(`الامتحان لم يبدأ بعد. موعد البدء: ${start.toLocaleString('ar-EG')}`);
+    if (!options.fromCourse && now > end) return platformNotify("عفواً، انتهى وقت الامتحان.");
     let code = exam.accessCode;
     if (!options.skipCode && exam.accessCode) {
       code = await platformPromptAsync(`اكتب كود «${exam.title || 'الامتحان'}» اللي المستر إداه لك.`, { title: 'كود الامتحان', placeholder: 'الكود', icon: 'key', confirmLabel: 'ابدأ الامتحان' });
@@ -272,7 +273,9 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
               adminDecision: null,
               resumeApproved: false,
               sourceVideoId: options.sourceVideoId || null,
-              startedFromVideo: !!options.skipCode,
+              startedFromVideo: !!options.sourceVideoId,
+              courseId: options.sourceCourseId || null,
+              lessonId: options.sourceLessonId || null,
               submittedAt: serverTimestamp()
             });
             setActiveExam({ ...exam, attemptId: attemptRef.id, sourceVideoId: options.sourceVideoId || null });

@@ -1,10 +1,9 @@
-import { httpsCallable } from 'firebase/functions';
-import { auth, functions } from '../../services/firebase.js';
+import { auth } from '../../services/firebase.js';
+import { apiUrl, callFunction } from '../../services/callFunction.js';
 
 const callAdminFunction = async (name, payload = {}) => {
-  const fn = httpsCallable(functions, name);
-  const result = await fn(payload);
-  return result.data || { ok: true };
+  const data = await callFunction(name, payload);
+  return data || { ok: true };
 };
 
 const callVercelAdminApi = async (path, payload = {}) => {
@@ -14,7 +13,7 @@ const callVercelAdminApi = async (path, payload = {}) => {
   }
 
   const token = await currentUser.getIdToken(true);
-  const response = await fetch(path, {
+  const response = await fetch(apiUrl(path), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -23,7 +22,8 @@ const callVercelAdminApi = async (path, payload = {}) => {
     body: JSON.stringify(payload)
   });
 
-  const data = await response.json().catch(() => ({}));
+  const data = await response.json().catch(() => null);
+  if (!data) throw new Error('تعذر الوصول للسيرفر. تأكد من الاتصال وحاول مرة أخرى.');
   if (!response.ok || data?.ok === false) {
     throw new Error(data?.message || 'فشل تنفيذ العملية من السيرفر.');
   }

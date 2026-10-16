@@ -35,6 +35,7 @@ export function AdminNotificationsManager({ users = [], userData = {} }) {
     for (const u of targets) {
       await setDoc(doc(collection(db, 'notifications')), {
         userId: u.id,
+        audience: `user:${u.id}`,
         title: form.title,
         body: form.body,
         type: 'admin_message',

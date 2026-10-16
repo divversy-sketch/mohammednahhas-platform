@@ -57,7 +57,9 @@ export function AdminMessagingCenter({ users = [], userData }) {
     if (!clean(form.title) || !clean(form.body)) return platformNotify('اكتب العنوان والرسالة');
     const target = form.audience === 'student' ? [form.studentId] : form.audience === 'group' ? (groups.find((g) => g.id === form.groupId)?.members || []) : [];
     await addDoc(collection(db, 'student_messages'), { ...form, userIds: target, groupIds: form.groupId ? [form.groupId] : [], createdAt: serverTimestamp(), createdBy: userData?.email || 'admin', seenBy: [] });
-    await addDoc(collection(db, 'notifications'), { title: form.title, body: form.body, targetType: form.audience, targetUserIds: target, targetGroupId: form.groupId || '', createdAt: serverTimestamp(), createdBy: userData?.email || 'admin' });
+    const base = { title: form.title, body: form.body, text: form.body, targetType: form.audience, targetGroupId: form.groupId || '', createdAt: serverTimestamp(), createdBy: userData?.email || 'admin' };
+    if (form.audience === 'all') await addDoc(collection(db, 'notifications'), { ...base, audience: 'all' });
+    else await Promise.all(target.filter(Boolean).map((uid) => addDoc(collection(db, 'notifications'), { ...base, userId: uid, audience: `user:${uid}` })));
     setForm({ ...form, title: '', body: '' });
     platformNotify('تم إرسال الرسالة والإشعار');
   };

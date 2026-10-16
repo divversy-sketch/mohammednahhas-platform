@@ -7,7 +7,7 @@ import { db } from '@services/firebase';
 
 
 import { validateEgyptianPhones } from '@shared/utils/phone';
-import { FloatingArabicBackground } from '@features/home/HomeWidgets';
+import { FloatingArabicBackground, getUnreviewedEssayCount } from '@features/home/HomeWidgets';
 
 
 import { uploadToFirebaseContent, detectContentType, readHtmlFileAsInlineContent } from '@services/firebaseContentUpload';

@@ -13,6 +13,7 @@ import { makeExamAutosaveKey, readLocalExamBackup, writeLocalExamBackupToStorage
 import { useOnlineStatus } from '@shared/ui/ConnectionStatusBanner.jsx';
 import { ExamEmptyState, ExamCheatingScreen } from '@features/exams/runner/components/ExamRunnerStateScreens.jsx';
 import { ExamRunnerView } from '@features/exams/runner/views/ExamRunnerView.jsx';
+import { callFunction } from '@services/callFunction.js';
 
 
 
@@ -450,6 +451,8 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
 
     try {
       await batch.commit();
+      // keeps the leaderboard current even where Firestore triggers aren't deployed
+      callFunction('syncMyLeaderboardEntry').catch(() => {});
       clearLocalExamBackup(autosaveKey);
       platformNotify(auto ? 'انتهى الوقت وتم تسليم الامتحان تلقائيًا. تم حفظ الإجابات.' : 'تم تسليم الامتحان وحفظ النتيجة بنجاح.');
     } catch (err) {

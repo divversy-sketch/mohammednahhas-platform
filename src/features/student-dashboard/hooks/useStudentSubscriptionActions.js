@@ -7,7 +7,7 @@ export function useStudentSubscriptionActions() {
   const [isCharging, setIsCharging] = useState(false);
 
   const handleChargeSubscriptionCode = async (event) => {
-    event.preventDefault();
+    event?.preventDefault?.();
     const validationMessage = validateSubscriptionCode(subscriptionCodeInput);
     if (validationMessage) return platformNotify(validationMessage);
     setIsCharging(true);

@@ -1,12 +1,10 @@
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '../../../services/firebase';
+import { callFunction } from '../../../services/callFunction.js';
 
 export function validateSubscriptionCode(code) {
   return code?.trim() ? null : 'أدخل الكود أولاً';
 }
 
 export async function redeemStudentSubscriptionCode(code) {
-  const redeemCode = httpsCallable(functions, 'redeemSubscriptionCode');
-  const result = await redeemCode({ code: code.trim() });
-  return result.data?.days || 0;
+  const data = await callFunction('redeemSubscriptionCode', { code: code.trim() });
+  return data?.days || 0;
 }

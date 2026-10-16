@@ -9,7 +9,7 @@ export function useStudentPaymentActions({ user, userData }) {
   const [isSendingPayment, setIsSendingPayment] = useState(false);
 
   const handleSubmitPaymentRequest = async (event) => {
-    event.preventDefault();
+    event?.preventDefault?.();
     const validationMessage = validateStudentPaymentDraft(paymentDraft);
     if (validationMessage) return platformNotify(validationMessage);
     setIsSendingPayment(true);

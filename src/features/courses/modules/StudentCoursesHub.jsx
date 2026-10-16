@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { addDoc, collection, deleteDoc, doc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
 import { db } from '@services/firebase';
+import { callFunction } from '@services/callFunction.js';
 import { BookOpen, Layers, PlayCircle, FileText, ClipboardList, Lock, UploadCloud, PlusCircle, Trash2, Save, Unlock, Key, Users, Crown } from '@shared/icons/lucide-shim.jsx';
 import { uploadToCloudinary } from '@services/cloudinaryUpload';
 import { GradeOptions, getGradeLabel } from '@shared/constants/grades.jsx';
@@ -109,7 +110,7 @@ export function StudentCoursesHub({ user, userData, exams = [], onStartExam }) {
     const unsub = [
       onSnapshot(query(collection(db, 'enrollments'), where('userId', '==', user.uid)), (s) => setEnroll(s.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setEnroll([])),
       onSnapshot(query(collection(db, 'lessonProgress'), where('userId', '==', user.uid)), (s) => setProg(s.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setProg([])),
-      onSnapshot(query(collection(db, 'examResults'), where('userId', '==', user.uid)), (s) => setExr(s.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setExr([])),
+      onSnapshot(query(collection(db, 'exam_results'), where('studentId', '==', user.uid)), (s) => setExr(s.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setExr([])),
       onSnapshot(query(collection(db, 'lessonUnlockOverrides'), where('userId', '==', user.uid), where('active', '==', true)), (s) => setOvers(s.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setOvers([])),
     ];
     return () => unsub.forEach((u) => u());
@@ -131,7 +132,15 @@ export function StudentCoursesHub({ user, userData, exams = [], onStartExam }) {
   const isEnrolled = (c) => Number(c.price || 0) === 0 || enroll.some((e) => e.courseId === c.id && e.status !== 'blocked' && (e.paid || e.status === 'active') && (!e.expiresAt || new Date(e.expiresAt) >= new Date()));
   const courseProgress = (c) => enroll.find((e) => e.courseId === c.id)?.progress || 0;
   const pr = (id) => prog.find((p) => p.courseId === course?.id && p.lessonId === id) || {};
-  const er = (id) => exr.find((r) => r.courseId === course?.id && r.lessonId === id) || {};
+  // Best completed attempt of the lesson's exam: attempts started from the course carry courseId/lessonId,
+  // older ones are matched by the lesson's linked exam.
+  const er = (id) => {
+    const lesson = Object.values(lbm).flat().find((l) => l.id === id);
+    const rows = exr.filter((r) => r.status === 'completed' && ((r.courseId === course?.id && r.lessonId === id) || (lesson?.examId && r.examId === lesson.examId)));
+    const pctOf = (r) => Number(r.percentage ?? (Number(r.totalPossible || r.total) > 0 ? Math.round((Number(r.score || 0) / Number(r.totalPossible || r.total)) * 100) : 0));
+    const best = rows.sort((a, b) => pctOf(b) - pctOf(a))[0];
+    return best ? { ...best, score: pctOf(best), passed: best.passed } : {};
+  };
   const over = (id) => overs.some((o) => o.courseId === course?.id && o.lessonId === id && o.active !== false);
   const can = (l) => {
     if (l.isFree || course.unlockMode === 'all' || over(l.id)) return { ok: true, admin: over(l.id) };
@@ -158,18 +167,13 @@ export function StudentCoursesHub({ user, userData, exams = [], onStartExam }) {
   const redeemCode = async () => {
     const code = clean(accessCode).toUpperCase();
     if (!code) return platformNotify('اكتب كود فتح الكورس', 'error');
-    const snap = await getDocs(query(collection(db, 'courseAccessCodes'), where('code', '==', code), limit(1)));
-    if (snap.empty) return platformNotify('الكود غير صحيح', 'error');
-    const d = snap.docs[0];
-    const data = d.data();
-    if (data.isUsed) return platformNotify('الكود مستخدم بالفعل', 'error');
-    if (data.expiresAt && new Date(data.expiresAt) < new Date()) return platformNotify('انتهت صلاحية هذا الكود', 'error');
-    if (data.courseId !== course.id) return platformNotify('الكود لا يخص هذا الكورس', 'error');
-    const enrollmentExpiresAt = data.permanentAccess === false && data.validityDays ? new Date(Date.now() + Number(data.validityDays) * 86400000).toISOString() : null;
-    await setDoc(doc(db, 'enrollments', `${user.uid}_${course.id}`), { userId: user.uid, courseId: course.id, status: 'active', paid: true, joinedAt: serverTimestamp(), progress: 0, openedBy: 'access-code', accessCode: code, permanentAccess: !enrollmentExpiresAt, expiresAt: enrollmentExpiresAt }, { merge: true });
-    await updateDoc(doc(db, 'courseAccessCodes', d.id), { isUsed: true, usedBy: user.uid, usedAt: serverTimestamp() });
-    setAccessCode('');
-    platformNotify('تم فتح الكورس بنجاح', 'success');
+    try {
+      await callFunction('redeemCourseAccessCode', { code, courseId: course.id });
+      setAccessCode('');
+      platformNotify('تم فتح الكورس بنجاح', 'success');
+    } catch (error) {
+      platformNotify(error?.message || 'تعذر تفعيل الكود', 'error');
+    }
   };
 
   if (!course) {
@@ -238,7 +242,7 @@ export function StudentCoursesHub({ user, userData, exams = [], onStartExam }) {
         {mods.map((m) => <div key={m.id} className="mb-6"><h4 className="font-black text-amber-800 mb-3">{m.order}. {m.title}</h4><div className="grid lg:grid-cols-2 gap-6">{(lbm[m.id] || []).map((l) => { const a = can(l); const p = pr(l.id); return <button key={l.id} onClick={() => { if (!a.ok) return platformNotify(a.reason, 'error'); setLesson(l); setTab('video'); }} className={`text-right rounded-3xl overflow-hidden border bg-white ${a.ok ? 'hover:-translate-y-1' : 'opacity-70'}`}><div className="relative"><div className="h-72 lg:h-80 w-full bg-slate-100 overflow-hidden"><img src={l.lessonImage || course.coverImage || (l.youtubeVideoId ? `https://img.youtube.com/vi/${l.youtubeVideoId}/hqdefault.jpg` : 'https://placehold.co/600x340?text=Lesson')} className="w-full h-full" style={imagePlacementStyle(l.lessonImage ? l.lessonImagePlacement : course.coverImagePlacement)} /></div><span className="absolute top-3 right-3 bg-white/90 rounded-full px-3 py-1 font-black">{l.icon || '📘'}</span><span className="absolute top-3 left-3 bg-white/90 rounded-full p-2">{a.ok ? <Unlock size={18} className="text-emerald-600" /> : <Lock size={18} className="text-red-600" />}</span></div><div className="p-4"><h5 className="font-black">{l.title}</h5><p className="text-xs text-slate-500 font-bold">مشاهدة: {pct(p.watchPercent)}%</p>{a.admin && <p className="text-xs text-emerald-700 font-black">متاح باستثناء من الإدارة</p>}{!a.ok && <p className="text-xs text-red-600 font-black">{a.reason}</p>}</div></button>; })}</div></div>)}
       </div>
 
-      {lesson && <div className="bg-white rounded-3xl p-5 border"><h3 className="text-2xl font-black mb-4">{lesson.icon || '📘'} {lesson.title}</h3><div className="grid md:grid-cols-3 gap-2 mb-5"><button onClick={() => setTab('video')} className={`p-3 rounded-2xl font-black ${tab === 'video' ? 'bg-amber-600 text-white' : 'bg-slate-100'}`}><PlayCircle className="inline ml-1" /> شرح الدرس</button><button onClick={() => setTab('pdf')} className={`p-3 rounded-2xl font-black ${tab === 'pdf' ? 'bg-blue-600 text-white' : 'bg-slate-100'}`}><FileText className="inline ml-1" /> PDF</button><button onClick={() => setTab('exam')} className={`p-3 rounded-2xl font-black ${tab === 'exam' ? 'bg-emerald-600 text-white' : 'bg-slate-100'}`}><ClipboardList className="inline ml-1" /> الامتحان</button></div>{tab === 'video' && <YouTubeLessonPlayer videoUrl={lesson.videoUrl} posterImage={lesson.lessonImage || course.coverImage || (lesson.youtubeVideoId ? `https://img.youtube.com/vi/${lesson.youtubeVideoId}/hqdefault.jpg` : '')} savedProgress={pr(lesson.id)} onProgress={(d) => saveP(lesson, d)} />} {tab === 'pdf' && <div className="bg-blue-50 rounded-3xl p-6 text-center space-y-4">{lesson.pdfImage && <div className="h-56 rounded-3xl bg-white border overflow-hidden"><img src={lesson.pdfImage} className="w-full h-full" style={imagePlacementStyle(lesson.pdfImagePlacement)} /></div>}{lesson.pdfUrl ? <a href={lesson.pdfUrl} target="_blank" rel="noreferrer" className="bg-blue-600 text-white px-6 py-3 rounded-2xl font-black inline-flex gap-2"><FileText /> فتح PDF</a> : <p className="font-bold text-slate-500">لا يوجد PDF لهذا الدرس.</p>}</div>} {tab === 'exam' && <div className="bg-emerald-50 rounded-3xl p-6 text-center space-y-3">{lesson.examImage && <div className="h-56 rounded-3xl bg-white border overflow-hidden"><img src={lesson.examImage} className="w-full h-full" style={imagePlacementStyle(lesson.examImagePlacement)} /></div>}<p className="font-black">نسبة مشاهدتك: {pct(pr(lesson.id).watchPercent)}%</p><button onClick={() => openExam(lesson)} className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-black inline-flex gap-2"><ClipboardList /> بدء الامتحان</button><p className="text-xs text-slate-500 font-bold">لا يفتح إلا بعد مشاهدة {lesson.unlockRules?.examRequiresWatchPercent || 75}% إلا باستثناء من الأدمن.</p></div>}</div>}
+      {lesson && <div className="bg-white rounded-3xl p-5 border"><h3 className="text-2xl font-black mb-4">{lesson.icon || '📘'} {lesson.title}</h3><div className="grid md:grid-cols-3 gap-2 mb-5"><button onClick={() => setTab('video')} className={`p-3 rounded-2xl font-black ${tab === 'video' ? 'bg-amber-600 text-white' : 'bg-slate-100'}`}><PlayCircle className="inline ml-1" /> شرح الدرس</button><button onClick={() => setTab('pdf')} className={`p-3 rounded-2xl font-black ${tab === 'pdf' ? 'bg-blue-600 text-white' : 'bg-slate-100'}`}><FileText className="inline ml-1" /> PDF</button><button onClick={() => setTab('exam')} className={`p-3 rounded-2xl font-black ${tab === 'exam' ? 'bg-emerald-600 text-white' : 'bg-slate-100'}`}><ClipboardList className="inline ml-1" /> الامتحان</button></div>{tab === 'video' && <YouTubeLessonPlayer key={lesson.id} unlockPercent={Number(lesson.unlockRules?.examRequiresWatchPercent || 75)} chapters={Array.isArray(lesson.chapters) ? lesson.chapters : []} videoUrl={lesson.videoUrl} posterImage={lesson.lessonImage || course.coverImage || (lesson.youtubeVideoId ? `https://img.youtube.com/vi/${lesson.youtubeVideoId}/hqdefault.jpg` : '')} savedProgress={pr(lesson.id)} onProgress={(d) => saveP(lesson, d)} />} {tab === 'pdf' && <div className="bg-blue-50 rounded-3xl p-6 text-center space-y-4">{lesson.pdfImage && <div className="h-56 rounded-3xl bg-white border overflow-hidden"><img src={lesson.pdfImage} className="w-full h-full" style={imagePlacementStyle(lesson.pdfImagePlacement)} /></div>}{lesson.pdfUrl ? <a href={lesson.pdfUrl} target="_blank" rel="noreferrer" className="bg-blue-600 text-white px-6 py-3 rounded-2xl font-black inline-flex gap-2"><FileText /> فتح PDF</a> : <p className="font-bold text-slate-500">لا يوجد PDF لهذا الدرس.</p>}</div>} {tab === 'exam' && <div className="bg-emerald-50 rounded-3xl p-6 text-center space-y-3">{lesson.examImage && <div className="h-56 rounded-3xl bg-white border overflow-hidden"><img src={lesson.examImage} className="w-full h-full" style={imagePlacementStyle(lesson.examImagePlacement)} /></div>}<p className="font-black">نسبة مشاهدتك: {pct(pr(lesson.id).watchPercent)}%</p><button onClick={() => openExam(lesson)} className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-black inline-flex gap-2"><ClipboardList /> بدء الامتحان</button><p className="text-xs text-slate-500 font-bold">لا يفتح إلا بعد مشاهدة {lesson.unlockRules?.examRequiresWatchPercent || 75}% إلا باستثناء من الأدمن.</p></div>}</div>}
     </div>
   );
 }

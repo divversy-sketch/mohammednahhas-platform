@@ -53,7 +53,7 @@ export function StudentMessagesInbox({ user, userData }) {
     const unsubs = [];
     unsubs.push(onSnapshot(query(collection(db, 'student_messages'), where('audience', '==', 'all')), (snap) => setMessages((prev)=>mergeMessages(prev, snap.docs.map((d)=>({id:d.id,...d.data()})))), () => {}));
     unsubs.push(onSnapshot(query(collection(db, 'student_messages'), where('userIds', 'array-contains', user.uid)), (snap) => setMessages((prev)=>mergeMessages(prev, snap.docs.map((d)=>({id:d.id,...d.data()})))), () => {}));
-    (userData?.groupIds || []).forEach((gid) => unsubs.push(onSnapshot(query(collection(db, 'student_messages'), where('groupIds', 'array-contains', gid)), (snap) => setMessages((prev)=>mergeMessages(prev, snap.docs.map((d)=>({id:d.id,...d.data()})))), () => {})));
+    // Group messages are delivered through userIds (the group's members at send time).
     return () => unsubs.forEach((u)=>u());
   }, [user?.uid, JSON.stringify(userData?.groupIds || [])]);
   return <div className="space-y-5" dir="rtl"><PageHeader title="رسائلي" description="رسائل الإدارة والتنبيهات المهمة تظهر هنا." icon={<MessageSquare className="text-emerald-600"/>}/>{messages.length ? messages.map((m)=><div key={m.id} className="bg-white rounded-3xl border p-5"><p className="font-black text-lg">{m.title}</p><p className="text-slate-600 font-bold leading-7 mt-2">{m.body}</p><p className="text-xs text-slate-400 mt-3">{arabicDate(m.createdAt)}</p></div>) : <EmptyState title="لا توجد رسائل حاليًا" icon="💬"/>}</div>;

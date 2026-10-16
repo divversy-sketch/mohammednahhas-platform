@@ -143,7 +143,7 @@ function Live({ ctx }) {
 export default function LearnView({ ctx, route }) {
   switch (route.sub) {
     case 'courses':
-      return <Embed><StudentCoursesHub user={ctx.user} userData={ctx.userData} exams={ctx.exams} onStartExam={(exam) => ctx.startExamWithCode(exam)} /></Embed>;
+      return <Embed><StudentCoursesHub user={ctx.user} userData={ctx.userData} exams={ctx.exams} onStartExam={(exam, opts = {}) => ctx.startExamWithCode(exam, { ...opts, skipCode: true, fromCourse: true })} /></Embed>;
     case 'interactive': return <Interactive ctx={ctx} />;
     case 'files': return <Files ctx={ctx} />;
     case 'live': return <Live ctx={ctx} />;

@@ -4,6 +4,7 @@ import { db } from '@services/firebase';
 import { platformNotify, platformConfirm } from '@shared/core/platformShared.jsx';
 import { getYouTubeID, safeNumber } from '@shared/utils/media';
 import '@features/lectures/lecture-player.css';
+import { clampPercent } from '../utils/progress.js';
 
 import { YT_PLAYING } from '../constants.js';
 import { SecureVideoPlayerView } from '../views/SecureVideoPlayerView.jsx';
@@ -153,7 +154,7 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
       where('videoId', '==', video.id),
       orderBy('timestamp', 'asc')
     );
-    const unsub = onSnapshot(q, (snap) => setNotes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsub = onSnapshot(q, (snap) => setNotes(snap.docs.map(d => ({ id: d.id, ...d.data() }))), (error) => console.warn('video notes unavailable:', error?.message));
     return () => unsub();
   }, [user, video?.id]);
 
@@ -329,7 +330,7 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
       userId: user.uid,
       videoId: video.id,
       text: currentNote.trim(),
-      timestamp: videoRef.current?.currentTime || 0,
+      timestamp: videoRef.current?.currentTime || Math.round(youtubePlayerRef.current?.getCurrentTime?.() || 0),
       createdAt: serverTimestamp()
     });
     setCurrentNote('');
@@ -341,7 +342,12 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
       videoRef.current.play();
       return;
     }
-    if (videoId) platformNotify('عفواً، ميزة القفز للوقت المحدد تعمل مع الفيديوهات المرفوعة على المنصة فقط وليس يوتيوب.', 'error');
+    if (videoId && youtubePlayerRef.current?.seekTo) {
+      // never jump past what the student has already watched
+      const target = Math.min(Number(time) || 0, Number(maxAllowedSeekRef.current) || Number(time) || 0);
+      youtubePlayerRef.current.seekTo(target, true);
+      youtubePlayerRef.current.playVideo?.();
+    }
   };
 
   const deleteNote = async (noteId) => {
@@ -358,7 +364,7 @@ const SecureVideoPlayer = ({ video, user, userName, onClose, onProgress }) => {
     showNotes, notes, currentNote, setCurrentNote, setShowNotes, handleAddNote,
     handleJumpToTime, deleteNote, formatMinSec, playerShellRef, isZoomed, setIsZoomed,
     isFullscreen, toggleFullscreen, videoId, reloadVideo, showSettings, setShowSettings,
-    changeSpeed, playbackRate, onClose, watermarkText, resumeHint, antiSeekHint,
+    changeSpeed, playbackRate, onClose, watermarkText, resumeHint, antiSeekHint, setAntiSeekHint,
     isBuffering, youtubeDomId, posterUrl, youtubeStarted, pendingResumeSecondsRef,
     maxAllowedSeekRef, youtubePlayerRef, resumeAppliedRef, setYoutubeStarted, video,
     videoRef, finalUrl, setIsBuffering, setPlaybackRate, watchedPercent, setWatchedPercent,

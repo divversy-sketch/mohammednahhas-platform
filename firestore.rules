@@ -101,6 +101,9 @@ service cloud.firestore {
     function isParentOf(studentId) {
       return isParentAccount()
         && (
+          (exists(/databases/$(database)/documents/parent_links/$(userField('phone')))
+            && get(/databases/$(database)/documents/parent_links/$(userField('phone'))).data.get('studentIds', []).hasAny([studentId]))
+          || 
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.linkedStudentId == studentId
           || (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.linkedStudentIds is list
             && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.linkedStudentIds.hasAny([studentId]))
@@ -129,28 +132,76 @@ service cloud.firestore {
         && request.resource.data.studentId == resource.data.studentId;
     }
 
+    function studentExamProgressKeys() {
+      return [
+        'answers', 'answerText', 'essayAnswer', 'uploadedAnswerUrl', 'uploadedImages',
+        'localDraftSyncedAt', 'autosaveAt', 'lastSavedAt', 'updatedAt', 'submittedAt',
+        'status', 'timeLeft', 'remainingSeconds', 'remainingTime', 'currentQIndex',
+        'antiCheatWarnings', 'antiCheatLog', 'studentNotes',
+        'adminDecision', 'adminSecurityAction', 'resumeApproved',
+        'resumedAfterAdminApprovalAt', 'restartedByAdminDecisionAt', 'sourceVideoId',
+        'examId', 'studentName', 'startedAtMillis', 'totalTime', 'courseId', 'lessonId',
+        'securityHoldAt', 'securityReason', 'securityDecision', 'continuedAt',
+        'restartCount', 'restartedAfterSecurityAt'
+      ];
+    }
+
+    // Written once by the exam runner when the student submits.
+    function studentExamCompletionKeys() {
+      return [
+        'score', 'mcqScore', 'total', 'totalPossible', 'timeTaken', 'hasEssay',
+        'startedFromVideo', 'branchStats', 'weakBranches', 'performanceAnalysis',
+        'percentage', 'examTitle', 'grade'
+      ];
+    }
+
     function safeStudentExamResultUpdate() {
       let changed = request.resource.data.diff(resource.data).changedKeys();
+      let wasCompleted = resource.data.get('status', '') == 'completed';
       return ownsExistingStudentId()
-        && changed.hasOnly([
-          'answers', 'answerText', 'essayAnswer', 'uploadedAnswerUrl', 'uploadedImages',
-          'localDraftSyncedAt', 'autosaveAt', 'lastSavedAt', 'updatedAt', 'submittedAt',
-          'status', 'timeLeft', 'remainingSeconds', 'remainingTime', 'currentQIndex',
-          'antiCheatWarnings', 'antiCheatLog', 'studentNotes',
-          'adminDecision', 'adminSecurityAction', 'resumeApproved',
-          'resumedAfterAdminApprovalAt', 'restartedByAdminDecisionAt', 'sourceVideoId'
-        ])
+        && (wasCompleted
+          // a finished attempt can't be reopened or re-scored by the student
+          ? changed.hasOnly(['studentNotes', 'updatedAt', 'lastSavedAt'])
+          : changed.hasOnly(studentExamProgressKeys().concat(studentExamCompletionKeys())))
         && (!changed.hasAny(['adminDecision'])
           || (resource.data.adminDecision == 'continue' && request.resource.data.adminDecision == 'continue_consumed')
           || (resource.data.adminDecision == 'restart' && request.resource.data.adminDecision == 'restart_consumed'))
         && (!changed.hasAny(['adminSecurityAction'])
           || (resource.data.adminSecurityAction == 'continue' && request.resource.data.adminSecurityAction == 'continue_consumed')
           || (resource.data.adminSecurityAction == 'restart' && request.resource.data.adminSecurityAction == 'restart_consumed'))
-        && (!changed.hasAny(['resumeApproved']) || request.resource.data.resumeApproved == false)
-        && (!changed.hasAny(['score']) || request.resource.data.score == resource.data.score)
-        && (!changed.hasAny(['totalScore']) || request.resource.data.totalScore == resource.data.totalScore)
-        && (!changed.hasAny(['percentage']) || request.resource.data.percentage == resource.data.percentage)
-        && (!changed.hasAny(['grade']) || request.resource.data.grade == resource.data.grade);
+        && (!changed.hasAny(['resumeApproved']) || request.resource.data.resumeApproved == false);
+    }
+
+    function safeStudentSubmissionUpdate() {
+      return ownsExistingStudentId()
+        && resource.data.get('reviewStatus', 'submitted') == 'submitted'
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          'answerText', 'answerImage', 'reviewStatus', 'submittedAt', 'updatedAt',
+          'studentName', 'assignmentTitle', 'grade', 'branch', 'totalMarks', 'assignmentId'
+        ])
+        && request.resource.data.reviewStatus == 'submitted';
+    }
+
+    function safeLessonProgressUpdate() {
+      return ownsExistingUserId()
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          'watchPercent', 'watchedPercent', 'maxWatchedSeconds', 'watchTime', 'videoDuration',
+          'examUnlocked', 'completed', 'completedAt', 'updatedAt', 'lastPosition',
+          'progress', 'courseId', 'lessonId', 'partsDone'
+        ]);
+    }
+
+    function safeVideoViewUpdate() {
+      return ownsExistingUserId()
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          'userName', 'videoTitle', 'viewedAt', 'lastPositionSeconds', 'maxWatchedSeconds',
+          'estimatedDuration', 'watchedPercent', 'watchPercent', 'linkedExamId', 'updatedAt',
+          'progress', 'completed', 'watchedSeconds', 'lastPosition', 'videoId', 'viewCount'
+        ]);
+    }
+
+    function userField(name) {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get(name, '');
     }
 
     function safeOwnerProgressUpdate() {
@@ -268,7 +319,7 @@ service cloud.firestore {
     match /assignment_submissions/{docId} {
       allow read: if isAdmin() || (signedIn() && resource.data.studentId == request.auth.uid) || isParentOf(resource.data.studentId);
       allow create: if ownStudentIdOnCreate();
-      allow update: if canManageHomework() || safeStudentExamResultUpdate();
+      allow update: if canManageHomework() || safeStudentSubmissionUpdate();
       allow delete: if canManageHomework();
     }
 
@@ -280,7 +331,7 @@ service cloud.firestore {
     match /video_views/{docId} {
       allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
       allow create: if ownUserIdOnCreate();
-      allow update: if isAdmin() || safeOwnerProgressUpdate();
+      allow update: if isAdmin() || safeVideoViewUpdate();
       allow delete: if canManageExams();
     }
 
@@ -312,14 +363,7 @@ service cloud.firestore {
     }
 
     match /courseAccessCodes/{codeId} {
-      allow read: if signedIn();
-      allow create, delete: if canManageSubscriptions();
-      allow update: if canManageSubscriptions()
-        || (signedIn()
-          && resource.data.isUsed == false
-          && request.resource.data.isUsed == true
-          && request.resource.data.usedBy == request.auth.uid
-          && request.resource.data.diff(resource.data).changedKeys().hasOnly(['isUsed', 'usedBy', 'usedAt', 'updatedAt']));
+      allow read, write: if canManageSubscriptions() || canManageContent();
     }
 
     match /banned_users/{docId} {
@@ -328,7 +372,11 @@ service cloud.firestore {
     }
 
     match /notifications/{docId} {
-      allow read: if canReadTargetedDocument();
+      // audience is 'all', a grade code, or 'user:<uid>'
+      allow read: if canReadTargetedDocument()
+        || resource.data.audience == 'all'
+        || (signedIn() && resource.data.audience == 'user:' + request.auth.uid)
+        || (signedIn() && resource.data.audience == userField('grade'));
       allow write: if canManageMessages();
     }
 
@@ -338,7 +386,9 @@ service cloud.firestore {
     }
 
     match /student_messages/{messageId} {
-      allow read: if canReadTargetedDocument();
+      allow read: if canReadTargetedDocument()
+        || resource.data.audience == 'all'
+        || (signedIn() && request.auth.uid in resource.data.userIds);
       allow create: if canManageMessages() || (signedIn() && request.resource.data.userId == request.auth.uid && request.resource.data.kind == 'support');
       allow update, delete: if canManageMessages();
     }
@@ -458,7 +508,7 @@ service cloud.firestore {
 
     match /enrollments/{enrollmentId} {
       allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
-      allow create: if isAdmin() || ownUserIdOnCreate();
+      allow create: if isAdmin();
       allow update: if isAdmin() || safeOwnerProgressUpdate();
       allow delete: if canManageExams();
     }
@@ -466,7 +516,7 @@ service cloud.firestore {
     match /lessonProgress/{progressId} {
       allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
       allow create: if ownUserIdOnCreate();
-      allow update: if isAdmin() || safeOwnerProgressUpdate();
+      allow update: if isAdmin() || safeLessonProgressUpdate();
       allow delete: if canManageExams();
     }
 
@@ -514,6 +564,34 @@ service cloud.firestore {
       allow read: if isAdmin() || (signedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.phone == phone);
       allow write: if isAdmin();
     }
+
+    match /review_questions/{docId} {
+      allow read: if signedIn();
+      allow write: if canManageContent() || canManageExams();
+    }
+    match /files/{docId} {
+      allow read: if resource.data.isPublic == true || signedIn();
+      allow write: if canManageContent();
+    }
+    match /subscription_plans/{docId} {
+      allow read: if signedIn();
+      allow write: if canManageSubscriptions();
+    }
+    match /course_units/{docId} {
+      allow read: if signedIn();
+      allow write: if canManageContent();
+    }
+    match /exam_drafts/{docId} { allow read, write: if canManageExams(); }
+    match /smart_exam_drafts/{docId} { allow read, write: if canManageExams(); }
+    match /platform_settings_history/{docId} { allow read, write: if canManageSettings(); }
+    match /internal_notifications/{docId} { allow read, write: if isAdmin(); }
+
+    // سجلات السنتر وتواصل أولياء الأمور (إدارة فقط)
+    match /parent_message_log/{docId} { allow read, write: if isAdmin(); }
+    match /parent_reports/{docId} { allow read, write: if isAdmin(); }
+    match /parent_access_codes/{docId} { allow read, write: if isAdmin(); }
+    match /center_attendance/{docId} { allow read, write: if isAdmin(); }
+    match /center_payments/{docId} { allow read, write: if isAdmin(); }
 
     match /{document=**} {
       allow read, write: if false;
