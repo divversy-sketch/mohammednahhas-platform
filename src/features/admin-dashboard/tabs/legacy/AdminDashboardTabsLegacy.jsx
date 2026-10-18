@@ -293,6 +293,8 @@ export default function AdminDashboardTabs({ ctx }) {
     alerts: (pendingUsers || []).length + (passwordResetRequests || []).length + (examResults || []).filter((result) => ['security_hold', 'cheated', 'in_progress'].includes(result.status)).length,
   }), [activeUsersList, examsList, contentList, pendingUsers, passwordResetRequests, examResults]);
 
+  const pulseData = React.useMemo(() => ({ activeUsersList, examsList, examResults, contentList, pendingUsers, passwordResetRequests, messagesList }), [activeUsersList, examsList, examResults, contentList, pendingUsers, passwordResetRequests, messagesList]);
+
   const exportStudentsExcel = async () => {
     const header = ['name','email','phone','parentPhone','grade','status','subscriptionStatus','subscriptionExpiry'];
     const rows = dailyFilteredActiveUsers.map((student) => [
@@ -342,6 +344,8 @@ export default function AdminDashboardTabs({ ctx }) {
             activeTab={activeTab}
             onNavigate={setActiveTab}
             stats={v2AdminStats}
+            data={pulseData}
+            adminProfile={adminProfile || userData}
             adminName={adminProfile?.name || userData?.name || userData?.email}
           >
           <AdminDashboardTab ctx={tabCtx} />

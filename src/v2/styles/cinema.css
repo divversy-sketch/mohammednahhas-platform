@@ -183,3 +183,18 @@ button.cx-stat { cursor: pointer; }
 
 :root[data-motion="reduced"] .cx-app *, :root[data-motion="reduced"] .cx-app *::before, :root[data-motion="reduced"] .cx-app *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 @media (prefers-reduced-motion: reduce) { :root:not([data-motion="full"]) .cx-app *, :root:not([data-motion="full"]) .cx-app *::before { animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
+
+/* inner pages also start under the see-through bar */
+.cx-app .cx-under { margin-top: calc(var(--cx-nav) * -1 - var(--nx-safe-top)); }
+.cx-app .cx-phero { min-height: calc(var(--cx-nav) + var(--nx-safe-top) + 200px); }
+:root[data-form="phone"] .cx-app .cx-phero { min-height: calc(var(--cx-nav) + var(--nx-safe-top) + 140px); }
+.cx-phero .cx-kicker { text-shadow: 0 1px 10px rgba(0,0,0,.4); animation: cx-rise .5s both; }
+.cx-phero__glyph { top: calc(var(--cx-nav) - 30px); animation: cx-glyph 9s ease-in-out infinite; }
+@keyframes cx-glyph { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+:root[data-theme="dark"] .cx-phero h1 { color: #fff; }
+/* the old sidebar used to carry the sub-sections on desktop; in the cinema shell they live in this strip */
+:root[data-form="desktop"] .cx-app .nx-subnav { display: block; }
+.cx-app .nx-exam__meta span { white-space: nowrap; }
+.cx-app .nx-exam__title { font-family: var(--nx-f-cal); font-size: 17px; font-weight: 700; }
+.cx-app .nx-exam:hover { transform: translateY(-3px); box-shadow: 0 20px 40px -26px rgba(0,0,0,.55); }
+.cx-app .nx-exam { transition: transform .25s, box-shadow .25s; }

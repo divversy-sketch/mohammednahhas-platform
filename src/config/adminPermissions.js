@@ -11,7 +11,7 @@ export const ADMIN_ROLE_LABELS = Object.freeze({
 });
 
 export const ADMIN_TAB_LABELS = Object.freeze({
-  dashboard: 'Dashboard شامل',
+  dashboard: 'مركز القيادة',
   follow_up: 'المتابعة والتقارير',
   users: 'طلبات الانضمام',
   all_users: 'الطلاب',

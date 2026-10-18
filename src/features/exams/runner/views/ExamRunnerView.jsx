@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef } from 'react';
 import { burstConfetti } from '@v2/ui/kit.jsx';
-import ExamDashboardView from '@features/exams/components/ExamDashboardView.jsx';
-import ExamRunnerQuestionsView from '@features/exams/runner/components/ExamRunnerQuestionsView.jsx';
+import CinemaExam from '@v2/exam/CinemaExam.jsx';
+
+const ExamReview = lazy(() => import('@v2/student/ExamReview.jsx'));
 
 // v2: the runner keeps its own layout; .nx-bridge maps its Tailwind colours to the platform theme (light/dark).
 export function ExamRunnerView({ ctx }) {
@@ -10,14 +11,13 @@ export function ExamRunnerView({ ctx }) {
 
 function ExamRunnerScreens({ ctx }) {
   const {
-    exam, user, activeView, isSubmitted, timeLeft, score, mcqQuestions,
-    flatQuestions, answers, onClose, setActiveView, confirmSubmit, totalQs,
-    percentage, solvedQs, correctQs, wrongQs, essayAnswered, essayQuestions,
-    antiCheatWarnings, branchStats, setActiveBranchTab, wmPositions, isOnline,
+    exam, user, isSubmitted, timeLeft, score, mcqQuestions,
+    flatQuestions, answers, onClose, setActiveView, confirmSubmit,
+    percentage, setActiveBranchTab, wmPositions, isOnline,
     lastLocalSaveAt, showAntiCheatChoice, showSubmitConfirm, handleSubmit, submissionError, submitting,
     setShowSubmitConfirm, activeBranchTab, uniqueBranches, displayQuestions,
     flagged, currentQIndex, setCurrentQIndex, currentQObj, handleAnswer,
-    setFlagged, handleEssayImageUpload, fileDialogBypassRef,
+    setFlagged, handleEssayImageUpload, fileDialogBypassRef, isReviewMode, existingResult,
   } = ctx;
 
   // celebrate a good result once, right after submitting (not when reopening an old result)
@@ -27,38 +27,20 @@ function ExamRunnerScreens({ ctx }) {
     wasSubmitted.current = isSubmitted;
   }, [isSubmitted, percentage]);
 
-  const canReview = exam.id === 'custom_mistakes_exam' || Date.now() > new Date(exam.endTime).getTime();
-  if (activeView === 'dashboard') {
-    return (
-      <ExamDashboardView
-        exam={exam}
-        user={user}
-        isSubmitted={isSubmitted}
-        timeLeft={timeLeft}
-        score={score}
-        mcqQuestions={mcqQuestions}
-        flatQuestions={flatQuestions}
-        answers={answers}
-        onClose={onClose}
-        setActiveView={setActiveView}
-        confirmSubmit={confirmSubmit}
-        totalQs={totalQs}
-        percentage={percentage}
-        solvedQs={solvedQs}
-        correctQs={correctQs}
-        wrongQs={wrongQs}
-        essayAnswered={essayAnswered}
-        essayQuestions={essayQuestions}
-        antiCheatWarnings={antiCheatWarnings}
-        branchStats={branchStats}
-        canReview={canReview}
-        setActiveBranchTab={setActiveBranchTab}
-      />
-    );
+  // After submitting (or when reopening a saved attempt): the score right away, the full review once the exam window closes.
+  const submittedAt = useMemo(() => (isSubmitted ? new Date() : null), [isSubmitted]);
+  const result = useMemo(() => (existingResult ? existingResult : {
+    answers, score, total: mcqQuestions?.length || 0, percentage, status: 'completed',
+    timeTaken: Math.max(0, Number(exam.duration || 0) * 60 - Number(timeLeft || 0)),
+    submittedAt: submittedAt || new Date(),
+  }), [existingResult, answers, score, mcqQuestions, percentage, exam.duration, timeLeft, submittedAt]);
+  if (isSubmitted) {
+    const reviewExam = isReviewMode ? { ...exam, allowReviewImmediately: true } : exam;
+    return <Suspense fallback={null}><ExamReview exam={reviewExam} result={result} onClose={onClose} /></Suspense>;
   }
 
   return (
-    <ExamRunnerQuestionsView
+    <CinemaExam
       exam={exam}
       user={user}
       isSubmitted={isSubmitted}

@@ -151,7 +151,7 @@ export default function StudentAppV2({ ctx }) {
         {phone
           ? <CinemaPhoneTop ctx={ctx} route={route} title={SECTIONS.find((s) => s.key === route.section)?.title || title} onSearch={() => setSearchOpen(true)} onBell={bell} go={go} />
           : <CinemaNav ctx={ctx} route={route} go={go} badges={badges} theme={theme} toggleTheme={toggleTheme} onSearch={() => setSearchOpen(true)} onBell={bell} device={device} />}
-        <main className={`nx-content ${route.section === 'home' ? 'cx-home-content' : ''}`} id="nx-main">
+        <main className={`nx-content cx-under ${route.section === "home" ? "cx-home-content" : ""}`} id="nx-main">
           {route.section !== 'home' && <PageHero route={route} title={title} />}
           <SubNav route={route} go={go} counts={counts} />
           <div className="nx-page" key={route.key}>

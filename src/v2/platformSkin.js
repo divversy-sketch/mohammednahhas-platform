@@ -10,7 +10,7 @@ export function watchPlatformSkin() {
   started = true;
   try {
     onSnapshot(doc(db, 'platform_settings', 'main'), (snap) => {
-      const id = snap.exists() ? snap.data()?.defaultSkin : '';
+      const id = snap.exists() ? snap.data()?.designSkin : '';
       if (id) setPlatformSkin(id);
     }, () => { /* offline or blocked: keep the cached skin */ });
   } catch { /* firebase not configured (local preview) */ }

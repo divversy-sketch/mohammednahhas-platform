@@ -112,6 +112,6 @@
 .xr-cta { display: flex; gap: 14px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .xr-cta small { display: block; color: var(--nx-ink-3); }
 .xr-btn { display: inline-flex; gap: 8px; align-items: center; padding: 12px 20px; border-radius: 12px; border: 0; background: var(--nx-copper); color: var(--nx-on-copper); font: inherit; font-weight: 800; cursor: pointer; }
-@media (prefers-reduced-motion: reduce) { .xr *, .xr *::before { animation-duration: .01ms !important; } }
+@media (prefers-reduced-motion: reduce) { :root:not([data-motion="full"]) .xr *, :root:not([data-motion="full"]) .xr *::before { animation-duration: .01ms !important; } }
 :root[data-motion="reduced"] .xr * { animation-duration: .01ms !important; }
 @media print { .xr-bar, .xr-filters, .xr-cta, .xr-nav { display: none !important; } .xr-hero { color: #000; } }

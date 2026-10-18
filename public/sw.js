@@ -1,5 +1,5 @@
 /* منصة النحاس التعليمية - Safe PWA Service Worker */
-const APP_VERSION = "2026.07.15.brand4";
+const APP_VERSION = "2026.10.18.cinema2";
 const CACHE_NAME = `nahhas-platform-${APP_VERSION}`;
 const ASSET_CACHE = ["/", "/offline.html", "/manifest.json?v=20260715-brand4", "/favicon.ico?v=20260715-brand4", "/icons/alnahhas-app-192-v4.png", "/icons/alnahhas-app-512-v4.png"];
 

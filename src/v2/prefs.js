@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react';
 import { setChromeColor } from './device/native.js';
 import { DEFAULT_SKIN, SKINS, getSkin } from './skins.js';
 
-const DEFAULTS = { theme: 'system', text: 'normal', motion: 'auto', haptics: 'on', skin: '' };
-const PLATFORM_SKIN_KEY = 'nx-platform-skin';
+// motion 'full' by default: many Windows PCs ship with system animations off, which would freeze the design.
+// Students who want less motion pick «أقل» in الإعدادات.
+const DEFAULTS = { theme: 'system', text: 'normal', motion: 'full', haptics: 'on', skin: '', v: 2 };
+const PLATFORM_SKIN_KEY = 'nx-platform-skin-v2'; // v2: the cinema design; older saved skins are dropped
 let platformSkin = (() => { try { return localStorage.getItem(PLATFORM_SKIN_KEY) || DEFAULT_SKIN; } catch { return DEFAULT_SKIN; } })();
 const KEY = 'nx-prefs-v1';
 const listeners = new Set();
@@ -13,7 +15,12 @@ const listeners = new Set();
 function readStored() {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { ...DEFAULTS, ...JSON.parse(raw) };
+    if (raw) {
+      const saved = JSON.parse(raw);
+      // before v2 a device could keep one of the old colour-only skins; start everyone on the cinema design
+      if (!saved.v || saved.v < 2) return { ...DEFAULTS, theme: saved.theme || 'system', text: saved.text || 'normal', haptics: saved.haptics || 'on' };
+      return { ...DEFAULTS, ...saved };
+    }
     // carry over the old per-page toggles if a student had picked dark mode before
     const legacy = localStorage.getItem('theme') || localStorage.getItem('platform-theme');
     if (legacy === 'dark' || legacy === 'light') return { ...DEFAULTS, theme: legacy };

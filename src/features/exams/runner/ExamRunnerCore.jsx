@@ -530,7 +530,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
     lastLocalSaveAt, showAntiCheatChoice, showSubmitConfirm, handleSubmit, submissionError, submitting,
     setShowSubmitConfirm, activeBranchTab, uniqueBranches, displayQuestions,
     flagged, currentQIndex, setCurrentQIndex, currentQObj, handleAnswer,
-    setFlagged, handleEssayImageUpload, fileDialogBypassRef,
+    setFlagged, handleEssayImageUpload, fileDialogBypassRef, isReviewMode, existingResult,
   }} />;
 };
 

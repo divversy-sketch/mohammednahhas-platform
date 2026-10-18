@@ -43,7 +43,7 @@ export function Avatar({ ctx }) {
 /** Top navigation for tablet and desktop. Sits over the poster on Home, turns solid once you scroll. */
 export function CinemaNav({ ctx, route, go, badges, theme, toggleTheme, onSearch, onBell, device }) {
   const scrolled = useScrolled();
-  const over = route.section === 'home' && !scrolled;
+  const over = !scrolled; // every page opens with a poster or a banner under the bar
   const mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
   return (
     <header className={`cx-nav ${over ? 'is-over' : ''} ${scrolled ? 'is-scrolled' : ''}`}>
@@ -65,8 +65,8 @@ export function CinemaNav({ ctx, route, go, badges, theme, toggleTheme, onSearch
 }
 
 export function CinemaPhoneTop({ ctx, route, title, onSearch, onBell, go }) {
-  const scrolled = useScrolled(route.section === 'home' ? 120 : 20);
-  const over = route.section === 'home' && !scrolled;
+  const scrolled = useScrolled(route.section === 'home' ? 120 : 40);
+  const over = !scrolled;
   return (
     <header className={`cx-ptop ${over ? 'is-over' : ''} ${scrolled ? 'is-scrolled' : ''}`}>
       {route.section === 'home'
@@ -103,7 +103,7 @@ export function HeroCarousel({ slides, interval = 7000, hello }) {
             {s.meta && <p className="cx-slide__meta">{s.meta}</p>}
             {Number.isFinite(s.percent) && s.percent > 0 && <div className="cx-slide__bar"><i style={{ width: `${s.percent}%` }} /></div>}
             <div className="cx-slide__cta">
-              <button type="button" className="cx-btn cx-btn--white" tabIndex={k === i ? 0 : -1} onClick={() => { haptic('medium'); s.action(); }}><Icon name={s.icon === 'exam' ? 'arrowLeft' : 'play'} />{s.cta}</button>
+              <button type="button" className="cx-btn cx-btn--white" tabIndex={k === i ? 0 : -1} onClick={() => { haptic('medium'); s.action(); }}><Icon name={s.ctaIcon || (s.icon === 'exam' ? 'arrowLeft' : 'play')} />{s.cta}</button>
               {s.secondary && <button type="button" className="cx-btn cx-btn--glass" tabIndex={k === i ? 0 : -1} onClick={s.secondary.action}><Icon name={s.secondary.icon} />{s.secondary.label}</button>}
             </div>
           </div>

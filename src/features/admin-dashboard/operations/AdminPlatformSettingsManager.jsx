@@ -24,7 +24,7 @@ const DEFAULT_SETTINGS = {
   showLearningPath: true,
   primaryColor: '#f59e0b',
   logoUrl: '',
-  defaultSkin: DEFAULT_SKIN,
+  designSkin: DEFAULT_SKIN,
 };
 
 const SKIN_OPTIONS = SKINS.map((s) => <option key={s.id} value={s.id}>{s.name}</option>);
@@ -52,7 +52,7 @@ export function AdminPlatformSettingsManager({ userData = {} }) {
         updatedAt: serverTimestamp(),
         updatedBy: userData?.email || userData?.uid || 'admin',
       }, { merge: true });
-      setPlatformSkin(settings.defaultSkin || DEFAULT_SKIN);
+      setPlatformSkin(settings.designSkin || DEFAULT_SKIN);
       await setDoc(doc(collection(db, 'admin_client_logs')), {
         action: 'platform_settings_update',
         title: 'تعديل إعدادات المنصة العامة',
@@ -79,7 +79,7 @@ export function AdminPlatformSettingsManager({ userData = {} }) {
           <h3 className="text-lg font-black text-slate-900">تصميم المنصة</h3>
           <p className="text-slate-500 font-bold text-sm mt-1">التصميم اللي هيظهر لكل الطلاب وأولياء الأمور. كل طالب يقدر يغيّره لنفسه من الإعدادات، وكل تصميم بيتبدّل لوحده بين النهاري والليلي مع وضع الجهاز.</p>
         </div>
-        <SkinPicker label="التصميم الافتراضي للمنصة" value={settings.defaultSkin || DEFAULT_SKIN} onChange={(id) => setSettings({ ...settings, defaultSkin: id })} />
+        <SkinPicker label="التصميم الافتراضي للمنصة" value={settings.designSkin || DEFAULT_SKIN} onChange={(id) => setSettings({ ...settings, designSkin: id })} />
         <div className="grid md:grid-cols-2 gap-4">
           <Field label="الوضع على جهازك">
             <select className="w-full border rounded-xl p-3" value={prefs.theme} onChange={(e) => setPref('theme', e.target.value)}>

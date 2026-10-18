@@ -14,21 +14,22 @@ export const InlineTabs = ({ tabs = [], defaultTab }) => {
   if (!visibleTabs.length) return null;
   return (
     <div className="space-y-5">
-      <div className="sticky top-0 z-20 bg-white/85 backdrop-blur-xl border border-slate-100 rounded-2xl p-2 shadow-sm overflow-x-auto">
+      <div className="nx-itabs sticky top-0 z-20 bg-white/85 backdrop-blur-xl border border-slate-100 rounded-2xl p-2 shadow-sm overflow-x-auto">
         <div className="flex gap-2 min-w-max">
           {visibleTabs.map(tab => (
             <button
               key={tab.key}
               type="button"
               onClick={() => setActiveKey(tab.key)}
-              className={`px-4 py-2.5 rounded-xl font-black text-sm transition whitespace-nowrap ${current?.key === tab.key ? 'bg-amber-600 text-white shadow-lg shadow-amber-500/20' : 'bg-slate-50 text-slate-600 hover:bg-amber-50 hover:text-amber-700'}`}
+              data-on={current?.key === tab.key ? 'true' : undefined}
+              className={`nx-itab px-4 py-2.5 rounded-xl font-black text-sm transition whitespace-nowrap ${current?.key === tab.key ? 'bg-amber-600 text-white shadow-lg shadow-amber-500/20' : 'bg-slate-50 text-slate-600 hover:bg-amber-50 hover:text-amber-700'}`}
             >
               {tab.label}
             </button>
           ))}
         </div>
       </div>
-      <div>{current?.content}</div>
+      <div className="nx-itabs__panel" key={current?.key}>{current?.content}</div>
     </div>
   );
 };
