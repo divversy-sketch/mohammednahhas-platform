@@ -14,6 +14,7 @@ import { useOnlineStatus } from '@shared/ui/ConnectionStatusBanner.jsx';
 import { ExamEmptyState, ExamCheatingScreen } from '@features/exams/runner/components/ExamRunnerStateScreens.jsx';
 import { ExamRunnerView } from '@features/exams/runner/views/ExamRunnerView.jsx';
 import { callFunction } from '@services/callFunction.js';
+import { queuePendingSubmit, clearPendingSubmit } from '@shared/exam/pendingSubmit.js';
 
 
 
@@ -81,6 +82,41 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
   useEffect(() => {
     stateRefs.current = { isSubmitted, showSubmitConfirm, isCheating, showAntiCheatChoice };
   }, [isSubmitted, showSubmitConfirm, isCheating, showAntiCheatChoice]);
+
+  // Live presence for the admin's «مراقبة الامتحانات»: a beat every 30s while the exam is open,
+  // «away» when the tab is hidden or the page closes, «online» again when the student comes back.
+  const presenceRef = useRef({ answers, timeLeft, currentQIndex });
+  presenceRef.current = { answers, timeLeft, currentQIndex };
+  useEffect(() => {
+    if (isReviewMode || !exam.attemptId || exam.id === 'custom_mistakes_exam') return undefined;
+    const ref = doc(db, 'exam_results', exam.attemptId);
+    const beat = (presence) => {
+      if (stateRefs.current.isSubmitted) return;
+      const { answers: a, timeLeft: t, currentQIndex: qi } = presenceRef.current;
+      const answeredCount = Object.values(a || {}).filter((v) => v !== undefined && v !== null && v !== '').length;
+      setDoc(ref, {
+        presence,
+        lastSeenAt: serverTimestamp(),
+        ...(presence === 'away' ? { leftAt: serverTimestamp() } : {}),
+        answeredCount,
+        totalQuestions: flatQuestions.length,
+        remainingTime: t,
+        currentQIndex: qi,
+        totalTime: exam.duration,
+      }, { merge: true }).catch(() => { /* rules not deployed yet or offline: answers are still saved separately */ });
+    };
+    beat('online');
+    const timer = setInterval(() => beat(document.hidden ? 'away' : 'online'), 30000);
+    const onVisibility = () => beat(document.hidden ? 'away' : 'online');
+    const onLeave = () => beat('away');
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', onLeave);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', onLeave);
+    };
+  }, [isReviewMode, exam.attemptId, exam.id, exam.duration, flatQuestions.length]);
 
   useEffect(() => {
     if (isReviewMode) return;
@@ -410,11 +446,13 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
       const isCorrect = studentAns === q.correctIdx;
 
       if (isAnswered && !isCorrect) {
-        const mistakeRef = exam.attemptId ? doc(db, 'student_mistakes', `${exam.attemptId}_${String(q.id).replaceAll('/', '_')}`) : doc(collection(db, 'student_mistakes'));
+        const mistakeRef = doc(collection(db, 'student_mistakes'));
         batch.set(mistakeRef, {
           userId: user.uid,
+          examId: exam.id,
           examTitle: exam.title,
           question: {
+            blockText: q.blockText || '',
             ...q,
             studentAnswerText: q.options?.[studentAns],
             correctAnswerText: q.options?.[q.correctIdx]
@@ -424,9 +462,10 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
       }
     });
 
+    let completionPayload = null;
     if (exam.attemptId && exam.id !== 'custom_mistakes_exam') {
       const attemptRef = doc(db, 'exam_results', exam.attemptId);
-      batch.set(attemptRef, {
+      batch.set(attemptRef, completionPayload = {
         examId: exam.id,
         examTitle: exam.title || '',
         grade: exam.grade || '',
@@ -462,12 +501,17 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
           branchStats: finalBranchStats
         },
         percentage: finalMetrics.percentage || (mcqQuestions.length > 0 ? Math.round((finalScore / mcqQuestions.length) * 100) : 0),
-        submittedAt: serverTimestamp()
+        submittedAt: serverTimestamp(),
       }, { merge: true });
     }
 
     try {
-      await batch.commit();
+      // offline, Firestore keeps the write queued and the promise waits; don't leave the student staring at a spinner
+      await Promise.race([
+        batch.commit(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('submit-timeout')), 20000)),
+      ]);
+      clearPendingSubmit(exam.attemptId);
       // keeps the leaderboard current even where Firestore triggers aren't deployed
       callFunction('syncMyLeaderboardEntry').catch(() => {});
       clearLocalExamBackup(autosaveKey);
@@ -478,7 +522,10 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
     } catch (err) {
       console.error("Error saving results or mistakes", err);
       writeLocalExamBackup(answers);
-      setSubmissionError('تعذر رفع النتيجة إلى السيرفر. إجاباتك محفوظة على هذا الجهاز؛ تحقق من الاتصال ثم أعد المحاولة.');
+      queuePendingSubmit(exam.attemptId, completionPayload);
+      setSubmissionError(err?.message === 'submit-timeout'
+        ? 'النت ضعيف والتسليم لسه ما وصلش. إجاباتك محفوظة على الجهاز وهتتبعت لوحدها أول ما النت يرجع، أو اضغط «جرّب التسليم تاني».'
+        : 'تعذر رفع النتيجة إلى السيرفر. إجاباتك محفوظة على هذا الجهاز؛ تحقق من الاتصال ثم أعد المحاولة.');
     } finally {
       submittingRef.current = false;
       setSubmitting(false);

@@ -50,7 +50,7 @@ function PhoneMock() {
         <div className="lx-phone__screen nx">
           <div className="lx-phone__notch" />
           <div className="lx-mini">
-            <div className="lx-mini__hello"><span className="nx-avatar">ي</span><div><b>صباح الخير يا يوسف</b><small>تالتة ثانوي</small></div></div>
+            <div className="lx-mini__hello"><span className="nx-avatar">م</span><div><b>صباح الخير يا محمد</b><small>تالتة ثانوي</small></div></div>
             <div className="lx-mini__hero">
               <span className="lx-mini__chip">كمّل من مكانك</span>
               <b>المفعول المطلق وأنواعه</b>

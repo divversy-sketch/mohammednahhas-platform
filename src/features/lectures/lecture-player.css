@@ -147,12 +147,9 @@
   to { transform: rotate(360deg); }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .watermark-video.smooth-watermark {
+@media (prefers-reduced-motion: reduce) {:root:not([data-motion="full"]) .watermark-video.smooth-watermark {
     animation-duration: 90s !important;
-  }
-  .lecture-media-frame,
-  .lecture-action-btn {
+  }:root:not([data-motion="full"]) .lecture-media-frame, :root:not([data-motion="full"]) .lecture-action-btn {
     transition: none;
   }
 }

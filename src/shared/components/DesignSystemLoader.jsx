@@ -8,7 +8,8 @@ const shouldUseLowPerformanceMode = () => {
   const saveData = Boolean(nav.connection?.saveData);
   const connection = String(nav.connection?.effectiveType || '').toLowerCase();
   const smallScreen = window.matchMedia?.('(max-width: 768px)').matches;
-  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  // the platform keeps its motion unless the student picks «أقل»; Windows often reports reduced motion by default
+  const reducedMotion = document.documentElement.dataset.motion === 'reduced';
   const slowConnection = ['slow-2g', '2g', '3g'].includes(connection);
   return reducedMotion || saveData || slowConnection || ((cores <= 2 || memory <= 2) && smallScreen);
 };
@@ -120,7 +121,7 @@ const DesignSystemLoader = () => {
         .exam-mobile-actions { position: sticky; bottom: 0; background: rgba(255,255,255,0.96); backdrop-filter: none; -webkit-backdrop-filter: none; padding: 0.75rem; border-top: 1px solid #e2e8f0; z-index: 30; }
       }
       @media (prefers-reduced-motion: reduce) {
-        *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: 0.001ms !important; }
+        :root:not([data-motion="full"]) *, :root:not([data-motion="full"]) *::before, :root:not([data-motion="full"]) *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: 0.001ms !important; }
       }
     `}</style>
   );

@@ -239,7 +239,7 @@ export default function AdminContentTab({ ctx }) {
                           <input type="file" onChange={handleFileSelect} className="absolute inset-0 opacity-0 cursor-pointer" />
                           <div className="flex flex-col items-center gap-2 text-slate-500">
                               <Upload size={32} />
-                              <span className="text-sm font-bold">اضغط هنا لرفع ملف عام على Firebase</span><span className="text-xs text-emerald-600">يدعم HTML وPDF وأي ملف عام حتى 100MB — والكورسات تظل على Cloudinary</span>
+                              <span className="text-sm font-bold">اضغط هنا وارفع الملف (بيترفع على Cloudinary)</span><span className="text-xs text-emerald-600">PDF، Word، PowerPoint، Excel، صور، فيديو، صوت، ZIP، وملفات HTML التفاعلية</span>
                           </div>
                           {isUploading && (
                               <div className="absolute inset-0 bg-white/90 flex flex-col items-center justify-center rounded-xl z-10">
@@ -291,6 +291,16 @@ export default function AdminContentTab({ ctx }) {
                                       value={newContent.estimatedDurationMinutes || ''}
                                       onChange={(e) => setNewContent({ ...newContent, estimatedDurationMinutes: e.target.value })}
                                   />
+                              </div>
+                              <div className="md:col-span-2">
+                                  <label className="block text-sm font-bold text-blue-800 mb-1">أجزاء المحاضرة (اختياري)</label>
+                                  <textarea
+                                      className="border p-3 rounded w-full bg-white min-h-[110px] leading-8"
+                                      placeholder={'سطر لكل جزء: الوقت وبعده العنوان\n00:00 مقدمة\n2:00 أنواع التشبيه\n7:00 التشبيه المفصل'}
+                                      value={newContent.chaptersText || ''}
+                                      onChange={(e) => setNewContent({ ...newContent, chaptersText: e.target.value })}
+                                  />
+                                  <p className="text-xs text-blue-700 mt-1">الطالب هيشوف المحاضرة متقسمة للأجزاء دي، وكل جزء مكتوب جنبه اتفرج عليه ولا لأ.</p>
                               </div>
                               <div className="md:col-span-2 bg-white/70 border border-blue-100 rounded-xl p-3 text-xs text-blue-800 font-bold leading-relaxed">
                                   عند ربط الفيديو بامتحان لن يظهر زر دخول الامتحان للطالب إلا بعد مشاهدة {VIDEO_EXAM_UNLOCK_PERCENT}% من الفيديو.

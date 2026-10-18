@@ -17,6 +17,10 @@ service firebase.storage {
       return request.resource.size < 10 * 1024 * 1024;
     }
 
+    function validContentFile() {
+      return request.resource.size < 100 * 1024 * 1024;
+    }
+
     match /public/{allPaths=**} {
       allow read: if true;
       allow write: if isAdmin() && validSmallFile();
@@ -24,7 +28,7 @@ service firebase.storage {
 
     match /content/{allPaths=**} {
       allow read: if signedIn();
-      allow write: if isAdmin() && validSmallFile();
+      allow write: if isAdmin() && validContentFile();
     }
 
     match /users/{userId}/{allPaths=**} {

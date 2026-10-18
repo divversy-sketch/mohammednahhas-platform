@@ -6,7 +6,6 @@ import { platformConfirmAsync } from '@shared/core/platformShared.jsx';
 import { Icon } from '../../ui/Icon.jsx';
 import { Button, Chip, Segmented, Switch, formatNumber } from '../../ui/kit.jsx';
 import { usePrefs } from '../../prefs.js';
-import { SkinPicker } from '../../ui/SkinPicker.jsx';
 import { useDevice } from '../../device/useDevice.js';
 import { arabicDate } from '../insights.js';
 import { SectionHead } from '../parts.jsx';
@@ -178,7 +177,7 @@ function Support({ ctx }) {
 }
 
 function Settings({ ctx }) {
-  const { prefs, setPref, platformSkin } = usePrefs();
+  const { prefs, setPref } = usePrefs();
   const device = useDevice();
   const [notifState, setNotifState] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported');
   useEffect(() => { if (typeof Notification !== 'undefined') setNotifState(Notification.permission); }, []);
@@ -190,15 +189,11 @@ function Settings({ ctx }) {
         <div className="nx-field"><span>الوضع</span>
           <Segmented label="الوضع" value={prefs.theme} onChange={(v) => setPref('theme', v)} items={[{ key: 'system', label: 'زي الجهاز' }, { key: 'light', label: 'نهاري' }, { key: 'dark', label: 'ليلي' }]} />
         </div>
-        <div className="nx-field"><span>التصميم</span>
-          <SkinPicker value={prefs.skin || ''} platformDefault={platformSkin} onChange={(v) => setPref('skin', v)} />
-          <small>كل تصميم ليه شكل نهاري وليلي، وبيتبدّل لوحده مع وضع الجهاز.</small>
-        </div>
         <div className="nx-field"><span>حجم الخط</span>
           <Segmented label="حجم الخط" value={prefs.text} onChange={(v) => setPref('text', v)} items={[{ key: 'small', label: 'صغير' }, { key: 'normal', label: 'عادي' }, { key: 'large', label: 'كبير' }, { key: 'xlarge', label: 'أكبر' }]} />
         </div>
         <div className="nx-field"><span>الحركة والأنيميشن</span>
-          <Segmented label="الحركة" value={prefs.motion} onChange={(v) => setPref('motion', v)} items={[{ key: 'auto', label: 'تلقائي' }, { key: 'full', label: 'كاملة' }, { key: 'reduced', label: 'أقل' }]} />
+          <Segmented label="الحركة" value={prefs.motion === 'reduced' ? 'reduced' : 'full'} onChange={(v) => setPref('motion', v)} items={[{ key: 'full', label: 'كاملة' }, { key: 'reduced', label: 'أقل' }]} />
           <small>«أقل» بيوقف الحركات الكبيرة ويوفّر بطارية على الأجهزة القديمة.</small>
         </div>
       </section>

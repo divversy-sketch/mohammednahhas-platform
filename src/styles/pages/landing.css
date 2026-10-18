@@ -551,10 +551,7 @@ button.neo-learning-card:hover { transform: translateY(-3px) scale(1.01); box-sh
   .neo-section-heading h2 { margin-top: 8px; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .neo-arabic-field span,
-  .neo-orb { animation: none !important; }
-  .neo-public-page *, .neo-public-page *::before, .neo-public-page *::after { transition: none !important; }
+@media (prefers-reduced-motion: reduce) {:root:not([data-motion="full"]) .neo-arabic-field span, :root:not([data-motion="full"]) .neo-orb { animation: none !important; }:root:not([data-motion="full"]) .neo-public-page *, :root:not([data-motion="full"]) .neo-public-page *::before, :root:not([data-motion="full"]) .neo-public-page *::after { transition: none !important; }
 }
 
 /* 2026 refined public landing layout */

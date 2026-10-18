@@ -134,10 +134,10 @@ export function examBuckets({ exams = [], examResults = [] }, now = Date.now()) 
 }
 
 export function attemptState(attempts = []) {
-  if (attempts.some((r) => r.adminDecision === 'continue' || r.adminDecision === 'restart')) return { label: 'الأدمن وافق تكمّل', tone: 'patina' };
-  if (attempts.some((r) => r.status === 'security_hold')) return { label: 'موقوف للمراجعة', tone: 'gold' };
-  if (attempts.some((r) => r.status === 'cheated')) return { label: 'مسجّل مخالفة', tone: 'danger' };
-  if (attempts.some((r) => r.status === 'in_progress')) return { label: 'محاولة مش مكتملة', tone: 'gold' };
+  if (attempts.some((r) => r.adminDecision === 'continue' || r.adminDecision === 'restart')) return { label: 'المستر وافق · تقدر تكمّل', tone: 'patina', resume: true };
+  if (attempts.some((r) => r.status === 'security_hold')) return { label: 'موقوف للمراجعة · مستني موافقة المستر', tone: 'gold', waiting: true };
+  if (attempts.some((r) => r.status === 'cheated')) return { label: 'مسجّل مخالفة', tone: 'danger', waiting: true };
+  if (attempts.some((r) => r.status === 'in_progress')) return { label: 'خرجت قبل ما تسلّم · مستني موافقة المستر', tone: 'gold', waiting: true };
   return null;
 }
 

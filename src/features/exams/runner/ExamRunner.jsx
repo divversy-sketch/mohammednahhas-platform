@@ -1,8 +1,9 @@
-import ExamRunnerLegacy, { ExamRunner as NamedExamRunnerLegacy } from './legacy/ExamRunnerLegacy.jsx';
+import ExamRunnerCore, { ExamRunner as NamedExamRunnerCore } from './ExamRunnerCore.jsx';
 
-// Phase 6 boundary file for the exam runtime.
+// The exam runtime. ExamRunnerCore only marks an exam as submitted after the server confirms it,
+// keeps time by a deadline (not a ticking counter), reports presence to the admin and queues a failed submit.
 export function ExamRunner(props) {
-  const Component = NamedExamRunnerLegacy || ExamRunnerLegacy;
+  const Component = NamedExamRunnerCore || ExamRunnerCore;
   return <Component {...props} />;
 }
 

@@ -34,6 +34,7 @@ export const ADMIN_TAB_LABELS = Object.freeze({
   audit_logs: 'سجل الإدارة',
   notifications_admin: 'الإشعارات',
   assignments: 'الواجبات',
+  exam_live: 'مراقبة الامتحانات لايف',
   exams: 'الامتحانات والنتائج',
   smart_hw: 'الواجب الذكي QR',
   content: 'المحتوى',
@@ -96,7 +97,9 @@ export const normalizeAdminProfile = (user = {}, adminData = {}) => {
   };
 };
 
-export const canAccessAdminTab = (adminProfile, tab) => {
+export const canAccessAdminTab = (adminProfile, rawTab) => {
+  // the live exam monitor follows the exams permission
+  const tab = rawTab === 'exam_live' ? 'exams' : rawTab;
   if (!tab) return false;
   if (isOwnerEmail(adminProfile?.email) || adminProfile?.adminRole === 'owner' || adminProfile?.permissions?.includes('all')) return true;
   return (adminProfile?.allowedTabs || []).includes(tab);

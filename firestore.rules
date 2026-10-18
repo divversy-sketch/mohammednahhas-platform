@@ -142,7 +142,9 @@ service cloud.firestore {
         'resumedAfterAdminApprovalAt', 'restartedByAdminDecisionAt', 'sourceVideoId',
         'examId', 'studentName', 'startedAtMillis', 'totalTime', 'courseId', 'lessonId',
         'securityHoldAt', 'securityReason', 'securityDecision', 'continuedAt',
-        'restartCount', 'restartedAfterSecurityAt'
+        'restartCount', 'restartedAfterSecurityAt',
+        // live monitor for the admin
+        'presence', 'lastSeenAt', 'leftAt', 'answeredCount', 'totalQuestions'
       ];
     }
 

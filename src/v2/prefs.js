@@ -37,8 +37,9 @@ export function resolvedTheme(p = prefs) {
   return darkQuery?.matches ? 'dark' : 'light';
 }
 
-export function resolvedSkin(p = prefs) {
-  const id = p.skin || platformSkin;
+// The design is chosen by the admin for the whole platform (إعدادات المنصة); students no longer pick their own.
+export function resolvedSkin() {
+  const id = platformSkin;
   return SKINS.some((s) => s.id === id) ? id : DEFAULT_SKIN;
 }
 
@@ -107,5 +108,5 @@ export function usePrefs() {
     listeners.add(setState);
     return () => listeners.delete(setState);
   }, []);
-  return { prefs: state, theme: resolvedTheme(state), skin: resolvedSkin(state), platformSkin, setPref, toggleTheme };
+  return { prefs: state, theme: resolvedTheme(state), skin: resolvedSkin(), platformSkin, setPref, toggleTheme };
 }

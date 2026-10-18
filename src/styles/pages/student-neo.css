@@ -1051,14 +1051,9 @@
   .student-neo-letters span { width: 48px; height: 48px; font-size: 24px; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .student-neo-letters span,
-  .student-neo-section,
-  .student-neo-loader span {
+@media (prefers-reduced-motion: reduce) {:root:not([data-motion="full"]) .student-neo-letters span, :root:not([data-motion="full"]) .student-neo-section, :root:not([data-motion="full"]) .student-neo-loader span {
     animation: none !important;
-  }
-  .student-neo-nav button,
-  .student-neo-btn { transition: none !important; }
+  }:root:not([data-motion="full"]) .student-neo-nav button, :root:not([data-motion="full"]) .student-neo-btn { transition: none !important; }
 }
 
 /* 2026 refinement pass: stronger light mode, install CTA, fresh student artwork, full icon refresh. */
@@ -1287,8 +1282,7 @@
   .student-neo-study-scene { max-width: 100%; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .student-neo-install-btn { animation: none !important; }
+@media (prefers-reduced-motion: reduce) {:root:not([data-motion="full"]) .student-neo-install-btn { animation: none !important; }
 }
 
 

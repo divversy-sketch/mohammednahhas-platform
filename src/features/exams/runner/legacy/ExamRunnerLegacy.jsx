@@ -396,8 +396,10 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
         const mistakeRef = doc(collection(db, 'student_mistakes'));
         batch.set(mistakeRef, {
           userId: user.uid,
+          examId: exam.id,
           examTitle: exam.title,
           question: {
+            blockText: q.blockText || '',
             ...q,
             studentAnswerText: q.options?.[studentAns],
             correctAnswerText: q.options?.[q.correctIdx]

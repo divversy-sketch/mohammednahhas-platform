@@ -89,6 +89,7 @@ export default function AdminFullContentEditorModal({
             {examsList.filter(exam => !contentEditDraft.grade || exam.grade === contentEditDraft.grade).map(exam => <option key={exam.id} value={exam.id}>{exam.title}</option>)}
           </select>
           <input type="number" min="1" className="border p-3 rounded-xl bg-white" placeholder="مدة الفيديو بالدقائق" value={contentEditDraft.estimatedDurationMinutes} onChange={e => setContentEditDraft({...contentEditDraft, estimatedDurationMinutes: e.target.value})} />
+          <textarea className="border p-3 rounded-xl bg-white min-h-[110px] md:col-span-2 leading-8" placeholder={'أجزاء المحاضرة: سطر لكل جزء\n00:00 مقدمة\n2:00 أنواع التشبيه\n7:00 التشبيه المفصل'} value={contentEditDraft.chaptersText || ''} onChange={e => setContentEditDraft({...contentEditDraft, chaptersText: e.target.value})} />
         </div>
       )}
 

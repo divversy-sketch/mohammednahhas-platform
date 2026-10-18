@@ -11,13 +11,14 @@ import { HeroCarousel, HERO_ART, ART } from '@v2/student/cinema.jsx';
 import { usePrefs } from '@v2/prefs.js';
 import { canAccessAdminTab, ADMIN_TABS } from '@config/adminPermissions';
 import { getAdminPageMeta } from './adminPageMeta.js';
+import { liveState } from './AdminExamLive.jsx';
 
 /* ── sections ── */
 export const ADMIN_GROUPS = [
   { key: 'home', title: 'القيادة', icon: 'chart', tabs: ['dashboard', 'follow_up'] },
   { key: 'students', title: 'الطلاب', icon: 'users', tabs: ['users', 'all_users', 'student_groups', 'parent_portal', 'password_resets'] },
   { key: 'teach', title: 'التعليم', icon: 'book', tabs: ['courses', 'content', 'assignments', 'smart_hw'] },
-  { key: 'exams', title: 'الاختبارات', icon: 'exam', tabs: ['exams', 'question_bank', 'smart_teacher', 'smart_exam_engine', 'mistakes_admin', 'student_reports'] },
+  { key: 'exams', title: 'الاختبارات', icon: 'exam', tabs: ['exam_live', 'exams', 'question_bank', 'smart_teacher', 'smart_exam_engine', 'mistakes_admin', 'student_reports'] },
   { key: 'money', title: 'الماليات', icon: 'wallet', tabs: ['payments', 'subscriptions_legacy', 'finance_dashboard'] },
   { key: 'talk', title: 'التواصل', icon: 'message', tabs: ['messages_center', 'notifications_admin'] },
   { key: 'system', title: 'النظام', icon: 'settings', tabs: ['security_center', 'video_security', 'admin_roles', 'audit_logs', 'platform_settings', 'app_convert'] },
@@ -26,7 +27,7 @@ export const ADMIN_GROUPS = [
 export const ADMIN_TAB_ICON = {
   dashboard: 'chart', follow_up: 'target', users: 'grade', all_users: 'users', password_resets: 'key',
   payments: 'wallet', subscriptions_legacy: 'ticket', finance_dashboard: 'trend', courses: 'book', content: 'layers',
-  exams: 'exam', question_bank: 'fileText', smart_teacher: 'spark', parent_portal: 'user', smart_exam_engine: 'rocket', assignments: 'file', smart_hw: 'qr',
+  exam_live: 'live', exams: 'exam', question_bank: 'fileText', smart_teacher: 'spark', parent_portal: 'user', smart_exam_engine: 'rocket', assignments: 'file', smart_hw: 'qr',
   mistakes_admin: 'mistake', student_reports: 'trophy', student_groups: 'users', messages_center: 'message',
   notifications_admin: 'bell', security_center: 'shield', video_security: 'lock', app_convert: 'phone',
   admin_roles: 'key', audit_logs: 'fileText', platform_settings: 'settings',
@@ -244,7 +245,11 @@ export function computeAdminPulse(data = {}) {
     const k = days.findIndex((x, i) => d.getTime() >= x.t && (i === days.length - 1 || d.getTime() < days[i + 1].t));
     if (k >= 0) days[k].n += 1;
   });
+  const states = results.map((r) => liveState(r, now));
+  const liveNow = states.filter((x) => x === 'live').length;
+  const leftNow = states.filter((x) => x === 'left').length;
   return {
+    liveNow, leftNow,
     students: users.length,
     premium: users.filter((u) => u.subscriptionStatus === 'premium').length,
     exams: exams.length,
@@ -279,6 +284,7 @@ function PulseChart({ days }) {
 }
 
 const QUICK = [
+  { tab: 'exam_live', icon: 'live', title: 'مراقبة لايف', sub: 'مين بيمتحن دلوقتي' },
   { tab: 'exams', icon: 'exam', title: 'امتحان جديد', sub: 'أنشئ وحدد الوقت' },
   { tab: 'content', icon: 'video', title: 'ارفع محاضرة', sub: 'فيديو أو ملف' },
   { tab: 'users', icon: 'grade', title: 'طلبات الانضمام', sub: 'قبول ورفض' },
@@ -316,7 +322,7 @@ export function AdminCinemaHero({ activeTab, onNavigate, pulse, adminName, canOp
   const p = pulse;
   const slides = [];
   if (p.pending > 0 && canOpen('users')) slides.push({ key: 'pending', icon: 'grade', kicker: 'مستني ردك', glyph: '«', title: p.pending === 1 ? 'طالب جديد طالب ينضم للمنصة' : `${formatNumber(p.pending)} طلبات انضمام جديدة`, meta: 'راجع البيانات واقبل أو ارفض بضغطة.', cta: 'راجع الطلبات', ctaIcon: 'arrowLeft', action: () => onNavigate('users') });
-  if (p.running.length > 0 && canOpen('exams')) slides.push({ key: 'running', icon: 'exam', kicker: 'شغال دلوقتي', glyph: '«', title: p.running.length === 1 ? `«${p.running[0].title || 'امتحان'}» مفتوح للطلاب` : `${formatNumber(p.running.length)} امتحانات مفتوحة دلوقتي`, meta: 'تابع التسليمات والنتايج أول بأول، وعدّل الوقت لو محتاج.', cta: 'تابع الامتحانات', ctaIcon: 'arrowLeft', action: () => onNavigate('exams') });
+  if ((p.running.length > 0 || p.liveNow > 0) && canOpen('exams')) slides.unshift({ key: 'running', icon: 'live', kicker: 'لايف دلوقتي', glyph: '«', title: p.liveNow ? `${formatNumber(p.liveNow)} طالب بيمتحن دلوقتي` : p.running.length === 1 ? `«${p.running[0].title || 'امتحان'}» مفتوح للطلاب` : `${formatNumber(p.running.length)} امتحانات مفتوحة دلوقتي`, meta: p.leftNow ? `و${formatNumber(p.leftNow)} خرجوا من الامتحان قبل ما يسلّموا. قرّر تسمح لهم يكمّلوا ولا لأ.` : 'شوف مين بيمتحن ومين سلّم ومين لسه ما دخلش، لحظة بلحظة.', cta: 'مراقبة لايف', ctaIcon: 'arrowLeft', action: () => onNavigate('exam_live') });
   if (p.tickets > 0 && canOpen('messages_center')) slides.push({ key: 'tickets', icon: 'message', kicker: 'رسائل الطلاب', glyph: '«', title: `${formatNumber(p.tickets)} رسالة مستنية رد`, meta: 'الطالب اللي بيترد عليه بسرعة بيكمّل.', cta: 'افتح الرسائل', ctaIcon: 'arrowLeft', action: () => onNavigate('messages_center') });
   if (p.held > 0 && canOpen('security_center')) slides.push({ key: 'held', icon: 'shield', kicker: 'الحماية', glyph: '«', title: `${formatNumber(p.held)} محاولة امتحان متوقفة للمراجعة`, meta: 'قرّر تكمّل للطالب ولا تعيد له الامتحان.', cta: 'مركز الحماية', ctaIcon: 'arrowLeft', action: () => onNavigate('security_center') });
   if (p.resets > 0 && canOpen('password_resets')) slides.push({ key: 'resets', icon: 'key', kicker: 'الدخول', glyph: '«', title: `${formatNumber(p.resets)} طلب تغيير كلمة سر`, meta: 'طلاب مش عارفين يدخلوا ومستنيينك.', cta: 'شوف الطلبات', ctaIcon: 'arrowLeft', action: () => onNavigate('password_resets') });
@@ -324,7 +330,7 @@ export function AdminCinemaHero({ activeTab, onNavigate, pulse, adminName, canOp
 
   const stats = [
     { icon: 'users', label: 'الطلاب', value: p.students, sub: `${formatNumber(p.premium)} VIP`, tab: 'all_users' },
-    { icon: 'exam', label: 'الامتحانات', value: p.exams, sub: p.running.length ? `${formatNumber(p.running.length)} مفتوح دلوقتي` : 'مفيش امتحان مفتوح', tab: 'exams' },
+    { icon: 'live', label: 'بيمتحنوا دلوقتي', value: p.liveNow, sub: p.leftNow ? `${formatNumber(p.leftNow)} خرجوا قبل التسليم` : p.running.length ? `${formatNumber(p.running.length)} امتحان مفتوح` : 'مفيش امتحان مفتوح', tab: 'exam_live', hot: p.leftNow > 0 },
     { icon: 'target', label: 'متوسط الدرجات', value: p.avg, suffix: '٪', sub: `من ${formatNumber(p.attempts)} تسليم`, tab: 'student_reports' },
     { icon: 'bell', label: 'محتاج متابعة', value: p.alerts, sub: p.alerts ? 'طلبات ورسائل مستنية' : 'كله تمام', tab: 'follow_up', hot: p.alerts > 0 },
   ];

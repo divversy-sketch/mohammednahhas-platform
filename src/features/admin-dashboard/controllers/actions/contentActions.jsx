@@ -4,10 +4,11 @@ import { db } from '@services/firebase';
 import { validateEgyptianPhones } from '@shared/utils/phone';
 import { FloatingArabicBackground } from '@features/home/HomeWidgets';
 import { uploadToFirebaseContent, detectContentType, readHtmlFileAsInlineContent } from '@services/firebaseContentUpload';
-import { uploadToCloudinary } from '@services/cloudinaryUpload';
+import { uploadToCloudinary, isCloudinaryConfigured } from '@services/cloudinaryUpload';
 import { downloadXlsx } from '@shared/utils/exportData.js';
 import { platformNotify, platformConfirm, platformPrompt, sendSystemNotification, safeNumber, VIDEO_EXAM_UNLOCK_PERCENT, getQuestionMaxScore, calculateDetailedExamMetrics } from '@shared/core/platformShared.jsx';
 import { normalizeImagePlacement, defaultImagePlacement } from '@shared/utils/imagePlacement.js';
+import { parseChapters, chaptersToText } from '@shared/utils/chapters.js';
 import { adminSecureFunctions } from '@admin/services/adminSecureFunctions.js';
 import { confirmSensitiveAction } from '@admin/services/adminAudit.js';
 
@@ -139,6 +140,7 @@ export const createContentManagementActions = (ctx) => {
       allowedEmailsText,
       linkedExamId: item.linkedExamId || '',
       estimatedDurationMinutes: item.estimatedDurationMinutes || '',
+      chaptersText: item.chaptersText || chaptersToText(item.chapters),
       branch: item.branch || '',
       thumbnailUrl: item.thumbnailUrl || item.posterUrl || item.image || '',
       imagePlacement: normalizeImagePlacement(item.imagePlacement)
@@ -175,6 +177,7 @@ export const createContentManagementActions = (ctx) => {
       imagePlacement: normalizeImagePlacement(contentEditDraft.imagePlacement),
       linkedExamId: contentEditDraft.type === 'video' ? (contentEditDraft.linkedExamId || '') : '',
       estimatedDurationMinutes: contentEditDraft.type === 'video' ? safeNumber(contentEditDraft.estimatedDurationMinutes, 0) : 0,
+      chapters: contentEditDraft.type === 'video' ? parseChapters(contentEditDraft.chaptersText) : [],
       videoExamUnlockPercent: contentEditDraft.type === 'video' && contentEditDraft.linkedExamId ? VIDEO_EXAM_UNLOCK_PERCENT : 0,
       updatedAt: serverTimestamp()
     };
@@ -237,14 +240,28 @@ export const createContentManagementActions = (ctx) => {
       try {
           // صفحة المحتوى العام منفصلة عن الكورسات:
           // HTML صغير مثل 120KB يتم حفظه كنص داخل Firestore ويفتح داخل المنصة فورًا.
-          // باقي الملفات تترفع على Firebase Storage. الكورسات فقط تستخدم Cloudinary.
+          // باقي الملفات (PDF، Word، PowerPoint، صور، فيديو، صوت) تترفع على Cloudinary المربوط بالمنصة،
+          // ولو Cloudinary مش متظبط أو رفض الملف بنجرب Firebase Storage كاحتياطي.
           const autoType = detectContentType(file);
-          const uploaded = autoType === 'html'
-            ? await readHtmlFileAsInlineContent(file)
-            : await uploadToFirebaseContent(file, {
-                folder: newContent.type || 'general',
-                onProgress: (percent) => setUploadProgress(percent)
-            });
+          let uploaded;
+          if (autoType === 'html') {
+            uploaded = await readHtmlFileAsInlineContent(file);
+          } else {
+            let cloudError = null;
+            if (isCloudinaryConfigured()) {
+              try {
+                const c = await uploadToCloudinary(file, { kind: 'auto', folder: `nahhas-platform/content/${newContent.type || 'general'}`, onProgress: (percent) => setUploadProgress(percent) });
+                uploaded = { url: c.url, name: file.name, size: c.bytes || file.size, mimeType: file.type || c.format || '', path: c.publicId, storageProvider: 'cloudinary' };
+              } catch (err) { cloudError = err; }
+            }
+            if (!uploaded) {
+              try {
+                uploaded = await uploadToFirebaseContent(file, { folder: newContent.type || 'general', onProgress: (percent) => setUploadProgress(percent) });
+              } catch (fbError) {
+                throw new Error(cloudError ? `Cloudinary: ${cloudError.message}` : `Firebase Storage: ${fbError?.message || 'الرفع اترفض.'}`);
+              }
+            }
+          }
           setNewContent({
               ...newContent,
               url: uploaded.url,
@@ -252,7 +269,8 @@ export const createContentManagementActions = (ctx) => {
               fileName: uploaded.name,
               fileSize: uploaded.size,
               mimeType: uploaded.mimeType,
-              firebaseStoragePath: uploaded.path,
+              firebaseStoragePath: uploaded.storageProvider === 'firebase' ? uploaded.path : '',
+              cloudinaryPublicId: uploaded.storageProvider === 'cloudinary' ? uploaded.path : '',
               storageProvider: uploaded.storageProvider || 'firebase',
               type: autoType === 'html' ? 'html' : (newContent.type === 'video' && autoType !== 'video' ? autoType : (newContent.type || autoType))
           });
@@ -290,9 +308,11 @@ export const createContentManagementActions = (ctx) => {
           imagePlacement: normalizeImagePlacement(newContent.imagePlacement),
           linkedExamId: newContent.type === 'video' ? (newContent.linkedExamId || '') : '',
           estimatedDurationMinutes: newContent.type === 'video' ? safeNumber(newContent.estimatedDurationMinutes, 0) : 0,
+          chapters: newContent.type === 'video' ? parseChapters(newContent.chaptersText) : [],
           videoExamUnlockPercent: newContent.type === 'video' && newContent.linkedExamId ? VIDEO_EXAM_UNLOCK_PERCENT : 0,
           storageProvider: newContent.storageProvider || (newContent.firebaseStoragePath ? 'firebase' : ''),
           firebaseStoragePath: newContent.firebaseStoragePath || '',
+          cloudinaryPublicId: newContent.cloudinaryPublicId || '',
           mimeType: newContent.mimeType || '',
           fileName: newContent.fileName || '',
           fileSize: newContent.fileSize || 0,
@@ -308,7 +328,7 @@ export const createContentManagementActions = (ctx) => {
       } 
       
       platformNotify("تم النشر!"); 
-      setNewContent({ title: '', url: '', thumbnailUrl: '', imagePlacement: defaultImagePlacement, type: 'video', videoSection: 'explanation', isPublic: false, grade: '3sec', allowedEmails: '', isPremium: false, linkedExamId: '', estimatedDurationMinutes: '', branch: '', storageProvider: '', firebaseStoragePath: '', mimeType: '', fileName: '', fileSize: 0, htmlContent: '' });
+      setNewContent({ title: '', url: '', thumbnailUrl: '', imagePlacement: defaultImagePlacement, type: 'video', videoSection: 'explanation', isPublic: false, grade: '3sec', allowedEmails: '', isPremium: false, linkedExamId: '', estimatedDurationMinutes: '', chaptersText: '', branch: '', storageProvider: '', firebaseStoragePath: '', mimeType: '', fileName: '', fileSize: 0, htmlContent: '' });
   }; 
   
   const handleDeleteContent = async (id) => { 

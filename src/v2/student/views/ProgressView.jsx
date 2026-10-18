@@ -3,6 +3,8 @@ import { Icon } from '../../ui/Icon.jsx';
 import { Button, Chip, CountUp, Empty, Ring, formatNumber } from '../../ui/kit.jsx';
 import { arabicDate, completedResults, normalizeArabic, percentOf, scoreSeries, toDate } from '../insights.js';
 import { ScoreChart, SectionHead } from '../parts.jsx';
+import { mistakePassage } from '@shared/exam/mistakes.js';
+import { renderBracketHighlightedText } from '@shared/core/platform/text.jsx';
 import { Embed, LeaderboardV2, StudentCertificatePanel, StudentGrowthPanel, StudentLearningPath, StudentRemediationCenter } from '../embeds.jsx';
 
 const toneOf = (pct) => (pct >= 75 ? 'patina' : pct >= 50 ? 'gold' : 'danger');
@@ -124,6 +126,7 @@ function Mistakes({ ctx, go }) {
                   </button>
                   {isOpen && (
                     <div className="nx-mistake__body">
+                      {(() => { const passage = mistakePassage(m, ctx.exams); return passage ? <details className="nx-mistake__passage" open><summary><Icon name="book" />نص القراءة</summary><div>{renderBracketHighlightedText(passage)}</div></details> : null; })()}
                       {m.question?.studentAnswerText && <p><Chip tone="danger" icon="close">إجابتك</Chip> {m.question.studentAnswerText}</p>}
                       {m.question?.correctAnswerText && <p><Chip tone="patina" icon="check">الصح</Chip> {m.question.correctAnswerText}</p>}
                       {m.question?.explanation && <p className="dim">{m.question.explanation}</p>}

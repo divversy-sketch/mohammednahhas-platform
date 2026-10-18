@@ -27,7 +27,7 @@ const examResults = [
 ].map(([examId, percentage, ago], i) => ({ id: `r${i}`, examId, status: 'completed', percentage, score: Math.round(percentage / 5), total: 20, submittedAt: ts(now - ago * day) }));
 
 const mistakes = [
-  { id: 'm1', examTitle: 'امتحان التشبيه', question: { text: 'حدد أركان التشبيه في: «العلم نور».', studentAnswerText: 'مشبه ومشبه به فقط', correctAnswerText: 'مشبه + مشبه به (تشبيه بليغ)' }, timestamp: ts(now - 13 * day) },
+  { id: 'm1', examTitle: 'امتحان التشبيه', question: { blockText: 'قال الشاعر في وصف العلم: «العلمُ نورٌ يُستضاءُ به، والجهلُ ظلامٌ يُضِلُّ صاحبه». فالعلم عند الشاعر [سراج] يهدي السائرين.', text: 'حدد أركان التشبيه في: «العلم نور».', studentAnswerText: 'مشبه ومشبه به فقط', correctAnswerText: 'مشبه + مشبه به (تشبيه بليغ)' }, timestamp: ts(now - 13 * day) },
   { id: 'm2', examTitle: 'امتحان كان وأخواتها', question: { text: 'ما إعراب «مجتهدًا» في: كان الطالبُ مجتهدًا؟', studentAnswerText: 'حال منصوب', correctAnswerText: 'خبر كان منصوب' }, timestamp: ts(now - 8 * day) },
   { id: 'm3', examTitle: 'امتحان كان وأخواتها', question: { text: 'أي الأفعال التالية من أخوات كان؟', studentAnswerText: 'ظنّ', correctAnswerText: 'صار' }, timestamp: ts(now - 8 * day) },
 ];
@@ -43,15 +43,15 @@ export default function StudentPreview() {
   const [preExam, setPreExam] = useState(null);
   const [scanningHwId, setScanningHwId] = useState(null);
   const [showNotifications, setShowNotifications] = useState(params.get('sheet') === 'notifications');
-  const [editFormData, setEditFormData] = useState({ name: 'يوسف أحمد محمود', phone: '01012345678', parentPhone: '01198765432', grade: '3sec' });
+  const [editFormData, setEditFormData] = useState({ name: 'محمد أحمد محمود', phone: '01012345678', parentPhone: '01198765432', grade: '3sec' });
   const [paymentDraft, setPaymentDraft] = useState({ amount: '', method: 'vodafone_cash', transactionId: '', note: '' });
   const [supportDraft, setSupportDraft] = useState({ category: 'exam', message: '' });
   const [subscriptionCodeInput, setSubscriptionCodeInput] = useState('');
   const premium = params.get('free') ? false : true;
 
   const ctx = {
-    user: { uid: 'preview', email: 'youssef@example.com', displayName: 'يوسف أحمد' },
-    userData: { name: 'يوسف أحمد محمود', grade: '3sec', status: 'active', subscriptionStatus: premium ? 'premium' : 'free', subscriptionExpiry: { toDate: () => ts(now + 5 * day) } },
+    user: { uid: 'preview', email: 'mohamed@example.com', displayName: 'محمد أحمد' },
+    userData: { name: 'محمد أحمد محمود', grade: '3sec', status: 'active', subscriptionStatus: premium ? 'premium' : 'free', subscriptionExpiry: { toDate: () => ts(now + 5 * day) } },
     activeTab, setActiveTab, playingVideo, setPlayingVideo, playingHtml, setPlayingHtml, preExam, setPreExam, scanningHwId, setScanningHwId,
     showNotifications, setShowNotifications, setHasNewNotif: () => {}, editFormData, setEditFormData, setShowFocusMode: () => platformNotify('وضع التركيز'),
     paymentDraft, setPaymentDraft, isSendingPayment: false, handleSubmitPaymentRequest: () => platformNotify('تم إرسال طلب الدفع', 'success'),

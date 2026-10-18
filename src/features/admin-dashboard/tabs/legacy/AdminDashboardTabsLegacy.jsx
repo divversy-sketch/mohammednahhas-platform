@@ -40,6 +40,7 @@ import { canAccessAdminTab } from '@config/adminPermissions';
 import AdminCommandCenter from '@admin/components/AdminCommandCenter.jsx';
 import AdminSystemHealthPanel from '@admin/components/AdminSystemHealthPanel.jsx';
 import AdminV2PageFrame from '@admin/v2/AdminV2PageFrame.jsx';
+import AdminExamLive from '@admin/v2/AdminExamLive.jsx';
 import AdminStudentSuccessSuite from '@features/studentSuccess/StudentSuccessAdminSuite.jsx';
 import { AdminGlobalSearch, AdminLiveClassesPanel, AdminCertificatesPanel, AdminCommandQuickActions } from '@features/product/ProductExperienceSuite.jsx';
 import AdminAllUsersTab from '../users/AdminAllUsersTab.jsx';
@@ -349,6 +350,8 @@ export default function AdminDashboardTabs({ ctx }) {
             adminName={adminProfile?.name || userData?.name || userData?.email}
           >
           <AdminDashboardTab ctx={tabCtx} />
+
+          {activeTab === 'exam_live' && <AdminExamLive ctx={tabCtx} />}
 
           <AdminFollowUpTab ctx={tabCtx} />
 

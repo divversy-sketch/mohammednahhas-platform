@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { signOut } from 'firebase/auth';
 import { addDoc, collection, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@services/firebase';
@@ -13,6 +13,8 @@ import { getStudentAssignmentSummary, getStudentContentBuckets, getStudentPerfor
 import { resolveStudentExamAccessState } from '@features/exams/utils/studentExamAccess.js';
 import StudentSmartTeacherPopup from '@features/smart-teacher/StudentSmartTeacherPopup.jsx';
 import StudentAppV2 from '@v2/student/StudentAppV2.jsx';
+import { buildMistakesExam } from '@shared/exam/mistakes.js';
+import { flushPendingSubmits } from '@shared/exam/pendingSubmit.js';
 import { AccountStatusScreen, AppLoading } from '@v2/student/AccountStatusScreen.jsx';
 
 const ExamRunner = lazy(() => import('@features/exams/runner/ExamRunner.jsx'));
@@ -42,6 +44,15 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
   const [learningHubTab, setLearningHubTab] = useState('assignments');
   const [mobileMenu, setMobileMenu] = useState(false);
   const [activeExam, setActiveExam] = useState(null);
+
+  // an exam submitted while the internet was down is sent as soon as the platform opens again
+  useEffect(() => {
+    if (!user?.uid) return undefined;
+    const flush = () => flushPendingSubmits(db, user.uid).then((n) => { if (n) platformNotify(n === 1 ? 'امتحانك اللي سلّمته من غير نت اتسلّم دلوقتي.' : `${n} امتحانات سلّمتها من غير نت اتسلّموا دلوقتي.`); });
+    flush();
+    window.addEventListener('online', flush);
+    return () => window.removeEventListener('online', flush);
+  }, [user?.uid]);
   const [playingVideo, setPlayingVideo] = useState(null);
   const [playingHtml, setPlayingHtml] = useState(null);
   const [reviewingExam, setReviewingExam] = useState(null);
@@ -75,11 +86,7 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
   
   const startMistakesExam = () => {
       if (mistakes.length === 0) return platformNotify("ليس لديك أي أخطاء مسجلة بعد! استمر في التميز 👏");
-      const shuffledMistakes = [...mistakes].sort(() => 0.5 - Math.random()).slice(0, 20);
-      const generatedExam = {
-          id: 'custom_mistakes_exam', title: 'امتحان نقاط الضعف (بنك الأخطاء) 🏦', duration: shuffledMistakes.length * 2, 
-          questions: [ { text: 'أجب عن هذه الأسئلة التي أخطأت بها سابقاً:', subQuestions: shuffledMistakes.map(m => m.question) } ]
-      };
+      const generatedExam = buildMistakesExam(mistakes, exams);
       setActiveExam(generatedExam);
   };
 
@@ -113,7 +120,8 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
   };
 
   const latestCompletedResult = examResults.find(r => r.status === 'completed') || examResults[0] || null;
-  const inProgressExamResult = examResults.find(r => ['in_progress', 'security_hold'].includes(r.status));
+  // «كمّل» only when the admin allowed it; an unfinished attempt otherwise waits for the admin's decision
+  const inProgressExamResult = examResults.find(r => r.status === 'in_progress' && ['continue', 'restart'].includes(r.adminDecision));
   const inProgressExam = inProgressExamResult ? exams.find(e => e.id === inProgressExamResult.examId) : null;
   const { pendingAssignments, pendingAssignmentsCount } = getStudentAssignmentSummary({ assignments, assignmentSubmissions });
   const { completedVideoCount, videoCompletionPercent } = getVideoCompletionSummary({ videos, getVideoWatchPercent });

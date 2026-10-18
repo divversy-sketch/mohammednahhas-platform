@@ -80,8 +80,8 @@ export function ExamCard({ entry, ctx, now, mode = 'open' }) {
       </div>
       <div className="nx-exam__actions">
         {mode === 'open' && (
-          <Button variant="pri" icon={ctx.isBannedExam || !access.allowed ? 'lock' : 'arrowLeft'} onClick={startExam} disabled={ctx.isBannedExam || !access.allowed}>
-            {ctx.isBannedExam ? 'محظور' : !access.allowed ? 'مقفول' : state ? 'كمّل الامتحان' : 'ادخل الامتحان'}
+          <Button variant={state?.waiting ? 'soft' : 'pri'} icon={ctx.isBannedExam || !access.allowed ? 'lock' : state?.waiting ? 'clock' : 'arrowLeft'} onClick={startExam} disabled={ctx.isBannedExam || !access.allowed || state?.waiting}>
+            {ctx.isBannedExam ? 'محظور' : !access.allowed ? 'مقفول' : state?.waiting ? 'مستني موافقة المستر' : state?.resume ? 'كمّل الامتحان' : 'ادخل الامتحان'}
           </Button>
         )}
         {mode === 'upcoming' && <Button variant="soft" icon="bell" onClick={() => platformNotify(`«${exam.title || 'الامتحان'}» هيفتح ${arabicDateTime(start)}.`)}>هيفتح {arabicDate(start)}</Button>}

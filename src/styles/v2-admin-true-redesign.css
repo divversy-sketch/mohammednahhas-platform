@@ -557,9 +557,7 @@ html[data-theme='night'] {
 }
 
 /* Respect reduced motion users and give a speed mode */
-@media (prefers-reduced-motion: reduce) {
-  .nahhas-admin-shell *,
-  .v2-admin-shell * {
+@media (prefers-reduced-motion: reduce) {:root:not([data-motion="full"]) .nahhas-admin-shell *, :root:not([data-motion="full"]) .v2-admin-shell * {
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
