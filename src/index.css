@@ -6,7 +6,7 @@
 body {
   margin: 0;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background-color: #f8fafc;
+  background-color: var(--nx-bg, #f8fafc);
   direction: rtl;
 }
 
@@ -15,12 +15,12 @@ body {
   width: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #f1f1f1; 
+  background: var(--nx-sunk, #f1f1f1); 
 }
 ::-webkit-scrollbar-thumb {
-  background: #d97706; 
+  background: var(--nx-line-strong, #d97706); 
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #b45309; 
+  background: var(--nx-copper, #b45309); 
 }

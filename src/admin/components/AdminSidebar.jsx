@@ -3,6 +3,7 @@ import { ADMIN_TABS, canAccessAdminTab } from '../../config/adminPermissions';
 import AdminNeoIcon from './AdminNeoIcon.jsx';
 
 export { ADMIN_TABS };
+export { TAB_ICONS, getLabel };
 
 const TAB_ICONS = {
   dashboard: 'activity', follow_up: 'target', users: 'graduation', all_users: 'users', password_resets: 'key',
@@ -10,7 +11,7 @@ const TAB_ICONS = {
   exams: 'file', question_bank: 'clipboard', smart_teacher: 'brain', parent_portal: 'users', smart_exam_engine: 'brain', assignments: 'clipboard', smart_hw: 'qr',
   mistakes_admin: 'target', student_reports: 'trophy', student_groups: 'users', messages_center: 'message',
   notifications_admin: 'bell', security_center: 'shield', video_security: 'lock', app_convert: 'phone',
-  admin_roles: 'shield', audit_logs: 'activity',
+  admin_roles: 'shield', audit_logs: 'activity', platform_settings: 'settings',
 };
 
 const GROUPS = [
@@ -20,7 +21,7 @@ const GROUPS = [
   { title: 'الاختبارات', tabs: ['exams', 'question_bank', 'smart_teacher', 'smart_exam_engine', 'mistakes_admin', 'student_reports'] },
   { title: 'الماليات', tabs: ['payments', 'subscriptions_legacy', 'finance_dashboard'] },
   { title: 'التواصل', tabs: ['messages_center', 'notifications_admin'] },
-  { title: 'النظام', tabs: ['security_center', 'video_security', 'admin_roles', 'audit_logs'] },
+  { title: 'النظام', tabs: ['security_center', 'video_security', 'admin_roles', 'audit_logs', 'platform_settings', 'app_convert'] },
 ];
 
 const getLabel = (tab) => ADMIN_TABS.find(([key]) => key === tab)?.[1] || tab;

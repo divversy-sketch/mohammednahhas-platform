@@ -75,6 +75,8 @@ import AdminMistakesTab from '../split/AdminMistakesTab.jsx';
 import AdminContentTab from '../split/AdminContentTab.jsx';
 import AdminNotificationsTab from '../split/AdminNotificationsTab.jsx';
 import AdminNotificationsGrowthTab from '../split/AdminNotificationsGrowthTab.jsx';
+import AdminPlatformSettingsTab from '../split/AdminPlatformSettingsTab.jsx';
+import AppConversionGuidePanel from '@admin/parts/AppConversionGuidePanel.jsx';
 
 
 // Render-only split from AdminDashboard.jsx.
@@ -414,6 +416,10 @@ export default function AdminDashboardTabs({ ctx }) {
 
 
           <AdminNotificationsGrowthTab ctx={tabCtx} />
+
+          <AdminPlatformSettingsTab ctx={tabCtx} />
+
+          {activeTab === 'app_convert' && <AppConversionGuidePanel />}
 
           {/* تم حذف صفحة الرد الآلي وإدارة الحكم من لوحة الأدمن */}
           </AdminV2PageFrame>

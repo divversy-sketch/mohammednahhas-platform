@@ -1,38 +1,23 @@
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
 
 .admin-neo-shell,
 .admin-neo-shell * { box-sizing: border-box; }
 
 .admin-neo-shell {
-  --admin-bg: #f4f7fb;
-  --admin-panel: #ffffff;
-  --admin-panel-soft: #f8fafc;
-  --admin-border: #e5eaf1;
-  --admin-text: #172033;
-  --admin-muted: #6b768a;
-  --admin-primary: #c45108;
-  --admin-primary-soft: #fff4e8;
-  --admin-danger: #dc2626;
-  --admin-shadow: 0 8px 24px rgba(15, 23, 42, .06);
+  /* v2: the admin follows the active skin and the day/night theme through the shared --nx-* tokens */
+  --admin-bg: var(--nx-bg);
+  --admin-panel: var(--nx-surface);
+  --admin-panel-soft: var(--nx-surface-2);
+  --admin-border: var(--nx-line);
+  --admin-text: var(--nx-ink);
+  --admin-muted: var(--nx-ink-3);
+  --admin-primary: var(--nx-copper);
+  --admin-primary-soft: var(--nx-copper-soft);
+  --admin-danger: var(--nx-danger);
+  --admin-shadow: var(--nx-shadow-1);
   min-height: 100vh;
   background: var(--admin-bg);
   color: var(--admin-text);
-  font-family: 'Cairo', system-ui, sans-serif;
-}
-
-html[data-theme='night'] .admin-neo-shell,
-html.dark .admin-neo-shell,
-body.dark .admin-neo-shell {
-  --admin-bg: #0d1118;
-  --admin-panel: #141a23;
-  --admin-panel-soft: #19212c;
-  --admin-border: #283241;
-  --admin-text: #edf2f7;
-  --admin-muted: #9ca8b8;
-  --admin-primary: #6ea8fe;
-  --admin-primary-soft: rgba(110, 168, 254, .12);
-  --admin-danger: #ff7b86;
-  --admin-shadow: 0 8px 24px rgba(0, 0, 0, .22);
+  font-family: var(--nx-f-ui);
 }
 
 .admin-neo-layout {
@@ -68,7 +53,7 @@ body.dark .admin-neo-shell {
   display: grid;
   place-items: center;
   border-radius: 11px;
-  color: #fff;
+  color: var(--nx-on-copper);
   background: var(--admin-primary);
   font-size: 20px;
   font-weight: 800;
@@ -206,7 +191,7 @@ body.dark .admin-neo-shell {
   font-size: 11px;
   font-weight: 700;
 }
-.admin-neo-grade-select option { color: #111827; }
+.admin-neo-grade-select option { color: var(--nx-ink); background: var(--nx-surface); }
 .admin-neo-logout {
   min-height: 38px;
   padding: 0 11px;
@@ -316,7 +301,7 @@ body.dark .admin-neo-shell {
   box-shadow: 0 0 0 3px var(--admin-primary-soft) !important;
   outline: 0 !important;
 }
-.admin-neo-workspace select option { color: #111827; }
+.admin-neo-workspace select option { color: var(--nx-ink); background: var(--nx-surface); }
 .admin-neo-workspace button { font-family: inherit; border-radius: 8px !important; box-shadow: none !important; }
 .admin-neo-workspace table { width: 100%; border-collapse: collapse; }
 .admin-neo-workspace thead th {
@@ -392,7 +377,7 @@ body.dark .admin-neo-shell {
     color: var(--admin-text);
     background: var(--admin-panel-soft);
   }
-  .admin-neo-mobile-overlay { display: block; position: fixed; inset: 0; z-index: 60; border: 0; background: rgba(0,0,0,.45); }
+  .admin-neo-mobile-overlay { display: block; position: fixed; inset: 0; z-index: 60; border: 0; background: var(--nx-scrim); }
   .admin-neo-dashboard-intro { align-items: flex-start; flex-direction: column; }
   .admin-neo-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -405,4 +390,24 @@ body.dark .admin-neo-shell {
   .admin-neo-logout span { display: none; }
   .admin-neo-metrics { grid-template-columns: 1fr; }
   .admin-neo-workspace { padding: 9px; }
+}
+
+/* v2 skins: theme toggle + phone tab bar */
+.admin-neo-theme {
+  width: 38px; height: 38px; display: grid; place-items: center; flex: none; cursor: pointer;
+  border: 1px solid var(--admin-border); border-radius: 9px; color: var(--admin-text); background: var(--admin-panel-soft);
+}
+.admin-neo-tabbar { display: none; }
+@media (max-width: 820px) {
+  .admin-neo-main { padding-bottom: calc(84px + var(--nx-safe-bottom)); }
+  .admin-neo-tabbar {
+    position: fixed; inset: auto 0 0 0; z-index: 55; display: grid; grid-template-columns: repeat(5, 1fr);
+    padding: 6px 8px calc(8px + var(--nx-safe-bottom));
+    background: var(--nx-glass); border-top: 1px solid var(--admin-border);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4);
+  }
+  .admin-neo-tabbar button { display: grid; justify-items: center; gap: 2px; border: 0; background: none; color: var(--admin-muted); font: inherit; font-size: 11px; padding: 4px 0; cursor: pointer; }
+  .admin-neo-tabbar i { display: grid; place-items: center; width: 54px; height: 30px; border-radius: 999px; }
+  .admin-neo-tabbar button[aria-current="page"] { color: var(--admin-primary); font-weight: 800; }
+  .admin-neo-tabbar button[aria-current="page"] i { background: var(--admin-primary-soft); }
 }

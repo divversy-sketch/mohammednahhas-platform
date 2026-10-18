@@ -6,7 +6,7 @@ import { haptic, onBackButton } from '../device/native.js';
 const ar = (n, opts) => Number(n || 0).toLocaleString('ar-EG', opts);
 export const formatNumber = ar;
 
-const prefersReducedMotion = () => {
+export const prefersReducedMotion = () => {
   if (typeof window === 'undefined') return true;
   const root = document.documentElement;
   if (root.dataset.motion === 'reduced') return true;

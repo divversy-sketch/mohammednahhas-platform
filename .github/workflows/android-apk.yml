@@ -1,0 +1,42 @@
+name: Android APK
+
+# Builds NahhasPlatform.apk on GitHub's servers — no Android Studio needed on your computer.
+# Run it from the repo page: Actions → Android APK → Run workflow. The APK appears under "Artifacts".
+# One-time setup: Settings → Secrets and variables → Actions → New secret named ENV_FILE,
+# and paste the whole content of your .env file as its value.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+      - name: Write .env from the ENV_FILE secret
+        env:
+          ENV_FILE: ${{ secrets.ENV_FILE }}
+        run: printf '%s\n' "$ENV_FILE" > .env
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync android
+      - name: Build debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+      - run: cp android/app/build/outputs/apk/debug/app-debug.apk NahhasPlatform.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NahhasPlatform-apk
+          path: NahhasPlatform.apk

@@ -45,14 +45,20 @@
     "security:audit": "node scripts/security/audit-report.mjs",
     "performance:budget": "node scripts/performance/bundle-budget-guard.mjs",
     "storybook:check": "node scripts/storybook/storybook-readiness-check.mjs",
-    "final:ultimate": "npm run final:check && npm run test:all && npm run security:env && npm run security:audit && npm run performance:budget && npm run storybook:check"
+    "final:ultimate": "npm run final:check && npm run test:all && npm run security:env && npm run security:audit && npm run performance:budget && npm run storybook:check",
+    "apk": "node scripts/android/build-apk.mjs",
+    "apk:release": "node scripts/android/build-apk.mjs --release",
+    "skins": "node scripts/v2/gen-skins.mjs && python3 scripts/v2/gen-bridge.py"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.3",
     "@capacitor/app": "^8.1.2",
     "@capacitor/cli": "^8.3.1",
     "@capacitor/core": "^8.3.1",
     "@capacitor/haptics": "^8.0.2",
     "@capacitor/status-bar": "^8.0.4",
+    "@fontsource/almarai": "^5.3.0",
+    "@fontsource/changa": "^5.3.0",
     "firebase": "^12.12.0",
     "firebase-admin": "^12.7.0",
     "framer-motion": "^12.38.0",

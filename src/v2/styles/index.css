@@ -1,7 +1,9 @@
 @import './tokens.css';
+@import './skins.css';
 @import './base.css';
 @import './components.css';
 @import './motion.css';
 @import './shell.css';
 @import './bridge.css';
 @import './bridge-extra.css';
+@import './skins-flavors.css';

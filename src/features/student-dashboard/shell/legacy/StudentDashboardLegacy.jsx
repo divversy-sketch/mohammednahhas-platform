@@ -18,6 +18,8 @@ import { AccountStatusScreen, AppLoading } from '@v2/student/AccountStatusScreen
 const ExamRunner = lazy(() => import('@features/exams/runner/ExamRunner.jsx'));
 const PomodoroFocusMode = lazy(() => import('@features/study/PomodoroFocusMode'));
 
+const ExamReview = lazy(() => import('@v2/student/ExamReview.jsx'));
+const resultTime = (r) => { const v = r?.submittedAt; return v?.toDate ? v.toDate().getTime() : v?.seconds ? v.seconds * 1000 : new Date(v || 0).getTime() || 0; };
 const LazyPanel = ({ children }) => <Suspense fallback={<AppLoading />}>{children}</Suspense>;
 
 export const StudentDashboard = ({ user, userData, installPrompt }) => {
@@ -137,8 +139,10 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
   if (activeExam) return <LazyPanel><ExamRunner exam={activeExam} user={user} onClose={() => setActiveExam(null)} /></LazyPanel>;
   if (showFocusMode) return <LazyPanel><PomodoroFocusMode onClose={() => setShowFocusMode(false)} /></LazyPanel>;
   if (reviewingExam) {
-      const result = examResults.find(r => r.examId === reviewingExam.id);
-      return <LazyPanel><ExamRunner exam={reviewingExam} user={user} onClose={() => setReviewingExam(null)} isReviewMode={true} existingResult={result} /></LazyPanel>;
+      // latest completed attempt for this exam; full review (answers + corrections) unlocks after the exam window closes
+      const attempts = examResults.filter(r => r.examId === reviewingExam.id);
+      const result = attempts.filter(r => r.status === 'completed').sort((a, b) => resultTime(b) - resultTime(a))[0] || attempts[0];
+      return <LazyPanel><ExamReview exam={reviewingExam} result={result} onClose={() => setReviewingExam(null)} onPracticeMistakes={() => { setReviewingExam(null); startMistakesExam(); }} /></LazyPanel>;
   }
 
   const isBannedAll = userData.status === 'banned_all';

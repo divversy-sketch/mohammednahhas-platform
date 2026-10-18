@@ -1,6 +1,12 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
+import '@fontsource/almarai/400.css';
+import '@fontsource/almarai/700.css';
+import '@fontsource/almarai/800.css';
+import '@fontsource/changa/600.css';
+import '@fontsource/changa/700.css';
+import '@fontsource/changa/800.css';
 import './index.css';
 import './styles/v2-redesign.css';
 import './v2/styles/index.css';
@@ -45,12 +51,13 @@ document.documentElement.dataset.nx = '2';
 startDeviceWatcher();
 startPrefs();
 loadNativePlugins().then(startPrefs);
+import('./v2/platformSkin.js').then((m) => m.watchPlatformSkin()).catch(() => {});
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('nxPreview')) {
   // dev-only screen previews with sample data
   const which = new URLSearchParams(window.location.search).get('nxPreview');
-  Promise.all([({ exam: () => import('./v2/dev/ExamPreview.jsx'), landing: () => import('./v2/public/LandingV2.jsx'), auth: () => import('./shared/platformParts/AuthPage.jsx') }[which] || (() => import('./v2/dev/StudentPreview.jsx')))(), import('./v2/ui/Overlays.jsx')]).then(([{ default: Preview }, { NxToastCenter, NxPromptCenter }]) => {
+  Promise.all([({ review: () => import('./v2/dev/ReviewPreview.jsx'), admin: () => import('./v2/dev/AdminPreview.jsx'), exam: () => import('./v2/dev/ExamPreview.jsx'), landing: () => import('./v2/public/LandingV2.jsx'), auth: () => import('./shared/platformParts/AuthPage.jsx') }[which] || (() => import('./v2/dev/StudentPreview.jsx')))(), import('./v2/ui/Overlays.jsx')]).then(([{ default: Preview }, { NxToastCenter, NxPromptCenter }]) => {
     root.render(<><NxToastCenter /><NxPromptCenter /><Preview /></>);
   });
 } else {

@@ -17,7 +17,7 @@
       "purpose": "any"
     },
     {
-      "src": "/icons/alnahhas-app-512-v4.png",
+      "src": "/icons/alnahhas-app-512-maskable.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
@@ -29,8 +29,8 @@
   "orientation": "any",
   "dir": "rtl",
   "lang": "ar-EG",
-  "theme_color": "#0F0B09",
-  "background_color": "#0F0B09",
+  "theme_color": "#0B0908",
+  "background_color": "#0B0908",
   "categories": [
     "education"
   ]

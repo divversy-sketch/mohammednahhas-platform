@@ -1,0 +1,103 @@
+/*
+ * Skin flavours: the few shape rules a skin needs beyond its tokens.
+ * <html data-flavor="…"> is set together with data-skin by src/v2/prefs.js.
+ * Selectors cover the v2 student shell (.nx-*) and the admin shell (.admin-neo-*).
+ */
+.nx-page-title, .admin-neo-header h1 { font-family: var(--nx-f-head); }
+
+/* glass — الموج */
+:root[data-flavor="glass"] .nx-app, :root[data-flavor="glass"] .admin-neo-shell {
+  background:
+    radial-gradient(60% 40% at 90% 0%, color-mix(in srgb, var(--nx-copper) 18%, transparent), transparent 70%),
+    radial-gradient(50% 40% at 0% 60%, color-mix(in srgb, var(--nx-patina-2) 18%, transparent), transparent 70%),
+    radial-gradient(50% 50% at 80% 100%, color-mix(in srgb, var(--nx-info) 14%, transparent), transparent 70%),
+    var(--nx-bg);
+  background-attachment: fixed;
+}
+:root[data-flavor="glass"] .nx-card:not(.nx-night), :root[data-flavor="glass"] .nx-side, :root[data-flavor="glass"] .nx-rail,
+:root[data-flavor="glass"] .admin-neo-sidebar, :root[data-flavor="glass"] .nx-bridge .bg-white {
+  background: color-mix(in srgb, var(--nx-surface) 60%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.5); backdrop-filter: blur(18px) saturate(1.5);
+  border-color: color-mix(in srgb, var(--nx-surface) 65%, var(--nx-line));
+}
+
+/* brutal — الجريء */
+:root[data-flavor="brutal"] .nx-card:not(.nx-card--flat), :root[data-flavor="brutal"] .nx-night, :root[data-flavor="brutal"] .nx-bridge .bg-white.shadow-sm,
+:root[data-flavor="brutal"] .nx-bridge .rounded-3xl.border, :root[data-flavor="brutal"] .admin-neo-header {
+  border: 2px solid var(--nx-line); box-shadow: var(--nx-shadow-2);
+}
+:root[data-flavor="brutal"] .nx-btn, :root[data-flavor="brutal"] .nx-iconbtn { border: 2px solid var(--nx-line); box-shadow: var(--nx-shadow-1); }
+:root[data-flavor="brutal"] .nx-btn--pri { background: var(--nx-copper); }
+:root[data-flavor="brutal"] .nx-btn--pri::after { display: none; }
+:root[data-flavor="brutal"] .nx-navitem[aria-current="page"], :root[data-flavor="brutal"] .admin-neo-nav-list button.is-active {
+  background: var(--nx-gold-2); color: #0B0B0B; border: 2px solid var(--nx-line); box-shadow: var(--nx-shadow-1);
+}
+:root[data-flavor="brutal"] .nx-night::before { content: ""; position: absolute; inset: 0; z-index: -1; background: repeating-linear-gradient(-45deg, transparent 0 14px, rgba(0, 0, 0, .06) 14px 16px); }
+:root[data-flavor="brutal"] .nx-page-title, :root[data-flavor="brutal"] .nx-kpi__value { font-weight: 400; letter-spacing: .01em; }
+
+/* notebook — الدفتر والسبورة */
+:root[data-flavor="notebook"]:not([data-theme="dark"]) .nx-content {
+  background-image: repeating-linear-gradient(to bottom, transparent 0 31px, color-mix(in srgb, var(--nx-line) 55%, transparent) 31px 32px);
+}
+:root[data-flavor="notebook"]:not([data-theme="dark"]) .nx-night::before {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  background: repeating-linear-gradient(to bottom, transparent 0 27px, var(--nx-night-line) 27px 28px), linear-gradient(to left, transparent 38px, color-mix(in srgb, var(--nx-danger) 55%, transparent) 38px 40px, transparent 40px);
+}
+:root[data-flavor="notebook"][data-theme="dark"] .nx-card:not(.nx-night) { border-style: dashed; border-color: var(--nx-line-strong); }
+:root[data-flavor="notebook"] .nx-btn--pri { background: var(--nx-copper); box-shadow: none; }
+:root[data-flavor="notebook"] .nx-navitem[aria-current="page"], :root[data-flavor="notebook"] .admin-neo-nav-list button.is-active { background: transparent; box-shadow: inset -3px 0 0 var(--nx-copper); border-radius: 0; }
+
+/* aurora — الشفق */
+:root[data-flavor="aurora"] .nx-night { background:
+  radial-gradient(90% 80% at 100% 0%, color-mix(in srgb, var(--nx-copper) 70%, transparent), transparent 60%),
+  radial-gradient(80% 90% at 0% 100%, color-mix(in srgb, var(--nx-copper-2) 60%, transparent), transparent 60%),
+  radial-gradient(60% 60% at 60% 110%, color-mix(in srgb, var(--nx-gold-2) 45%, transparent), transparent 60%), var(--nx-night); }
+:root[data-flavor="aurora"] .nx-btn--pri { background: linear-gradient(135deg, var(--nx-copper), var(--nx-copper-2)); }
+:root[data-flavor="aurora"] .nx-navitem[aria-current="page"], :root[data-flavor="aurora"] .admin-neo-nav-list button.is-active { background: linear-gradient(135deg, var(--nx-copper-soft), color-mix(in srgb, var(--nx-copper-2) 14%, var(--nx-surface))); }
+
+/* geo — الزمرّد */
+:root[data-flavor="geo"] .nx-night { background:
+  radial-gradient(circle at 50% 50%, transparent 9px, var(--nx-night-line) 9.5px 10.5px, transparent 11px) 0 0 / 34px 34px,
+  conic-gradient(from 45deg at 50% 50%, transparent 0 25%, color-mix(in srgb, var(--nx-gold-2) 9%, transparent) 0 50%, transparent 0 75%, color-mix(in srgb, var(--nx-gold-2) 9%, transparent) 0) 0 0 / 34px 34px,
+  radial-gradient(90% 90% at 0% 100%, color-mix(in srgb, var(--nx-copper-2) 35%, transparent), transparent 70%), var(--nx-night); }
+:root[data-flavor="geo"] .nx-sec__title::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-inline-end: 8px; background: var(--nx-gold-2); transform: rotate(45deg); vertical-align: middle; }
+:root[data-flavor="geo"] .nx-navitem[aria-current="page"], :root[data-flavor="geo"] .admin-neo-nav-list button.is-active { background: var(--nx-copper); color: var(--nx-on-copper); }
+
+/* minimal — الجرافيت */
+:root[data-flavor="minimal"] .nx-btn--pri, :root[data-flavor="minimal"] .admin-neo-logout { background: var(--nx-ink); color: var(--nx-bg); box-shadow: none; }
+:root[data-flavor="minimal"] .nx-btn--pri::after { display: none; }
+:root[data-flavor="minimal"] .nx-card { box-shadow: none; }
+:root[data-flavor="minimal"] .nx-navitem[aria-current="page"], :root[data-flavor="minimal"] .admin-neo-nav-list button.is-active { background: var(--nx-sunk); color: var(--nx-ink); }
+:root[data-flavor="minimal"] .nx-tile { background: var(--nx-sunk); color: var(--nx-ink-2); }
+
+/* playful — المرح */
+:root[data-flavor="playful"] .nx-btn--pri { box-shadow: 0 4px 0 var(--nx-copper-deep); }
+:root[data-flavor="playful"] .nx-btn:not(.nx-btn--pri):not(.nx-btn--ghost) { box-shadow: 0 3px 0 var(--nx-line-strong); }
+:root[data-flavor="playful"] .nx-card:not(.nx-night) { border-width: 2px; box-shadow: 0 4px 0 var(--nx-line); }
+:root[data-flavor="playful"] .nx-tile { border-radius: 50%; }
+:root[data-flavor="playful"] .nx-navitem[aria-current="page"], :root[data-flavor="playful"] .admin-neo-nav-list button.is-active { background: var(--nx-copper); color: var(--nx-on-copper); box-shadow: 0 3px 0 var(--nx-copper-deep); }
+
+/* royal — الملكي */
+:root[data-flavor="royal"] .nx-night { box-shadow: inset 0 0 0 1px var(--nx-night-line), inset 0 0 0 7px var(--nx-night), inset 0 0 0 8px var(--nx-night-line); }
+:root[data-flavor="royal"] .nx-card:not(.nx-night) { border-top: 2px solid color-mix(in srgb, var(--nx-gold-2) 70%, var(--nx-line)); }
+:root[data-flavor="royal"] .nx-sec__title, :root[data-flavor="royal"] .nx-page-title { font-family: var(--nx-f-cal); }
+:root[data-flavor="royal"]:not([data-theme="dark"]) .nx-navitem[aria-current="page"], :root[data-flavor="royal"]:not([data-theme="dark"]) .admin-neo-nav-list button.is-active { background: var(--nx-night); color: var(--nx-gold-2); }
+
+/* soft — الزهري */
+:root[data-flavor="soft"] .nx-app, :root[data-flavor="soft"] .admin-neo-shell { background: linear-gradient(180deg, var(--nx-bg-2), var(--nx-bg) 40%); }
+:root[data-flavor="soft"] .nx-card:not(.nx-night) { border-color: transparent; box-shadow: var(--nx-shadow-2); }
+:root[data-flavor="soft"] .nx-btn { border-radius: var(--nx-r-pill); }
+
+/* skin picker (student settings + admin platform settings) */
+.nx-skins { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+.nx-skin { text-align: start; display: grid; gap: 6px; padding: 10px; border-radius: var(--nx-r-m); border: 1px solid var(--nx-line); background: var(--nx-surface); color: var(--nx-ink); cursor: pointer; font: inherit; transition: border-color var(--nx-dur-2), transform var(--nx-dur-1); min-width: 0; }
+.nx-skin:active { transform: scale(.98); }
+.nx-skin[aria-checked="true"] { border-color: var(--nx-copper); box-shadow: 0 0 0 1px var(--nx-copper); }
+.nx-skin__swatch { display: grid; grid-template-columns: 1fr 1fr; height: 52px; border-radius: var(--nx-r-s); overflow: hidden; border: 1px solid var(--nx-line); }
+.nx-skin__swatch > span { display: flex; flex-direction: column; justify-content: space-between; padding: 6px 7px; }
+.nx-skin__swatch b { font-size: 12px; line-height: 1; }
+.nx-skin__dots { display: flex; gap: 3px; }
+.nx-skin__dots i { width: 9px; height: 9px; border-radius: 50%; }
+.nx-skin__name { font-weight: 700; font-size: var(--nx-fs-s); }
+.nx-skin__tag { font-size: var(--nx-fs-xs); color: var(--nx-ink-3); line-height: 1.5; }
+@media (max-width: 520px) { .nx-skins { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

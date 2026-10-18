@@ -15,23 +15,23 @@
 .nx-btn--l { min-height: 54px; padding: 0 26px; font-size: var(--nx-fs-l); border-radius: var(--nx-r-l); }
 .nx-btn--pri {
   background: linear-gradient(135deg, var(--nx-copper-2), var(--nx-copper)); border-color: transparent;
-  color: #fff; box-shadow: var(--nx-glow);
+  color: var(--nx-on-copper); box-shadow: var(--nx-glow);
 }
-:root[data-theme="dark"] .nx-btn--pri { color: #1A0E07; }
+
 .nx-btn--pri::after {
   content: ""; position: absolute; z-index: -1; top: 0; bottom: 0; width: 45%; left: -70%;
-  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .42), transparent);
+  background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--nx-night-ink) 42%, transparent), transparent);
   transform: skewX(-20deg); animation: nx-shimmer 3.6s ease-in-out infinite;
 }
-.nx-btn--pri:hover { box-shadow: 0 14px 34px -10px rgba(192, 89, 42, .65); }
+.nx-btn--pri:hover { box-shadow: 0 14px 34px -10px color-mix(in srgb, var(--nx-copper) 65%, transparent); }
 .nx-btn--soft { background: var(--nx-copper-soft); border-color: transparent; color: var(--nx-copper); }
 .nx-btn--ghost { background: transparent; border-color: transparent; color: var(--nx-ink-2); }
 .nx-btn--ghost:hover { background: var(--nx-sunk); }
 .nx-btn--night { background: var(--nx-night-2); color: var(--nx-night-ink); border-color: var(--nx-night-line); }
-.nx-btn--glass { background: rgba(255, 255, 255, .07); color: var(--nx-night-ink); border-color: var(--nx-night-line); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.nx-btn--glass { background: color-mix(in srgb, var(--nx-night-ink) 7%, transparent); color: var(--nx-night-ink); border-color: var(--nx-night-line); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 .nx-btn--danger { background: var(--nx-danger-soft); color: var(--nx-danger); border-color: transparent; }
-.nx-btn--patina { background: var(--nx-patina); color: #fff; border-color: transparent; }
-:root[data-theme="dark"] .nx-btn--patina { color: #06231d; }
+.nx-btn--patina { background: var(--nx-patina); color: var(--nx-bg); border-color: transparent; }
+
 .nx-btn .nx-ico { width: 1.2em; height: 1.2em; }
 
 .nx-iconbtn {
@@ -71,10 +71,10 @@
 .nx-night .muted, .nx-night .dim { color: var(--nx-night-dim); }
 .nx-night__glow {
   position: absolute; z-index: -1; width: 340px; height: 340px; border-radius: 50%; pointer-events: none;
-  background: radial-gradient(circle, rgba(238, 132, 80, .55), transparent 65%); filter: blur(10px);
+  background: radial-gradient(circle, color-mix(in srgb, var(--nx-copper) 55%, transparent), transparent 65%); filter: blur(10px);
   top: -170px; inset-inline-start: -90px; animation: nx-drift-a 12s ease-in-out infinite alternate;
 }
-.nx-night__glow--gold { background: radial-gradient(circle, rgba(242, 192, 99, .35), transparent 65%); top: auto; bottom: -190px; inset-inline-start: auto; inset-inline-end: -80px; animation-name: nx-drift-b; }
+.nx-night__glow--gold { background: radial-gradient(circle, color-mix(in srgb, var(--nx-gold-2) 35%, transparent), transparent 65%); top: auto; bottom: -190px; inset-inline-start: auto; inset-inline-end: -80px; animation-name: nx-drift-b; }
 .nx-night__star { position: absolute; z-index: -1; width: 420px; height: 420px; opacity: .09; inset-inline-end: -140px; top: -120px; animation: nx-spin 140s linear infinite; pointer-events: none; color: var(--nx-gold-2); }
 
 .nx-glass {
@@ -94,7 +94,7 @@
 .nx-chip--patina { background: var(--nx-patina-soft); color: var(--nx-patina); }
 .nx-chip--danger { background: var(--nx-danger-soft); color: var(--nx-danger); }
 .nx-chip--info { background: var(--nx-info-soft); color: var(--nx-info); }
-.nx-chip--night { background: rgba(255, 255, 255, .08); color: var(--nx-night-ink); border: 1px solid var(--nx-night-line); }
+.nx-chip--night { background: color-mix(in srgb, var(--nx-night-ink) 8%, transparent); color: var(--nx-night-ink); border: 1px solid var(--nx-night-line); }
 .nx-chip--live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: nx-blink 1.2s ease-in-out infinite; }
 
 /* ───────── Form fields ───────── */
@@ -170,7 +170,7 @@ button.nx-row:active { opacity: .7; }
 /* ───────── Avatar ───────── */
 .nx-avatar {
   width: 42px; height: 42px; border-radius: 50%; flex: 0 0 auto; display: grid; place-items: center; overflow: hidden;
-  background: linear-gradient(135deg, var(--nx-copper-2), var(--nx-copper)); color: #fff; font-weight: 600; font-size: 16px;
+  background: linear-gradient(135deg, var(--nx-copper-2), var(--nx-copper)); color: var(--nx-on-copper); font-weight: 600; font-size: 16px;
   box-shadow: 0 0 0 3px var(--nx-surface), 0 0 0 4.5px var(--nx-copper-soft);
 }
 .nx-avatar img { width: 100%; height: 100%; object-fit: cover; }
@@ -183,8 +183,8 @@ button.nx-row:active { opacity: .7; }
 .nx-bar--patina > i { background: linear-gradient(90deg, var(--nx-patina), var(--nx-patina-2)); }
 .nx-bar--gold > i { background: linear-gradient(90deg, var(--nx-gold), var(--nx-gold-2)); }
 .nx-bar--danger > i { background: var(--nx-danger); }
-.nx-night .nx-bar { background: rgba(255, 255, 255, .13); }
-.nx-night .nx-bar > i { background: linear-gradient(90deg, var(--nx-gold-2), #EE8450); }
+.nx-night .nx-bar { background: color-mix(in srgb, var(--nx-night-ink) 13%, transparent); }
+.nx-night .nx-bar > i { background: linear-gradient(90deg, var(--nx-gold-2), var(--nx-copper-2)); }
 
 .nx-ring { position: relative; display: inline-grid; place-items: center; }
 .nx-ring svg { transform: rotate(-90deg); display: block; }
@@ -243,15 +243,15 @@ button.nx-row:active { opacity: .7; }
 .nx-lesson:active { transform: scale(.985); }
 .nx-lesson__art {
   position: relative; aspect-ratio: 16 / 8.5; overflow: hidden; isolation: isolate;
-  background: radial-gradient(120% 120% at 100% 0%, #3a2112 0%, var(--nx-night) 60%);
+  background: radial-gradient(120% 120% at 100% 0%, color-mix(in srgb, var(--nx-copper) 30%, var(--nx-night)) 0%, var(--nx-night) 60%);
   display: grid; place-items: center; color: var(--nx-night-ink);
 }
 .nx-lesson__art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -1; }
-.nx-lesson__art::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, transparent 40%, rgba(12, 9, 7, .7)); }
-.nx-lesson__letter { position: absolute; inset-inline-start: 14px; bottom: -14px; font-family: var(--nx-f-cal); font-size: 84px; line-height: 1; color: rgba(242, 192, 99, .16); z-index: -1; }
+.nx-lesson__art::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, transparent 40%, color-mix(in srgb, var(--nx-night) 70%, transparent)); }
+.nx-lesson__letter { position: absolute; inset-inline-start: 14px; bottom: -14px; font-family: var(--nx-f-cal); font-size: 84px; line-height: 1; color: color-mix(in srgb, var(--nx-gold-2) 16%, transparent); z-index: -1; }
 .nx-lesson__play {
   width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center;
-  background: rgba(255, 255, 255, .14); border: 1px solid rgba(255, 255, 255, .25);
+  background: color-mix(in srgb, var(--nx-night-ink) 14%, transparent); border: 1px solid color-mix(in srgb, var(--nx-night-ink) 25%, transparent);
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   transition: transform var(--nx-dur-3) var(--nx-spring), background var(--nx-dur-2);
 }
@@ -334,7 +334,7 @@ button.nx-row:active { opacity: .7; }
 .nx-toast--success .nx-toast__ico { background: var(--nx-patina-soft); color: var(--nx-patina); }
 .nx-toast--error .nx-toast__ico { background: var(--nx-danger-soft); color: var(--nx-danger); }
 :root[data-platform="android"] .nx-toasts { top: auto; bottom: calc(var(--nx-safe-bottom) + 92px); }
-:root[data-platform="android"] .nx-toast { background: #2B221C; color: #F6EEE6; border-color: transparent; border-radius: 8px; backdrop-filter: none; -webkit-backdrop-filter: none; animation-name: nx-snack-in; }
+:root[data-platform="android"] .nx-toast { background: var(--nx-night-3); color: var(--nx-night-ink); border-color: transparent; border-radius: 8px; backdrop-filter: none; -webkit-backdrop-filter: none; animation-name: nx-snack-in; }
 :root[data-platform="android"] .nx-toast.is-leaving { animation-name: nx-snack-out; }
 :root[data-form="desktop"] .nx-toasts { justify-items: start; inset-inline: auto 24px; top: 20px; }
 
@@ -348,7 +348,7 @@ button.nx-row:active { opacity: .7; }
 .nx-streak { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
 .nx-streak__day { display: grid; justify-items: center; gap: 4px; font-size: 10.5px; color: var(--nx-ink-3); }
 .nx-streak__day b { width: 100%; aspect-ratio: 1 / 1; max-width: 40px; border-radius: 12px; background: var(--nx-sunk); display: grid; place-items: center; color: var(--nx-ink-3); font-weight: 500; font-size: 12px; }
-.nx-streak__day.is-on b { background: linear-gradient(160deg, var(--nx-copper-2), var(--nx-copper)); color: #fff; animation: nx-pop .5s var(--nx-spring) both; }
+.nx-streak__day.is-on b { background: linear-gradient(160deg, var(--nx-copper-2), var(--nx-copper)); color: var(--nx-on-copper); animation: nx-pop .5s var(--nx-spring) both; }
 .nx-streak__day.is-today b { box-shadow: 0 0 0 2px var(--nx-surface), 0 0 0 3.5px var(--nx-copper); }
 .nx-flame { color: var(--nx-copper); animation: nx-flick 1.6s ease-in-out infinite; transform-origin: 50% 90%; }
 .nx-switch { position: relative; width: 50px; height: 30px; flex: 0 0 auto; border-radius: 99px; border: 0; background: var(--nx-line-strong); transition: background var(--nx-dur-2); }
@@ -371,16 +371,16 @@ button.nx-row:active { opacity: .7; }
 /* drifting copper mesh + sheen text (hero areas) */
 .lx-mesh { position: absolute; inset: -20%; z-index: -2; filter: blur(70px); opacity: .75; }
 .lx-mesh i { position: absolute; border-radius: 50%; display: block; }
-.lx-mesh i:nth-child(1) { width: 46vw; height: 46vw; max-width: 620px; max-height: 620px; background: radial-gradient(circle, #B4451F 0, transparent 65%); top: 5%; right: 8%; animation: nx-drift-a 18s ease-in-out infinite alternate; }
-.lx-mesh i:nth-child(2) { width: 38vw; height: 38vw; max-width: 520px; max-height: 520px; background: radial-gradient(circle, #9A6512 0, transparent 65%); bottom: 0; left: 12%; animation: nx-drift-b 22s ease-in-out infinite alternate; }
-.lx-mesh i:nth-child(3) { width: 30vw; height: 30vw; max-width: 420px; max-height: 420px; background: radial-gradient(circle, #0E5A50 0, transparent 65%); top: 30%; left: 40%; animation: nx-drift-c 26s ease-in-out infinite alternate; }
-.lx-sheen { background: linear-gradient(100deg, #F6A56E 0%, #F2C063 40%, #FFF1D6 50%, #F2C063 60%, #E07B3F 100%); background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: nx-sheen 6s ease-in-out infinite; }
+.lx-mesh i:nth-child(1) { width: 46vw; height: 46vw; max-width: 620px; max-height: 620px; background: radial-gradient(circle, var(--nx-copper-deep) 0, transparent 65%); top: 5%; right: 8%; animation: nx-drift-a 18s ease-in-out infinite alternate; }
+.lx-mesh i:nth-child(2) { width: 38vw; height: 38vw; max-width: 520px; max-height: 520px; background: radial-gradient(circle, var(--nx-gold) 0, transparent 65%); bottom: 0; left: 12%; animation: nx-drift-b 22s ease-in-out infinite alternate; }
+.lx-mesh i:nth-child(3) { width: 30vw; height: 30vw; max-width: 420px; max-height: 420px; background: radial-gradient(circle, var(--nx-patina) 0, transparent 65%); top: 30%; left: 40%; animation: nx-drift-c 26s ease-in-out infinite alternate; }
+.lx-sheen { background: linear-gradient(100deg, var(--nx-copper-2) 0%, var(--nx-gold-2) 40%, var(--nx-night-ink) 50%, var(--nx-gold-2) 60%, var(--nx-copper) 100%); background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: nx-sheen 6s ease-in-out infinite; }
 
 /* splash while the app or a page loads */
-.nx-splash { position: fixed; inset: 0; z-index: 2000; display: grid; place-content: center; justify-items: center; gap: 22px; background: radial-gradient(80% 60% at 50% 40%, #2a160c 0%, var(--nx-night) 70%); color: var(--nx-night-ink); overflow: hidden; isolation: isolate; }
+.nx-splash { position: fixed; inset: 0; z-index: 2000; display: grid; place-content: center; justify-items: center; gap: 22px; background: radial-gradient(80% 60% at 50% 40%, color-mix(in srgb, var(--nx-copper) 22%, var(--nx-night)) 0%, var(--nx-night) 70%); color: var(--nx-night-ink); overflow: hidden; isolation: isolate; }
 .nx-splash__star { position: absolute; z-index: -1; width: 520px; height: 520px; left: 50%; top: 50%; margin: -300px 0 0 -260px; opacity: .1; color: var(--nx-gold-2); animation: nx-spin 40s linear infinite; }
 .nx-splash__logo { width: 180px; height: auto; animation: nx-pop .7s var(--nx-spring) both; }
-.nx-splash__bar { width: 140px; height: 4px; border-radius: 4px; background: rgba(255, 255, 255, .1); overflow: hidden; }
-.nx-splash__bar i { display: block; width: 40%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--nx-gold-2), #EE8450); animation: nx-splash 1.2s ease-in-out infinite; }
+.nx-splash__bar { width: 140px; height: 4px; border-radius: 4px; background: color-mix(in srgb, var(--nx-night-ink) 10%, transparent); overflow: hidden; }
+.nx-splash__bar i { display: block; width: 40%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--nx-gold-2), var(--nx-copper-2)); animation: nx-splash 1.2s ease-in-out infinite; }
 @keyframes nx-splash { 0% { transform: translateX(160%); } 100% { transform: translateX(-260%); } }
 .nx-splash__msg { font-size: var(--nx-fs-s); color: var(--nx-night-dim); }

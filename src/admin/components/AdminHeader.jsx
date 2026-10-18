@@ -3,9 +3,11 @@ import AdminNeoIcon from './AdminNeoIcon.jsx';
 import { auth } from '../../services/firebase';
 import { GradeOptions } from '../../shared/constants/grades';
 import { getAdminPageMeta } from '../v2/adminPageMeta.js';
+import { usePrefs } from '../../v2/prefs.js';
 
 export default function AdminHeader({ activeTab, adminGradeFilter, setAdminGradeFilter, onMenuClick }) {
   const meta = getAdminPageMeta(activeTab);
+  const { theme, toggleTheme } = usePrefs();
 
   return (
     <header className="admin-neo-header">
@@ -22,6 +24,7 @@ export default function AdminHeader({ activeTab, adminGradeFilter, setAdminGrade
             <GradeOptions />
           </select>
         </label>
+        <button type="button" className="admin-neo-theme" onClick={toggleTheme} title={theme === 'dark' ? 'الوضع النهاري' : 'الوضع الليلي'} aria-label={theme === 'dark' ? 'الوضع النهاري' : 'الوضع الليلي'}><AdminNeoIcon name={theme === 'dark' ? 'sun' : 'moon'} size={17} /></button>
         <button type="button" onClick={() => signOut(auth)} className="admin-neo-logout" title="تسجيل الخروج"><AdminNeoIcon name="logout" size={17} /><span>خروج</span></button>
       </div>
     </header>

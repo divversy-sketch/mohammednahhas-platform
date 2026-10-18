@@ -24,8 +24,9 @@ FAMILIES = {
     'danger': ['red', 'rose'],
 }
 ROLE = {fam: role for role, fams in FAMILIES.items() for fam in fams}
-SOLID = {'copper': '#C0592A', 'gold': '#B97F14', 'patina': '#13806F', 'danger': '#C0303F'}
-SOLID_DEEP = {'copper': '#9A3F18', 'gold': '#8A5E0C', 'patina': '#0D5E52', 'danger': '#93202D'}
+# solid fills follow the active skin (see src/v2/styles/skins.css); they stay saturated in both themes
+SOLID = {r: f'var(--nx-{r}-solid)' for r in ('copper', 'gold', 'patina', 'danger')}
+SOLID_DEEP = {r: f'var(--nx-{r}-solid-deep)' for r in ('copper', 'gold', 'patina', 'danger')}
 TOKEN = {'copper': '--nx-copper', 'gold': '--nx-gold', 'patina': '--nx-patina', 'danger': '--nx-danger'}
 SOFT = {'copper': '--nx-copper-soft', 'gold': '--nx-gold-soft', 'patina': '--nx-patina-soft', 'danger': '--nx-danger-soft'}
 
@@ -48,13 +49,13 @@ def colour(role, shade, prop):
     if role == 'neutral':
         if prop == 'bg':
             return {50: 'var(--nx-bg-2)', 100: 'var(--nx-sunk)', 200: 'var(--nx-line)', 300: 'var(--nx-line-strong)',
-                    400: 'var(--nx-ink-3)', 500: 'var(--nx-ink-3)', 600: 'var(--nx-ink-2)', 700: '#3A2D24',
+                    400: 'var(--nx-ink-3)', 500: 'var(--nx-ink-3)', 600: 'var(--nx-ink-2)', 700: 'color-mix(in srgb, var(--nx-ink) 78%, var(--nx-bg))',
                     800: 'var(--nx-night-3)', 900: 'var(--nx-night-2)', 950: 'var(--nx-night)'}.get(s)
         if prop in ('text', 'placeholder', 'fill', 'stroke', 'caret', 'decoration'):
             if s <= 100:
-                return '#F7EFE7'
+                return 'var(--nx-night-ink)'
             if s <= 300:
-                return '#D9CBBB' if prop == 'text' else 'var(--nx-line-strong)'
+                return 'color-mix(in srgb, var(--nx-night-ink) 72%, var(--nx-night-dim))' if prop == 'text' else 'var(--nx-line-strong)'
             if s <= 500:
                 return 'var(--nx-ink-3)'
             if s <= 700:
@@ -76,7 +77,7 @@ def colour(role, shade, prop):
         if s <= 200:
             return f'color-mix(in srgb, var({tok}) 24%, var(--nx-surface))'
         if s <= 400:
-            return f'color-mix(in srgb, {SOLID[role]} 70%, #FFFFFF)'
+            return f'color-mix(in srgb, {SOLID[role]} 70%, var(--nx-surface))'
         if s <= 600:
             return SOLID[role]
         return SOLID_DEEP[role]

@@ -48,6 +48,11 @@
   --nx-shadow-2: 0 2px 4px rgba(70, 35, 10, .05), 0 18px 40px -18px rgba(70, 35, 10, .28);
   --nx-shadow-3: 0 30px 70px -24px rgba(40, 18, 5, .45);
   --nx-glow: 0 10px 30px -10px rgba(192, 89, 42, .55);
+  --nx-copper-solid: #C0592A; --nx-copper-solid-deep: #9A3F18;
+  --nx-gold-solid: #B97F14; --nx-gold-solid-deep: #8A5E0C;
+  --nx-patina-solid: #13806F; --nx-patina-solid-deep: #0D5E52;
+  --nx-danger-solid: #C0303F; --nx-danger-solid-deep: #93202D;
+  --nx-f-head: var(--nx-f-ui);
 
   --nx-f-ui: 'Readex Pro', 'IBM Plex Sans Arabic', system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif;
   --nx-f-cal: 'Aref Ruqaa', 'Readex Pro', serif;

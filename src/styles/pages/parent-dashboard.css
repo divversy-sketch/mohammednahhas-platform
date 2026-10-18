@@ -11,12 +11,12 @@
 .parent-empty{background:var(--nx-surface);border:1.5px dashed var(--nx-line-strong);border-radius:var(--nx-r-l);padding:48px 22px;text-align:center;color:var(--nx-ink-2)}
 .parent-empty h2{color:var(--nx-ink);font-size:var(--nx-fs-xl);margin-bottom:8px}
 .parent-child-bar{position:relative;overflow:hidden;isolation:isolate;background:var(--nx-night);color:var(--nx-night-ink);border:1px solid var(--nx-night-line);border-radius:var(--nx-r-xl, 28px);padding:24px 26px;display:flex;justify-content:space-between;align-items:center;gap:16px;box-shadow:var(--nx-shadow-2)}
-.parent-child-bar::before{content:"";position:absolute;z-index:-1;width:420px;height:420px;border-radius:50%;inset-inline-start:-120px;top:-220px;background:radial-gradient(circle,rgba(230,138,78,.45),transparent 65%);animation:nx-drift-a 18s ease-in-out infinite alternate}
+.parent-child-bar::before{content:"";position:absolute;z-index:-1;width:420px;height:420px;border-radius:50%;inset-inline-start:-120px;top:-220px;background:radial-gradient(circle,color-mix(in srgb,var(--nx-copper-2) 45%,transparent),transparent 65%);animation:nx-drift-a 18s ease-in-out infinite alternate}
 .parent-child-bar small{color:var(--nx-gold-2);font-weight:500}
 .parent-child-bar h2{font-size:var(--nx-fs-3xl);margin:4px 0;font-weight:700}
 .parent-child-bar p{margin:0;color:var(--nx-night-dim)}
-.parent-child-bar select{min-width:220px;border:1px solid var(--nx-night-line);background:rgba(255,255,255,.08);color:var(--nx-night-ink);border-radius:14px;padding:12px;font-weight:600}
-.parent-child-bar select option{color:#1A120D}
+.parent-child-bar select{min-width:220px;border:1px solid var(--nx-night-line);background:color-mix(in srgb,var(--nx-night-ink) 8%,transparent);color:var(--nx-night-ink);border-radius:14px;padding:12px;font-weight:600}
+.parent-child-bar select option{color:var(--nx-ink);background:var(--nx-surface)}
 .parent-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
 .parent-stat{background:var(--nx-surface);border:1px solid var(--nx-line);border-radius:var(--nx-r-l);padding:20px 12px;text-align:center;animation:nx-rise .55s var(--nx-ease) both}
 .parent-stat:nth-child(2){animation-delay:.05s}.parent-stat:nth-child(3){animation-delay:.1s}.parent-stat:nth-child(4){animation-delay:.15s}.parent-stat:nth-child(5){animation-delay:.2s}

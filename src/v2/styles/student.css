@@ -38,15 +38,15 @@
 .nx-podium__col i {
   font-style: normal; width: 100%; display: grid; place-items: center; border-radius: 14px 14px 4px 4px; margin-top: 6px;
   font-size: var(--nx-fs-xl); font-weight: 700; color: var(--nx-night-ink);
-  background: linear-gradient(180deg, rgba(255, 255, 255, .14), rgba(255, 255, 255, .04)); border: 1px solid var(--nx-night-line);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--nx-night-ink) 14%, transparent), color-mix(in srgb, var(--nx-night-ink) 4%, transparent)); border: 1px solid var(--nx-night-line);
 }
-.nx-podium__col--1 i { height: 92px; background: linear-gradient(180deg, color-mix(in srgb, var(--nx-gold-2) 45%, transparent), rgba(255, 255, 255, .04)); }
+.nx-podium__col--1 i { height: 92px; background: linear-gradient(180deg, color-mix(in srgb, var(--nx-gold-2) 45%, transparent), color-mix(in srgb, var(--nx-night-ink) 4%, transparent)); }
 .nx-podium__col--2 i { height: 66px; }
 .nx-podium__col--3 i { height: 48px; }
 .nx-podium__col--1 { animation-delay: .1s; }
 .nx-podium__col--3 { animation-delay: .2s; }
 .nx-avatar--medal-gold { box-shadow: 0 0 0 3px var(--nx-gold-2); width: 56px; height: 56px; font-size: 20px; }
-.nx-avatar--medal-neutral { box-shadow: 0 0 0 3px #C9CED6; }
+.nx-avatar--medal-neutral { box-shadow: 0 0 0 3px var(--nx-line-strong); }
 .nx-avatar--medal-copper { box-shadow: 0 0 0 3px var(--nx-copper-2); }
 .nx-rank { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--nx-sunk); font-weight: 600; font-size: var(--nx-fs-s); color: var(--nx-ink-2); flex: 0 0 auto; }
 .nx-rank .nx-ico { color: var(--nx-gold); width: 18px; height: 18px; }
@@ -56,7 +56,7 @@
 .nx-profile-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .nx-plan { position: relative; overflow: hidden; isolation: isolate; }
 .nx-plan.nx-night .nx-field > span { color: var(--nx-night-dim); }
-.nx-plan.nx-night .nx-input { background: rgba(255, 255, 255, .06); border-color: var(--nx-night-line); }
+.nx-plan.nx-night .nx-input { background: color-mix(in srgb, var(--nx-night-ink) 6%, transparent); border-color: var(--nx-night-line); }
 .nx-plan.nx-night .nx-input input { color: var(--nx-night-ink); }
 
 /* live */

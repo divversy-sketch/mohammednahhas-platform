@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl" data-skin="cinema" data-flavor="cinema">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#FAF6F1" />
+    <meta name="theme-color" content="#0B0908" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="منصة النحاس" />
@@ -16,12 +16,13 @@
     <link href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600;700&family=Aref+Ruqaa:wght@700&display=swap" rel="stylesheet">
     <style>
       /* first paint before the app loads: matches the v2 background so there is no white flash */
-      html { background: #FAF6F1; }
-      @media (prefers-color-scheme: dark) { html { background: #0F0B09; } }
-      body { margin: 0; font-family: 'Readex Pro', 'Cairo', system-ui, sans-serif; }
+      html { background: #F4F1EE; }
+      @media (prefers-color-scheme: dark) { html { background: #0B0908; } }
+      body { margin: 0; font-family: 'Almarai', 'Readex Pro', system-ui, sans-serif; }
     </style>
     <script>
-      try { var p = JSON.parse(localStorage.getItem('nx-prefs-v1') || '{}'); var t = p.theme === 'dark' || (p.theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light'; document.documentElement.dataset.theme = t; document.documentElement.style.background = t === 'dark' ? '#0F0B09' : '#FAF6F1'; } catch (e) {}
+      /* first paint: apply the saved skin + day/night before the app loads (map generated from scripts/v2/skins.source.mjs) */
+      try { var S = {"cinema":["cinema","#F4F1EE","#0B0908"],"nahhas":["classic","#FAF6F1","#0F0B09"],"zumurrud":["geo","#F2F5F1","#07120F"],"mawj":["glass","#E9F2FB","#050E1B"],"shafaq":["aurora","#F6F4FF","#0A0716"],"daftar":["notebook","#FDFDFB","#18211D"],"jari":["brutal","#FFF9E8","#121212"],"graphite":["minimal","#F8F8F9","#09090B"],"marah":["playful","#FFF7F2","#160F0D"],"malaki":["royal","#F4F5F8","#080B18"],"zahri":["soft","#FCF6F8","#140C12"]}; var p = JSON.parse(localStorage.getItem('nx-prefs-v1') || '{}'); var k = p.skin || localStorage.getItem('nx-platform-skin') || 'cinema'; if (!S[k]) k = 'cinema'; var t = p.theme === 'dark' || (p.theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light'; var d = document.documentElement; d.dataset.skin = k; d.dataset.flavor = S[k][0]; d.dataset.theme = t; d.style.background = S[k][t === 'dark' ? 2 : 1]; } catch (e) {}
     </script>
   </head>
   <body>

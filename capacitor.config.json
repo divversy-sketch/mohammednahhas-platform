@@ -2,12 +2,12 @@
   "appId": "com.nahhas.platform",
   "appName": "NahhasPlatform",
   "webDir": "dist",
-  "backgroundColor": "#0F0B09",
+  "backgroundColor": "#0B0908",
   "plugins": {
     "StatusBar": {
       "overlaysWebView": false,
       "style": "DARK",
-      "backgroundColor": "#0F0B09"
+      "backgroundColor": "#0B0908"
     }
   }
 }

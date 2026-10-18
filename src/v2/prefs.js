@@ -1,8 +1,12 @@
-// Per-device display preferences: theme, text size, motion and haptics.
+// Per-device display preferences: skin, theme, text size, motion and haptics.
+// skin '' means "use the platform default" that the admin picks in إعدادات المنصة.
 import { useEffect, useState } from 'react';
 import { setChromeColor } from './device/native.js';
+import { DEFAULT_SKIN, SKINS, getSkin } from './skins.js';
 
-const DEFAULTS = { theme: 'system', text: 'normal', motion: 'auto', haptics: 'on' };
+const DEFAULTS = { theme: 'system', text: 'normal', motion: 'auto', haptics: 'on', skin: '' };
+const PLATFORM_SKIN_KEY = 'nx-platform-skin';
+let platformSkin = (() => { try { return localStorage.getItem(PLATFORM_SKIN_KEY) || DEFAULT_SKIN; } catch { return DEFAULT_SKIN; } })();
 const KEY = 'nx-prefs-v1';
 const listeners = new Set();
 
@@ -26,19 +30,49 @@ export function resolvedTheme(p = prefs) {
   return darkQuery?.matches ? 'dark' : 'light';
 }
 
+export function resolvedSkin(p = prefs) {
+  const id = p.skin || platformSkin;
+  return SKINS.some((s) => s.id === id) ? id : DEFAULT_SKIN;
+}
+
+const loadedFonts = new Set(['nahhas', 'cinema']); // these two ship with the app (offline-safe)
+function loadSkinFonts(skin) {
+  if (loadedFonts.has(skin.id) || typeof document === 'undefined') return;
+  loadedFonts.add(skin.id);
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = `https://fonts.googleapis.com/css2?${skin.fonts}&display=swap`;
+  link.dataset.nxSkin = skin.id;
+  document.head.appendChild(link);
+}
+
 export function applyPrefs() {
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
   const theme = resolvedTheme();
+  const skin = getSkin(resolvedSkin());
+  loadSkinFonts(skin);
+  root.dataset.skin = skin.id;
+  root.dataset.flavor = skin.flavor;
   root.dataset.theme = theme;
   root.dataset.text = prefs.text;
   root.dataset.haptics = prefs.haptics;
   if (prefs.motion === 'auto') delete root.dataset.motion; else root.dataset.motion = prefs.motion;
   root.style.colorScheme = theme;
-  setChromeColor(theme === 'dark' ? '#0F0B09' : '#FAF6F1', theme !== 'dark');
+  setChromeColor(skin[theme].bg, theme !== 'dark');
 }
 
 export function getPrefs() { return prefs; }
+
+/** The skin every device uses until its owner picks one (set by the admin, cached on the device). */
+export function setPlatformSkin(id) {
+  if (!id || id === platformSkin || !SKINS.some((s) => s.id === id)) return;
+  platformSkin = id;
+  try { localStorage.setItem(PLATFORM_SKIN_KEY, id); } catch { /* storage blocked */ }
+  applyPrefs();
+  listeners.forEach((fn) => fn(prefs));
+}
+export function getPlatformSkin() { return platformSkin; }
 
 export function setPref(key, value) {
   prefs = { ...prefs, [key]: value };
@@ -66,5 +100,5 @@ export function usePrefs() {
     listeners.add(setState);
     return () => listeners.delete(setState);
   }, []);
-  return { prefs: state, theme: resolvedTheme(state), setPref, toggleTheme };
+  return { prefs: state, theme: resolvedTheme(state), skin: resolvedSkin(state), platformSkin, setPref, toggleTheme };
 }

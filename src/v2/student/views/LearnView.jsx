@@ -7,6 +7,7 @@ import { Bar, Button, Chip, Empty, Skeleton, formatNumber } from '../../ui/kit.j
 import { arabicDateTime, normalizeArabic, orderOf, titleOf, toDate } from '../insights.js';
 import { FileRow, LessonCard, SectionHead } from '../parts.jsx';
 import { Embed, StudentCoursesHub } from '../embeds.jsx';
+import { Poster } from '../cinema.jsx';
 
 function FilterBar({ q, setQ, placeholder, children }) {
   return (
@@ -47,7 +48,7 @@ function Lectures({ ctx }) {
         </div>
       </FilterBar>
       {list.length
-        ? <div className="nx-grid nx-stagger">{list.map((v, i) => <LessonCard key={v.id} item={v} ctx={ctx} index={i} />)}</div>
+        ? <div className="cx-grid">{list.map((v, i) => <Poster key={v.id} item={v} ctx={ctx} index={i} />)}</div>
         : <Empty icon="video" title={q ? 'مفيش محاضرة بالاسم ده' : 'مفيش محاضرات هنا'} text={q ? 'جرّب كلمة تانية.' : 'أول ما المحاضرات تنزل لصفّك هتظهر هنا.'} />}
       {linked.length > 0 && (
         <section className="nx-card nx-sec">

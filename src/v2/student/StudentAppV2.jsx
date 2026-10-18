@@ -1,14 +1,8 @@
-// Student app, v2. One tree, four presentations chosen by <html data-platform data-form>:
-// iPhone (large title + frosted tab bar), Android (Material app bar + navigation bar),
-// tablet (navigation rail) and desktop (sidebar + search + Ctrl/⌘K).
+// Student app, v2 · «السينما». Top navigation over a moving poster on tablet/desktop, frosted tab bar on phones,
+// a banner on every inner page, and search on Ctrl/⌘K.
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { signOut } from 'firebase/auth';
-import { auth } from '@services/firebase';
-import { getGradeLabel } from '@shared/constants/grades';
-import logoLight from '@assets/nahhas-logo-transparent.webp';
-import logoDark from '@assets/nahhas-logo-dark.webp';
 import { Icon } from '../ui/Icon.jsx';
-import { IconButton, Segmented, formatNumber } from '../ui/kit.jsx';
+import { Segmented } from '../ui/kit.jsx';
 import { useDevice, useOnline } from '../device/useDevice.js';
 import { haptic, onBackButton } from '../device/native.js';
 import { usePrefs } from '../prefs.js';
@@ -17,6 +11,8 @@ import { examBuckets } from './insights.js';
 import { CommandPalette, NotificationsSheet } from './parts.jsx';
 import { ExamPreStartPanel, InteractiveViewer, Overlay, SecureVideoPlayer, SmartHomeworkScanner, EmbedFallback } from './embeds.jsx';
 import HomeView from './views/HomeView.jsx';
+import { CinemaNav, CinemaPhoneTop, PageHero } from './cinema.jsx';
+import '../styles/cinema.css';
 import '../styles/student.css';
 
 const LearnView = lazy(() => import('./views/LearnView.jsx'));
@@ -24,69 +20,6 @@ const ExamsView = lazy(() => import('./views/ExamsView.jsx'));
 const ProgressView = lazy(() => import('./views/ProgressView.jsx'));
 const AccountView = lazy(() => import('./views/AccountView.jsx'));
 
-const firstName = (name) => String(name || 'طالب').trim().split(/\s+/)[0];
-
-function Avatar({ ctx, size }) {
-  const name = ctx.userData?.name || 'طالب';
-  const photo = ctx.userData?.photoURL || ctx.user?.photoURL;
-  return <span className={`nx-avatar ${size === 'l' ? 'nx-avatar--l' : ''}`} aria-hidden="true">{photo ? <img src={photo} alt="" loading="lazy" /> : name.trim().charAt(0)}</span>;
-}
-
-function useScrolled(threshold = 24) {
-  const [scrolled, setScrolled] = useState(false);
-  useEffect(() => {
-    let frame = 0;
-    const onScroll = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => setScrolled(window.scrollY > threshold));
-    };
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => { cancelAnimationFrame(frame); window.removeEventListener('scroll', onScroll); };
-  }, [threshold]);
-  return scrolled;
-}
-
-/* ───── phone: iPhone and Android headers ───── */
-function PhoneTop({ ctx, route, device, theme, title, onSearch, onBell, go }) {
-  const scrolled = useScrolled(route.section === 'home' ? 70 : 24);
-  const isHome = route.section === 'home';
-  const actions = (
-    <>
-      <IconButton icon="search" label="بحث" plain onClick={onSearch} />
-      <IconButton icon="bell" label="الإشعارات" plain badge={ctx.unseenNotificationCount || null} onClick={onBell} />
-    </>
-  );
-  if (device.platform === 'ios') {
-    return (
-      <header className={`nx-top ${scrolled ? 'is-scrolled' : ''}`}>
-        <div className="nx-top__bar">
-          <div className="nx-top__side">
-            {isHome ? <img className="nx-top__logo" src={theme === 'dark' ? logoDark : logoLight} alt="منصة النحاس" style={{ height: 30, opacity: scrolled ? 0 : 1, transition: 'opacity .2s' }} />
-              : <button type="button" className="nx-sec__more" style={{ fontSize: 'var(--nx-fs-m)' }} onClick={() => go('home')}><Icon name="chevronRight" />الرئيسية</button>}
-          </div>
-          <div className="nx-top__title">{isHome ? `أهلاً ${firstName(ctx.userData?.name)}` : title}</div>
-          <div className="nx-top__side nx-top__side--end">{actions}</div>
-        </div>
-        {!isHome && <h1 className="nx-top__large" style={{ opacity: scrolled ? 0 : 1 }}>{title}</h1>}
-      </header>
-    );
-  }
-  return (
-    <header className={`nx-top ${scrolled ? 'is-scrolled' : ''}`}>
-      <div className="nx-top__bar">
-        {isHome
-          ? <img className="nx-top__logo" src={theme === 'dark' ? logoDark : logoLight} alt="منصة النحاس" />
-          : <IconButton icon="arrowRight" label="رجوع" plain onClick={() => go('home')} />}
-        <div className="nx-top__title">{isHome ? '' : title}</div>
-        <div className="nx-top__actions">
-          {actions}
-          <button type="button" className="nx-iconbtn nx-iconbtn--plain" aria-label="حسابي" onClick={() => go('account:profile')}><Avatar ctx={ctx} /></button>
-        </div>
-      </div>
-    </header>
-  );
-}
 
 function TabBar({ route, go, badges }) {
   return (
@@ -99,75 +32,6 @@ function TabBar({ route, go, badges }) {
         </button>
       ))}
     </nav>
-  );
-}
-
-/* ───── tablet: navigation rail ───── */
-function Rail({ route, go, badges, theme, toggleTheme }) {
-  return (
-    <nav className="nx-rail" aria-label="التنقل الرئيسي">
-      <img className="nx-rail__mark" src={theme === 'dark' ? logoDark : logoLight} alt="منصة النحاس" />
-      {SECTIONS.map((s) => (
-        <button key={s.key} type="button" className="nx-tab" aria-current={route.section === s.key ? 'page' : undefined} onClick={() => go(s.key)}>
-          <span className="nx-tab__pill"><Icon name={s.icon} />{badges[s.key] ? <span className="nx-dot" /> : null}</span>
-          <span>{s.label}</span>
-        </button>
-      ))}
-      <span className="nx-rail__spacer" />
-      <IconButton icon={theme === 'dark' ? 'sun' : 'moon'} label={theme === 'dark' ? 'الوضع النهاري' : 'الوضع الليلي'} plain onClick={toggleTheme} />
-    </nav>
-  );
-}
-
-/* ───── desktop: sidebar ───── */
-function Sidebar({ ctx, route, go, badges, theme, toggleTheme }) {
-  return (
-    <aside className="nx-side" aria-label="التنقل الرئيسي">
-      <img className="nx-side__logo" src={theme === 'dark' ? logoDark : logoLight} alt="منصة النحاس" />
-      {SECTIONS.map((s) => {
-        const active = route.section === s.key;
-        return (
-          <div key={s.key}>
-            <button type="button" className="nx-navitem" aria-current={active && (!SUBS[s.key] || s.key === 'home') ? 'page' : undefined}
-              style={active && SUBS[s.key] ? { color: 'var(--nx-ink)', fontWeight: 600 } : undefined} onClick={() => go(s.key)}>
-              <Icon name={s.icon} />{s.title}
-              {badges[s.key] ? <span className="nx-chip nx-chip--copper">{formatNumber(badges[s.key])}</span> : null}
-            </button>
-            {active && (SUBS[s.key] || []).map((sub) => (
-              <button key={sub.key} type="button" className="nx-navitem nx-navitem--sub" aria-current={route.sub === sub.key ? 'page' : undefined} onClick={() => go(`${s.key}:${sub.key}`)}>
-                {sub.label}
-              </button>
-            ))}
-          </div>
-        );
-      })}
-      <div className="nx-side__foot">
-        <button type="button" className="nx-navitem" onClick={toggleTheme}><Icon name={theme === 'dark' ? 'sun' : 'moon'} />{theme === 'dark' ? 'الوضع النهاري' : 'الوضع الليلي'}</button>
-        <div className="nx-me">
-          <Avatar ctx={ctx} />
-          <div className="nx-me__txt"><b>{ctx.userData?.name}</b><span>{getGradeLabel(ctx.userData?.grade)}</span></div>
-          <IconButton icon="logout" label="تسجيل الخروج" plain onClick={() => signOut(auth)} />
-        </div>
-      </div>
-    </aside>
-  );
-}
-
-function DeskBar({ ctx, device, title, section, onSearch, onBell, go }) {
-  const mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
-  return (
-    <header className="nx-deskbar">
-      <div className="nx-deskbar__title">
-        <small>{section === 'home' ? new Date().toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' }) : SECTIONS.find((s) => s.key === section)?.title}</small>
-        <b>{section === 'home' ? `أهلاً يا ${firstName(ctx.userData?.name)}` : title}</b>
-      </div>
-      <button type="button" className="nx-search" onClick={onSearch} aria-label="بحث">
-        <Icon name="search" /><span>دوّر على درس أو امتحان</span>
-        {device.form === 'desktop' && <span className="nx-kbd">{mac ? '⌘' : 'Ctrl'} K</span>}
-      </button>
-      <IconButton icon="bell" label="الإشعارات" badge={ctx.unseenNotificationCount || null} onClick={onBell} />
-      {device.form === 'tablet' && <button type="button" className="nx-iconbtn nx-iconbtn--plain" aria-label="حسابي" onClick={() => go('account:profile')}><Avatar ctx={ctx} /></button>}
-    </header>
   );
 }
 
@@ -281,15 +145,14 @@ export default function StudentAppV2({ ctx }) {
   };
 
   return (
-    <div className="nx nx-app" dir="rtl" data-section={route.section}>
+    <div className="nx nx-app cx-app" dir="rtl" data-section={route.section}>
       {!online && <div className="nx-offline" role="status"><Icon name="wifiOff" size={14} /> مفيش إنترنت دلوقتي. اللي اتحمّل هيفضل ظاهر، وهنكمّل أول ما النت يرجع.</div>}
-      {device.form === 'desktop' && <Sidebar ctx={ctx} route={route} go={go} badges={badges} theme={theme} toggleTheme={toggleTheme} />}
-      {device.form === 'tablet' && <Rail route={route} go={go} badges={badges} theme={theme} toggleTheme={toggleTheme} />}
       <div className="nx-main">
         {phone
-          ? <PhoneTop ctx={ctx} route={route} device={device} theme={theme} title={SECTIONS.find((s) => s.key === route.section)?.title || title} onSearch={() => setSearchOpen(true)} onBell={bell} go={go} />
-          : <DeskBar ctx={ctx} device={device} title={title} section={route.section} onSearch={() => setSearchOpen(true)} onBell={bell} go={go} />}
-        <main className="nx-content" id="nx-main">
+          ? <CinemaPhoneTop ctx={ctx} route={route} title={SECTIONS.find((s) => s.key === route.section)?.title || title} onSearch={() => setSearchOpen(true)} onBell={bell} go={go} />
+          : <CinemaNav ctx={ctx} route={route} go={go} badges={badges} theme={theme} toggleTheme={toggleTheme} onSearch={() => setSearchOpen(true)} onBell={bell} device={device} />}
+        <main className={`nx-content ${route.section === 'home' ? 'cx-home-content' : ''}`} id="nx-main">
+          {route.section !== 'home' && <PageHero route={route} title={title} />}
           <SubNav route={route} go={go} counts={counts} />
           <div className="nx-page" key={route.key}>
             <Suspense fallback={<EmbedFallback />}>{view}</Suspense>

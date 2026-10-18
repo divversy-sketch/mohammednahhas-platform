@@ -55,7 +55,7 @@ export function ExamCard({ entry, ctx, now, mode = 'open' }) {
   const access = ctx.getExamAccessState ? ctx.getExamAccessState(exam) : { allowed: true };
   const pct = completed ? percentOf(completed) : null;
   const questionsCount = (exam.questions || []).reduce((n, g) => n + ((g.subQuestions || []).length || 1), 0);
-  const canReview = completed && (Date.now() > (end?.getTime() || 0) || exam.allowReviewImmediately);
+  const canReview = completed && (now > (end?.getTime() || 0) || exam.allowReviewImmediately);
   const startExam = () => {
     if (exam.accessRule?.requiredExamId || exam.showPreStart) ctx.setPreExam?.(exam);
     else ctx.startExamWithCode?.(exam);
@@ -87,7 +87,7 @@ export function ExamCard({ entry, ctx, now, mode = 'open' }) {
         {mode === 'upcoming' && <Button variant="soft" icon="bell" onClick={() => platformNotify(`«${exam.title || 'الامتحان'}» هيفتح ${arabicDateTime(start)}.`)}>هيفتح {arabicDate(start)}</Button>}
         {mode === 'done' && (
           <>
-            <Button variant="soft" icon="eye" disabled={!canReview} onClick={() => ctx.setReviewingExam?.(exam)}>{canReview ? 'راجع إجاباتك' : 'المراجعة بعد قفل الامتحان'}</Button>
+            <Button variant={canReview ? 'pri' : 'soft'} icon={canReview ? 'eye' : 'lock'} onClick={() => ctx.setReviewingExam?.(exam)}>{canReview ? 'راجع إجاباتك والتصويب' : `درجتك · المراجعة بعد ${formatDuration((end?.getTime() || 0) - now)}`}</Button>
           </>
         )}
       </div>
