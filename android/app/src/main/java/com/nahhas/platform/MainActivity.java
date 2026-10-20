@@ -1,9 +1,11 @@
 package com.nahhas.platform;
 
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.WindowManager;
+import android.webkit.WebSettings;
 import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
 
@@ -69,6 +71,23 @@ public class MainActivity extends BridgeActivity {
     registerPlugin(ScreenShieldPlugin.class);
     super.onCreate(savedInstanceState);
     getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+      WindowManager.LayoutParams lp = getWindow().getAttributes();
+      lp.layoutInDisplayCutoutMode =
+          WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_NEVER;
+      getWindow().setAttributes(lp);
+    }
+
+    ScreenShieldPlugin.applySafeWindowInsets(this);
+
+    if (bridge != null && bridge.getWebView() != null) {
+      WebSettings settings = bridge.getWebView().getSettings();
+      settings.setTextZoom(100);
+      settings.setUseWideViewPort(true);
+      settings.setLoadWithOverviewMode(true);
+    }
+
     getWindow()
         .getDecorView()
         .setOnSystemUiVisibilityChangeListener(
@@ -83,6 +102,7 @@ public class MainActivity extends BridgeActivity {
   public void onResume() {
     super.onResume();
     getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+    ScreenShieldPlugin.applySafeWindowInsets(this);
     if (ScreenShieldPlugin.isExamLockActive()) {
       ScreenShieldPlugin.applyImmersiveExamUi(this, true);
     }
