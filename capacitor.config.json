@@ -3,6 +3,16 @@
   "appName": "NahhasPlatform",
   "webDir": "dist",
   "backgroundColor": "#0B0908",
+  "server": {
+    "url": "https://mohammednahhas-da7e7platform-beryl.vercel.app",
+    "cleartext": false,
+    "allowNavigation": [
+      "mohammednahhas-da7e7platform-beryl.vercel.app",
+      "*.vercel.app",
+      "*.firebaseapp.com",
+      "*.web.app"
+    ]
+  },
   "plugins": {
     "StatusBar": {
       "overlaysWebView": false,
