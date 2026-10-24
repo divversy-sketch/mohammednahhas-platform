@@ -11,7 +11,7 @@ export function loadNativePlugins() {
   if (!loading) {
     loading = Promise.allSettled([
       import('@capacitor/haptics').then((m) => { loaded.Haptics = m.Haptics; }),
-      import('@capacitor/status-bar').then((m) => { loaded.StatusBar = m.StatusBar; }),
+      import('@capacitor/core').then((m) => { loaded.SystemBars = m.SystemBars; loaded.registerPlugin = m.registerPlugin; }),
       import('@capacitor/app').then((m) => { loaded.App = m.App; }),
     ]).then(() => loaded);
   }
@@ -50,10 +50,15 @@ export function setChromeColor(color, darkContent) {
       document.head.appendChild(meta);
     }
     meta.content = color;
-    const { StatusBar } = plugins();
-    if (isNative() && StatusBar) {
-      StatusBar.setStyle?.({ style: darkContent ? 'LIGHT' : 'DARK' });
-      if (detectPlatform() === 'android') StatusBar.setBackgroundColor?.({ color });
+    if (isNative()) {
+      // dark icons on a light screen, light icons on a dark one; the window behind the bars gets the same colour
+      loadNativePlugins().then(({ SystemBars, registerPlugin }) => {
+        SystemBars?.setStyle?.({ style: darkContent ? 'LIGHT' : 'DARK' })?.catch?.(() => {});
+        if (registerPlugin) {
+          if (!loaded.AppChrome) loaded.AppChrome = registerPlugin('AppChrome');
+          loaded.AppChrome.setColor?.({ color })?.catch?.(() => {});
+        }
+      });
     }
   } catch { /* not critical */ }
 }

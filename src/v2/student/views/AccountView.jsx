@@ -200,6 +200,14 @@ function Settings({ ctx }) {
       <section className="nx-card nx-sec">
         <SectionHead title="الجهاز" icon="phone" />
         <div className="nx-list">
+          {device.native && (() => {
+            const live = !['localhost', '127.0.0.1'].includes(window.location.hostname);
+            const when = typeof __NX_BUILD_TIME__ !== 'undefined' ? new Date(__NX_BUILD_TIME__).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' }) : '';
+            const sha = typeof __NX_BUILD_COMMIT__ !== 'undefined' && __NX_BUILD_COMMIT__ ? ` · ${__NX_BUILD_COMMIT__}` : '';
+            return (
+              <div className="nx-row"><span className="nx-tile"><Icon name="phone" /></span><span className="nx-row__main"><span className="nx-row__title">{live ? 'تحديث مباشر ✓' : 'نسخة مدمجة في التطبيق'}</span><span className="nx-row__sub" style={{ whiteSpace: "normal" }}>{live ? 'أي تحديث بينزل على الموقع بيظهر هنا لوحده.' : 'محتاج APK جديد مع كل تحديث.'} نسخة: {when}{sha}</span></span></div>
+            );
+          })()}
           {device.platform !== 'web' && (
             <div className="nx-row"><span className="nx-tile"><Icon name="vibrate" /></span><span className="nx-row__main"><span className="nx-row__title">اهتزاز خفيف مع اللمس</span></span><Switch checked={prefs.haptics !== 'off'} onChange={(v) => setPref('haptics', v ? 'on' : 'off')} label="الاهتزاز" /></div>
           )}

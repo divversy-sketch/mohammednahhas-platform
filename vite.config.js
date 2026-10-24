@@ -2,7 +2,14 @@ import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+const BUILD_TIME = new Date().toISOString()
+const BUILD_COMMIT = (process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || '').slice(0, 7)
+
 export default defineConfig({
+  define: {
+    __NX_BUILD_TIME__: JSON.stringify(BUILD_TIME),
+    __NX_BUILD_COMMIT__: JSON.stringify(BUILD_COMMIT),
+  },
   plugins: [react()],
   resolve: {
     alias: {
