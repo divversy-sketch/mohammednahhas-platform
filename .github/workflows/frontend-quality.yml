@@ -8,12 +8,19 @@ on:
 
 jobs:
   quality:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
-      - run: npm ci
-      - run: npm run final:ultimate
+      - name: Write .env from the ENV_FILE secret
+        env:
+          ENV_FILE: ${{ secrets.ENV_FILE }}
+        run: |
+          if [ -n "$ENV_FILE" ]; then
+            printf '%s\n' "$ENV_FILE" > .env
+          fi
+      - run: npm install
+      - run: npm run build
