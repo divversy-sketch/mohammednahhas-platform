@@ -1,20 +1,19 @@
 @echo off
-chcp 65001 >nul
 echo ================================================
-echo   بناء تطبيق منصة النحاس للأندرويد (APK)
+echo   Building Nahhas Platform Android APK
 echo ================================================
-echo محتاج: Node.js 20+ و Android Studio متثبتين
+echo Needs: Node.js 20+ and Android Studio installed.
 echo.
 call npm install
-if errorlevel 1 goto :fail
+if errorlevel 1 goto fail
 call node scripts/android/build-apk.mjs
-if errorlevel 1 goto :fail
+if errorlevel 1 goto fail
 echo.
-echo الملف اتعمل باسم NahhasPlatform.apk جوه فولدر المشروع
+echo Done. NahhasPlatform.apk is in the project folder.
 pause
 exit /b 0
 :fail
 echo.
-echo حصل خطأ. ابعت الرسالة اللي فوق.
+echo Something failed. Send the message above.
 pause
 exit /b 1
