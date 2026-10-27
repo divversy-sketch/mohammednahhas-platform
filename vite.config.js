@@ -1,16 +1,42 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
 const BUILD_TIME = new Date().toISOString()
 const BUILD_COMMIT = (process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || '').slice(0, 7)
+// بصمة النسخة: بتتغير مع كل بناء. التطبيق بيقارن بصمته بـ /version.json على الموقع، ولو اختلفوا بيحدّث نفسه.
+const BUILD_ID = `${BUILD_TIME.replace(/[^0-9]/g, '').slice(0, 14)}${BUILD_COMMIT ? `-${BUILD_COMMIT}` : ''}`
 
-export default defineConfig({
+function liveUrl(mode) {
+  const env = loadEnv(mode, process.cwd(), '')
+  if (env.CAP_SERVER_URL) return env.CAP_SERVER_URL.trim().replace(/\/+$/, '')
+  try { return String(JSON.parse(fs.readFileSync('app-update.json', 'utf8')).liveUrl || '').trim().replace(/\/+$/, '') } catch { return '' }
+}
+
+// بعد البناء: يكتب dist/version.json، ويحط رابط الموقع في offline.html عشان زرار «إعادة المحاولة» جوه التطبيق يرجع للموقع.
+function liveUpdatePlugin(mode) {
+  let outDir = 'dist'
+  return {
+    name: 'nahhas-live-update',
+    apply: 'build',
+    configResolved(cfg) { outDir = path.resolve(cfg.root, cfg.build.outDir) },
+    closeBundle() {
+      fs.writeFileSync(path.join(outDir, 'version.json'), JSON.stringify({ build: BUILD_ID, time: BUILD_TIME, commit: BUILD_COMMIT }))
+      const offline = path.join(outDir, 'offline.html')
+      if (fs.existsSync(offline)) fs.writeFileSync(offline, fs.readFileSync(offline, 'utf8').replaceAll('__NX_LIVE_URL__', liveUrl(mode)))
+    },
+  }
+}
+
+export default defineConfig(({ mode }) => ({
   define: {
     __NX_BUILD_TIME__: JSON.stringify(BUILD_TIME),
     __NX_BUILD_COMMIT__: JSON.stringify(BUILD_COMMIT),
+    __NX_BUILD_ID__: JSON.stringify(BUILD_ID),
   },
-  plugins: [react()],
+  plugins: [react(), liveUpdatePlugin(mode)],
   resolve: {
     alias: {
       '@app': fileURLToPath(new URL('./src/app', import.meta.url)),
@@ -45,4 +71,4 @@ export default defineConfig({
       }
     }
   }
-})
+}))

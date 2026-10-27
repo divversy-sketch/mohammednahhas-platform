@@ -1,0 +1,26 @@
+/* شاشة تثبيت الامتحان */
+@keyframes xl-in { from { opacity: 0; transform: translateY(14px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes xl-spin { to { transform: rotate(360deg); } }
+.xl-screen { position: fixed; inset: 0; z-index: 2147482000; display: grid; place-items: center; padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px calc(env(safe-area-inset-bottom, 0px) + 16px); background: var(--nx-bg, #0B0908); color: var(--nx-ink, #fff); overflow-y: auto; font-family: 'Almarai', 'Readex Pro', system-ui, sans-serif; }
+.xl-screen--over { background: color-mix(in srgb, var(--nx-bg, #0B0908) 92%, transparent); backdrop-filter: blur(10px); }
+.xl-card { width: min(460px, 100%); display: grid; gap: 14px; justify-items: center; text-align: center; padding: 28px 22px; border-radius: 24px; background: var(--nx-surface, #16110E); border: 1px solid var(--nx-line, rgba(255,255,255,.1)); box-shadow: 0 30px 80px rgba(0,0,0,.35); animation: xl-in .4s both; }
+.xl-badge { width: 64px; height: 64px; border-radius: 20px; display: grid; place-items: center; color: #fff; background: linear-gradient(135deg, var(--nx-gold-2, #F0A04B), var(--nx-copper, #D97706)); }
+.xl-badge.is-bad { background: linear-gradient(135deg, #F87171, #DC2626); }
+.xl-badge .nx-ico { width: 30px; height: 30px; }
+.xl-card h2 { margin: 0; font-size: 22px; font-weight: 800; }
+.xl-exam { margin: -6px 0 0; color: var(--nx-ink-3, #aaa); font-size: 14px; line-height: 1.7; }
+.xl-rules { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 10px; width: 100%; text-align: start; }
+.xl-rules li { display: flex; gap: 10px; align-items: flex-start; padding: 11px 12px; border-radius: 14px; background: var(--nx-sunk, rgba(255,255,255,.05)); font-size: 14px; line-height: 1.7; }
+.xl-rules .nx-ico { width: 18px; height: 18px; flex: none; margin-top: 3px; color: var(--nx-copper, #D97706); }
+.xl-help { display: grid; gap: 8px; text-align: start; font-size: 14px; line-height: 1.8; color: var(--nx-ink-2, #ddd); }
+.xl-help p, .xl-help-line { margin: 0; }
+.xl-help-line { font-size: 14px; color: var(--nx-ink-2, #ddd); }
+.xl-help-line.is-bad { color: var(--nx-danger, #F87171); font-weight: 700; }
+.xl-actions { display: grid; gap: 8px; width: 100%; margin-top: 4px; }
+.xl-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 50px; border-radius: 14px; border: 0; font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
+.xl-actions .nx-ico { width: 18px; height: 18px; }
+.xl-primary { background: var(--nx-copper, #D97706); color: #fff; }
+.xl-primary:disabled { opacity: .7; }
+.xl-ghost { background: transparent; color: var(--nx-ink-2, #ddd); border: 1px solid var(--nx-line, rgba(255,255,255,.15)) !important; }
+.xl-wait { display: inline-flex; align-items: center; gap: 10px; min-height: 50px; font-weight: 700; color: var(--nx-ink-2, #ddd); }
+.xl-wait i { width: 20px; height: 20px; border-radius: 50%; border: 3px solid var(--nx-line, rgba(255,255,255,.2)); border-top-color: var(--nx-copper, #D97706); animation: xl-spin .8s linear infinite; }

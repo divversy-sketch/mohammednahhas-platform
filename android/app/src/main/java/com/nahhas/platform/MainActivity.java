@@ -8,6 +8,7 @@ public class MainActivity extends BridgeActivity {
   public void onCreate(Bundle savedInstanceState) {
     registerPlugin(ScreenShieldPlugin.class);
     registerPlugin(AppChromePlugin.class);
+    registerPlugin(ExamLockPlugin.class);
     super.onCreate(savedInstanceState);
     // Phones with a large "font size" setting would otherwise blow the text up and push content out of the screen.
     if (getBridge() != null && getBridge().getWebView() != null) {

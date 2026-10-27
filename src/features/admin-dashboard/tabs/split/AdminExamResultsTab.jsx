@@ -24,6 +24,7 @@ import AdminStudentSuccessSuite from '@features/studentSuccess/StudentSuccessAdm
 import { AdminGlobalSearch, AdminLiveClassesPanel, AdminCertificatesPanel, AdminCommandQuickActions } from '@features/product/ProductExperienceSuite.jsx';
 import AdminAllUsersTab from '@features/admin-dashboard/tabs/users/AdminAllUsersTab.jsx';
 import AdminDashboardOverviewTab from '@features/admin-dashboard/tabs/dashboard/AdminDashboardOverviewTab.jsx';
+import AdminResultsV2, { ResultDetailHeader } from '@admin/v2/AdminResultsV2.jsx';
 
 export default function AdminExamResultsTab({ ctx }) {
   const {
@@ -211,39 +212,23 @@ export default function AdminExamResultsTab({ ctx }) {
   return (
     <>
 {activeTab === 'exams' && adminExamView === 'results' && (
-             <div className="glass-panel p-4 md:p-6 rounded-xl">
-               <div className="flex flex-col md:flex-row justify-between md:items-center mb-4 gap-4">
-                 <h2 className="font-bold flex items-center gap-2 font-arabic text-xl"><Layout/> نتائج الامتحانات</h2>
-                 {!viewingResult && examResults.length > 0 && (
-                     <button onClick={handleDeleteAllResults} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-red-700 transition shadow-lg w-full md:w-auto justify-center"><Trash2 size={16}/> حذف جميع النتائج</button>
-                 )}
-               </div>
+             <div className={viewingResult ? "glass-panel p-4 md:p-6 rounded-xl" : ""}>
                {viewingResult ? (
                    <div className="bg-slate-50 p-4 rounded-xl border">
-                       <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
-                           <button onClick={() => setViewingResult(null)} className="text-sm text-slate-500 underline font-bold text-right">العودة للقائمة</button>
-                           {(() => {
-                               const examData = examsList.find(e => e.id === viewingResult.examId);
-                               const questions = getQuestionsForExam(examData);
-                               return (
-                                   <div className="flex gap-2">
-                                       <button onClick={() => sendWhatsAppToParent(viewingResult)} className="flex-1 md:flex-none justify-center bg-green-500 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 font-bold hover:bg-green-600 shadow-sm"><MessageCircle size={16}/> واتساب لولي الأمر</button>
-                                       <button onClick={() => generatePDF('admin', {...viewingResult, total: viewingResult.total || 0, examTitle: examData?.title, questions: questions, answers: viewingResult.answers })} className="flex-1 md:flex-none justify-center bg-blue-600 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 shadow-sm"><Download size={16}/> التقرير</button>
-                                   </div>
-                               );
-                           })()}
-                       </div>
-                       <h3 className="font-bold text-lg mb-2">إجابات الطالب: {viewingResult.studentName}</h3>
-                       {(!['continue', 'restart'].includes(viewingResult.adminDecision)) && (
-                         <div className="mb-4 bg-red-50 border border-red-200 text-red-800 p-4 rounded-xl">
-                           <p className="font-black mb-2 flex items-center gap-2"><ShieldAlert size={18}/> هذه المحاولة تحتاج قرار الأدمن</p>
-                           <p className="text-sm font-bold mb-3">يمكنك السماح للطالب بالاستكمال من نفس الإجابات والوقت المتبقي، أو السماح بإعادة الامتحان من البداية.</p>
-                           <div className="flex flex-col md:flex-row gap-2">
-                             <button onClick={() => handleApproveSecurityContinue(viewingResult)} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-700">السماح بالاستكمال</button>
-                             <button onClick={() => handleApproveSecurityRestart(viewingResult)} className="bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-amber-700">السماح بالإعادة من البداية</button>
-                           </div>
-                         </div>
-                       )}
+                       {(() => {
+                           const examData = examsList.find(e => e.id === viewingResult.examId);
+                           return (
+                               <ResultDetailHeader
+                                   result={viewingResult}
+                                   exam={examData}
+                                   onBack={() => setViewingResult(null)}
+                                   onWhatsApp={viewingResult.status === 'completed' ? () => sendWhatsAppToParent(viewingResult) : null}
+                                   onPdf={examData ? () => generatePDF('admin', { ...viewingResult, total: viewingResult.total || 0, examTitle: examData?.title, questions: getQuestionsForExam(examData), answers: viewingResult.answers }) : null}
+                                   onApproveContinue={() => handleApproveSecurityContinue({ ...viewingResult, totalTime: viewingResult.totalTime || examData?.duration })}
+                                   onApproveRestart={() => handleApproveSecurityRestart({ ...viewingResult, totalTime: viewingResult.totalTime || examData?.duration })}
+                               />
+                           );
+                       })()}
                        {viewingResult.hasEssay && (
                            <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-xl font-bold text-sm">
                                هذا الامتحان يحتوي على أسئلة مقالية، ويمكنك تصحيح كل سؤال يدويًا وتحديد الدرجة النهائية له من نفس الصفحة.
@@ -336,41 +321,7 @@ export default function AdminExamResultsTab({ ctx }) {
                        </div>
                    </div>
                ) : (
-                   <div className="overflow-x-auto">
-                       <div className="min-w-[600px] space-y-2">
-                           {examResults.map(res => (
-                               <div key={res.id} className="flex justify-between items-center border p-3 rounded hover:bg-slate-50 transition bg-white/50">
-                                   <div>
-                                       <p className="font-bold flex items-center gap-2">
-                                           {res.studentName}
-                                           {res.hasEssay && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px] font-bold">مقالي</span>}
-                                       </p>
-                                       <p className="text-xs text-slate-500">
-                                           {res.status==='security_hold'
-                                             ? 'موقوف أمنيًا في انتظار قرار الأدمن 🛡️'
-                                             : res.status==='cheated'
-                                               ? 'غش 🚫'
-                                               : res.status==='in_progress'
-                                                 ? 'قيد التنفيذ (لم يسلم) ⏳'
-                                                 : `درجة: ${res.score}/${res.total}`}
-                                       </p>
-                                   </div>
-                                   <div className="flex gap-2 flex-wrap justify-end">
-                                      {(!['continue', 'restart'].includes(res.adminDecision)) && (
-                                        <>
-                                          <button onClick={()=>handleApproveSecurityContinue(res)} className="bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-blue-700">السماح بالاستكمال</button>
-                                          <button onClick={()=>handleApproveSecurityRestart(res)} className="bg-amber-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-amber-700">السماح بالإعادة</button>
-                                        </>
-                                      )}
-                                      {res.status === 'completed' && <button onClick={()=>sendWhatsAppToParent(res)} className="bg-green-100 text-green-700 px-3 py-1 rounded text-xs font-bold flex items-center gap-1 hover:bg-green-200"><MessageCircle size={14}/><span className="hidden md:inline"> إرسال لولي الأمر</span></button>}
-                                      <button onClick={()=>setViewingResult(res)} className="bg-blue-100 text-blue-600 px-3 py-1 rounded text-xs font-bold">التفاصيل</button>
-                                      <button onClick={()=>openAdminResultReview(res)} className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded text-xs font-bold flex items-center gap-1"><Eye size={14}/> مراجعة الامتحان</button>
-                                      <button onClick={()=>handleDeleteResult(res.id)} className="bg-amber-100 text-amber-600 px-3 py-1 rounded text-xs font-bold">إعادة</button>
-                                   </div>
-                               </div>
-                           ))}
-                       </div>
-                   </div>
+                   <AdminResultsV2 ctx={ctx} />
                )}
              </div>
           )}

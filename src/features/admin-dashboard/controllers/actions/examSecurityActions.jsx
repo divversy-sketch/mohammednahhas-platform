@@ -126,6 +126,10 @@ export const createExamSecurityActions = (ctx) => {
 
   const handleApproveSecurityContinue = async (result) => {
     if (!result?.id) return;
+    if (result.status === 'completed') {
+      platformNotify('الطالب ده سلّم الامتحان خلاص، ومينفعش يكمّله تاني. لو عايزه يمتحن من جديد استخدم «إعادة الامتحان» من صفحة النتائج.');
+      return;
+    }
     const adminUser = auth.currentUser;
     if (!adminUser) {
       platformNotify('انتهت جلسة تسجيل الدخول. سجل الدخول مرة أخرى قبل اعتماد قرار الامتحان.');
@@ -163,6 +167,10 @@ export const createExamSecurityActions = (ctx) => {
 
   const handleApproveSecurityRestart = async (result) => {
     if (!result?.id) return;
+    if (result.status === 'completed') {
+      platformNotify('الطالب ده سلّم الامتحان خلاص، ومينفعش يكمّله تاني. لو عايزه يمتحن من جديد استخدم «إعادة الامتحان» من صفحة النتائج.');
+      return;
+    }
     const adminUser = auth.currentUser;
     if (!adminUser) {
       platformNotify('انتهت جلسة تسجيل الدخول. سجل الدخول مرة أخرى قبل اعتماد قرار الامتحان.');

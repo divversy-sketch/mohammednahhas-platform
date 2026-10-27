@@ -15,10 +15,12 @@ import { ExamEmptyState, ExamCheatingScreen } from '@features/exams/runner/compo
 import { ExamRunnerView } from '@features/exams/runner/views/ExamRunnerView.jsx';
 import { callFunction } from '@services/callFunction.js';
 import { queuePendingSubmit, clearPendingSubmit } from '@shared/exam/pendingSubmit.js';
+import { useExamLockWatch, releaseExamLock, blockBackButton, examLockMode } from '@features/native-app/examLock.js';
+import { ExamLockBrokenOverlay } from '@features/native-app/ExamLockGate.jsx';
 
 
 
-export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult = null }) => {
+export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existingResult = null, examLocked = false }) => {
   const [activeView, setActiveView] = useState(isReviewMode || existingResult ? 'dashboard' : 'questions');
   const [currentQIndex, setCurrentQIndex] = useState(() => Math.max(0, safeNumber(exam.resumeData?.currentQIndex ?? readLocalExamBackup(makeExamAutosaveKey(user, exam))?.currentQIndex, 0)));
   const autosaveKey = makeExamAutosaveKey(user, exam);
@@ -117,6 +119,27 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
       window.removeEventListener('pagehide', onLeave);
     };
   }, [isReviewMode, exam.attemptId, exam.id, exam.duration, flatQuestions.length]);
+
+  // قفل الامتحان على الموبايل: لو الطالب فك تثبيت الشاشة بتتسجل محاولة غش والامتحان بيتغطى لحد ما يرجّعه.
+  const examLock = useExamLockWatch({
+    enabled: examLocked && !isReviewMode && !isSubmitted && !isCheating && !showAntiCheatChoice,
+    onBroken: () => handleCheatingRef.current?.('app_unpinned'),
+    bypassRef: fileDialogBypassRef,
+  });
+  // بعد التسليم (أو قفل الامتحان) الشاشة بتتفك لوحدها.
+  useEffect(() => { if (isSubmitted) releaseExamLock(); }, [isSubmitted]);
+  useEffect(() => () => { releaseExamLock(); }, []);
+  // زرار الرجوع في الموبايل ما يخرجش من الامتحان قبل التسليم.
+  useEffect(() => {
+    if (isReviewMode || isSubmitted) return undefined;
+    return blockBackButton(() => platformNotify('مينفعش تخرج من الامتحان قبل ما تسلّم. لما تخلص اضغط «تسليم».'));
+  }, [isReviewMode, isSubmitted]);
+  // الأدمن يشوف الطالب امتحن والشاشة مقفولة ولا لأ (طلب منفصل: لو القواعد لسه ما اتنشرتش ما يبوّظش الحفظ).
+  useEffect(() => {
+    if (isReviewMode || isSubmitted || !exam.attemptId || exam.id === 'custom_mistakes_exam') return;
+    setDoc(doc(db, 'exam_results', exam.attemptId), { examLock: examLocked ? 'pinned' : examLockMode() }, { merge: true }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exam.attemptId]);
 
   useEffect(() => {
     if (isReviewMode) return;
@@ -569,7 +592,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
     }
   });
 
-  return <ExamRunnerView ctx={{
+  return <>{examLock.broken && <ExamLockBrokenOverlay onRepin={examLock.repin} />}<ExamRunnerView ctx={{
     exam, user, activeView, isSubmitted, timeLeft, score, mcqQuestions,
     flatQuestions, answers, onClose, setActiveView, confirmSubmit, totalQs,
     percentage, solvedQs, correctQs, wrongQs, essayAnswered, essayQuestions,
@@ -578,7 +601,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
     setShowSubmitConfirm, activeBranchTab, uniqueBranches, displayQuestions,
     flagged, currentQIndex, setCurrentQIndex, currentQObj, handleAnswer,
     setFlagged, handleEssayImageUpload, fileDialogBypassRef, isReviewMode, existingResult,
-  }} />;
+  }} /></>;
 };
 
 export default ExamRunner;

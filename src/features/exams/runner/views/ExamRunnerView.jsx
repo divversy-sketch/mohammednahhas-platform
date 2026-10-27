@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef } from 'react';
 import { burstConfetti } from '@v2/ui/kit.jsx';
 import CinemaExam from '@v2/exam/CinemaExam.jsx';
+import { setUpdateBlocked } from '@v2/device/liveUpdate.js';
 
 const ExamReview = lazy(() => import('@v2/student/ExamReview.jsx'));
 
@@ -26,6 +27,13 @@ function ExamRunnerScreens({ ctx }) {
     if (!wasSubmitted.current && isSubmitted && Number(percentage) >= 75) burstConfetti(Number(percentage) >= 90 ? 70 : 42);
     wasSubmitted.current = isSubmitted;
   }, [isSubmitted, percentage]);
+
+  // ممنوع التحديث التلقائي يعيد تحميل الصفحة والطالب بيمتحن.
+  useEffect(() => {
+    if (isSubmitted || isReviewMode) return undefined;
+    setUpdateBlocked('exam');
+    return () => setUpdateBlocked(null);
+  }, [isSubmitted, isReviewMode]);
 
   // After submitting (or when reopening a saved attempt): the score right away, the full review once the exam window closes.
   const submittedAt = useMemo(() => (isSubmitted ? new Date() : null), [isSubmitted]);

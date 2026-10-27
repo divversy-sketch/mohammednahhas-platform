@@ -139,7 +139,7 @@ export default function AdminExamLive({ ctx }) {
             return (
               <div key={x.r?.id || x.u.id} className={`alv-row alv-tone-${st.tone}`} role="row">
                 <span className="alv-who"><i>{String(x.name).trim().charAt(0)}</i><span><b>{x.name}</b><small>{x.phone || x.grade || ''}</small></span></span>
-                <span><em className="alv-badge"><Icon name={st.icon} />{st.label}</em>{x.r?.antiCheatWarnings ? <small className="alv-warn">{formatNumber(x.r.antiCheatWarnings)} تنبيه أمان</small> : null}</span>
+                <span><em className="alv-badge"><Icon name={st.icon} />{st.label}</em>{x.r?.antiCheatWarnings ? <small className="alv-warn">{formatNumber(x.r.antiCheatWarnings)} تنبيه أمان</small> : null}{x.r?.examLock === 'pinned' && x.state !== 'submitted' ? <small className="alv-pin"><Icon name="lock" />الشاشة مقفولة</small> : null}{(x.r?.antiCheatLog || []).some((e) => e.type === 'app_unpinned') ? <small className="alv-warn">حاول يفك تثبيت الشاشة</small> : null}</span>
                 <span className="alv-prog">{x.state === 'submitted'
                   ? <b className="alv-score">{formatNumber(x.r.score ?? 0)} / {formatNumber(x.r.total ?? x.total)} · {formatNumber(x.r.percentage ?? 0)}٪</b>
                   : x.r ? <><i><em style={{ width: `${pct}%` }} /></i><small>{formatNumber(x.answered)} من {formatNumber(x.total)}</small></> : <small>—</small>}</span>
@@ -156,7 +156,7 @@ export default function AdminExamLive({ ctx }) {
           })}
         </div>
       )}
-      <p className="alv-note"><Icon name="info" />الصفحة بتتحدّث لوحدها. «خرج من الامتحان» يعني قفل الصفحة أو سابها أكتر من دقيقة؛ تقدر تسمح له يكمّل بنفس إجاباته ووقته الباقي، أو يبدأ من الأول.</p>
+      <p className="alv-note"><Icon name="info" />الصفحة بتتحدّث لوحدها. «خرج من الامتحان» يعني قفل الصفحة أو سابها أكتر من دقيقة؛ تقدر تسمح له يكمّل بنفس إجاباته ووقته الباقي، أو يبدأ من الأول. اللي «سلّم» امتحانه مقفول ومينفعش يكمّله.</p>
     </div>
   );
 }

@@ -34,6 +34,8 @@ export default function AdminPreview() {
   const params = new URLSearchParams(window.location.search);
   const [activeTab, setActiveTab] = useState(params.get('tab') || 'dashboard');
   const [grade, setGrade] = useState('all');
+  const [examView, setExamView] = useState(params.get('view') || '');
+  const [viewingResult, setViewingResult] = useState(null);
   const profile = { ...buildOwnerAdminProfile({ uid: 'preview', email: 'owner@preview' }), name: 'أ. محمد النحاس' };
   const now = Date.now();
   const demo = params.get('demo') ? {
@@ -44,13 +46,13 @@ export default function AdminPreview() {
     contentList: Array.from({ length: 23 }, (_, i) => ({ id: `c${i}` })),
     examsList: [{ id: 'e1', title: 'امتحان البلاغة الشامل', startTime: new Date(now - 36e5).toISOString(), endTime: new Date(now + 36e5).toISOString() }, { id: 'e2', title: 'النحو' }, { id: 'e3', title: 'القصة' }],
     examResults: [
-      ...Array.from({ length: 90 }, (_, i) => ({ id: `x${i}`, examId: i < 6 ? 'e1' : 'e2', studentId: `u${i}`, studentName: `طالب ${i + 1}`, status: 'completed', score: 12 + (i % 8), total: 20, percentage: 55 + ((i * 37) % 45), timeTaken: 1500 + i * 13, submittedAt: new Date(now - ((i * 7919) % 13) * 864e5 - 36e5).toISOString() })),
+      ...Array.from({ length: 90 }, (_, i) => ({ id: `x${i}`, examId: i < 6 ? 'e1' : 'e2', studentId: `u${i}`, studentName: `طالب ${i + 1}`, status: 'completed', score: 12 + (i % 8), total: 20, percentage: 30 + ((i * 37) % 70), examLock: i % 3 ? 'pinned' : 'web', antiCheatWarnings: i % 11 === 0 ? 2 : 0, antiCheatLog: i % 11 === 0 ? [{ type: 'app_unpinned', at: new Date(now - 4e6).toISOString() }, { type: 'focus_or_visibility_lost', at: new Date(now - 3e6).toISOString() }] : [], branchStats: { 'البلاغة': { earned: 3 + (i % 5), possible: 8 }, 'النحو': { earned: 5 + (i % 3), possible: 7 }, 'النصوص': { earned: 2 + (i % 4), possible: 5 } }, timeTaken: 1500 + i * 13, submittedAt: new Date(now - ((i * 7919) % 13) * 864e5 - 36e5).toISOString() })),
       ...[['u20', 'live', 14], ['u21', 'live', 6], ['u22', 'live', 19], ['u23', 'away', 9], ['u24', 'old', 3]].map(([sid, kind, n], i) => ({ id: `lv${i}`, examId: 'e1', studentId: sid, studentName: ['مريم سامي', 'عمر خالد', 'منة الله', 'أحمد علي', 'كريم حسن'][i], status: 'in_progress', presence: kind === 'away' ? 'away' : 'online', lastSeenAt: new Date(now - (kind === 'old' ? 6e5 : 12e3)).toISOString(), answeredCount: n, totalQuestions: 20, remainingTime: 1800 - i * 200, submittedAt: new Date(now - 9e5).toISOString() })),
-      { id: 'hold1', examId: 'e1', studentId: 'u25', studentName: 'سلمى نبيل', status: 'security_hold', antiCheatWarnings: 3, answeredCount: 11, totalQuestions: 20, lastSeenAt: new Date(now - 2e5).toISOString() },
+      { id: 'hold1', examId: 'e1', studentId: 'u25', studentName: 'سلمى نبيل', status: 'security_hold', antiCheatWarnings: 3, antiCheatLog: [{ type: 'app_unpinned', at: new Date(now - 3e5).toISOString() }], answeredCount: 11, totalQuestions: 20, lastSeenAt: new Date(now - 2e5).toISOString() },
     ],
   } : {};
   const base = { ...demo, newContent: NEW_CONTENT, filteredPendingUsers: demo.pendingUsers || [], filteredActiveUsers: demo.activeUsersList || [], filteredContentList: demo.contentList || [], filteredExamsList: demo.examsList || [] };
-  const extra = { ...base, activeTab, setActiveTab, adminGradeFilter: grade, setAdminGradeFilter: setGrade, userData: profile, user: { uid: 'preview' }, adminProfile: profile };
+  const extra = { ...base, activeTab, setActiveTab, adminGradeFilter: grade, setAdminGradeFilter: setGrade, adminExamView: examView, setAdminExamView: setExamView, viewingResult, setViewingResult, userData: profile, user: { uid: 'preview' }, adminProfile: profile };
   const ctx = materialize(emptyCtx(extra), extra);
   return <AdminDashboardShell user={{ uid: 'preview' }} adminProfile={profile} activeTab={activeTab} setActiveTab={setActiveTab} adminGradeFilter={grade} setAdminGradeFilter={setGrade} dashboardContext={ctx} />;
 }

@@ -59,3 +59,4 @@
   .alv-row > :nth-child(5) { grid-area: seen; } .alv-row > :nth-child(6) { grid-area: act; }
 }
 @media (max-width: 560px) { .alv-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .alv-search input { width: 140px; } .alv-pick select { max-width: 210px; } }
+.alv-pin { display: flex !important; align-items: center; gap: 4px; margin-top: 2px; } .alv-pin .nx-ico { width: 12px; height: 12px; }

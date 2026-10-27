@@ -144,7 +144,9 @@ service cloud.firestore {
         'securityHoldAt', 'securityReason', 'securityDecision', 'continuedAt',
         'restartCount', 'restartedAfterSecurityAt',
         // live monitor for the admin
-        'presence', 'lastSeenAt', 'leftAt', 'answeredCount', 'totalQuestions'
+        'presence', 'lastSeenAt', 'leftAt', 'answeredCount', 'totalQuestions',
+        // قفل الامتحان على الموبايل (pinned / unavailable / web)
+        'examLock'
       ];
     }
 
