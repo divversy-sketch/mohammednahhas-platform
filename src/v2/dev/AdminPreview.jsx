@@ -34,8 +34,10 @@ export default function AdminPreview() {
   const params = new URLSearchParams(window.location.search);
   const [activeTab, setActiveTab] = useState(params.get('tab') || 'dashboard');
   const [grade, setGrade] = useState('all');
-  const [examView, setExamView] = useState(params.get('view') || '');
+  const [examView, setExamView] = useState(params.get('view') || 'manage');
   const [viewingResult, setViewingResult] = useState(null);
+  const [examBuilder, setExamBuilder] = useState({ title: '', grade: '3sec', duration: 60, startTime: '', endTime: '', questions: [], accessCode: '', isPremium: false, examImageUrl: '', imagePlacement: { fit: 'contain', position: 'center', size: 100 }, accessRule: { enabled: false, requiredExamId: '', requiredPercentage: 70, visibilityWhenLocked: 'locked', useBestAttempt: true, allowAdminOverride: true } });
+  const [bulkText, setBulkText] = useState('');
   const profile = { ...buildOwnerAdminProfile({ uid: 'preview', email: 'owner@preview' }), name: 'أ. محمد النحاس' };
   const now = Date.now();
   const demo = params.get('demo') ? {
@@ -52,7 +54,7 @@ export default function AdminPreview() {
     ],
   } : {};
   const base = { ...demo, newContent: NEW_CONTENT, filteredPendingUsers: demo.pendingUsers || [], filteredActiveUsers: demo.activeUsersList || [], filteredContentList: demo.contentList || [], filteredExamsList: demo.examsList || [] };
-  const extra = { ...base, activeTab, setActiveTab, adminGradeFilter: grade, setAdminGradeFilter: setGrade, adminExamView: examView, setAdminExamView: setExamView, viewingResult, setViewingResult, userData: profile, user: { uid: 'preview' }, adminProfile: profile };
+  const extra = { ...base, activeTab, setActiveTab, adminGradeFilter: grade, setAdminGradeFilter: setGrade, adminExamView: examView, setAdminExamView: setExamView, viewingResult, setViewingResult, examBuilder, setExamBuilder, bulkText, setBulkText, userData: profile, user: { uid: 'preview' }, adminProfile: profile };
   const ctx = materialize(emptyCtx(extra), extra);
   return <AdminDashboardShell user={{ uid: 'preview' }} adminProfile={profile} activeTab={activeTab} setActiveTab={setActiveTab} adminGradeFilter={grade} setAdminGradeFilter={setGrade} dashboardContext={ctx} />;
 }

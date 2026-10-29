@@ -17,6 +17,7 @@ import { callFunction } from '@services/callFunction.js';
 import { queuePendingSubmit, clearPendingSubmit } from '@shared/exam/pendingSubmit.js';
 import { useExamLockWatch, releaseExamLock, blockBackButton, examLockMode } from '@features/native-app/examLock.js';
 import { ExamLockBrokenOverlay } from '@features/native-app/ExamLockGate.jsx';
+import { markActiveExam, clearActiveExam } from '@shared/exam/activeExamSession.js';
 
 
 
@@ -126,6 +127,12 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
     onBroken: () => handleCheatingRef.current?.('app_unpinned'),
     bypassRef: fileDialogBypassRef,
   });
+  // الامتحان مفتوح على الجهاز ده: لو التطبيق اتقفل فجأة يرجع له لوحده (activeExamSession.js).
+  useEffect(() => {
+    if (isReviewMode || existingResult || !exam.attemptId || exam.id === 'custom_mistakes_exam') return;
+    if (isSubmitted || showAntiCheatChoice) clearActiveExam(exam.attemptId);
+    else markActiveExam({ uid: user.uid, examId: exam.id, attemptId: exam.attemptId });
+  }, [isReviewMode, existingResult, exam.attemptId, exam.id, user.uid, isSubmitted, showAntiCheatChoice]);
   // بعد التسليم (أو قفل الامتحان) الشاشة بتتفك لوحدها.
   useEffect(() => { if (isSubmitted) releaseExamLock(); }, [isSubmitted]);
   useEffect(() => () => { releaseExamLock(); }, []);

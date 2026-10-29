@@ -3,6 +3,7 @@ import { DebugPanel } from '@shared/core/debugTools.jsx';
 import { canAccessAdminTab } from '@config/adminPermissions';
 import AdminLazyFallback from '@admin/dashboard/AdminLazyFallback.jsx';
 import { Icon } from '@v2/ui/Icon.jsx';
+import { useAdminInbox, AdminInboxContext } from '@admin/v2/AdminInbox.jsx';
 import { AdminCinemaNav, AdminPalette, AdminSectionsSheet, ADMIN_TAB_ICON, tabLabel, useAdminGroups } from '@admin/v2/AdminCinema.jsx';
 import '@styles/pages/admin-neo.css';
 import '@styles/pages/admin-cinema.css';
@@ -57,8 +58,10 @@ export const AdminDashboardShell = ({
   }, []);
 
   const alerts = (dashboardContext?.pendingUsers?.length || 0) + (dashboardContext?.passwordResetRequests?.length || 0);
+  const inbox = useAdminInbox(dashboardContext, adminProfile);
 
   return (
+    <AdminInboxContext.Provider value={inbox}>
     <div className="admin-neo-shell adx" dir="rtl">
       <DebugPanel user={user} />
       <Suspense fallback={<AdminLazyFallback />}>
@@ -72,6 +75,8 @@ export const AdminDashboardShell = ({
         grade={adminGradeFilter}
         setGrade={setAdminGradeFilter}
         alerts={alerts}
+        inbox={inbox}
+        ctx={dashboardContext}
         onSearch={() => setPaletteOpen(true)}
         onMenu={() => setMenuOpen(true)}
       />
@@ -84,6 +89,7 @@ export const AdminDashboardShell = ({
       <AdminSectionsSheet open={menuOpen} onClose={() => setMenuOpen(false)} groups={groups} activeTab={activeTab} onNavigate={handleNavigate} />
       <AdminPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} groups={groups} onNavigate={handleNavigate} />
     </div>
+    </AdminInboxContext.Provider>
   );
 };
 

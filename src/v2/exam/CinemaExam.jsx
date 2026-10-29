@@ -10,6 +10,8 @@ import { ConnectionStatusBanner } from '@shared/ui/ConnectionStatusBanner.jsx';
 import { platformNotify } from '@shared/core/platformShared.jsx';
 import { renderBracketHighlightedText } from '@shared/core/platform/text.jsx';
 import { Icon } from '../ui/Icon.jsx';
+import { InAppCamera, canUseInAppCamera } from './InAppCamera.jsx';
+import { isExamLockSupported } from '@features/native-app/examLock.js';
 import { formatNumber } from '../ui/kit.jsx';
 import { BrandMark } from '../ui/Brand.jsx';
 import { haptic } from '../device/native.js';
@@ -106,18 +108,50 @@ function Options({ question, answer, onPick }) {
   );
 }
 
-function Essay({ question, answer, onAnswer, onImageUpload, onFileDialogOpen }) {
+function Essay({ question, answer, onAnswer, onImageUpload, onFileDialogOpen, onFileDialogClose }) {
   const value = typeof answer === 'object' ? answer?.text || '' : answer || '';
   const image = typeof answer === 'object' ? answer?.image : null;
+  const [cam, setCam] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInput = useRef(null);
+  // جوه تطبيق الأندرويد بالقفل: ممنوع نفتح أي تطبيق تاني (معرض الصور)، الكاميرا جوه الامتحان بس.
+  const locked = isExamLockSupported();
+  const upload = async (file) => {
+    if (!file) return;
+    setUploading(true);
+    try { await onImageUpload(question.id, file); } finally { setUploading(false); }
+  };
+  const openCamera = () => { onFileDialogOpen?.(); setCam(true); };
+  const closeCamera = () => { setCam(false); onFileDialogClose?.(); };
+  const pickFile = () => { onFileDialogOpen?.(); fileInput.current?.click(); };
   return (
     <div className="cxe-essay">
       <textarea value={value} placeholder="اكتب إجابتك هنا…" onChange={(e) => onAnswer(question.id, { text: e.target.value, image, fileName: typeof answer === 'object' ? answer?.fileName : null })} />
-      <label className="cxe-upload">
-        <Icon name="plus" />
-        <span><b>أو صوّر إجابتك من الورقة</b><small>فتح الكاميرا لهذا السؤال مش بيتحسب غش</small></span>
-        <input type="file" accept="image/*" capture="environment" onClick={onFileDialogOpen} onChange={(e) => onImageUpload(question.id, e.target.files?.[0])} />
-      </label>
+      <div className="cxe-upload-row">
+        {canUseInAppCamera() && (
+          <button type="button" className="cxe-upload" onClick={openCamera} disabled={uploading}>
+            <Icon name="plus" />
+            <span><b>{image ? 'صوّر الإجابة تاني' : 'صوّر إجابتك من الورقة'}</b><small>الكاميرا بتفتح جوه الامتحان، مش بتخرجك منه</small></span>
+          </button>
+        )}
+        {(!locked || !canUseInAppCamera()) && (
+          <button type="button" className="cxe-upload cxe-upload--ghost" onClick={pickFile} disabled={uploading}>
+            <Icon name="file" />
+            <span><b>اختار صورة</b><small>من الموبايل أو الكمبيوتر</small></span>
+          </button>
+        )}
+        <input ref={fileInput} type="file" accept="image/*" hidden onChange={(e) => { upload(e.target.files?.[0]); e.target.value = ''; }} />
+      </div>
+      {uploading && <p className="cxe-upload__state"><i className="cxe-cam__spin" />بنرفع الصورة…</p>}
       {image && <img className="cxe-essay__img" src={image} alt="صورة الإجابة" />}
+      {cam && createPortal(
+        <InAppCamera
+          onClose={closeCamera}
+          onCapture={(file) => { setCam(false); upload(file); }}
+          onFallback={locked ? null : () => { setCam(false); pickFile(); }}
+        />,
+        document.body,
+      )}
     </div>
   );
 }
@@ -178,7 +212,7 @@ export default function CinemaExam(props) {
   const {
     exam, user, wmPositions, isOnline, lastLocalSaveAt, showAntiCheatChoice, submissionError, submitting, onClose,
     showSubmitConfirm, onSubmit, onCancelSubmit, timeLeft, onConfirmSubmit, displayQuestions, flatQuestions, answers, flagged,
-    currentQIndex, onSelectQuestion, currentQObj, onAnswer, onFlagToggle, onImageUpload, onFileDialogOpen,
+    currentQIndex, onSelectQuestion, currentQObj, onAnswer, onFlagToggle, onImageUpload, onFileDialogOpen, onFileDialogClose,
   } = props;
   const all = displayQuestions;
   const q = currentQObj || all[currentQIndex] || {};
@@ -328,7 +362,7 @@ export default function CinemaExam(props) {
             <h2 className="cxe-q__text"><QuestionText text={q.text} /></h2>
             {q.image && <img className="cxe-q__img" src={q.image} alt="صورة السؤال" />}
             {q.type === 'essay'
-              ? <Essay question={q} answer={answers?.[q.id]} onAnswer={onAnswer} onImageUpload={onImageUpload} onFileDialogOpen={onFileDialogOpen} />
+              ? <Essay question={q} answer={answers?.[q.id]} onAnswer={onAnswer} onImageUpload={onImageUpload} onFileDialogOpen={onFileDialogOpen} onFileDialogClose={onFileDialogClose} />
               : <Options question={q} answer={answers?.[q.id]} onPick={pick} />}
           </article>
           <div className="cxe-hint" aria-hidden="true"><kbd>1</kbd>–<kbd>4</kbd> للاختيار · <kbd>←</kbd> <kbd>→</kbd> للتنقل · <kbd>F</kbd> للتعليم</div>

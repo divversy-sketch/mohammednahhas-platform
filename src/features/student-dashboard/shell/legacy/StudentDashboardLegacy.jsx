@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { signOut } from 'firebase/auth';
 import { addDoc, collection, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@services/firebase';
@@ -15,6 +15,7 @@ import StudentSmartTeacherPopup from '@features/smart-teacher/StudentSmartTeache
 import StudentAppV2 from '@v2/student/StudentAppV2.jsx';
 import { buildMistakesExam } from '@shared/exam/mistakes.js';
 import { flushPendingSubmits } from '@shared/exam/pendingSubmit.js';
+import { readActiveExam, clearActiveExam, buildDeviceResume } from '@shared/exam/activeExamSession.js';
 import { AccountStatusScreen, AppLoading } from '@v2/student/AccountStatusScreen.jsx';
 
 const ExamRunner = lazy(() => import('@features/exams/runner/ExamRunner.jsx'));
@@ -123,6 +124,22 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
   // «كمّل» only when the admin allowed it; an unfinished attempt otherwise waits for the admin's decision
   const inProgressExamResult = examResults.find(r => r.status === 'in_progress' && ['continue', 'restart'].includes(r.adminDecision));
   const inProgressExam = inProgressExamResult ? exams.find(e => e.id === inProgressExamResult.examId) : null;
+
+  // التطبيق اتقفل أو اتعمله ريستارت والطالب في نص امتحان على الجهاز ده: يرجع لامتحانه لوحده.
+  const autoResumeDone = useRef(false);
+  useEffect(() => {
+    if (activeExam || autoResumeDone.current || !user?.uid) return;
+    const marker = readActiveExam(user.uid);
+    if (!marker) { autoResumeDone.current = true; return; }
+    const result = examResults.find((r) => r.id === marker.attemptId);
+    const exam = exams.find((e) => e.id === (result?.examId || marker.examId));
+    if (!result || !exam) return; // لسه البيانات بتحمّل
+    autoResumeDone.current = true;
+    if (result.status !== 'in_progress') { clearActiveExam(marker.attemptId); return; }
+    const resume = buildDeviceResume({ user, exam, result });
+    setActiveExam({ ...exam, attemptId: result.id, resumeData: resume, sourceVideoId: result.sourceVideoId || null });
+    platformNotify('رجّعناك لامتحانك بنفس إجاباتك. الوقت كان شغال.');
+  }, [activeExam, examResults, exams, user]);
   const { pendingAssignments, pendingAssignmentsCount } = getStudentAssignmentSummary({ assignments, assignmentSubmissions });
   const { completedVideoCount, videoCompletionPercent } = getVideoCompletionSummary({ videos, getVideoWatchPercent });
   const { completedExamResults, averageScore } = getStudentPerformanceSummary({ examResults });
@@ -255,6 +272,13 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
         }
 
         if (previousResult.status === 'in_progress') {
+          // نفس الجهاز اللي بدأ عليه الامتحان (التطبيق اتقفل أو اتعمله ريستارت): يكمّل على طول والوقت شغال.
+          const marker = readActiveExam(user.uid);
+          if (marker?.attemptId === previousResult.id) {
+            const resume = buildDeviceResume({ user, exam, result: previousResult });
+            openExamFromSavedResult({ ...previousResult, ...resume }, resume);
+            return;
+          }
           platformNotify('لديك محاولة غير مكتملة. لا يمكن الاستكمال إلا بعد موافقة الأدمن من لوحة النتائج.');
           return;
         }

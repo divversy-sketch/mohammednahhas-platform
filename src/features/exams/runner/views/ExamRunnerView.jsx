@@ -79,6 +79,7 @@ function ExamRunnerScreens({ ctx }) {
       onFlagToggle={(questionId) => setFlagged((prev) => ({ ...prev, [questionId]: !prev[questionId] }))}
       onImageUpload={handleEssayImageUpload}
       onFileDialogOpen={() => { fileDialogBypassRef.current = true; }}
+      onFileDialogClose={() => { setTimeout(() => { fileDialogBypassRef.current = false; }, 800); }}
       onPrevious={() => setCurrentQIndex((p) => p - 1)}
       onNext={() => setCurrentQIndex((p) => p + 1)}
     />

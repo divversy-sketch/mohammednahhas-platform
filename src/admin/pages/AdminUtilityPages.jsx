@@ -20,10 +20,12 @@ export function AdminAssignmentsPage({ adminGradeFilter, handleDeleteAllHomework
 }
 
 export function AdminExamViewTabs({ adminExamView, setAdminExamView }) {
+  const items = [['manage', 'إدارة الامتحانات'], ['results', 'النتائج']];
   return (
-    <div className="flex flex-wrap gap-2 mb-4">
-      <button onClick={() => setAdminExamView('manage')} className={`px-5 py-3 rounded-2xl font-black ${adminExamView === 'manage' ? 'bg-amber-600 text-white' : 'bg-amber-50 text-amber-700'}`}>إدارة الامتحانات</button>
-      <button onClick={() => setAdminExamView('results')} className={`px-5 py-3 rounded-2xl font-black ${adminExamView === 'results' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700'}`}>النتائج</button>
+    <div className="adx-seg" role="tablist" aria-label="الامتحانات">
+      {items.map(([k, label]) => (
+        <button key={k} type="button" role="tab" aria-selected={adminExamView === k} className={adminExamView === k ? 'is-on' : ''} onClick={() => setAdminExamView(k)}>{label}</button>
+      ))}
     </div>
   );
 }

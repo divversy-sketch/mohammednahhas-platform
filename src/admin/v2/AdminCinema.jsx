@@ -12,6 +12,7 @@ import { usePrefs } from '@v2/prefs.js';
 import { canAccessAdminTab, ADMIN_TABS } from '@config/adminPermissions';
 import { getAdminPageMeta } from './adminPageMeta.js';
 import { liveState } from './AdminExamLive.jsx';
+import { AdminInboxButton } from './AdminInbox.jsx';
 
 /* ── sections ── */
 export const ADMIN_GROUPS = [
@@ -67,7 +68,7 @@ function useScrolled(threshold = 40) {
 const isMac = () => typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
 
 /* ── top navigation ── */
-export function AdminCinemaNav({ activeTab, onNavigate, groups, adminProfile, grade, setGrade, alerts = 0, onSearch, onMenu }) {
+export function AdminCinemaNav({ activeTab, onNavigate, groups, adminProfile, grade, setGrade, alerts = 0, onSearch, onMenu, inbox, ctx }) {
   const scrolled = useScrolled();
   const { theme, toggleTheme } = usePrefs();
   const [open, setOpen] = useState(null);
@@ -128,9 +129,11 @@ export function AdminCinemaNav({ activeTab, onNavigate, groups, adminProfile, gr
         </select>
       </label>
       <button type="button" className="adx-icon" onClick={toggleTheme} aria-label={theme === 'dark' ? 'الوضع النهاري' : 'الوضع الليلي'} title={theme === 'dark' ? 'الوضع النهاري' : 'الوضع الليلي'}><Icon name={theme === 'dark' ? 'sun' : 'moon'} /></button>
-      <button type="button" className="adx-icon" onClick={() => go('dashboard')} aria-label="التنبيهات">
-        <Icon name="bell" />{alerts > 0 && <em>{formatNumber(Math.min(alerts, 99))}</em>}
-      </button>
+      {inbox ? <AdminInboxButton inbox={inbox} onNavigate={go} ctx={ctx} /> : (
+        <button type="button" className="adx-icon" onClick={() => go('dashboard')} aria-label="التنبيهات">
+          <Icon name="bell" />{alerts > 0 && <em>{formatNumber(Math.min(alerts, 99))}</em>}
+        </button>
+      )}
       <div className="adx-me">
         <button type="button" className="adx-me__btn" onClick={() => setMe((v) => !v)} aria-expanded={me} aria-label="الحساب">
           <span className="adx-avatar">{String(name).trim().replace(/^أ\.\s*/, '').charAt(0)}</span>
@@ -315,6 +318,15 @@ export function AdminCinemaHero({ activeTab, onNavigate, pulse, adminName, canOp
           <h1>{meta.title || tabLabel(activeTab)}</h1>
           {meta.description && <p>{meta.description}</p>}
         </div>
+        {g.tabs.filter(canOpen).length > 1 && (
+          <nav className="adx-siblings" aria-label={`أقسام ${g.title}`} ref={(el) => { const cur = el?.querySelector('[aria-current]'); if (cur && el.scrollWidth > el.clientWidth) el.scrollLeft += cur.getBoundingClientRect().left - el.getBoundingClientRect().left - (el.clientWidth - cur.clientWidth) / 2; }}>
+            {g.tabs.filter(canOpen).map((t) => (
+              <button key={t} type="button" aria-current={t === activeTab ? 'page' : undefined} onClick={() => onNavigate(t)}>
+                <Icon name={ADMIN_TAB_ICON[t] || 'layers'} />{tabLabel(t)}
+              </button>
+            ))}
+          </nav>
+        )}
       </section>
     );
   }

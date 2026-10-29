@@ -33,6 +33,7 @@ const pctOf = (r) => {
 export const CHEAT_LABELS = {
   focus_or_visibility_lost: 'خرج من شاشة الامتحان',
   app_unpinned: 'فك تثبيت الشاشة',
+  app_restarted: 'التطبيق اتقفل ورجع للامتحان',
   right_click_attempt: 'ضغط كليك يمين',
   paste_attempt: 'حاول يلصق نص',
   copy_or_cut_attempt: 'حاول ينسخ',

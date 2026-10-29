@@ -232,7 +232,8 @@ service cloud.firestore {
         || (isOwner(userId)
           && request.resource.data.diff(resource.data).changedKeys().hasOnly([
             'name', 'phone', 'parentPhone', 'grade', 'photoURL', 'updatedAt',
-            'lastLoginAt', 'deviceInfo', 'notificationToken', 'requestedGrade', 'gradeUpdateStatus'
+            'lastLoginAt', 'deviceInfo', 'notificationToken', 'requestedGrade', 'gradeUpdateStatus',
+            'profileUpdatedAt', 'profileChange'
           ])
           && request.resource.data.role == resource.data.role
           && request.resource.data.status == resource.data.status
