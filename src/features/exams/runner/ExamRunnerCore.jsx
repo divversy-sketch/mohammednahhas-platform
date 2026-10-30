@@ -18,6 +18,7 @@ import { queuePendingSubmit, clearPendingSubmit } from '@shared/exam/pendingSubm
 import { useExamLockWatch, releaseExamLock, blockBackButton, examLockMode, isExamLockSupported, wasScreenTurnedOff } from '@features/native-app/examLock.js';
 import { ExamLockBrokenOverlay } from '@features/native-app/ExamLockGate.jsx';
 import { markActiveExam, clearActiveExam } from '@shared/exam/activeExamSession.js';
+import { useExamTracking } from './useExamTracking.js';
 
 
 
@@ -122,11 +123,17 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
   }, [isReviewMode, exam.attemptId, exam.id, exam.duration, flatQuestions.length]);
 
   // قفل الامتحان على الموبايل: لو الطالب فك تثبيت الشاشة بتتسجل محاولة غش والامتحان بيتغطى لحد ما يرجّعه.
+  const trackerRefForLock = useRef(null);
   const examLock = useExamLockWatch({
     enabled: examLocked && !isReviewMode && !isSubmitted && !isCheating && !showAntiCheatChoice,
-    onBroken: () => handleCheatingRef.current?.('app_unpinned'),
+    onBroken: () => { trackerRefForLock.current?.log('unpin'); handleCheatingRef.current?.('app_unpinned'); },
     bypassRef: fileDialogBypassRef,
   });
+  // تتبع كامل للامتحان (للأدمن: ليه الطالب خرج، وقف عند أنهي سؤال، النت…)
+  const tracker = useExamTracking({ exam, user, isReviewMode, existingResult, isSubmitted, isCheating, currentQIndex, flatQuestions, answers, flagged, timeLeft, examLocked });
+
+  trackerRefForLock.current = tracker;
+
   // الامتحان مفتوح على الجهاز ده: لو التطبيق اتقفل فجأة يرجع له لوحده (activeExamSession.js).
   useEffect(() => {
     if (isReviewMode || existingResult || !exam.attemptId || exam.id === 'custom_mistakes_exam') return;
@@ -273,6 +280,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
     setAntiCheatWarnings(nextWarning);
     setAntiCheatLog(nextLog);
 
+    tracker.log(nextWarning < 3 ? 'warn' : 'hold', { reason: eventType, n: nextWarning });
     if (nextWarning < 3) {
       platformNotify(`تنبيه رقم ${nextWarning}: تم رصد حركة غير آمنة داخل الامتحان. عند التكرار للمرة الثالثة سيتم إيقاف المحاولة مؤقتًا لحين مراجعة الأدمن، والأدمن وحده يقرر السماح بالاستكمال أو إعادة الامتحان.`);
       await saveExamProgress({ antiCheatWarnings: nextWarning, antiCheatLog: nextLog });
@@ -303,6 +311,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
     const nextLog = [...antiCheatLog, { type: eventType, warningNumber: nextWarning, at: new Date().toISOString(), immediate: true }];
     setAntiCheatWarnings(nextWarning);
     setAntiCheatLog(nextLog);
+    tracker.log('cheated', { reason: eventType });
     setIsCheating(true);
     clearHiddenMark();
     clearActiveExam(exam.attemptId);
@@ -378,6 +387,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
       if (await wasScreenTurnedOff(at)) {
         clearHiddenMark();
         const ev = { type: 'screen_off', at: new Date(at).toISOString() };
+        tracker.log('screen_off', { secs: Math.round((Date.now() - at) / 1000) });
         setAntiCheatLog((prev) => [...prev, ev]);
         return;
       }
@@ -499,6 +509,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
         cloudinaryPublicId: uploaded.publicId,
       });
     } catch (err) {
+      tracker.log('upload_fail', { err: String(err?.message || '').slice(0, 80) });
       platformNotify(err?.message || 'فشل رفع الصورة على Cloudinary.');
     } finally {
       fileDialogBypassRef.current = false;
@@ -513,10 +524,11 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
     return rawScore;
   };
 
-  const confirmSubmit = () => setShowSubmitConfirm(true);
+  const confirmSubmit = () => { tracker.log('submit_open', { left: Math.round(timeLeft) }); setShowSubmitConfirm(true); };
 
   const handleSubmit = async (auto = false) => {
     if (submittingRef.current || isSubmitted) return;
+    tracker.log('submit_try', { auto: auto ? 1 : undefined });
     submittingRef.current = true;
     setSubmitting(true);
     setSubmissionError('');
@@ -617,6 +629,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
       callFunction('syncMyLeaderboardEntry').catch(() => {});
       clearLocalExamBackup(autosaveKey);
       setScore(finalScore);
+      tracker.log('submit_ok', { score: finalScore, of: mcqQuestions.length });
       setIsSubmitted(true);
       setActiveView('dashboard');
       platformNotify(auto ? 'انتهى الوقت وتم تسليم الامتحان تلقائيًا. تم حفظ الإجابات.' : 'تم تسليم الامتحان وحفظ النتيجة بنجاح.');
@@ -624,6 +637,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
       console.error("Error saving results or mistakes", err);
       writeLocalExamBackup(answers);
       queuePendingSubmit(exam.attemptId, completionPayload);
+      tracker.log('submit_fail', { err: err?.message === 'submit-timeout' ? 'timeout' : String(err?.code || err?.message || 'error') });
       setSubmissionError(err?.message === 'submit-timeout'
         ? 'النت ضعيف والتسليم لسه ما وصلش. إجاباتك محفوظة على الجهاز وهتتبعت لوحدها أول ما النت يرجع، أو اضغط «جرّب التسليم تاني».'
         : 'تعذر رفع النتيجة إلى السيرفر. إجاباتك محفوظة على هذا الجهاز؛ تحقق من الاتصال ثم أعد المحاولة.');

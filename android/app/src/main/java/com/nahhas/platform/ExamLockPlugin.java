@@ -43,6 +43,14 @@ public class ExamLockPlugin extends Plugin {
     try {
       ContextCompat.registerReceiver(getContext(), screenReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
     } catch (Exception ignored) { }
+    // التطبيق لسه فاتح من جديد: مفيش امتحان مفتوح، فأي تثبيت فاضل من قبل كده بيتفك.
+    // (لو الطالب راجع لامتحانه، صفحة الامتحان هتطلب التثبيت تاني.)
+    final Activity activity = getActivity();
+    if (activity != null) {
+      activity.runOnUiThread(() -> {
+        try { if (!"none".equals(stateName())) activity.stopLockTask(); } catch (Exception ignored) { }
+      });
+    }
   }
 
   @Override

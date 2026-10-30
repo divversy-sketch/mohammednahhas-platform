@@ -51,6 +51,8 @@ document.documentElement.dataset.nx = '2';
 startDeviceWatcher();
 startPrefs();
 loadNativePlugins().then(startPrefs);
+// تثبيت الشاشة مسموح بس جوه صفحة الامتحان: أي تثبيت فاضل بعد الخروج من الامتحان بيتفك لوحده
+loadNativePlugins().then(() => import('./features/native-app/examLockGuard.js')).then((m) => m.startExamLockGuard()).catch(() => {});
 import('./v2/platformSkin.js').then((m) => m.watchPlatformSkin()).catch(() => {});
 
 const root = ReactDOM.createRoot(document.getElementById('root'));

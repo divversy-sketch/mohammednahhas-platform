@@ -146,7 +146,9 @@ service cloud.firestore {
         // live monitor for the admin
         'presence', 'lastSeenAt', 'leftAt', 'answeredCount', 'totalQuestions',
         // قفل الامتحان على الموبايل (pinned / unavailable / web)
-        'examLock'
+        'examLock',
+        // تتبع الامتحان (ملخص للمراقبة اللايف)
+        'lastEvent', 'device', 'network', 'networkAt', 'appState', 'battery', 'questionTimes', 'answerChanges', 'trackVersion'
       ];
     }
 
@@ -286,6 +288,16 @@ service cloud.firestore {
       allow create: if ownStudentIdOnCreate();
       allow update: if canManageExams() || safeStudentExamResultUpdate();
       allow delete: if canManageExams();
+    }
+
+    // تتبع الامتحان: دفعات أحداث بيكتبها الطالب لنفسه بس، والأدمن بيقراها
+    match /exam_events/{docId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.studentId == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.studentId == request.auth.uid
+        && request.resource.data.events is list
+        && request.resource.data.events.size() <= 400;
+      allow update, delete: if canManageExams();
     }
 
     match /attempts/{docId} {

@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { Icon } from '@v2/ui/Icon.jsx';
 import { isExamLockSupported, requestExamLock, getExamLockState, releaseExamLock } from './examLock.js';
+import { markExamPage } from './examLockGuard.js';
 import './exam-lock.css';
 
 export function needsExamLock({ exam, isReviewMode, existingResult }) {
@@ -10,6 +11,12 @@ export function needsExamLock({ exam, isReviewMode, existingResult }) {
 
 export function ExamLockGate({ exam, onClose, children }) {
   const [step, setStep] = useState('check'); // check | intro | waiting | declined | ready
+
+  // طول ما صفحة الامتحان مفتوحة التثبيت مسموح، وأول ما تتقفل (بأي طريقة) بيتفك
+  useEffect(() => {
+    markExamPage(true);
+    return () => { markExamPage(false); releaseExamLock(); };
+  }, []);
 
   useEffect(() => {
     let alive = true;

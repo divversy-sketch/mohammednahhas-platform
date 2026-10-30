@@ -154,3 +154,14 @@ b.lv-top, b.lv-good, b.lv-ok, b.lv-mid, b.lv-low { color: var(--lv); }
 }
 .ars-row:has(details[open]) { position: relative; z-index: 20; }
 @media (max-width: 640px) { .ars-rank small { display: none; } }
+.ars-track summary { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 14px; cursor: pointer; }
+.ars-track summary .nx-ico { width: 16px; height: 16px; color: var(--nx-copper); }
+.ars-track summary small { margin-inline-start: auto; font-weight: 600; color: var(--nx-ink-3); font-size: 12px; }
+.ars-track[open] summary { margin-bottom: 12px; }
+.ars-track__diag { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: 14px; margin-bottom: 10px; color: var(--st); background: color-mix(in srgb, var(--st) 10%, transparent); }
+.ars-track__diag .nx-ico { width: 20px; height: 20px; flex: none; margin-top: 2px; }
+.ars-track__diag b { display: block; font-size: 15px; }
+.ars-track__diag small { display: block; color: var(--nx-ink-2); font-size: 12.5px; line-height: 1.7; }
+.ars-track__nums { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.ars-track__nums span { padding: 6px 10px; border-radius: 10px; background: var(--nx-sunk); font-size: 12px; color: var(--nx-ink-3); }
+.ars-track__nums b { color: var(--nx-ink); margin-inline-start: 4px; }

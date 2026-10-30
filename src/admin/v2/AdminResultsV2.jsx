@@ -7,7 +7,8 @@ import { Icon } from '@v2/ui/Icon.jsx';
 import { formatNumber } from '@v2/ui/kit.jsx';
 import { getQuestionsForExam, generatePDF } from '@shared/core/platformShared.jsx';
 import { downloadXlsx } from '@shared/utils/exportData.js';
-import { liveState } from './AdminExamLive.jsx';
+import { liveState, useExamEvents, Timeline } from './AdminExamLive.jsx';
+import { diagnoseAttempt, attemptStats, groupEvents, dur } from '@shared/exam/examDiagnosis.js';
 import '@styles/pages/admin-results.css';
 
 const toMs = (v) => {
@@ -365,6 +366,10 @@ export function ResultDetailHeader({ result, exam, onBack, onApproveContinue, on
   const lv = levelOf(p);
   const st = STATES[liveState(result)] || STATES.submitted;
   const log = result.antiCheatLog || [];
+  const { batches } = useExamEvents({ attemptId: result.id });
+  const events = useMemo(() => groupEvents(batches).get(result.id) || [], [batches, result.id]);
+  const diag = diagnoseAttempt(result, events, { totalQuestions: getQuestionsForExam(exam).length });
+  const tstats = attemptStats(result, events);
   const needsDecision = !done && ['security_hold', 'cheated', 'in_progress'].includes(result.status) && !['continue', 'restart'].includes(result.adminDecision);
   return (
     <div className="ars ars-detail" dir="rtl">
@@ -396,6 +401,19 @@ export function ResultDetailHeader({ result, exam, onBack, onApproveContinue, on
           </div>
         </div>
       )}
+      <details className="ars-card ars-track" open={!done}>
+        <summary><Icon name="route" />تتبع الامتحان<small>{diag.title}</small></summary>
+        <div className={`ars-track__diag st-${diag.tone === 'live' ? 'live' : diag.tone}`}><Icon name={diag.icon} /><span><b>{diag.title}</b><small>{diag.detail}</small></span></div>
+        <div className="ars-track__nums">
+          <span>وقت جوه الامتحان <b>{tstats.activeSecs ? dur(tstats.activeSecs) : '—'}</b></span>
+          <span>غيّر إجابات <b>{formatNumber(tstats.changes)}</b></span>
+          <span>أطول سؤال <b>{tstats.longestQ ? `س${formatNumber(tstats.longestQ.i)} · ${dur(tstats.longestQ.secs)}` : '—'}</b></span>
+          <span>النت فصل <b>{tstats.offlineCount ? `${formatNumber(tstats.offlineCount)} مرة` : 'ولا مرة'}</b></span>
+          <span>ساب الشاشة <b>{tstats.hideCount ? `${formatNumber(tstats.hideCount)} مرة` : 'ولا مرة'}</b></span>
+          {result.device?.app && <span>الجهاز <b>{result.device.app === 'app' ? 'التطبيق' : 'متصفح'}{result.device.model ? ` · ${result.device.model}` : ''}</b></span>}
+        </div>
+        <Timeline events={events} startAt={events[0]?.at || 0} />
+      </details>
       {log.length > 0 && (
         <details className="ars-card ars-log">
           <summary><Icon name="shield" />سجل الأمان ({formatNumber(log.length)})</summary>
