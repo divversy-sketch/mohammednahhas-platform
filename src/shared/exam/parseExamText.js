@@ -1,6 +1,18 @@
 // تحويل نص الأسئلة (اللي الأدمن بيكتبه في «إنشاء امتحان») لأسئلة.
 // نفس القواعد القديمة بالظبط، بس دلوقتي بيرجّع كمان تحذيرات عشان المعاينة تبيّن
 // الأسئلة اللي هتتشال أو اللي مالهاش إجابة صح قبل النشر (قبل كده كانت بتختفي من غير ما حد يعرف).
+//
+// السؤال المقالي بيتعرف بأي طريقة من دول:
+//   #مقالي: نص السؤال      مقالي: نص السؤال      سؤال مقالي: نص السؤال      (مقالي) نص السؤال
+//   نص السؤال (مقالي)      #مقالي  ← لوحدها في سطر، والسؤال في السطور اللي بعدها
+//   وأي سؤال مالوش اختيارات خالص (سؤال وبعده سطر فاضي) بيتحسب مقالي لوحده.
+// الإجابة النموذجية: سطر بيبدأ بـ «نموذج:» أو «الإجابة النموذجية:» أو «الإجابة:» تحت السؤال المقالي.
+
+// كلمة «مقالي/مقال/essay» في أول السطر (مع # أو أقواس أو «سؤال» قبلها)، وبعدها لازم فاصل أو نهاية السطر
+// (عشان «مقالة عن الوطن» ما تتفهمش علامة).
+const ESSAY_HEAD = /^[#\s]*[([]?\s*(?:سؤال\s+)?(?:مقالي|مقال|essay)(?=[\s:：\-–.)\]]|$)\s*[)\]]?\s*[:：\-–.)]*\s*(.*)$/i;
+const ESSAY_TAIL = /^(.+?)\s*[-–(\[]\s*(?:مقالي|مقال|essay)\s*[)\]]?\s*$/i;
+const MODEL_ANSWER = /^(?:نموذج|الإجابة النموذجية|الاجابة النموذجية|إجابة نموذجية|اجابة نموذجية|الإجابة|الاجابة)\s*[:：]\s*(.*)$/;
 
 export function parseExamText(bulkText = '') {
   const lines = String(bulkText).split('\n').map((l) => l.trim());
@@ -16,6 +28,11 @@ export function parseExamText(bulkText = '') {
   const pushCurrentQuestion = () => {
     if (!currentQuestion) return;
     if (currentQuestion.type === 'essay') {
+      if (!currentQuestion.text.trim()) {
+        warnings.push({ type: 'dropped', line: currentQuestion.line, message: 'علامة «مقالي» من غير نص سؤال بعدها — اتشالت' });
+        currentQuestion = null;
+        return;
+      }
       currentBlock.subQuestions.push({
         id: currentQuestion.id,
         type: 'essay',
@@ -27,6 +44,14 @@ export function parseExamText(bulkText = '') {
       return;
     }
     const text = currentQuestion.text?.trim();
+    // سؤال من غير اختيارات (أو سطر واحد بس) ومن غير *: ده سؤال مقالي اتكتب من غير علامة
+    if (text && currentQuestion.options.length < 2 && currentQuestion.correctIdx < 0) {
+      const full = [text, ...currentQuestion.options].join('\n').trim();
+      warnings.push({ type: 'auto_essay', line: currentQuestion.line, text, message: 'مالوش اختيارات، فاتحسب سؤال مقالي' });
+      currentBlock.subQuestions.push({ id: currentQuestion.id, type: 'essay', text: full, branch: currentQuestion.branch || currentBranch, modelAnswer: '' });
+      currentQuestion = null;
+      return;
+    }
     if (text && currentQuestion.options.length >= 2) {
       if (currentQuestion.correctIdx < 0) {
         warnings.push({ type: 'no_correct', line: currentQuestion.line, text, message: 'مفيش إجابة عليها * — هتتحسب الاختيار الأول صح' });
@@ -35,7 +60,7 @@ export function parseExamText(bulkText = '') {
       const { line, ...q } = currentQuestion; // eslint-disable-line no-unused-vars
       currentBlock.subQuestions.push({ ...q, text, branch: currentQuestion.branch || currentBranch });
     } else if (text) {
-      warnings.push({ type: 'dropped', line: currentQuestion.line, text, message: `اختيارات أقل من ٢ (${currentQuestion.options.length}) — السؤال ده مش هيتنشر` });
+      warnings.push({ type: 'dropped', line: currentQuestion.line, text, message: `عليه * بس اختياراته أقل من ٢ (${currentQuestion.options.length}) — السؤال ده مش هيتنشر. لو مقالي اكتب قبله #مقالي` });
     }
     currentQuestion = null;
   };
@@ -60,10 +85,17 @@ export function parseExamText(bulkText = '') {
     if (line === 'حذف القطعة') { pushCurrentBlock(); isReadingPassage = false; return; }
     if (isReadingPassage) { currentBlock.text += (currentBlock.text ? '\n' : '') + line; return; }
 
-    const essayMatch = line.match(/^#?\s*(?:مقالي|essay)\s*[:：\-).]?\s*(.+)$/i);
-    if (essayMatch) {
+    // سطر إجابة نموذجية تحت سؤال مقالي
+    if (currentQuestion?.type === 'essay') {
+      const model = line.match(MODEL_ANSWER);
+      if (model) { currentQuestion.modelAnswer = model[1].trim(); return; }
+    }
+
+    const essayHead = line.match(ESSAY_HEAD);
+    const essayTail = !essayHead && line.match(ESSAY_TAIL);
+    if (essayHead || essayTail) {
       pushCurrentQuestion();
-      currentQuestion = { id: newId(), type: 'essay', text: (essayMatch[1] || '').trim(), branch: currentBranch, modelAnswer: '', line: lineNo };
+      currentQuestion = { id: newId(), type: 'essay', text: ((essayHead ? essayHead[1] : essayTail[1]) || '').trim(), branch: currentBranch, modelAnswer: '', line: lineNo };
       return;
     }
 
@@ -76,11 +108,7 @@ export function parseExamText(bulkText = '') {
     }
 
     if (currentQuestion.type === 'essay') {
-      if (cleanLine.startsWith('نموذج:') || cleanLine.startsWith('إجابة نموذجية:')) {
-        currentQuestion.modelAnswer = cleanLine.replace('نموذج:', '').replace('إجابة نموذجية:', '').trim();
-      } else {
-        currentQuestion.text += `\n${cleanLine}`;
-      }
+      currentQuestion.text = currentQuestion.text ? `${currentQuestion.text}\n${cleanLine}` : cleanLine;
       return;
     }
 

@@ -63,7 +63,7 @@ function Preview({ parsed }) {
       {parsed.warnings.length > 0 && (
         <ul className="aeb-warns">
           {parsed.warnings.map((w, i) => (
-            <li key={i} className={w.type === 'dropped' ? 'is-bad' : ''}>
+            <li key={i} className={w.type === 'dropped' ? 'is-bad' : w.type === 'auto_essay' ? 'is-info' : ''}>
               <Icon name="alert" />
               <span>{w.line ? <b>سطر {formatNumber(w.line)}: </b> : null}{w.text ? `«${String(w.text).slice(0, 50)}» — ` : ''}{w.message}</span>
             </li>
@@ -228,7 +228,7 @@ export default function AdminExamBuilder({ ctx }) {
               <div className="aeb-guide">
                 <p><b>سطر فاضي</b> بين كل سؤال واللي بعده، و<b>*</b> قبل الإجابة الصح.</p>
                 <p><code>#فرع: اسم الفرع</code> في سطر لوحده عشان تحدد الفرع.</p>
-                <p><code>#مقالي: نص السؤال</code> للسؤال المقالي، وبعده <code>نموذج: …</code> للإجابة النموذجية.</p>
+                <p>السؤال المقالي: <code>#مقالي: نص السؤال</code> أو <code>سؤال مقالي: …</code> أو اكتب <code>(مقالي)</code> في آخره. وأي سؤال مالوش اختيارات بيتحسب مقالي لوحده. وبعده <code>نموذج: …</code> للإجابة النموذجية.</p>
                 <p>القطعة: <code>بداية القطعة</code> ثم النص ثم <code>نهاية القطعة</code>، والأسئلة بعدها.</p>
                 <p>لكلمة جوه القطعة: حددها واضغط «تظليل المحدد» أو اكتبها بين <code>[ ]</code>.</p>
               </div>

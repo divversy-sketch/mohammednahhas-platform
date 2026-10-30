@@ -15,7 +15,7 @@ import { ExamEmptyState, ExamCheatingScreen } from '@features/exams/runner/compo
 import { ExamRunnerView } from '@features/exams/runner/views/ExamRunnerView.jsx';
 import { callFunction } from '@services/callFunction.js';
 import { queuePendingSubmit, clearPendingSubmit } from '@shared/exam/pendingSubmit.js';
-import { useExamLockWatch, releaseExamLock, blockBackButton, examLockMode } from '@features/native-app/examLock.js';
+import { useExamLockWatch, releaseExamLock, blockBackButton, examLockMode, isExamLockSupported, wasScreenTurnedOff } from '@features/native-app/examLock.js';
 import { ExamLockBrokenOverlay } from '@features/native-app/ExamLockGate.jsx';
 import { markActiveExam, clearActiveExam } from '@shared/exam/activeExamSession.js';
 
@@ -130,9 +130,9 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
   // الامتحان مفتوح على الجهاز ده: لو التطبيق اتقفل فجأة يرجع له لوحده (activeExamSession.js).
   useEffect(() => {
     if (isReviewMode || existingResult || !exam.attemptId || exam.id === 'custom_mistakes_exam') return;
-    if (isSubmitted || showAntiCheatChoice) clearActiveExam(exam.attemptId);
+    if (isSubmitted || showAntiCheatChoice || isCheating) clearActiveExam(exam.attemptId);
     else markActiveExam({ uid: user.uid, examId: exam.id, attemptId: exam.attemptId });
-  }, [isReviewMode, existingResult, exam.attemptId, exam.id, user.uid, isSubmitted, showAntiCheatChoice]);
+  }, [isReviewMode, existingResult, exam.attemptId, exam.id, user.uid, isSubmitted, showAntiCheatChoice, isCheating]);
   // بعد التسليم (أو قفل الامتحان) الشاشة بتتفك لوحدها.
   useEffect(() => { if (isSubmitted) releaseExamLock(); }, [isSubmitted]);
   useEffect(() => () => { releaseExamLock(); }, []);
@@ -293,6 +293,54 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
     });
   };
 
+  // خروج من شاشة الامتحان (تبويب تاني / تطبيق تاني): الامتحان بيقفل فورًا ويتسجل غش، والأدمن بس يقرر.
+  const markCheatedRef = useRef();
+  markCheatedRef.current = async (eventType) => {
+    const { isSubmitted, isCheating } = stateRefs.current;
+    if (isReviewMode || isSubmitted || isCheating || exam.id === 'custom_mistakes_exam') return;
+    const nextWarning = antiCheatWarningsRef.current + 1;
+    antiCheatWarningsRef.current = nextWarning;
+    const nextLog = [...antiCheatLog, { type: eventType, warningNumber: nextWarning, at: new Date().toISOString(), immediate: true }];
+    setAntiCheatWarnings(nextWarning);
+    setAntiCheatLog(nextLog);
+    setIsCheating(true);
+    clearHiddenMark();
+    clearActiveExam(exam.attemptId);
+    releaseExamLock();
+    await saveExamProgress({
+      status: 'cheated',
+      adminDecision: null,
+      adminSecurityAction: 'pending',
+      resumeApproved: false,
+      antiCheatWarnings: nextWarning,
+      antiCheatLog: nextLog,
+      securityHoldAt: serverTimestamp(),
+      securityReason: eventType,
+    });
+  };
+
+  // لو التطبيق اتقفل بعد ما الطالب خرج منه (وما رجعش للامتحان): أول ما يفتحه تاني بيتحسب غش.
+  const hiddenKey = `nx-exam-hidden-${exam.attemptId || exam.id}`;
+  const markHidden = (at) => { try { localStorage.setItem(hiddenKey, String(at)); } catch { /* ignore */ } };
+  const clearHiddenMark = () => { try { localStorage.removeItem(hiddenKey); } catch { /* ignore */ } };
+  useEffect(() => {
+    if (isReviewMode || isSubmitted || existingResult) return;
+    let left = null;
+    try { left = localStorage.getItem(hiddenKey); } catch { /* ignore */ }
+    if (left) setTimeout(() => markCheatedRef.current?.('left_exam_and_closed_app'), 300);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // المتصفح: نمنع الشاشة تطفي لوحدها وقت الامتحان (عشان انطفاء الشاشة ما يتحسبش خروج)
+  useEffect(() => {
+    if (isReviewMode || isSubmitted || isCheating || !('wakeLock' in navigator)) return undefined;
+    let lock = null;
+    const grab = () => { if (document.visibilityState === 'visible') navigator.wakeLock.request('screen').then((l) => { lock = l; }).catch(() => {}); };
+    grab();
+    document.addEventListener('visibilitychange', grab);
+    return () => { document.removeEventListener('visibilitychange', grab); lock?.release?.().catch?.(() => {}); };
+  }, [isReviewMode, isSubmitted, isCheating]);
+
   useEffect(() => {
     if (isReviewMode) return;
 
@@ -304,14 +352,36 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
       }
     };
 
+    const nativeLocked = isExamLockSupported();
     const handleAntiCheat = () => {
       const { showSubmitConfirm, isSubmitted, showAntiCheatChoice } = stateRefs.current;
       if (fileDialogBypassRef.current || showAntiCheatChoice) return;
+      // جوه التطبيق بالتثبيت مفيش طريقة يفتح حاجة تانية من غير ما الشاشة تختفي، فالخروج بيتمسك تحت (visibility)
+      if (nativeLocked) return;
       if (!showSubmitConfirm && !isSubmitted) handleCheatingRef.current('focus_or_visibility_lost');
     };
 
-    const handleVisibilityChange = () => {
-      if (document.hidden && !fileDialogBypassRef.current) handleAntiCheat();
+    let hiddenAt = 0;
+    const handleVisibilityChange = async () => {
+      const { isSubmitted, showAntiCheatChoice, isCheating } = stateRefs.current;
+      if (isSubmitted || showAntiCheatChoice || isCheating || fileDialogBypassRef.current) { hiddenAt = 0; return; }
+      if (document.hidden) {
+        hiddenAt = Date.now();
+        markHidden(hiddenAt);
+        // المتصفح: مفيش طريقة نفرّق بين تبويب تاني وقفل الشاشة، فبيتقفل فورًا (الشاشة مش بتطفي لوحدها بسبب wakeLock)
+        if (!nativeLocked) markCheatedRef.current('tab_switch');
+        return;
+      }
+      // رجع للتطبيق: لو الشاشة كانت مقفولة (زرار الباور) يكمّل عادي، غير كده يبقى خرج لتطبيق تاني
+      if (!hiddenAt) return;
+      const at = hiddenAt; hiddenAt = 0;
+      if (await wasScreenTurnedOff(at)) {
+        clearHiddenMark();
+        const ev = { type: 'screen_off', at: new Date(at).toISOString() };
+        setAntiCheatLog((prev) => [...prev, ev]);
+        return;
+      }
+      markCheatedRef.current('app_switch');
     };
 
     const blockContextMenu = (e) => {
@@ -542,6 +612,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
         new Promise((_, reject) => setTimeout(() => reject(new Error('submit-timeout')), 20000)),
       ]);
       clearPendingSubmit(exam.attemptId);
+      clearHiddenMark();
       // keeps the leaderboard current even where Firestore triggers aren't deployed
       callFunction('syncMyLeaderboardEntry').catch(() => {});
       clearLocalExamBackup(autosaveKey);
@@ -567,7 +638,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
   const currentQObj = displayQuestions[currentQIndex];
   if (!currentQObj) return null;
 
-  if (isCheating) return <ExamCheatingScreen />;
+  if (isCheating) return <ExamCheatingScreen onClose={onClose} />;
 
   const totalQs = flatQuestions.length;
   const solvedQs = flatQuestions.filter((q) => answers[q.id] !== undefined && answers[q.id] !== '' && answers[q.id] !== null).length;

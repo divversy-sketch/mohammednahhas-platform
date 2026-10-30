@@ -8,11 +8,12 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 const devMode = import.meta.env.DEV && typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('nxLock') : null;
 const devSim = devMode ? (() => {
   let state = 'none';
-  window.__nxLock = { unpin: () => { state = 'none'; } };
+  let lastScreenOffAt = 0;
+  window.__nxLock = { unpin: () => { state = 'none'; }, screenOff: () => { lastScreenOffAt = Date.now(); } };
   return {
     start: async () => { if (devMode !== 'deny') setTimeout(() => { state = 'pinned'; }, 1200); return { state, active: state !== 'none' }; },
     stop: async () => { state = 'none'; return { state, active: false }; },
-    getState: async () => ({ state, active: state !== 'none' }),
+    getState: async () => ({ state, active: state !== 'none', lastScreenOffAt }),
   };
 })() : null;
 
@@ -36,6 +37,23 @@ export function examLockMode() {
 export async function getExamLockState() {
   if (!isExamLockSupported()) return 'unsupported';
   try { return (await ExamLock.getState()).state || 'none'; } catch { return 'none'; }
+}
+
+/** حالة كاملة من الأندرويد: هل الشاشة اتقفلت (زرار الباور) وإمتى. */
+export async function getExamLockInfo() {
+  if (!isExamLockSupported()) return null;
+  try { return await ExamLock.getState(); } catch { return null; }
+}
+
+/**
+ * الطالب ساب شاشة الامتحان وبعدين رجع: ده كان قفل شاشة (باور) ولا خروج لتطبيق/تبويب تاني؟
+ * بيرجّع true لو أكيد قفل شاشة. على المتصفح أو APK قديم: false (مفيش طريقة نتأكد).
+ */
+export async function wasScreenTurnedOff(hiddenAt) {
+  const info = await getExamLockInfo();
+  const off = Number(info?.lastScreenOffAt) || 0;
+  // لازم الشاشة تكون اتقفلت في نفس لحظة الخروج (مش قفلة قديمة قبلها)
+  return Boolean(off && off >= hiddenAt - 1500 && off - hiddenAt < 4000);
 }
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));

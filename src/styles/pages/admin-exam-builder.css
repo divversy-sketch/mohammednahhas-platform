@@ -187,3 +187,5 @@
   .aeb .aeb-search input { width: 100%; } .aeb-search { flex: 1; }
   .aeb-card { padding: 14px; }
 }
+.aeb-warns li.is-info { color: #6D28D9; }
+:root[data-theme="dark"] .aeb-warns li.is-info { color: #C4B5FD; }
