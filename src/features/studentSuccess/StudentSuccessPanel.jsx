@@ -36,7 +36,7 @@ export default function StudentSuccessPanel({ userData, videos = [], exams = [],
 
   return <div className="space-y-5">
     <div className="rounded-[2rem] bg-gradient-to-br from-slate-950 to-blue-950 text-white p-5 md:p-7 shadow-xl">
-      <p className="text-blue-200 font-black text-sm">Student Success Suite</p>
+      <p className="text-blue-200 font-black text-sm">متابعة نجاحك</p>
       <h2 className="text-2xl md:text-3xl font-black mt-1">خطة نجاحك الذكية</h2>
       <p className="text-blue-100 text-sm font-bold mt-2">مسار مذاكرة، مراجعة أخطاء، حماية حساب، ونقاط إنجاز في نفس أماكن المنصة الحالية.</p>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-5">

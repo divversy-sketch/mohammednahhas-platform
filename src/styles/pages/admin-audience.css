@@ -1,0 +1,39 @@
+/* اختيار «مين يشوف ده؟» */
+.aud { display: grid; gap: 10px; padding: 14px; border-radius: 16px; border: 1px solid var(--nx-line); background: var(--nx-surface-2, var(--nx-surface)); color: var(--nx-ink); }
+.aud-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.aud-head > b { display: inline-flex; align-items: center; gap: 6px; font-size: 14.5px; font-weight: 800; }
+.aud-head > b .nx-ico { width: 16px; height: 16px; color: var(--nx-copper); }
+.aud-head > em { margin-inline-start: auto; display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; font-style: normal; font-size: 12.5px; font-weight: 800; color: #0E9F6E; background: color-mix(in srgb, #10B981 13%, transparent); }
+.aud-head > em.is-zero { color: var(--nx-danger, #DC2626); background: color-mix(in srgb, #EF4444 12%, transparent); }
+.aud-head > em .nx-ico { width: 14px; height: 14px; }
+.aud-modes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.aud-modes button { display: flex; align-items: center; gap: 8px; min-height: 52px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--nx-line); background: var(--nx-surface); color: var(--nx-ink); font: inherit; text-align: start; cursor: pointer; transition: border-color .2s, box-shadow .2s; }
+.aud-modes button .nx-ico { width: 18px; height: 18px; flex: none; color: var(--nx-ink-3); }
+.aud-modes button span { display: grid; min-width: 0; }
+.aud-modes button b { font-size: 13px; }
+.aud-modes button small { font-size: 11px; color: var(--nx-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aud-modes button.is-on { border-color: var(--nx-copper); box-shadow: inset 0 0 0 1px var(--nx-copper); background: color-mix(in srgb, var(--nx-copper) 7%, var(--nx-surface)); }
+.aud-modes button.is-on .nx-ico { color: var(--nx-copper); }
+.aud-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.aud-chips button { display: inline-flex; align-items: center; gap: 5px; min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--nx-line); background: var(--nx-surface); color: var(--nx-ink-2); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.aud-chips button small { padding: 0 6px; border-radius: 999px; background: var(--nx-sunk); font-size: 11px; color: var(--nx-ink-3); }
+.aud-chips button.is-on { background: var(--nx-copper); border-color: var(--nx-copper); color: #fff; }
+.aud-chips button.is-on small { background: rgba(255,255,255,.25); color: #fff; }
+.aud-chips .nx-ico { width: 13px; height: 13px; }
+.aud-hint { margin: 0; font-size: 12px; color: var(--nx-ink-3); line-height: 1.7; }
+.aud-students { display: grid; gap: 8px; }
+.aud-search { display: flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--nx-line); background: var(--nx-surface); }
+.aud-search .nx-ico { width: 16px; height: 16px; color: var(--nx-ink-3); }
+.aud .aud-search input { flex: 1; border: 0 !important; background: none !important; box-shadow: none !important; min-height: 0 !important; padding: 0 !important; font: inherit; color: var(--nx-ink) !important; outline: 0; }
+.aud-found { display: grid; gap: 2px; max-height: 220px; overflow-y: auto; padding: 4px; border-radius: 12px; border: 1px solid var(--nx-line); background: var(--nx-surface); }
+.aud-found button { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 9px; border: 0; background: none; color: var(--nx-ink); font: inherit; text-align: start; cursor: pointer; }
+.aud-found button:hover { background: var(--nx-sunk); }
+.aud-found button i { width: 24px; height: 24px; flex: none; display: grid; place-items: center; border-radius: 7px; border: 1px solid var(--nx-line); }
+.aud-found button.is-on i { background: var(--nx-copper); border-color: var(--nx-copper); color: #fff; }
+.aud-found button .nx-ico { width: 13px; height: 13px; }
+.aud-found b { display: block; font-size: 13px; } .aud-found small { font-size: 11.5px; color: var(--nx-ink-3); }
+.aud-picked { display: flex; flex-wrap: wrap; gap: 6px; }
+.aud-picked span { display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 10px; border-radius: 999px; background: color-mix(in srgb, var(--nx-copper) 13%, transparent); font-size: 12.5px; font-weight: 700; }
+.aud-picked button { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; border: 0; background: rgba(0,0,0,.08); color: inherit; cursor: pointer; }
+.aud-picked .nx-ico { width: 11px; height: 11px; }
+@media (max-width: 760px) { .aud-modes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

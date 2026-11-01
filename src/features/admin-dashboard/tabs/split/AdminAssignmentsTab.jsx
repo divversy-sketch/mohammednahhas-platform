@@ -210,7 +210,7 @@ export default function AdminAssignmentsTab({ ctx }) {
 
   return (
     <>
-{activeTab === 'assignments' && <div className="space-y-6"><AdminAssignmentsPage adminGradeFilter={adminGradeFilter} handleDeleteAllHomework={handleDeleteAllHomework} /><AdminStudentSuccessSuite variant="assignments" assignments={assignments} assignmentSubmissions={assignmentSubmissions} /></div>}
+{activeTab === 'assignments' && <div className="space-y-6"><AdminAssignmentsPage adminGradeFilter={adminGradeFilter} handleDeleteAllHomework={handleDeleteAllHomework} users={activeUsersList || []} /></div>}
     </>
   );
 }

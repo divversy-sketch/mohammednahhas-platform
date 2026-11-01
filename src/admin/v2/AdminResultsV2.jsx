@@ -7,7 +7,7 @@ import { Icon } from '@v2/ui/Icon.jsx';
 import { formatNumber } from '@v2/ui/kit.jsx';
 import { getQuestionsForExam, generatePDF } from '@shared/core/platformShared.jsx';
 import { downloadXlsx } from '@shared/utils/exportData.js';
-import { liveState, useExamEvents, Timeline } from './AdminExamLive.jsx';
+import { liveState, useExamEvents, useExamAttempts, Timeline } from './AdminExamLive.jsx';
 import { diagnoseAttempt, attemptStats, groupEvents, dur } from '@shared/exam/examDiagnosis.js';
 import '@styles/pages/admin-results.css';
 
@@ -99,7 +99,24 @@ export default function AdminResultsV2({ ctx }) {
   const examsById = useMemo(() => new Map(examsList.map((e) => [e.id, e])), [examsList]);
   const usersById = useMemo(() => new Map(activeUsersList.map((u) => [u.id || u.uid, u])), [activeUsersList]);
 
-  // امتحانات ليها نتائج، الأحدث فوق
+  // الامتحان المختار: كل محاولاته من Firebase مباشرة (مش من آخر ٥٠٠ نتيجة بس) + نسخه المعدّلة
+  const relatedIds = useMemo(() => {
+    if (!examId) return [];
+    const ids = new Set([examId]);
+    const ex = examsList.find((e) => e.id === examId);
+    [ex?.originalExamId, ex?.clonedFrom].filter(Boolean).forEach((x) => ids.add(x));
+    examsList.forEach((e) => { if (ids.has(e.originalExamId) || ids.has(e.clonedFrom)) ids.add(e.id); });
+    return [...ids];
+  }, [examId, examsList]);
+  const direct = useExamAttempts(relatedIds);
+  const allResults = useMemo(() => {
+    if (!direct.length) return examResults;
+    const byId = new Map(examResults.map((r) => [`${r.sourceCollection || ''}:${r.id}`, r]));
+    direct.forEach((r) => byId.set(`${r.sourceCollection || ''}:${r.id}`, { ...byId.get(`${r.sourceCollection || ''}:${r.id}`), ...r }));
+    return [...byId.values()];
+  }, [examResults, direct]);
+
+  // امتحانات ليها نتائج، الأحدث فوق (+ أي امتحان تاني من القايمة عشان تقدر تختاره حتى لو نتايجه قديمة)
   const examOptions = useMemo(() => {
     const stats = new Map();
     examResults.forEach((r) => {
@@ -107,17 +124,18 @@ export default function AdminResultsV2({ ctx }) {
       s.n += 1; s.last = Math.max(s.last, toMs(r.submittedAt), toMs(r.lastSavedAt));
       stats.set(r.examId, s);
     });
+    examsList.forEach((e) => { if (!stats.has(e.id)) stats.set(e.id, { n: 0, last: toMs(e.startTime) || 0, noRecent: true }); });
     return [...stats.entries()]
-      .map(([id, s]) => ({ id, n: s.n, last: s.last, title: examsById.get(id)?.title || examResults.find((r) => r.examId === id)?.examTitle || 'امتحان محذوف' }))
-      .sort((a, b) => b.last - a.last);
-  }, [examResults, examsById]);
+      .map(([id, s]) => ({ id, n: s.n, last: s.last, noRecent: s.noRecent, title: examsById.get(id)?.title || examResults.find((r) => r.examId === id)?.examTitle || 'امتحان محذوف' }))
+      .sort((a, b) => (a.noRecent === b.noRecent ? b.last - a.last : a.noRecent ? 1 : -1));
+  }, [examResults, examsById, examsList]);
 
   const rows = useMemo(() => {
     const grade = adminGradeFilter && adminGradeFilter !== 'all' ? adminGradeFilter : '';
-    return examResults
-      .filter((r) => !examId || r.examId === examId)
+    return allResults
+      .filter((r) => !examId || relatedIds.includes(r.examId))
       .map((r) => {
-        const u = usersById.get(r.studentId) || {};
+        const u = usersById.get(r.studentId || r.userId) || {};
         const exam = examsById.get(r.examId);
         const state = liveState(r, now);
         const percentage = pctOf(r);
@@ -133,7 +151,7 @@ export default function AdminResultsV2({ ctx }) {
         };
       })
       .filter((x) => !grade || !x.grade || x.grade === grade);
-  }, [examResults, examId, usersById, examsById, adminGradeFilter, now]);
+  }, [allResults, examId, relatedIds, usersById, examsById, adminGradeFilter, now]);
 
   const done = useMemo(() => rows.filter((x) => x.state === 'submitted'), [rows]);
 
@@ -222,7 +240,7 @@ export default function AdminResultsV2({ ctx }) {
           <Icon name="exam" />
           <select value={examId} onChange={(e) => { setExamId(e.target.value); setLimit(60); }} aria-label="اختار الامتحان">
             <option value="">كل الامتحانات ({formatNumber(examResults.length)} نتيجة)</option>
-            {examOptions.map((e) => <option key={e.id} value={e.id}>{e.title} · {formatNumber(e.n)}</option>)}
+            {examOptions.map((e) => <option key={e.id} value={e.id}>{e.title}{e.noRecent ? "" : ` · ${formatNumber(e.n)}`}</option>)}
           </select>
         </label>
         <label className="ars-search"><Icon name="search" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="اسم الطالب أو رقمه" /></label>

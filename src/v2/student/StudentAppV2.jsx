@@ -8,7 +8,9 @@ import { haptic, onBackButton } from '../device/native.js';
 import { usePrefs } from '../prefs.js';
 import { SECTIONS, SUBS, parseRoute, routeTitle } from './nav.js';
 import { examBuckets } from './insights.js';
-import { CommandPalette, NotificationsSheet } from './parts.jsx';
+import { CommandPalette } from './parts.jsx';
+import { NotificationCenter, useUnreadNotifications } from './NotificationCenter.jsx';
+import '../styles/notification-center.css';
 import { ExamPreStartPanel, InteractiveViewer, Overlay, SecureVideoPlayer, SmartHomeworkScanner, EmbedFallback } from './embeds.jsx';
 import HomeView from './views/HomeView.jsx';
 import { CinemaNav, CinemaPhoneTop, PageHero } from './cinema.jsx';
@@ -139,6 +141,8 @@ export default function StudentAppV2({ ctx }) {
   })();
 
   const phone = device.form === 'phone';
+  const unread = useUnreadNotifications(ctx);
+  const navCtx = useMemo(() => ({ ...ctx, unseenNotificationCount: unread }), [ctx, unread]);
   const bell = () => {
     ctx.setShowNotifications(true);
     if (ctx.setHasNewNotif) ctx.setHasNewNotif(false);
@@ -149,8 +153,8 @@ export default function StudentAppV2({ ctx }) {
       {!online && <div className="nx-offline" role="status"><Icon name="wifiOff" size={14} /> مفيش إنترنت دلوقتي. اللي اتحمّل هيفضل ظاهر، وهنكمّل أول ما النت يرجع.</div>}
       <div className="nx-main">
         {phone
-          ? <CinemaPhoneTop ctx={ctx} route={route} title={SECTIONS.find((s) => s.key === route.section)?.title || title} onSearch={() => setSearchOpen(true)} onBell={bell} go={go} />
-          : <CinemaNav ctx={ctx} route={route} go={go} badges={badges} theme={theme} toggleTheme={toggleTheme} onSearch={() => setSearchOpen(true)} onBell={bell} device={device} />}
+          ? <CinemaPhoneTop ctx={navCtx} route={route} title={SECTIONS.find((s) => s.key === route.section)?.title || title} onSearch={() => setSearchOpen(true)} onBell={bell} go={go} />
+          : <CinemaNav ctx={navCtx} route={route} go={go} badges={badges} theme={theme} toggleTheme={toggleTheme} onSearch={() => setSearchOpen(true)} onBell={bell} device={device} />}
         <main className={`nx-content cx-under ${route.section === "home" ? "cx-home-content" : ""}`} id="nx-main">
           {route.section !== 'home' && <PageHero route={route} title={title} />}
           <SubNav route={route} go={go} counts={counts} />
@@ -161,7 +165,7 @@ export default function StudentAppV2({ ctx }) {
       </div>
       {phone && <TabBar route={route} go={go} badges={badges} />}
 
-      <NotificationsSheet ctx={ctx} open={Boolean(ctx.showNotifications)} onClose={() => ctx.setShowNotifications(false)} />
+      <NotificationCenter ctx={ctx} open={Boolean(ctx.showNotifications)} onClose={() => ctx.setShowNotifications(false)} go={go} onOpenRow={openRow} buckets={buckets} />
       <CommandPalette ctx={ctx} open={searchOpen} onClose={() => setSearchOpen(false)} onOpenRow={openRow} />
 
       {ctx.playingVideo && <Overlay><SecureVideoPlayer video={ctx.playingVideo} user={ctx.user} userName={ctx.userData?.name} onClose={() => ctx.setPlayingVideo(null)} onProgress={ctx.handleVideoProgress} /></Overlay>}

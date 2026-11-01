@@ -14,7 +14,8 @@ import AdminQuestionDeepAnalytics from '@features/admin-dashboard/analytics/Admi
 import AdvancedAntiCheatInsights from '@features/admin-dashboard/security/AdvancedAntiCheatInsights.jsx';
 import LeaderboardPanel from '@features/leaderboard/components/LeaderboardPanel.jsx';
 import SmartSubscriptionManager from '@features/subscriptions/admin/SmartSubscriptionManager.jsx';
-import AdminPendingUsersPage from '@admin/pages/AdminPendingUsersPage.jsx';
+import AdminPendingUsersPage from '@admin/pages/AdminPendingUsersPage.jsx'; // eslint-disable-line no-unused-vars
+import { AdminJoinRequestsV2 } from '@admin/v2/AdminStudentsV2.jsx';
 import { AdminAssignmentsPage, AdminExamViewTabs, AdminQuestionBankPage } from '@admin/pages/AdminUtilityPages.jsx';
 import AdminFollowUpPanel from '@features/insights/AdminFollowUpPanel.jsx';
 import AdminSmartHomeworkManager from '@features/homework/AdminSmartHomeworkManager.jsx';
@@ -210,7 +211,7 @@ export default function AdminPendingUsersTab({ ctx }) {
 
   return (
     <>
-{activeTab === 'users' && <AdminPendingUsersPage filteredPendingUsers={filteredPendingUsers} handleApprove={handleApprove} handleReject={handleReject} />}
+{activeTab === 'users' && <AdminJoinRequestsV2 pendingUsers={filteredPendingUsers || []} handleApprove={handleApprove} handleReject={handleReject} />}
     </>
   );
 }

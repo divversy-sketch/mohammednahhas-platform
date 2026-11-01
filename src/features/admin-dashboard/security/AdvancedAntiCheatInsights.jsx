@@ -23,7 +23,7 @@ export const AdvancedAntiCheatInsights = ({ examResults = [] }) => {
 
   return (
     <div className="glass-panel rounded-2xl p-5 border-t-4 border-red-600">
-      <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2 mb-4"><ShieldAlert className="text-red-600"/> Anti-cheat Risk Center</h2>
+      <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2 mb-4"><ShieldAlert className="text-red-600"/> مؤشر خطر الغش</h2>
       <div className="space-y-3">
         {risky.map(r => (
           <div key={r.id} className="bg-white border rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -32,7 +32,7 @@ export const AdvancedAntiCheatInsights = ({ examResults = [] }) => {
               <p className="text-xs text-slate-500">{r.examTitle || 'امتحان'} • تحذيرات: {safeNumber(r.antiCheatWarnings,0)}</p>
             </div>
             <div className="min-w-[180px]">
-              <div className="flex justify-between text-xs font-bold mb-1"><span>Risk</span><span>{r.risk}%</span></div>
+              <div className="flex justify-between text-xs font-bold mb-1"><span>نسبة الخطر</span><span>{r.risk}%</span></div>
               <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
                 <div className={`${r.risk >= 70 ? 'bg-red-600' : r.risk >= 40 ? 'bg-amber-500' : 'bg-emerald-500'} h-full`} style={{width:`${r.risk}%`}}></div>
               </div>

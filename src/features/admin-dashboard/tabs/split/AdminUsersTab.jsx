@@ -22,7 +22,7 @@ import { AdminAuditLogViewer, AdminNotificationsManager, AdminPlatformSettingsMa
 import { AdminSmartExamEngine, AdminStudentReports, AdminGroupsManager, AdminMessagingCenter, AdminFinanceDashboard, AdminVideoSecurityPanel } from '@features/smartLearning/SmartLearningEngine.jsx';
 import AdminStudentSuccessSuite from '@features/studentSuccess/StudentSuccessAdminSuite.jsx';
 import { AdminGlobalSearch, AdminLiveClassesPanel, AdminCertificatesPanel, AdminCommandQuickActions } from '@features/product/ProductExperienceSuite.jsx';
-import AdminAllUsersTab from '@features/admin-dashboard/tabs/users/AdminAllUsersTab.jsx';
+import AdminStudentsV2 from '@admin/v2/AdminStudentsV2.jsx';
 import AdminDashboardOverviewTab from '@features/admin-dashboard/tabs/dashboard/AdminDashboardOverviewTab.jsx';
 
 export default function AdminUsersTab({ ctx }) {
@@ -211,31 +211,7 @@ export default function AdminUsersTab({ ctx }) {
   return (
     <>
 {activeTab === 'all_users' && (
-            <AdminAllUsersTab
-              dailyFilteredActiveUsers={dailyFilteredActiveUsers}
-              filteredActiveUsers={filteredActiveUsers}
-              adminGradeFilter={adminGradeFilter}
-              setAdminGradeFilter={setAdminGradeFilter}
-              dailyAdminStats={dailyAdminStats}
-              studentSearchTerm={studentSearchTerm}
-              setStudentSearchTerm={setStudentSearchTerm}
-              studentStatusFilter={studentStatusFilter}
-              setStudentStatusFilter={setStudentStatusFilter}
-              studentSubscriptionFilter={studentSubscriptionFilter}
-              setStudentSubscriptionFilter={setStudentSubscriptionFilter}
-              exportStudentsExcel={exportStudentsExcel}
-              editingUser={editingUser}
-              setEditingUser={setEditingUser}
-              handleUpdateUser={handleUpdateUser}
-              studentsPagination={studentsPagination}
-              handleToggleSubscription={handleToggleSubscription}
-              handleChangeUserStatus={handleChangeUserStatus}
-              openStudentProfile={openStudentProfile}
-              handleSendResetPassword={handleSendResetPassword}
-              handleDeleteUser={handleDeleteUser}
-              approveGrade={approveGrade}
-              rejectGrade={rejectGrade}
-            />
+            <AdminStudentsV2 ctx={ctx} />
           )}
     </>
   );

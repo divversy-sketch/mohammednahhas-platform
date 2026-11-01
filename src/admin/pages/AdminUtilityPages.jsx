@@ -8,13 +8,15 @@ export function AdminQuestionBankPage({ adminGradeFilter }) {
   return <InlineTabs tabs={[{ key: 'bank', label: 'إدارة بنك الأسئلة', content: <QuestionBankManager adminGradeFilter={adminGradeFilter} /> }]} />;
 }
 
-export function AdminAssignmentsPage({ adminGradeFilter, handleDeleteAllHomework }) {
+export function AdminAssignmentsPage({ adminGradeFilter, handleDeleteAllHomework, users = [] }) {
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <button onClick={handleDeleteAllHomework} className="bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2"><Trash2 size={16}/> حذف كل الواجبات وسجلاتها</button>
-      </div>
-      <InlineTabs tabs={[{ key: 'assignments_admin', label: 'إدارة الواجبات', content: <AssignmentsManager adminGradeFilter={adminGradeFilter} /> }]} />
+      <AssignmentsManager adminGradeFilter={adminGradeFilter} users={users} />
+      {handleDeleteAllHomework ? (
+        <div className="flex justify-end">
+          <button onClick={handleDeleteAllHomework} className="apl-btn apl-btn--danger"><Trash2 size={15}/> حذف كل الواجبات وسجلاتها</button>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -393,7 +393,10 @@ service cloud.firestore {
       allow read: if canReadTargetedDocument()
         || resource.data.audience == 'all'
         || (signedIn() && resource.data.audience == 'user:' + request.auth.uid)
-        || (signedIn() && resource.data.audience == userField('grade'));
+        || (signedIn() && resource.data.audience == userField('grade'))
+        // الجديد: كل الطلبة / صف / طلبة معيّنين في قايمة واحدة
+        || (signedIn() && resource.data.audienceKeys is list
+            && resource.data.audienceKeys.hasAny(['all', 'user:' + request.auth.uid, 'grade:' + userField('grade')]));
       allow write: if canManageMessages();
     }
 

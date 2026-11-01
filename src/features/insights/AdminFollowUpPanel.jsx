@@ -4,6 +4,7 @@ import { db } from '../../services/firebase';
 import { AlertTriangle, BarChart3, ClipboardList, MessageCircle, Users, Bell, Crown } from '../../shared/icons/lucide-shim.jsx';
 import { buildAdminInsights, buildParentReportText, buildWhatsAppLink } from './learningInsights.js';
 import { getGradeLabel } from '../../shared/constants/grades';
+import { buildNotification } from '../../shared/notifications/notify.js';
 
 const AdminFollowUpPanel = ({ users = [], exams = [], examResults = [], assignments = [], assignmentSubmissions = [], hwResults = [], mistakes = [], videoViews = [], adminGradeFilter = 'all' }) => {
   const [groupName, setGroupName] = useState('');
@@ -24,8 +25,9 @@ const AdminFollowUpPanel = ({ users = [], exams = [], examResults = [], assignme
   const selectedStudent = users.find(u => u.id === selectedRow?.studentId) || {};
   const reportText = selectedRow ? buildParentReportText(selectedStudent, selectedRow) : '';
 
-  const copyReport = async () => {
-    await navigator.clipboard?.writeText(reportText);
+  const copyReport = async (row) => {
+    const text = row ? buildParentReportText(users.find(u => u.id === row.studentId) || {}, row) : reportText;
+    try { await navigator.clipboard?.writeText(text); } catch { /* ignore */ }
     window.dispatchEvent(new CustomEvent('nahhas-toast', { detail: { message: 'تم نسخ تقرير ولي الأمر.', type: 'success' } }));
   };
 
@@ -35,18 +37,8 @@ const AdminFollowUpPanel = ({ users = [], exams = [], examResults = [], assignme
   };
 
   const sendAlertNotification = async (row) => {
-    await addDoc(collection(db, 'notifications'), {
-      title: 'خطة متابعة جديدة',
-      text: `راجع خطتك: ${row.recommendations.join('، ')}`,
-      body: `راجع خطتك: ${row.recommendations.join('، ')}`,
-      target: 'user',
-      userId: row.studentId,
-      audience: `user:${row.studentId}`,
-      grade: row.grade || 'all',
-      clickUrl: '/',
-      createdAt: serverTimestamp(),
-      source: 'admin_follow_up'
-    });
+    const body = `راجع خطتك: ${(row.recommendations || []).join('، ') || 'كمّل وذاكر الدروس اللي فاتتك'}`;
+    await addDoc(collection(db, 'notifications'), { ...buildNotification({ audienceKeys: [`user:${row.studentId}`], category: 'reminder', priority: 'high', title: 'خطة متابعة جديدة', body, source: 'admin_follow_up' }), userId: row.studentId });
     window.dispatchEvent(new CustomEvent('nahhas-toast', { detail: { message: 'تم إرسال تنبيه للطالب.', type: 'success' } }));
   };
 
@@ -60,20 +52,20 @@ const AdminFollowUpPanel = ({ users = [], exams = [], examResults = [], assignme
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div className="xl:col-span-2 bg-white rounded-3xl border border-slate-100 p-5 shadow-sm overflow-x-auto">
+        <div className="xl:col-span-2 bg-white rounded-3xl border border-slate-100 p-5 shadow-sm">
           <h2 className="text-xl font-black text-slate-900 mb-4 flex items-center gap-2"><AlertTriangle className="text-red-500"/> متابعة الطلاب والإنذارات</h2>
-          <div className="min-w-[820px] space-y-2">
+          <div className="space-y-2">
             {insights.rows.sort((a,b) => (b.riskReasons.length - a.riskReasons.length) || (a.average - b.average)).map(row => {
               const student = users.find(u => u.id === row.studentId) || {};
               const wa = buildWhatsAppLink(student.parentPhone, buildParentReportText(student, row));
               return (
-                <div key={row.studentId} className="grid grid-cols-12 gap-3 items-center border border-slate-100 rounded-2xl p-3 bg-slate-50">
-                  <div className="col-span-3"><p className="font-black text-slate-800">{row.name}</p><p className="text-xs text-slate-500">{getGradeLabel(row.grade)} · {student.studyGroup || 'بدون مجموعة'}</p></div>
-                  <div className="col-span-1 font-black text-center">{row.average}%</div>
-                  <div className="col-span-2 text-xs font-bold text-slate-600">{row.riskReasons.join('، ') || 'مستقر'}</div>
-                  <div className="col-span-2"><input className="w-full border rounded-xl p-2 text-xs" placeholder="اسم المجموعة" defaultValue={student.studyGroup || ''} onBlur={(e)=>setStudentGroup(row.studentId, e.target.value)} /></div>
-                  <div className="col-span-4 flex gap-2 justify-end">
-                    <button onClick={() => { setSelectedStudentId(row.studentId); copyReport(); }} className="bg-slate-900 text-white px-3 py-2 rounded-xl text-xs font-black flex items-center gap-1"><ClipboardList size={14}/> تقرير</button>
+                <div key={row.studentId} className="flex flex-wrap gap-x-4 gap-y-2 items-center border border-slate-100 rounded-2xl p-3 bg-slate-50">
+                  <div className="flex-1 min-w-[150px]"><p className="font-black text-slate-800">{row.name}</p><p className="text-xs text-slate-500">{getGradeLabel(row.grade)} · {student.studyGroup || 'بدون مجموعة'}</p></div>
+                  <div className="font-black text-center w-12">{row.average}%</div>
+                  <div className="text-xs font-bold text-slate-600 flex-1 min-w-[120px]">{row.riskReasons.join('، ') || 'مستقر'}</div>
+                  <div className="w-36"><input className="w-full border rounded-xl p-2 text-xs" placeholder="اسم المجموعة" defaultValue={student.studyGroup || ''} onBlur={(e)=>setStudentGroup(row.studentId, e.target.value)} /></div>
+                  <div className="flex gap-2 justify-end flex-wrap ms-auto">
+                    <button onClick={() => { setSelectedStudentId(row.studentId); copyReport(row); }} className="bg-slate-900 text-white px-3 py-2 rounded-xl text-xs font-black flex items-center gap-1"><ClipboardList size={14}/> تقرير</button>
                     {wa && <a href={wa} target="_blank" rel="noreferrer" className="bg-emerald-600 text-white px-3 py-2 rounded-xl text-xs font-black flex items-center gap-1"><MessageCircle size={14}/> ولي الأمر</a>}
                     <button onClick={() => sendAlertNotification(row)} className="bg-amber-600 text-white px-3 py-2 rounded-xl text-xs font-black flex items-center gap-1"><Bell size={14}/> تنبيه</button>
                   </div>

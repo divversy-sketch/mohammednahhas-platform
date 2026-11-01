@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { CheckCircle, KeyRound, Mail, ShieldAlert, Trash2, User, XCircle } from '@shared/icons/lucide-shim.jsx';
+import { Icon } from '@v2/ui/Icon.jsx';
+import '@styles/pages/admin-people.css';
 import { platformNotify, platformPrompt, platformConfirm } from '@shared/core/platformShared.jsx';
 import { adminSecureFunctions } from '@admin/services/adminSecureFunctions.js';
 
@@ -70,70 +71,43 @@ export default function AdminPasswordResetRequestsPanel({ requests = [], users =
     }
   };
 
+  const ms = (v) => (v?.toMillis ? v.toMillis() : v?.seconds ? v.seconds * 1000 : v ? new Date(v).getTime() || 0 : 0);
   return (
-    <div className="space-y-5">
-      <div className="bg-white/80 border border-slate-100 rounded-2xl p-5 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
-          <div>
-            <h2 className="text-xl font-black text-slate-800 flex items-center gap-2"><KeyRound size={22} className="text-amber-600"/> طلبات تغيير كلمة السر</h2>
-            <p className="text-sm text-slate-500 mt-1">الطالب يرسل طلب من صفحة الدخول، والأدمن يعيّن كلمة سر جديدة بدون انتظار وصول إيميل.</p>
-          </div>
-          <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full font-black text-sm">{pendingRequests.length} طلب مفتوح</span>
-        </div>
-
-        {pendingRequests.length === 0 ? (
-          <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-6 text-center text-slate-500 font-bold">
-            لا توجد طلبات مفتوحة حاليًا. الدنيا هادية… بشكل مريب شوية 😄
-          </div>
-        ) : (
-          <div className="grid gap-3">
-            {pendingRequests.map((request) => {
-              const student = findStudentByEmail(request.email);
-              return (
-                <div key={request.id} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <p className="font-black text-slate-800 flex items-center gap-2"><Mail size={16} className="text-blue-600"/> {request.email}</p>
-                    <p className="text-sm text-slate-500 flex items-center gap-2"><User size={15}/> {student ? `الطالب: ${student.name || 'بدون اسم'}` : 'لا يوجد طالب مطابق لهذا الإيميل'}</p>
-                    <p className="text-xs text-slate-400">الحالة: {request.status || 'pending'} • المصدر: {request.source || 'auth_page'}</p>
-                    {!student && <p className="text-xs text-red-600 font-bold flex items-center gap-1"><ShieldAlert size={14}/> راجع الإيميل أو حساب الطالب قبل تعيين كلمة سر.</p>}
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      disabled={busyId === request.id || !student}
-                      onClick={() => setPasswordForRequest(request)}
-                      className="bg-emerald-600 disabled:bg-slate-300 text-white px-4 py-2 rounded-xl font-black flex items-center gap-2 hover:bg-emerald-700 transition"
-                    >
-                      <CheckCircle size={16}/> تعيين كلمة سر
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busyId === request.id}
-                      onClick={() => rejectRequest(request)}
-                      className="bg-red-100 disabled:opacity-50 text-red-700 px-4 py-2 rounded-xl font-black flex items-center gap-2 hover:bg-red-200 transition"
-                    >
-                      <XCircle size={16}/> رفض
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+    <div className="apl" dir="rtl">
+      <div className="apl-bar">
+        <p className="apl-lead"><Icon name="info" />الطالب بيبعت الطلب من صفحة الدخول، وانت بتحدد له كلمة سر جديدة على طول وتبعتهاله (واتساب أو مكالمة).</p>
+        <span className="apl-sp" />
+        <span className="apl-count is-hot">{pendingRequests.length.toLocaleString('ar-EG')} طلب مفتوح</span>
       </div>
-
+      {pendingRequests.length === 0 && <p className="apl-empty"><Icon name="checkCircle" />مفيش طلبات مفتوحة دلوقتي.</p>}
+      <div className="apl-cards">
+        {pendingRequests.map((request) => {
+          const student = findStudentByEmail(request.email);
+          return (
+            <article key={request.id} className={`apl-card ${student ? '' : 'is-warn'}`}>
+              <header className="apl-who"><i>{String(student?.name || request.email || 'ط').trim().charAt(0)}</i><span><b>{student?.name || 'مش لاقيين الطالب'}</b><small dir="ltr">{request.email}</small></span></header>
+              <dl>
+                {student?.phone && <div><dt>الموبايل</dt><dd dir="ltr"><a href={`https://wa.me/2${String(student.phone).replace(/\D/g, '').replace(/^2?/, '')}`} target="_blank" rel="noreferrer">{student.phone}</a></dd></div>}
+                <div><dt>الطلب</dt><dd>{ms(request.createdAt) ? new Date(ms(request.createdAt)).toLocaleString('ar-EG', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '—'}</dd></div>
+              </dl>
+              {!student && <p className="apl-note is-bad"><Icon name="alert" />مفيش طالب بالإيميل ده. راجع الإيميل أو حساب الطالب الأول.</p>}
+              <footer>
+                <button type="button" className="apl-btn apl-btn--ok" disabled={busyId === request.id || !student} onClick={() => setPasswordForRequest(request)}><Icon name="key" />حدد كلمة سر جديدة</button>
+                <button type="button" className="apl-btn apl-btn--danger" disabled={busyId === request.id} onClick={() => rejectRequest(request)}><Icon name="close" />رفض</button>
+              </footer>
+            </article>
+          );
+        })}
+      </div>
       {completedRequests.length > 0 && (
-        <div className="bg-white/70 border border-slate-100 rounded-2xl p-5 shadow-sm">
-          <h3 className="font-black text-slate-700 mb-3 flex items-center gap-2"><Trash2 size={18}/> آخر الطلبات المغلقة</h3>
-          <div className="space-y-2">
+        <section className="apl-section">
+          <h3><Icon name="clock" />آخر الطلبات المقفولة</h3>
+          <div className="apl-mini">
             {completedRequests.map((request) => (
-              <div key={request.id} className="flex justify-between gap-3 bg-slate-50 rounded-xl px-4 py-3 text-sm">
-                <span className="font-bold text-slate-700">{request.email}</span>
-                <span className={request.status === 'completed' ? 'text-emerald-700 font-black' : 'text-red-700 font-black'}>{request.status === 'completed' ? 'تم التنفيذ' : 'مرفوض'}</span>
-              </div>
+              <div key={request.id}><span dir="ltr">{request.email}</span><em className={request.status === 'completed' ? 'is-ok' : 'is-bad'}>{request.status === 'completed' ? 'اتنفّذ' : 'اترفض'}</em></div>
             ))}
           </div>
-        </div>
+        </section>
       )}
     </div>
   );

@@ -24,6 +24,7 @@ import AdminStudentSuccessSuite from '@features/studentSuccess/StudentSuccessAdm
 import { AdminGlobalSearch, AdminLiveClassesPanel, AdminCertificatesPanel, AdminCommandQuickActions } from '@features/product/ProductExperienceSuite.jsx';
 import AdminAllUsersTab from '@features/admin-dashboard/tabs/users/AdminAllUsersTab.jsx';
 import AdminDashboardOverviewTab from '@features/admin-dashboard/tabs/dashboard/AdminDashboardOverviewTab.jsx';
+import AdminNotifyCenter from '@admin/v2/AdminNotifyCenter.jsx';
 
 export default function AdminNotificationsAdminTab({ ctx }) {
   const {
@@ -210,7 +211,7 @@ export default function AdminNotificationsAdminTab({ ctx }) {
 
   return (
     <>
-{activeTab === 'notifications_admin' && <div className="space-y-6"><AdminNotificationsManager users={activeUsersList} userData={userData} /><AdminStudentSuccessSuite variant="broadcast" users={activeUsersList} /></div>}
+{activeTab === 'notifications_admin' && <div className="space-y-6"><AdminNotifyCenter ctx={ctx} /><details className="anc-more"><summary>أدوات تواصل إضافية (رسايل جماعية)</summary><AdminStudentSuccessSuite variant="broadcast" users={activeUsersList} /></details></div>}
     </>
   );
 }

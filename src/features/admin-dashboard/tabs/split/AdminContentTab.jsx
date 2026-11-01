@@ -24,6 +24,8 @@ import AdminStudentSuccessSuite from '@features/studentSuccess/StudentSuccessAdm
 import { AdminGlobalSearch, AdminLiveClassesPanel, AdminCertificatesPanel, AdminCommandQuickActions } from '@features/product/ProductExperienceSuite.jsx';
 import AdminAllUsersTab from '@features/admin-dashboard/tabs/users/AdminAllUsersTab.jsx';
 import AdminDashboardOverviewTab from '@features/admin-dashboard/tabs/dashboard/AdminDashboardOverviewTab.jsx';
+import AudiencePicker, { useStudentGroups } from '@admin/v2/AudiencePicker.jsx';
+import { defaultAudience, resolveAudience, audienceLabel } from '@shared/audience/audience.js';
 
 export default function AdminContentTab({ ctx }) {
   const {
@@ -207,6 +209,14 @@ export default function AdminContentTab({ ctx }) {
     exportStudentsExcel,
     v2AdminStats,
   } = ctx;
+  const groups = useStudentGroups();
+  const contentAudience = newContent?.audience || defaultAudience(newContent?.grade);
+  const setContentAudience = (v) => setNewContent({ ...newContent, audience: v, audienceFields: resolveAudience(v, activeUsersList || [], groups), allowedEmails: '' });
+  const setContentGrade = (grade) => {
+    const a = newContent?.audience;
+    const follow = !a || (a.mode === 'grades' && (a.grades || []).length <= 1);
+    setNewContent({ ...newContent, grade, ...(follow ? { audience: undefined, audienceFields: undefined } : {}) });
+  };
 
   return (
     <>
@@ -261,7 +271,7 @@ export default function AdminContentTab({ ctx }) {
                                   <option value="reviews">مراجعة نهائية</option>
                               </select>
                           )}
-                          <select className="border p-3 rounded flex-1" value={newContent.grade} onChange={e=>setNewContent({...newContent, grade:e.target.value})}><GradeOptions/></select>
+                          <select className="border p-3 rounded flex-1" value={newContent.grade} onChange={e=>setContentGrade(e.target.value)}><GradeOptions/></select>
                       </div>
 
                       {newContent.type === 'video' && (
@@ -314,11 +324,7 @@ export default function AdminContentTab({ ctx }) {
                           <label htmlFor="vipContent" className="font-bold text-amber-800 text-sm flex items-center gap-1 cursor-pointer"><Crown size={18}/> محتوى VIP (مغلق ومخصص للمشتركين فقط)</label>
                       </div>
                       
-                      <div className="border p-3 rounded-lg bg-gray-50">
-                          <label className="block text-sm font-bold text-gray-700 mb-1 flex items-center gap-2"><Lock size={14}/> تخصيص لطلاب محددين (اختياري)</label>
-                          <input className="border p-2 rounded w-full text-sm" placeholder="اكتب إيميلات الطلاب مفصولة بفاصلة" value={newContent.allowedEmails} onChange={e=>setNewContent({...newContent, allowedEmails:e.target.value})} />
-                          <p className="text-xs text-gray-500 mt-1">اتركه فارغاً لكي يظهر المحتوى للجميع.</p>
-                      </div>
+                      <AudiencePicker title="مين يشوف المحتوى ده؟" value={contentAudience} onChange={setContentAudience} users={activeUsersList || []} groups={groups} />
                       
                       <div className="flex items-center gap-2"><input type="checkbox" checked={newContent.isPublic} onChange={e=>setNewContent({...newContent, isPublic:e.target.checked})}/> <label>عام (يظهر للزوار في الصفحة الرئيسية)</label></div>
                       <button className="bg-amber-600 text-white p-3 rounded font-bold shadow-lg shadow-amber-500/30 w-full md:w-auto">نشر</button>
@@ -331,7 +337,7 @@ export default function AdminContentTab({ ctx }) {
                                       <span className="font-bold ml-2">{c.title}</span>
                                       {c.type === 'video' && <span className="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded font-bold">{c.videoSection === 'exercises' ? 'حل تدريبات' : c.videoSection === 'reviews' ? 'مراجعة' : 'شرح'}</span>}
                                       {c.isPremium && <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1"><Crown size={10}/> VIP</span>}
-                                      {c.allowedEmails && c.allowedEmails.length > 0 && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded flex items-center gap-1 inline-flex"><Lock size={10}/> خاص</span>}
+                                      {((c.allowedEmails && c.allowedEmails.length > 0) || (c.audience && c.audience.mode !== 'grades')) && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded flex items-center gap-1 inline-flex"><Lock size={10}/> {audienceLabel(c, { gradeLabel: getGradeLabel, groups })}</span>}
                                       {c.type === 'interactive_exam' && <span className="text-[10px] bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded">امتحان تفاعلي</span>}
                                       {c.type === 'html' && <span className="text-[10px] bg-purple-100 text-purple-600 px-2 py-0.5 rounded">HTML</span>}
                                       {c.type === 'link' && <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded">رابط خارجي</span>}

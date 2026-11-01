@@ -56,7 +56,13 @@ export function useStudentDashboardData({ user, userData, setScanningHwId, setEd
         if (lastSeen === latestId) return;
         try { localStorage.setItem(key, latestId); } catch { /* storage blocked */ }
         setHasNewNotif(true);
-        if (lastSeen && latest?.text) sendSystemNotification(latest.title || 'تنبيه جديد', latest.text);
+        // وقت الامتحان: ولا رسالة ولا إشعار على الشاشة. بيستنى في الجرس لحد ما يخلص.
+        const inExam = typeof document !== 'undefined' && document.documentElement.dataset.nxBusy === 'exam';
+        if (lastSeen && !inExam) {
+          const body = latest?.body || latest?.text || '';
+          sendSystemNotification(latest?.title || 'تنبيه جديد', body);
+          try { window.dispatchEvent(new CustomEvent('nahhas-toast', { detail: { message: `🔔 ${latest?.title || body}`, type: latest?.priority === 'high' ? 'error' : 'info' } })); } catch { /* ignore */ }
+        }
       }
     });
 

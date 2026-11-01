@@ -9,6 +9,8 @@ import { GradeOptions, getGradeLabel } from '@shared/constants/grades';
 import { platformNotify } from '@shared/core/platformShared.jsx';
 import ImageFitControls from '@shared/ui/ImageFitControls.jsx';
 import { parseExamText } from '@shared/exam/parseExamText.js';
+import AudiencePicker, { useStudentGroups } from './AudiencePicker.jsx';
+import { defaultAudience, resolveAudience, audienceLabel } from '@shared/audience/audience.js';
 import '@styles/pages/admin-exam-builder.css';
 
 const DRAFT_KEY = 'nx-admin-exam-draft-v1';
@@ -91,7 +93,7 @@ function Preview({ parsed }) {
 export default function AdminExamBuilder({ ctx }) {
   const {
     examBuilder, setExamBuilder, bulkText, setBulkText, parseExam, handleExamImageSelect,
-    examsList = [], filteredExamsList, openFullExamEditor, setEditingExamTime, setNewEndTime, handleDeleteExam, handleDeleteAllExams,
+    activeUsersList: audienceUsers = [], examsList = [], filteredExamsList, openFullExamEditor, setEditingExamTime, setNewEndTime, handleDeleteExam, handleDeleteAllExams,
     examOverrideDraft = {}, setExamOverrideDraft, gatedExamsList = [], activeUsersList = [], openExamAccessOverride, revokeExamAccessOverride, examAccessOverrides = [],
   } = ctx;
   const b = examBuilder || {};
@@ -127,6 +129,15 @@ export default function AdminExamBuilder({ ctx }) {
   }, [bulkText, b.title, b.accessCode, b.duration, b.grade, b.startTime, b.endTime]);
 
   const parsed = useMemo(() => parseExamText(bulkText || ''), [bulkText]);
+  // مين يشوف الامتحان (افتراضي: طلبة الصف المختار)
+  const groups = useStudentGroups();
+  const audience = b.audience || defaultAudience(b.grade);
+  const resolved = useMemo(() => resolveAudience(audience, audienceUsers, groups), [audience, audienceUsers, groups]);
+  const setGrade = (grade) => {
+    const a = b.audience;
+    const follow = !a || (a.mode === 'grades' && (a.grades || []).length <= 1);
+    set({ grade, ...(follow ? { audience: defaultAudience(grade) } : {}) });
+  };
   const start = parseDate(b.startTime); const end = parseDate(b.endTime);
   const checks = [
     { ok: Boolean(String(b.title || '').trim()), label: 'اسم الامتحان' },
@@ -134,6 +145,7 @@ export default function AdminExamBuilder({ ctx }) {
     { ok: Number(b.duration) > 0, label: 'المدة' },
     { ok: Boolean(start && end && end > start), label: 'الموعد' },
     { ok: parsed.stats.total > 0, label: 'الأسئلة' },
+    { ok: resolved.audienceKeys.length > 0 && (audience.mode === 'all' || audience.mode === 'grades' || resolved.count > 0), label: 'مين يشوفه' },
   ];
   const ready = checks.every((c) => c.ok);
 
@@ -165,7 +177,7 @@ export default function AdminExamBuilder({ ctx }) {
   };
   const publish = async () => {
     setPublishing(true);
-    try { await parseExam(); } finally { setPublishing(false); }
+    try { await parseExam({ audience: resolved.audience, audienceKeys: resolved.audienceKeys }); } finally { setPublishing(false); }
   };
   const clearDraft = () => {
     setBulkText('');
@@ -195,7 +207,7 @@ export default function AdminExamBuilder({ ctx }) {
             <h3><i>١</i>بيانات الامتحان</h3>
             <div className="aeb-fields">
               <Field label="اسم الامتحان" wide><input value={b.title || ''} onChange={(e) => set({ title: e.target.value })} placeholder="مثلًا: امتحان البلاغة الشامل" /></Field>
-              <Field label="الصف"><select value={b.grade || ''} onChange={(e) => set({ grade: e.target.value })}><GradeOptions /></select></Field>
+              <Field label="الصف"><select value={b.grade || ''} onChange={(e) => setGrade(e.target.value)}><GradeOptions /></select></Field>
               <Field label="المدة (بالدقيقة)"><input type="number" min="1" inputMode="numeric" value={b.duration ?? ''} onChange={(e) => set({ duration: parseInt(e.target.value, 10) || '' })} /></Field>
               <Field label="كود الدخول" hint="الطالب بيكتبه عشان يبدأ">
                 <span className="aeb-inline"><input value={b.accessCode || ''} onChange={(e) => set({ accessCode: e.target.value })} placeholder="مثلًا 2580" dir="ltr" /><button type="button" onClick={genCode}><Icon name="refresh" />توليد</button></span>
@@ -204,6 +216,9 @@ export default function AdminExamBuilder({ ctx }) {
                 <input type="checkbox" checked={!!b.isPremium} onChange={(e) => set({ isPremium: e.target.checked })} />
                 <i aria-hidden="true" /><span><b><Icon name="crown" />امتحان VIP</b><small>مقفول لغير المشتركين</small></span>
               </label>
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <AudiencePicker title="مين يشوف الامتحان؟" value={audience} onChange={(v) => set({ audience: v })} users={audienceUsers} groups={groups} />
             </div>
           </section>
 
@@ -280,6 +295,7 @@ export default function AdminExamBuilder({ ctx }) {
             <div className="aeb-sum__title">{b.title || <span className="dim">من غير اسم</span>}</div>
             <dl>
               <div><dt>الصف</dt><dd>{getGradeLabel(b.grade) || '—'}</dd></div>
+              <div><dt>هيوصل لـ</dt><dd>{audienceLabel({ audience: resolved.audience }, { gradeLabel: getGradeLabel, groups })} · {formatNumber(resolved.count)} طالب</dd></div>
               <div><dt>المدة</dt><dd>{b.duration ? `${formatNumber(b.duration)} دقيقة` : '—'}</dd></div>
               <div><dt>بيفتح</dt><dd>{nice(b.startTime) || '—'}</dd></div>
               <div><dt>بيقفل</dt><dd>{nice(b.endTime) || '—'}</dd></div>
@@ -328,6 +344,7 @@ export default function AdminExamBuilder({ ctx }) {
             <ul>
               <li><Icon name="calendar" />{nice(e.startTime) ? <>{nice(e.startTime)} ← {nice(e.endTime) || '—'}</> : <span className="dim">مفيش موعد متحدد</span>}</li>
               <li><Icon name="fileText" />{formatNumber(questionCount(e))} سؤال · {formatNumber(e.duration || 0)} دقيقة</li>
+              <li><Icon name="users" />{audienceLabel(e, { gradeLabel: getGradeLabel, groups })}</li>
               <li><Icon name="key" />الكود: <code>{e.accessCode || '—'}</code>{e.accessCode && <button type="button" className="aeb-copy" onClick={() => { navigator.clipboard?.writeText(String(e.accessCode)); platformNotify('الكود اتنسخ.'); }}>نسخ</button>}</li>
               {e.accessRule?.enabled && <li className="is-rule"><Icon name="lock" />مقفول لحد اجتياز «{examsList.find((x) => x.id === e.accessRule?.requiredExamId)?.title || 'امتحان سابق'}» بـ {formatNumber(e.accessRule?.requiredPercentage || 70)}٪</li>}
             </ul>

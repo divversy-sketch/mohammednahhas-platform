@@ -11,6 +11,8 @@ import { db } from '@services/firebase';
 import { Icon } from '@v2/ui/Icon.jsx';
 import { formatNumber } from '@v2/ui/kit.jsx';
 import { getQuestionsForExam } from '@shared/core/platformShared.jsx';
+import { normalizeResult } from '@services/platformData';
+import { canStudentSee } from '@shared/audience/audience.js';
 import { diagnoseAttempt, attemptStats, groupEvents, eventText, EVENT_VIEW, DIAG_GROUPS, dur, ago, toMs } from '@shared/exam/examDiagnosis.js';
 import '@styles/pages/admin-live.css';
 
@@ -46,7 +48,29 @@ function examWindowOpen(e, now) {
 }
 
 /** دفعات أحداث امتحان (أو محاولة واحدة) لايف */
-export function useExamEvents({ examId, attemptId }) {
+/**
+ * كل محاولات امتحان معيّن مباشرة من Firebase (مش من آخر ٥٠٠ نتيجة في المنصة كلها)،
+ * ومعاها محاولات النسخة الأصلية/النسخ المعدّلة من نفس الامتحان.
+ */
+export function useExamAttempts(examIds = []) {
+  const key = examIds.filter(Boolean).slice(0, 10).join('|');
+  const [rows, setRows] = useState({ canonical: [], legacy: [] });
+  useEffect(() => {
+    const ids = key ? key.split('|') : [];
+    if (!ids.length || (import.meta.env.DEV && typeof window !== 'undefined' && window.__nxDemoEvents)) { setRows({ canonical: [], legacy: [] }); return undefined; }
+    const map = (src) => (snap) => snap.docs.map((d) => normalizeResult({ id: d.id, ...d.data() }, src));
+    const offs = [
+      onSnapshot(query(collection(db, 'exam_results'), where('examId', 'in', ids), limit(2000)), (s) => setRows((r) => ({ ...r, canonical: map('exam_results')(s) })), () => {}),
+      onSnapshot(query(collection(db, 'examResults'), where('examId', 'in', ids), limit(2000)), (s) => setRows((r) => ({ ...r, legacy: map('examResults')(s) })), () => {}),
+    ];
+    return () => offs.forEach((u) => u());
+  }, [key]);
+  return useMemo(() => [...rows.canonical, ...rows.legacy], [rows]);
+}
+
+const sid = (r) => r?.studentId || r?.userId || r?.uid || '';
+
+export function useExamEvents({ examId, examIds, attemptId }) {
   const [batches, setBatches] = useState([]);
   const [state, setState] = useState('idle');
   useEffect(() => {
@@ -57,9 +81,11 @@ export function useExamEvents({ examId, attemptId }) {
     setState('loading');
     const q = attemptId
       ? query(collection(db, 'exam_events'), where('attemptId', '==', attemptId), limit(500))
-      : query(collection(db, 'exam_events'), where('examId', '==', examId), limit(3000));
+      : (examIds && examIds.length > 1
+        ? query(collection(db, 'exam_events'), where('examId', 'in', examIds.slice(0, 10)), limit(3000))
+        : query(collection(db, 'exam_events'), where('examId', '==', examId), limit(3000)));
     return onSnapshot(q, (snap) => { setBatches(snap.docs.map((d) => d.data())); setState('ok'); }, () => setState('error'));
-  }, [examId, attemptId]);
+  }, [examId, attemptId, (examIds || []).join('|')]); // eslint-disable-line react-hooks/exhaustive-deps
   return { batches, state };
 }
 
@@ -185,12 +211,26 @@ export default function AdminExamLive({ ctx }) {
   const [examId, setExamId] = useState('');
   const chosen = examId || openExams[0]?.id || recent[0]?.id || examsList[0]?.id || '';
   const exam = examsList.find((e) => e.id === chosen);
+  // نفس الامتحان: الأصلي + أي نسخة معدّلة منه (التعديل الكامل بيعمل نسخة بـ id جديد)
+  const relatedIds = useMemo(() => {
+    if (!exam) return [];
+    const ids = new Set([exam.id, exam.originalExamId, exam.clonedFrom].filter(Boolean));
+    examsList.forEach((e) => { if (ids.has(e.originalExamId) || ids.has(e.clonedFrom)) ids.add(e.id); });
+    return [...ids];
+  }, [exam, examsList]);
+  const directAttempts = useExamAttempts(relatedIds);
+  const allAttempts = useMemo(() => {
+    const byId = new Map();
+    examResults.forEach((r) => { if (relatedIds.includes(r.examId)) byId.set(`${r.sourceCollection || ''}:${r.id}`, r); });
+    directAttempts.forEach((r) => byId.set(`${r.sourceCollection || ''}:${r.id}`, { ...byId.get(`${r.sourceCollection || ''}:${r.id}`), ...r }));
+    return [...byId.values()];
+  }, [examResults, directAttempts, relatedIds]);
   const [filter, setFilter] = useState('all');
   const [q, setQ] = useState('');
   const [sound, setSound] = useState(() => { try { return localStorage.getItem('nx-live-sound') === '1'; } catch { return false; } });
   const [feedAll, setFeedAll] = useState(false);
   const [openId, setOpenId] = useState(null);
-  const { batches, state: evState } = useExamEvents({ examId: chosen });
+  const { batches, state: evState } = useExamEvents({ examId: chosen, examIds: relatedIds });
   const eventsBy = useMemo(() => groupEvents(batches), [batches]);
   const totalQ = useMemo(() => (exam?.questions || []).reduce((n, b) => n + (b.subQuestions || []).length, 0), [exam]);
 
@@ -198,14 +238,14 @@ export default function AdminExamLive({ ctx }) {
     if (!exam) return [];
     const usersById = new Map(activeUsersList.map((u) => [u.id || u.uid, u]));
     const latest = new Map();
-    examResults.filter((r) => r.examId === exam.id).forEach((r) => {
-      const key = r.studentId || r.id;
+    allAttempts.forEach((r) => {
+      const key = sid(r) || r.id;
       const prev = latest.get(key);
       const rank = (x) => (x.status === 'completed' ? 3 : 1) * 1e13 + Math.max(toMs(x.lastSeenAt), toMs(x.lastSavedAt), toMs(x.submittedAt));
       if (!prev || rank(r) > rank(prev)) latest.set(key, r);
     });
     const list = [...latest.values()].map((r) => {
-      const u = usersById.get(r.studentId) || {};
+      const u = usersById.get(sid(r)) || {};
       const state = liveState(r, now);
       const events = eventsBy.get(r.id) || [];
       const total = r.totalQuestions || totalQ;
@@ -215,15 +255,16 @@ export default function AdminExamLive({ ctx }) {
       const diag = diagnoseAttempt(r, events, { now, totalQuestions: totalQ });
       return { r, u, state, diag, events, name: r.studentName || u.name || 'طالب', phone: u.phone || '', grade: u.grade || r.grade || '', total, answered, beat, remaining };
     });
-    const started = new Set(list.map((x) => x.r.studentId));
+    const started = new Set(list.map((x) => sid(x.r)).filter(Boolean));
     const grade = exam.grade && exam.grade !== 'all' ? exam.grade : (adminGradeFilter && adminGradeFilter !== 'all' ? adminGradeFilter : '');
     if (examWindowOpen(exam, now)) {
-      activeUsersList.filter((u) => (!grade || u.grade === grade) && !started.has(u.id || u.uid) && (u.role || 'student') === 'student')
+      const targeted = (u) => (Array.isArray(exam.audienceKeys) && exam.audienceKeys.length ? canStudentSee(exam, { uid: u.id || u.uid, grade: u.grade, email: u.email }) : (!grade || u.grade === grade));
+      activeUsersList.filter((u) => targeted(u) && !started.has(u.id || u.uid) && (u.role || 'student') === 'student')
         .forEach((u) => list.push({ r: null, u, state: 'absent', diag: { code: 'absent', tone: 'mute', icon: 'clock', title: 'لسه ما دخلش', detail: '' }, events: [], name: u.name || 'طالب', phone: u.phone || '', grade: u.grade || '', total: totalQ, answered: 0, beat: 0, remaining: null }));
     }
     const order = { held: 0, cheated: 1, left: 2, live: 3, approved: 4, submitted: 5, absent: 6 };
     return list.sort((a, b) => order[a.state] - order[b.state] || b.beat - a.beat);
-  }, [exam, examResults, activeUsersList, now, adminGradeFilter, eventsBy, totalQ]);
+  }, [exam, allAttempts, activeUsersList, now, adminGradeFilter, eventsBy, totalQ]);
 
   const k = useMemo(() => {
     const c = { live: 0, offline: 0, left: 0, submitted: 0, absent: 0, decision: 0 };

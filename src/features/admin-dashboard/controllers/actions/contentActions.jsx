@@ -1,3 +1,4 @@
+import { buildNotification } from '@shared/notifications/notify.js';
 import { doc, setDoc, getDoc, getDocs, collection, addDoc, query, where, updateDoc, deleteDoc, serverTimestamp, writeBatch, increment } from 'firebase/firestore';
 
 import { db } from '@services/firebase';
@@ -296,8 +297,14 @@ export const createContentManagementActions = (ctx) => {
           return platformNotify('مهم: أدخل مدة الفيديو بالدقائق حتى يتم فتح امتحان الفيديو بعد مشاهدة 75% بدقة، خصوصًا مع YouTube.');
       }
 
+ 
+      // مين يشوف المحتوى (من «مين يشوف المحتوى ده؟»): كل الطلبة / صفوف / مجموعات / طلبة بالاسم
+      const { audienceFields, audience: _pickedAudience, ...contentFields } = newContent; // eslint-disable-line no-unused-vars
+      const targeted = audienceFields && !(audienceFields.audience?.mode === 'grades' && audienceFields.audience.grades?.length === 1 && audienceFields.audience.grades[0] === newContent.grade);
+      if (targeted && !audienceFields.audienceKeys.length) return platformNotify('اختار مين يشوف المحتوى (مفيش ولا طالب متحدد).');
       const contentData = { 
-          ...newContent, 
+          ...contentFields, 
+          ...(targeted ? { audience: audienceFields.audience, audienceKeys: audienceFields.audienceKeys } : {}),
           title: newContent.title.trim(),
           url: newContent.url.trim(),
           file: newContent.url.trim(), 
@@ -324,7 +331,11 @@ export const createContentManagementActions = (ctx) => {
       await audit('content_created', { title: 'إضافة محتوى جديد', targetCollection: 'content', targetDocId: addedContentRef.id, after: { title: newContent.title, type: contentData.type, grade: contentData.grade, isPremium: contentData.isPremium } });
       
       if (allowedEmailsArray.length === 0) {
-          await addDoc(collection(db, 'notifications'), { text: `تم إضافة درس جديد: ${newContent.title}`, grade: newContent.grade, audience: newContent.grade || 'all', createdAt: serverTimestamp() });
+          const kindLabel = { video: 'محاضرة جديدة', file: 'ملف جديد', pdf: 'ملف جديد', html: 'درس تفاعلي جديد', interactive_exam: 'تدريب جديد' }[newContent.type] || 'درس جديد';
+          await addDoc(collection(db, 'notifications'), buildNotification({
+            ...(targeted ? { audienceKeys: audienceFields.audienceKeys, audience: audienceFields.audience } : { audience: newContent.grade || 'all' }),
+            category: 'content', title: `${kindLabel}: ${newContent.title}`, body: 'متاحة دلوقتي على المنصة.', link: { kind: 'content', id: addedContentRef.id }, source: 'auto_content_new',
+          })).catch(() => null);
       } 
       
       platformNotify("تم النشر!"); 

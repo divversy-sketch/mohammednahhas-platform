@@ -1,75 +1,115 @@
+// مركز الرسائل — رسالة تفضل في «رسائلي» عند الطالب + إشعار، لمين ما تحب (نفس نظام «مين يشوف ده؟»).
 import { useEffect, useMemo, useState } from 'react';
-import { addDoc, collection, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where, limit } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, serverTimestamp, limit } from 'firebase/firestore';
 import { db } from '@services/firebase';
-import { BarChart3, ClipboardList, CreditCard, Download, Lock, MessageSquare, PlayCircle, Save, Send, Shield, Sparkles, Target, Users, Wand2 } from '@shared/icons/lucide-shim.jsx';
-import { GradeOptions, getGradeLabel } from '@shared/constants/grades.jsx';
-import { platformNotify } from '@shared/core/platformShared.jsx';
-import PageHeader from '@shared/ui/PageHeader.jsx';
-import EmptyState from '@shared/ui/EmptyState.jsx';
+import { getGradeLabel } from '@shared/constants/grades.jsx';
+import { platformNotify, platformConfirm } from '@shared/core/platformShared.jsx';
+import { Icon } from '@v2/ui/Icon.jsx';
+import AudiencePicker, { useStudentGroups } from '@admin/v2/AudiencePicker.jsx';
+import { audienceStudents, audienceLabel, resolveAudience } from '@shared/audience/audience.js';
+import { buildNotification } from '@shared/notifications/notify.js';
+import '@styles/pages/admin-people.css';
 
-const clamp = (n, min = 0, max = 100) => Math.max(min, Math.min(max, Number(n) || 0));
 const clean = (v) => String(v || '').trim();
-const arabicDate = (v) => {
-  const date = v?.toDate ? v.toDate() : v ? new Date(v) : null;
-  return date && !Number.isNaN(date.getTime()) ? date.toLocaleString('ar-EG') : '—';
+const n = (x) => Number(x || 0).toLocaleString('ar-EG');
+const when = (v) => {
+  const d = v?.toDate ? v.toDate() : v ? new Date(v) : null;
+  return d && !Number.isNaN(d.getTime()) ? d.toLocaleString('ar-EG', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '—';
 };
-const resultPercent = (result, exam) => {
-  const explicit = Number(result?.percentage ?? result?.percent ?? result?.scorePercentage);
-  if (Number.isFinite(explicit) && explicit > 0) return clamp(explicit);
-  const score = Number(result?.score ?? result?.totalScore ?? 0);
-  const total = Number(result?.total ?? result?.maxScore ?? 0) || flattenExamQuestions(exam).reduce((s, q) => s + Number(q.maxScore || q.mark || 1), 0) || 1;
-  return clamp((score / total) * 100);
-};
-const flattenExamQuestions = (exam) => (exam?.questions || []).flatMap((group) => group?.subQuestions || []);
-const questionScore = (q) => Number(q?.maxScore || q?.mark || 1) || 1;
-const pickRandom = (items, count) => [...items].sort(() => Math.random() - 0.5).slice(0, count);
-const downloadText = (filename, content, type = 'text/plain;charset=utf-8') => {
-  const blob = new Blob([content], { type });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-};
-const topicOf = (item) => clean(item?.topic || item?.lesson || item?.branch || 'عام');
-const branchOf = (item) => clean(item?.branch || 'عام');
-
-function StatCard({ title, value, hint, tone = 'slate' }) {
-  const toneClass = {
-    slate: 'bg-slate-50 text-slate-900 border-slate-100',
-    amber: 'bg-amber-50 text-amber-800 border-amber-100',
-    emerald: 'bg-emerald-50 text-emerald-800 border-emerald-100',
-    blue: 'bg-blue-50 text-blue-800 border-blue-100',
-    red: 'bg-red-50 text-red-800 border-red-100',
-  }[tone] || 'bg-slate-50 text-slate-900 border-slate-100';
-  return <div className={`rounded-3xl border p-5 ${toneClass}`}><p className="text-xs font-black opacity-70 mb-2">{title}</p><p className="text-3xl font-black">{value}</p>{hint && <p className="text-xs font-bold opacity-70 mt-2">{hint}</p>}</div>;
-}
+const TEMPLATES = [
+  { label: 'تذكير بامتحان', title: 'تذكير: امتحان قريب', body: 'عندك امتحان قريب، راجع الدروس كويس وادخل في ميعادك.' },
+  { label: 'غياب', title: 'وحشتنا!', body: 'لاحظنا إنك مدخلتش المنصة من فترة، ارجع كمّل وماتسيبش حاجة تفوتك.' },
+  { label: 'تهنئة', title: 'برافو عليك', body: 'مستواك في آخر امتحان ممتاز، كمّل كده.' },
+];
 
 export function AdminMessagingCenter({ users = [], userData }) {
-  const [groups, setGroups] = useState([]);
+  const groups = useStudentGroups();
   const [messages, setMessages] = useState([]);
-  const [form, setForm] = useState({ audience: 'all', studentId: '', groupId: '', title: '', body: '' });
-  useEffect(() => onSnapshot(query(collection(db, 'student_groups'), orderBy('createdAt', 'desc'), limit(100)), (snap) => setGroups(snap.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setGroups([])), []);
-  useEffect(() => onSnapshot(query(collection(db, 'student_messages'), orderBy('createdAt')), (snap) => setMessages(snap.docs.map((d) => ({ id: d.id, ...d.data() })).reverse().slice(0, 50)), () => setMessages([])), []);
+  const [audience, setAudience] = useState({ mode: 'all' });
+  const [form, setForm] = useState({ title: '', body: '', notify: true, priority: 'normal' });
+  const [busy, setBusy] = useState(false);
+  const [q, setQ] = useState('');
+
+  useEffect(() => onSnapshot(query(collection(db, 'student_messages'), orderBy('createdAt', 'desc'), limit(80)),
+    (snap) => setMessages(snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((m) => m.kind !== 'support')),
+    () => setMessages([])), []);
+
+  const reach = useMemo(() => resolveAudience(audience, users, groups), [audience, users, groups]);
+  const set = (p) => setForm((f) => ({ ...f, ...p }));
+
   const send = async (e) => {
     e.preventDefault();
     if (!clean(form.title) || !clean(form.body)) return platformNotify('اكتب العنوان والرسالة');
-    const target = form.audience === 'student' ? [form.studentId] : form.audience === 'group' ? (groups.find((g) => g.id === form.groupId)?.members || []) : [];
-    await addDoc(collection(db, 'student_messages'), { ...form, userIds: target, groupIds: form.groupId ? [form.groupId] : [], createdAt: serverTimestamp(), createdBy: userData?.email || 'admin', seenBy: [] });
-    const base = { title: form.title, body: form.body, text: form.body, targetType: form.audience, targetGroupId: form.groupId || '', createdAt: serverTimestamp(), createdBy: userData?.email || 'admin' };
-    if (form.audience === 'all') await addDoc(collection(db, 'notifications'), { ...base, audience: 'all' });
-    else await Promise.all(target.filter(Boolean).map((uid) => addDoc(collection(db, 'notifications'), { ...base, userId: uid, audience: `user:${uid}` })));
-    setForm({ ...form, title: '', body: '' });
-    platformNotify('تم إرسال الرسالة والإشعار');
+    const isAll = audience.mode === 'all';
+    const ids = isAll ? [] : audienceStudents(audience, users, groups).map((u) => u.id || u.uid).filter(Boolean);
+    if (!isAll && !ids.length) return platformNotify('مفيش طلبة في الاختيار ده');
+    setBusy(true);
+    try {
+      await addDoc(collection(db, 'student_messages'), {
+        title: clean(form.title), body: clean(form.body), priority: form.priority,
+        audience: isAll ? 'all' : 'custom', audienceInfo: reach.audience, audienceKeys: reach.audienceKeys,
+        userIds: ids.slice(0, 2000), groupIds: audience.mode === 'groups' ? audience.groupIds || [] : [],
+        targetType: audience.mode, createdAt: serverTimestamp(), createdBy: userData?.email || 'admin', seenBy: [],
+      });
+      if (form.notify) {
+        await addDoc(collection(db, 'notifications'), buildNotification({
+          audienceKeys: reach.audienceKeys, audience: reach.audience, category: form.priority === 'high' ? 'warning' : 'general', priority: form.priority,
+          title: clean(form.title), body: clean(form.body), createdBy: userData?.email || 'admin',
+        })).catch(() => {});
+      }
+      set({ title: '', body: '' });
+      platformNotify(`اتبعتت الرسالة لـ ${n(isAll ? reach.count : ids.length)} طالب`);
+    } catch (err) { platformNotify('ماتبعتتش: ' + (err?.message || 'خطأ')); }
+    setBusy(false);
   };
-  return <div className="space-y-6" dir="rtl"><PageHeader title="مركز الرسائل" description="رسائل داخلية حقيقية لطالب واحد أو مجموعة أو كل الطلاب، مع تسجيلها في صندوق رسائل الطالب." icon={<MessageSquare className="text-emerald-600"/>}/>
-    <form onSubmit={send} className="bg-white rounded-3xl border p-5 space-y-3">
-      <div className="grid md:grid-cols-3 gap-3"><select className="border rounded-xl p-3 font-bold" value={form.audience} onChange={(e)=>setForm({...form, audience:e.target.value})}><option value="all">كل الطلاب</option><option value="group">مجموعة</option><option value="student">طالب محدد</option></select>{form.audience==='group' && <select className="border rounded-xl p-3 font-bold" value={form.groupId} onChange={(e)=>setForm({...form, groupId:e.target.value})}><option value="">اختر المجموعة</option>{groups.map((g)=><option key={g.id} value={g.id}>{g.name}</option>)}</select>}{form.audience==='student' && <select className="border rounded-xl p-3 font-bold" value={form.studentId} onChange={(e)=>setForm({...form, studentId:e.target.value})}><option value="">اختر الطالب</option>{users.map((u)=><option key={u.id || u.uid} value={u.id || u.uid}>{u.name || u.email}</option>)}</select>}</div>
-      <input className="border rounded-xl p-3 font-bold w-full" placeholder="عنوان الرسالة" value={form.title} onChange={(e)=>setForm({...form,title:e.target.value})}/>
-      <textarea className="border rounded-xl p-3 font-bold w-full min-h-32" placeholder="نص الرسالة" value={form.body} onChange={(e)=>setForm({...form,body:e.target.value})}/>
-      <button className="bg-emerald-700 text-white px-6 py-3 rounded-2xl font-black flex gap-2"><Send/> إرسال</button>
-    </form>
-    <div className="bg-white rounded-3xl border p-5"><h3 className="font-black mb-3">آخر الرسائل</h3>{messages.map((m)=><div key={m.id} className="border rounded-2xl p-3 mb-2"><p className="font-black">{m.title}</p><p className="text-sm text-slate-600">{m.body}</p><p className="text-xs text-slate-400 mt-1">{arabicDate(m.createdAt)} • {m.audience}</p></div>)}</div>
-  </div>;
+
+  const remove = async (m) => {
+    if (!(await platformConfirm(`تمسح الرسالة «${m.title}» من عند الطلبة؟`))) return;
+    deleteDoc(doc(db, 'student_messages', m.id)).catch((e) => platformNotify(e?.message || 'خطأ'));
+  };
+
+  const label = (m) => {
+    if (m.audienceInfo) return audienceLabel({ audience: m.audienceInfo }, { gradeLabel: getGradeLabel, groups });
+    if (m.audience === 'all') return 'كل الطلبة';
+    if (m.audience === 'group') return `مجموعة: ${groups.find((g) => g.id === m.groupId)?.name || '—'}`;
+    return (m.userIds || []).length === 1 ? (users.find((u) => (u.id || u.uid) === m.userIds[0])?.name || 'طالب واحد') : `${n((m.userIds || []).length)} طالب`;
+  };
+  const shown = messages.filter((m) => !q.trim() || `${m.title} ${m.body}`.includes(q.trim()));
+
+  return (
+    <div className="apl amc">
+      <p className="apl-lead"><Icon name="info" />الرسالة بتفضل محفوظة في «رسائلي» عند الطالب، وبيوصله إشعار كمان. للإعلانات السريعة استخدم «الإشعارات».</p>
+      <div className="amc-cols">
+        <form className="apl-section amc-form" onSubmit={send}>
+          <h3><Icon name="message" />رسالة جديدة</h3>
+          <AudiencePicker title="لمين؟" value={audience} onChange={setAudience} users={users} groups={groups} compact />
+          <div className="amc-tpl">{TEMPLATES.map((t) => <button key={t.label} type="button" className="apl-chip" onClick={() => set({ title: t.title, body: t.body })}><Icon name="spark" />{t.label}</button>)}</div>
+          <label className="apl-field"><span>العنوان</span><input value={form.title} onChange={(e) => set({ title: e.target.value })} placeholder="عنوان قصير وواضح" /></label>
+          <label className="apl-field"><span>الرسالة</span><textarea rows={5} value={form.body} onChange={(e) => set({ body: e.target.value })} placeholder="اكتب رسالتك للطلبة" /></label>
+          <div className="amc-row">
+            <label className="aas-check"><input type="checkbox" checked={form.notify} onChange={(e) => set({ notify: e.target.checked })} /><span>ابعت إشعار كمان</span></label>
+            <label className="aas-check"><input type="checkbox" checked={form.priority === 'high'} onChange={(e) => set({ priority: e.target.checked ? 'high' : 'normal' })} /><span>مهمة (تتعلّم بالأحمر)</span></label>
+          </div>
+          <button className="apl-btn apl-btn--pri apl-btn--block" disabled={busy}><Icon name="rocket" />{busy ? 'بيتبعت…' : `ابعت${reach.count ? ` لـ ${n(reach.count)} طالب` : ''}`}</button>
+        </form>
+
+        <section className="apl-section amc-log">
+          <h3><Icon name="clock" />اللي اتبعت قبل كده <span className="apl-count">{n(messages.length)}</span></h3>
+          <label className="apl-search"><Icon name="search" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="دوّر في الرسائل" /></label>
+          <div className="amc-list">
+            {shown.map((m) => (
+              <article key={m.id} className={`amc-msg${m.priority === 'high' ? ' is-high' : ''}`}>
+                <header><b>{m.title || 'رسالة'}</b><button type="button" className="apl-icon" title="مسح" onClick={() => remove(m)}><Icon name="close" /></button></header>
+                <p>{m.body}</p>
+                <footer><span className="apl-chip"><Icon name="users" />{label(m)}</span><small className="dim">{when(m.createdAt)}</small></footer>
+              </article>
+            ))}
+            {!shown.length && <div className="apl-empty"><Icon name="message" />مفيش رسائل</div>}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
 }
+
+export default AdminMessagingCenter;

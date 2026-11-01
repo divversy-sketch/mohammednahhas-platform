@@ -1,4 +1,5 @@
 import { parseExamText } from '@shared/exam/parseExamText.js';
+import { buildNotification } from '@shared/notifications/notify.js';
 import { doc, setDoc, getDoc, getDocs, collection, addDoc, query, where, updateDoc, deleteDoc, serverTimestamp, writeBatch, increment } from 'firebase/firestore';
 
 import { db } from '@services/firebase';
@@ -125,7 +126,10 @@ export const createExamBuilderActions = (ctx) => {
     audit
   } = ctx;
 
-  const parseExam = async () => {
+  // extra: حقول «مين يشوف الامتحان» (audience, audienceKeys) من صفحة إنشاء الامتحان
+  const parseExam = async (extraArg = {}) => {
+    const extra = extraArg && typeof extraArg.preventDefault === 'function' ? {} : (extraArg || {});
+    if (extra.audienceKeys && !extra.audienceKeys.length) return platformNotify("اختار مين يشوف الامتحان (مفيش ولا طالب متحدد)");
     if (!String(examBuilder.title || '').trim()) return platformNotify("اكتب اسم الامتحان");
     if (!bulkText.trim()) return platformNotify("أدخل نص الامتحان");
     if (!examBuilder.accessCode) return platformNotify("أدخل كود للامتحان");
@@ -136,7 +140,9 @@ export const createExamBuilderActions = (ctx) => {
     const { blocks: finalBlocks } = parseExamText(bulkText);
     if (finalBlocks.length === 0) return platformNotify("لم يتم التعرف على الأسئلة بشكل صحيح. افصل بين كل سؤال بسطر فارغ، واستخدم #فرع: للفروع و #مقالي: للسؤال المقالي.");
 
-    await addDoc(collection(db, 'exams'), { 
+    const audienceFields = extra.audienceKeys ? { audience: extra.audience, audienceKeys: extra.audienceKeys } : {};
+    const examRef = await addDoc(collection(db, 'exams'), { 
+        ...audienceFields,
         title: examBuilder.title, grade: examBuilder.grade, duration: examBuilder.duration, 
         startTime: examBuilder.startTime, endTime: examBuilder.endTime, accessCode: examBuilder.accessCode, 
         isPremium: examBuilder.isPremium,
@@ -153,7 +159,18 @@ export const createExamBuilderActions = (ctx) => {
         questions: finalBlocks, createdAt: serverTimestamp() 
     });
 
-    await addDoc(collection(db, 'notifications'), { text: `امتحان جديد: ${examBuilder.title}`, grade: examBuilder.grade, audience: examBuilder.grade || 'all', createdAt: serverTimestamp() });
+    // إشعارات تلقائية لنفس الطلبة: امتحان جديد + تذكير قبل ما يفتح بساعة + المراجعة اتفتحت بعد ما يقفل
+    const target = extra.audienceKeys ? audienceFields : { audience: examBuilder.grade || 'all', grade: examBuilder.grade };
+    const link = { kind: 'exam', id: examRef.id };
+    const start = new Date(examBuilder.startTime).getTime();
+    const end = new Date(examBuilder.endTime).getTime();
+    const when = new Date(start).toLocaleString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' });
+    const notes = [
+      buildNotification({ ...target, category: 'exam', title: `امتحان جديد: ${examBuilder.title}`, body: `بيفتح ${when} ولمدة ${examBuilder.duration} دقيقة. جهّز نفسك.`, link, source: 'auto_exam_new' }),
+    ];
+    if (start - Date.now() > 70 * 60e3) notes.push(buildNotification({ ...target, category: 'reminder', priority: 'high', title: `فاضل ساعة على «${examBuilder.title}»`, body: 'الامتحان بيفتح كمان ساعة. خلّي النت والشحن تمام.', link, sendAt: new Date(start - 60 * 60e3), source: 'auto_exam_reminder' }));
+    notes.push(buildNotification({ ...target, category: 'result', title: `مراجعة «${examBuilder.title}» اتفتحت`, body: 'شوف درجتك وإجاباتك والتصحيح.', link, sendAt: new Date(end + 60e3), source: 'auto_exam_review' }));
+    await Promise.all(notes.map((n) => addDoc(collection(db, 'notifications'), n).catch(() => null)));
     setBulkText("");
     if (typeof setExamBuilder === 'function') setExamBuilder((prev) => ({ ...prev, title: '', accessCode: '', startTime: '', endTime: '', examImageUrl: '', accessRule: { ...(prev.accessRule || {}), enabled: false, requiredExamId: '' } }));
     platformNotify(`تم نشر الامتحان بنجاح!`);

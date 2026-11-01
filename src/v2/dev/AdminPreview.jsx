@@ -1,6 +1,7 @@
 // Development-only preview of the admin shell with empty data (never bundled in production).
 // Open: /?nxPreview=admin&tab=payments
 import { useState } from 'react';
+import AdminPasswordResetRequestsPanel from '@features/students/admin/AdminPasswordResetRequestsPanel.jsx';
 import { AdminDashboardShell } from '@features/admin-dashboard/shell/AdminDashboardShell.jsx';
 import { buildOwnerAdminProfile } from '@config/adminPermissions';
 import legacyTabsSource from '@features/admin-dashboard/tabs/legacy/AdminDashboardTabsLegacy.jsx?raw';
@@ -41,9 +42,9 @@ export default function AdminPreview() {
   const profile = { ...buildOwnerAdminProfile({ uid: 'preview', email: 'owner@preview' }), name: 'أ. محمد النحاس' };
   const now = Date.now();
   const demo = params.get('demo') ? {
-    activeUsersList: Array.from({ length: 48 }, (_, i) => ({ id: `u${i}`, name: `طالب ${i + 1}`, phone: `0101234${String(5000 + i)}`, grade: 'third_secondary', subscriptionStatus: i % 3 ? 'premium' : 'free', status: 'active' })),
-    pendingUsers: [{ id: 'p1', name: 'سارة أحمد' }, { id: 'p2', name: 'عمر خالد' }, { id: 'p3', name: 'منة الله' }],
-    passwordResetRequests: [{ id: 'r1' }],
+    activeUsersList: Array.from({ length: 48 }, (_, i) => ({ id: `u${i}`, email: `student${i}@mail.com`, parentPhone: `0122000${String(1000 + i)}`, lastLoginAt: new Date(now - (i % 9) * 864e5).toISOString(), name: `طالب ${i + 1}`, phone: `0101234${String(5000 + i)}`, grade: 'third_secondary', subscriptionStatus: i % 3 ? 'premium' : 'free', status: 'active' })),
+    pendingUsers: [{ id: 'p1', name: 'سارة أحمد', grade: '3sec', phone: '01011112222', parentPhone: '01233334444', email: 'sara@mail.com', createdAt: new Date(now - 72e5).toISOString() }, { id: 'p2', name: 'عمر خالد', grade: '2sec', phone: '01155556666', createdAt: new Date(now - 2e7).toISOString() }, { id: 'p3', name: 'منة الله', grade: '3sec', phone: '01077778888', parentPhone: '01099990000', createdAt: new Date(now - 9e7).toISOString() }],
+    passwordResetRequests: [{ id: 'r1', email: 'student1@mail.com', status: 'pending', createdAt: new Date(now - 36e5).toISOString() }, { id: 'r2', email: 'unknown@mail.com', status: 'pending', createdAt: new Date(now - 9e6).toISOString() }, { id: 'r3', email: 'old@mail.com', status: 'completed' }],
     messagesList: [{ id: 'm1', status: 'open' }, { id: 'm2', status: 'open' }],
     contentList: Array.from({ length: 23 }, (_, i) => ({ id: `c${i}` })),
     examsList: [{ id: 'e1', title: 'امتحان البلاغة الشامل', startTime: new Date(now - 36e5).toISOString(), endTime: new Date(now + 36e5).toISOString() }, { id: 'e2', title: 'النحو' }, { id: 'e3', title: 'القصة' }],
@@ -67,7 +68,7 @@ export default function AdminPreview() {
     ];
   }
   const base = { ...demo, newContent: NEW_CONTENT, filteredPendingUsers: demo.pendingUsers || [], filteredActiveUsers: demo.activeUsersList || [], filteredContentList: demo.contentList || [], filteredExamsList: demo.examsList || [] };
-  const extra = { ...base, activeTab, setActiveTab, adminGradeFilter: grade, setAdminGradeFilter: setGrade, adminExamView: examView, setAdminExamView: setExamView, viewingResult, setViewingResult, examBuilder, setExamBuilder, bulkText, setBulkText, userData: profile, user: { uid: 'preview' }, adminProfile: profile };
+  const extra = { ...base, AdminPasswordResetRequestsPanel, activeTab, setActiveTab, adminGradeFilter: grade, setAdminGradeFilter: setGrade, adminExamView: examView, setAdminExamView: setExamView, viewingResult, setViewingResult, examBuilder, setExamBuilder, bulkText, setBulkText, userData: profile, user: { uid: 'preview' }, adminProfile: profile };
   const ctx = materialize(emptyCtx(extra), extra);
   return <AdminDashboardShell user={{ uid: 'preview' }} adminProfile={profile} activeTab={activeTab} setActiveTab={setActiveTab} adminGradeFilter={grade} setAdminGradeFilter={setGrade} dashboardContext={ctx} />;
 }
