@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 
 
+import { isCorrectAnswer } from '@shared/exam/examScoring.js';
 import { BarChart3 } from '@shared/icons/lucide-shim.jsx';
 
 
@@ -40,7 +41,7 @@ export const AdminQuestionDeepAnalytics = ({ examsList = [], examResults = [] })
 
         if (q.type !== 'essay') {
           if (hasAnswer) optionCounts[String(ans)] = safeNumber(optionCounts[String(ans)], 0) + 1;
-          if (ans === q.correctIdx) correct += 1;
+          if (isCorrectAnswer(q, ans)) correct += 1;
           else if (hasAnswer) {
             wrong += 1;
             wrongStudents.push(r.studentName || 'طالب');

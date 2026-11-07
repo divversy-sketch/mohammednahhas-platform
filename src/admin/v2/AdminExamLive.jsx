@@ -5,6 +5,7 @@
 // - النشاط اللحظي: آخر الأحداث من كل الطلبة.
 // - تفاصيل الطالب: التشخيص، أرقام، الوقت على كل سؤال، والخط الزمني الكامل من أول ما فتح لحد ما خرج.
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { isCorrectAnswer } from '@shared/exam/examScoring.js';
 import { createPortal } from 'react-dom';
 import { collection, limit, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '@services/firebase';
@@ -177,7 +178,7 @@ function StudentDrawer({ x, exam, events, onClose, actions }) {
                 const done = a !== undefined && a !== null && a !== '';
                 const t = qt[String(i + 1)] || 0;
                 const cur = (Number(r.currentQIndex) || 0) === i && x.state !== 'submitted';
-                const right = done && q.type !== 'essay' && a === q.correctIdx;
+                const right = done && q.type !== 'essay' && isCorrectAnswer(q, a);
                 return (
                   <span key={q.id || i} className={`${done ? (x.state === 'submitted' && q.type !== 'essay' ? (right ? 'is-right' : 'is-wrong') : 'is-done') : ''} ${cur ? 'is-cur' : ''}`} title={`سؤال ${i + 1}${t ? ` · ${dur(t)}` : ''}${done ? ' · متجاوب' : ' · من غير إجابة'}`}>
                     <em style={{ height: `${Math.max(8, (t / maxT) * 100)}%` }} />

@@ -3,7 +3,8 @@
 // score, right / wrong / skipped, every question with the student's answer, the correct one and the explanation.
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { renderBracketHighlightedText } from '@shared/core/platform/text.jsx';
-import { extractAllQuestions, getQuestionMaxScore } from '@shared/core/platform/metrics.js';
+import { extractAllQuestions } from '@shared/core/platform/metrics.js';
+import { scoreAttempt, correctIndexOf } from '@shared/exam/examScoring.js';
 import { Icon } from '../ui/Icon.jsx';
 import { CountUp, formatDuration, formatNumber, useNow } from '../ui/kit.jsx';
 import { arabicDateTime, examWindow } from './insights.js';
@@ -19,47 +20,22 @@ export function reviewOpensAt(exam, now = Date.now()) {
   return end && end.getTime() > now ? end : null;
 }
 
-function isAnswered(q, a) {
-  if (q.type === 'essay') return !!(a && ((typeof a === 'string' && a.trim()) || a.text || a.image));
-  return a !== undefined && a !== null && a !== '';
-}
-
+// كل الأرقام (الدرجة، النسبة، الصح والغلط) بتتحسب من الإجابات نفسها بنفس دالة التسليم والأدمن،
+// مش من أرقام متخزنة ممكن تكون قديمة أو محسوبة غلط.
 function buildReview(exam, result) {
-  const answers = result?.answers || {};
-  const essayScores = result?.essayScores || {};
-  const essayMax = result?.essayMaxScores || {};
-  const essayGrades = result?.essayGrades || {};
+  const st = scoreAttempt(extractAllQuestions(exam), result || {});
   let lastBlock = null;
-  const items = extractAllQuestions(exam).map((q, i) => {
-    const a = answers[q.id];
-    const answered = isAnswered(q, a);
-    let state;
-    let earned = 0;
-    const max = q.type === 'essay' ? num(essayMax[q.id], getQuestionMaxScore(q)) : getQuestionMaxScore(q);
-    if (q.type === 'essay') {
-      const s = essayScores[q.id] ?? essayGrades[q.id]?.score;
-      if (!answered) state = 'skipped';
-      else if (s === undefined || s === null || s === '') state = 'pending';
-      else { earned = num(s); state = earned >= max ? 'right' : earned > 0 ? 'partial' : 'wrong'; }
-    } else if (!answered) state = 'skipped';
-    else if (Number(a) === Number(q.correctIdx)) { state = 'right'; earned = max; }
-    else state = 'wrong';
-    const showPassage = q.blockText && q.blockText !== lastBlock;
-    lastBlock = q.blockText || lastBlock;
-    return { q, n: i + 1, answer: a, answered, state, earned, max, showPassage };
+  const items = st.items.map((it, i) => {
+    const showPassage = it.q.blockText && it.q.blockText !== lastBlock;
+    lastBlock = it.q.blockText || lastBlock;
+    return { ...it, n: i + 1, showPassage };
   });
-  const count = (s) => items.filter((it) => it.state === s).length;
-  const earned = items.reduce((s, it) => s + it.earned, 0);
-  const possible = items.reduce((s, it) => s + it.max, 0);
-  const pct = num(result?.percentage, possible ? Math.round((earned / possible) * 100) : 0);
-  const branches = {};
-  items.forEach((it) => {
-    const b = it.q.branch || 'عام';
-    branches[b] = branches[b] || { earned: 0, possible: 0, wrong: 0 };
-    branches[b].earned += it.earned; branches[b].possible += it.max;
-    if (it.state === 'wrong') branches[b].wrong += 1;
-  });
-  return { items, right: count('right'), wrong: count('wrong'), skipped: count('skipped'), pending: count('pending'), partial: count('partial'), earned, possible, pct, branches };
+  if (!items.length) {
+    // الامتحان اتمسح أو أسئلته مش متاحة: نعرض اللي متخزن
+    const earned = num(result?.score); const possible = num(result?.total ?? result?.totalPossible);
+    return { items, right: num(result?.correctCount), wrong: num(result?.wrongCount), skipped: num(result?.skippedCount), pending: 0, partial: 0, earned, possible, pct: num(result?.percentage, possible ? Math.round((earned / possible) * 100) : 0), officialPct: num(result?.percentage), branches: {} };
+  }
+  return { ...st, items, pct: st.percentage, officialPct: st.percentage, pendingMax: st.possible - st.gradedPossible };
 }
 
 function verdict(p) {
@@ -85,7 +61,7 @@ function Ring({ pct }) {
 }
 
 function Hero({ exam, result, stats, locked, opensAt, now }) {
-  const scoreText = result?.score !== undefined ? `${formatNumber(num(result.score))} من ${formatNumber(num(result.total ?? result.totalPossible, stats.possible))}` : `${formatNumber(stats.earned)} من ${formatNumber(stats.possible)}`;
+  const scoreText = `${formatNumber(stats.earned)} من ${formatNumber(stats.possible)}`;
   const taken = num(result?.timeTaken);
   return (
     <section className="xr-hero">
@@ -99,6 +75,7 @@ function Hero({ exam, result, stats, locked, opensAt, now }) {
           <p className="xr-verdict">{verdict(stats.pct)}</p>
           <div className="xr-meta">
             <span><Icon name="grade" />درجتك {scoreText}</span>
+            {stats.pending > 0 && <span><Icon name="clock" />{formatNumber(stats.pending)} مقالي ({formatNumber(stats.pendingMax)} درجة) لسه بيتصحح، ودرجتك هتزيد بعد التصحيح</span>}
             {taken > 0 && <span><Icon name="clock" />خلصته في {formatNumber(Math.floor(taken / 60))} د {formatNumber(taken % 60)} ث</span>}
             {result?.submittedAt && <span><Icon name="calendar" />{arabicDateTime(result.submittedAt)}</span>}
           </div>
@@ -116,8 +93,8 @@ function Hero({ exam, result, stats, locked, opensAt, now }) {
 }
 
 function Option({ text, idx, q, answer }) {
-  const correct = idx === Number(q.correctIdx);
-  const mine = answer !== undefined && Number(answer) === idx;
+  const correct = idx === correctIndexOf(q);
+  const mine = answer !== undefined && answer !== null && answer !== '' && (Number(answer) === idx || String(answer).trim() === String(text).trim());
   const cls = correct ? 'is-right' : mine ? 'is-wrong' : '';
   return (
     <div className={`xr-opt ${cls}`}>

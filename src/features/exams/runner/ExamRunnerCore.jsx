@@ -8,6 +8,7 @@ import { db } from '@services/firebase';
 import { uploadToCloudinary } from '@services/cloudinaryUpload';
 
 import { platformNotify, safeNumber, calculateDetailedExamMetrics } from '@shared/core/platformShared.jsx';
+import { scoreAttempt, scoreFields, isCorrectAnswer, correctIndexOf } from '@shared/exam/examScoring.js';
 
 import { makeExamAutosaveKey, readLocalExamBackup, writeLocalExamBackupToStorage, clearLocalExamBackup, flattenExamQuestions, restoreExamRemainingTime } from '@shared/exam/examState.js';
 import { useOnlineStatus } from '@shared/ui/ConnectionStatusBanner.jsx';
@@ -516,13 +517,8 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
     }
   };
 
-  const calculateScore = () => {
-    let rawScore = 0;
-    mcqQuestions.forEach((q) => {
-      if (answers[q.id] === q.correctIdx) rawScore++;
-    });
-    return rawScore;
-  };
+  // الدرجة بالدرجات (مش عدد الأسئلة)، ومقارنة الإجابة متسامحة مع نوع البيانات — نفس الحساب اللي في صفحة النتيجة والأدمن.
+  const calculateScore = () => scoreAttempt(flatQuestions, { answers }).earned;
 
   const confirmSubmit = () => { tracker.log('submit_open', { left: Math.round(timeLeft) }); setShowSubmitConfirm(true); };
 
@@ -533,7 +529,8 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
     setSubmitting(true);
     setSubmissionError('');
     setShowSubmitConfirm(false);
-    const finalScore = calculateScore();
+    const finalStats = scoreAttempt(flatQuestions, { answers });
+    const finalScore = finalStats.earned;
     const timeTaken = Math.round((Date.now() - startTime) / 1000);
     const finalMetrics = calculateDetailedExamMetrics(exam, answers);
     const finalBranchStats = Object.fromEntries(
@@ -554,8 +551,8 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
 
     mcqQuestions.forEach((q) => {
       const studentAns = answers[q.id];
-      const isAnswered = studentAns !== undefined;
-      const isCorrect = studentAns === q.correctIdx;
+      const isAnswered = studentAns !== undefined && studentAns !== null && studentAns !== '';
+      const isCorrect = isCorrectAnswer(q, studentAns);
 
       if (isAnswered && !isCorrect) {
         const mistakeRef = doc(collection(db, 'student_mistakes'));
@@ -567,7 +564,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
             blockText: q.blockText || '',
             ...q,
             studentAnswerText: q.options?.[studentAns],
-            correctAnswerText: q.options?.[q.correctIdx]
+            correctAnswerText: q.options?.[correctIndexOf(q)]
           },
           timestamp: serverTimestamp()
         });
@@ -583,10 +580,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
         grade: exam.grade || '',
         studentId: user.uid,
         studentName: user.displayName || 'طالب',
-        score: finalScore,
-        mcqScore: finalScore,
-        total: mcqQuestions.length,
-        totalPossible: finalMetrics.totalPossible || mcqQuestions.length,
+        ...scoreFields(finalStats),
         answers,
         status: 'completed',
         timeTaken,
@@ -607,12 +601,11 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
           earned: stat.earned
         })).sort((a,b) => a.percentage - b.percentage),
         performanceAnalysis: {
-          percentage: finalMetrics.percentage || (mcqQuestions.length > 0 ? Math.round((finalScore / mcqQuestions.length) * 100) : 0),
-          totalScore: finalMetrics.totalScore || finalScore,
-          totalPossible: finalMetrics.totalPossible || mcqQuestions.length,
+          percentage: finalStats.percentage,
+          totalScore: finalStats.earned,
+          totalPossible: finalStats.possible,
           branchStats: finalBranchStats
         },
-        percentage: finalMetrics.percentage || (mcqQuestions.length > 0 ? Math.round((finalScore / mcqQuestions.length) * 100) : 0),
         submittedAt: serverTimestamp(),
       }, { merge: true });
     }
@@ -629,7 +622,7 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
       callFunction('syncMyLeaderboardEntry').catch(() => {});
       clearLocalExamBackup(autosaveKey);
       setScore(finalScore);
-      tracker.log('submit_ok', { score: finalScore, of: mcqQuestions.length });
+      tracker.log('submit_ok', { score: finalScore, of: finalStats.possible, right: finalStats.right, wrong: finalStats.wrong });
       setIsSubmitted(true);
       setActiveView('dashboard');
       platformNotify(auto ? 'انتهى الوقت وتم تسليم الامتحان تلقائيًا. تم حفظ الإجابات.' : 'تم تسليم الامتحان وحفظ النتيجة بنجاح.');
@@ -655,39 +648,31 @@ export const ExamRunner = ({ exam, user, onClose, isReviewMode = false, existing
   if (isCheating) return <ExamCheatingScreen onClose={onClose} />;
 
   const totalQs = flatQuestions.length;
-  const solvedQs = flatQuestions.filter((q) => answers[q.id] !== undefined && answers[q.id] !== '' && answers[q.id] !== null).length;
+  const liveStats = scoreAttempt(flatQuestions, { ...(existingResult || {}), answers });
+  const solvedQs = liveStats.items.filter((it) => it.answered).length;
   const unsolvedQs = totalQs - solvedQs;
-  const correctQs = score;
-  const wrongQs = mcqQuestions.filter((q) => answers[q.id] !== undefined && answers[q.id] !== q.correctIdx).length;
-  const percentage = mcqQuestions.length > 0 ? Math.round((score / mcqQuestions.length) * 100) : 0;
-  const essayAnswered = essayQuestions.filter((q) => {
-    const val = answers[q.id];
-    if (typeof val === 'object') return !!(val?.text?.trim() || val?.image);
-    return !!val;
-  }).length;
+  const correctQs = liveStats.right;
+  const wrongQs = liveStats.wrong;
+  const percentage = liveStats.percentage;
+  const essayAnswered = liveStats.items.filter((it) => it.q.type === 'essay' && it.answered).length;
+  void score; void unsolvedQs;
 
   const branchStats = {};
-  flatQuestions.forEach((q) => {
-    const b = q.branch;
+  liveStats.items.forEach((it) => {
+    const b = it.q.branch;
     if (!branchStats[b]) branchStats[b] = { total: 0, solved: 0, correct: 0, wrong: 0, unsolved: 0, essay: 0 };
     branchStats[b].total++;
-    const isAnswered = answers[q.id] !== undefined && answers[q.id] !== '' && answers[q.id] !== null;
-    if (isAnswered) branchStats[b].solved++;
+    if (it.answered) branchStats[b].solved++;
     else branchStats[b].unsolved++;
-
-    if (q.type === 'essay') {
-      branchStats[b].essay++;
-    } else if (answers[q.id] === q.correctIdx) {
-      branchStats[b].correct++;
-    } else if (answers[q.id] !== undefined) {
-      branchStats[b].wrong++;
-    }
+    if (it.q.type === 'essay') branchStats[b].essay++;
+    else if (it.state === 'right') branchStats[b].correct++;
+    else if (it.state === 'wrong') branchStats[b].wrong++;
   });
 
   return <>{examLock.broken && <ExamLockBrokenOverlay onRepin={examLock.repin} />}<ExamRunnerView ctx={{
     exam, user, activeView, isSubmitted, timeLeft, score, mcqQuestions,
     flatQuestions, answers, onClose, setActiveView, confirmSubmit, totalQs,
-    percentage, solvedQs, correctQs, wrongQs, essayAnswered, essayQuestions,
+    percentage, solvedQs, correctQs, wrongQs, essayAnswered, essayQuestions, liveStats,
     antiCheatWarnings, branchStats, setActiveBranchTab, wmPositions, isOnline,
     lastLocalSaveAt, showAntiCheatChoice, showSubmitConfirm, handleSubmit, submissionError, submitting,
     setShowSubmitConfirm, activeBranchTab, uniqueBranches, displayQuestions,

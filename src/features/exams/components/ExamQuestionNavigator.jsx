@@ -1,3 +1,4 @@
+import { isCorrectAnswer } from '@shared/exam/examScoring.js';
 function isQuestionAnswered(question, answers) {
   const value = answers?.[question.id];
   return value !== undefined && value !== '' && value !== null;
@@ -8,7 +9,7 @@ function getQuestionStatusClass({ question, answers, flagged, isSubmitted, isCur
   if (isCurrent) return 'bg-gradient-to-br from-indigo-500 to-violet-700 text-white border-indigo-500 shadow-lg shadow-indigo-200';
   if (isSubmitted) {
     if (question.type === 'essay') return isAnswered ? 'bg-sky-500 text-white border-sky-500' : 'bg-white text-slate-400 border-slate-200';
-    if (answers?.[question.id] === question.correctIdx) return 'bg-emerald-500 text-white border-emerald-500';
+    if (isCorrectAnswer(question, answers?.[question.id])) return 'bg-emerald-500 text-white border-emerald-500';
     if (isAnswered) return 'bg-rose-500 text-white border-rose-500';
     return 'bg-white text-slate-400 border-slate-200';
   }

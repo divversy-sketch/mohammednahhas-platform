@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ar" dir="rtl" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>امتحان تفاعلي</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;600;700;800&family=Aref+Ruqaa:wght@700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FAF6F1; --surface: #FFFFFF; --sunk: #F2ECE4; --line: #E8DED2; --ink: #1A120D; --ink-2: #5E5148; --ink-3: #8F8173;
+    --copper: #C0592A; --copper-2: #E68A4E; --copper-soft: #FBE7DA; --gold: #B97F14; --gold-2: #F2C063; --gold-soft: #FCEFD3;
+    --patina: #13806F; --patina-2: #4CCDB4; --patina-soft: #D9F0EB; --danger: #C0303F; --danger-soft: #FBE3E5;
+    --f-ui: 'Readex Pro', 'IBM Plex Sans Arabic', system-ui, sans-serif; --f-cal: 'Aref Ruqaa', 'Readex Pro', serif;
+    --r: 18px; --shadow: 0 2px 4px rgba(70,35,10,.05), 0 18px 40px -18px rgba(70,35,10,.28);
+  }
+  [data-theme="dark"] {
+    --bg: #120D09; --surface: #1C140F; --sunk: #241A13; --line: rgba(255,220,190,.12); --ink: #F7EFE7; --ink-2: #D9C9BA; --ink-3: #A8968A;
+    --copper-soft: rgba(230,138,78,.16); --gold-soft: rgba(242,192,99,.14); --patina-soft: rgba(76,205,180,.14); --danger-soft: rgba(255,120,120,.14);
+    --shadow: 0 20px 50px -24px rgba(0,0,0,.8);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); font-family: var(--f-ui); -webkit-tap-highlight-color: transparent; }
+  body { padding: clamp(14px, 3vw, 32px); }
+  .wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 16px; }
+
+  /* الهيدر */
+  .hero { position: relative; overflow: hidden; padding: 22px 22px 18px; border-radius: 24px; color: #F7EFE7;
+    background: radial-gradient(600px 240px at 90% -40%, rgba(242,192,99,.35), transparent 60%), linear-gradient(135deg, #2a1a10, #120b07); box-shadow: var(--shadow); }
+  .hero small { color: var(--gold-2); font-weight: 800; font-size: 13px; }
+  .hero h1 { margin: 4px 0 6px; font-family: var(--f-cal); font-size: clamp(26px, 4.5vw, 38px); font-weight: 700; line-height: 1.3; }
+  .hero p { margin: 0; color: #CDBBAA; font-size: 14px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 700; background: rgba(255,255,255,.08); border: 1px solid rgba(255,220,190,.14); }
+
+  /* شريط التقدم */
+  .bar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 16px; background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(10px); border: 1px solid var(--line); }
+  .track { flex: 1; height: 8px; border-radius: 8px; background: var(--sunk); overflow: hidden; }
+  .track i { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, var(--patina), var(--gold-2)); transition: width .35s ease; }
+  .bar b { font-size: 13px; color: var(--ink-2); white-space: nowrap; }
+
+  /* السؤال */
+  .q { padding: 18px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); animation: rise .4s both; }
+  .q-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .num { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 11px; font-weight: 800; color: #fff; background: linear-gradient(140deg, var(--copper-2), var(--copper)); }
+  .tag { padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--gold-soft); color: var(--gold); }
+  .pts { margin-inline-start: auto; font-size: 12px; color: var(--ink-3); font-weight: 700; }
+  .q h2 { margin: 0 0 14px; font-size: clamp(16px, 2.4vw, 19px); line-height: 1.9; font-weight: 700; }
+  .q h2 mark { background: var(--copper-soft); color: var(--copper); padding: 0 6px; border-radius: 6px; }
+  .opts { display: grid; gap: 8px; }
+  .opt { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; font-size: 15px; font-weight: 600; text-align: start; cursor: pointer; transition: border-color .15s, background .15s, transform .15s; }
+  .opt:hover { border-color: var(--copper-2); transform: translateY(-1px); }
+  .opt i { width: 30px; height: 30px; flex: none; display: grid; place-items: center; border-radius: 10px; font-style: normal; font-weight: 800; background: var(--sunk); color: var(--ink-2); }
+  .opt.is-picked { border-color: var(--copper); background: var(--copper-soft); }
+  .opt.is-picked i { background: var(--copper); color: #fff; }
+  .opt.is-right { border-color: var(--patina); background: var(--patina-soft); }
+  .opt.is-right i { background: var(--patina); color: #fff; }
+  .opt.is-wrong { border-color: var(--danger); background: var(--danger-soft); }
+  .opt.is-wrong i { background: var(--danger); color: #fff; }
+  .opt:disabled { cursor: default; transform: none; }
+  .explain { display: none; margin-top: 12px; padding: 12px 14px; border-radius: 12px; background: var(--sunk); font-size: 14px; line-height: 1.9; color: var(--ink-2); }
+  .done .explain { display: block; }
+  .explain b { color: var(--gold); }
+
+  .submit { position: sticky; bottom: 10px; display: flex; justify-content: center; }
+  .btn { min-height: 52px; padding: 0 30px; border: 0; border-radius: 16px; font: inherit; font-size: 16px; font-weight: 800; color: #fff; cursor: pointer; background: linear-gradient(135deg, var(--copper-2), var(--copper)); box-shadow: 0 16px 34px -14px rgba(192,89,42,.9); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .note { text-align: center; color: var(--ink-3); font-size: 13px; }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header class="hero">
+    <small>امتحان تفاعلي</small>
+    <h1 id="title">النحو: المبتدأ والخبر</h1>
+    <p>اختار الإجابة الصح في كل سؤال، وبعدين دوس «سلّم».</p>
+    <div class="meta"><span class="pill">٥ أسئلة</span><span class="pill">١٠ درجات</span><span class="pill" id="who"></span></div>
+  </header>
+
+  <div class="bar"><div class="track"><i id="prog"></i></div><b id="count">٠ / ٥</b></div>
+  <section id="list" class="wrap" style="gap:12px"></section>
+  <div class="submit"><button class="btn" id="send" disabled>سلّم الامتحان</button></div>
+  <p class="note" id="hint">جاوب على كل الأسئلة عشان تقدر تسلّم</p>
+</main>
+
+<script>
+  // ===== الأسئلة: عدّلها بس =====
+  const QUESTIONS = [
+    { text: 'في جملة «<mark>العلمُ</mark> نورٌ»، كلمة «العلمُ» إعرابها:', options: ['خبر مرفوع', 'مبتدأ مرفوع', 'فاعل مرفوع', 'مفعول به منصوب'], correct: 1, points: 2, branch: 'نحو', explain: 'جاء في أول الجملة الاسمية واتكلمنا عنه، فهو <b>مبتدأ مرفوع</b> بالضمة.' },
+    { text: 'الخبر في جملة «الطالبُ <mark>مجتهدٌ</mark>»:', options: ['الطالبُ', 'مجتهدٌ', 'لا يوجد خبر', 'الجملة فعلية'], correct: 1, points: 2, branch: 'نحو', explain: '«مجتهدٌ» تمّم معنى المبتدأ، فهو <b>الخبر</b>.' },
+    { text: 'أي جملة خبرها جملة فعلية؟', options: ['محمدٌ في البيت', 'الشمسُ تشرقُ', 'الكتابُ مفيدٌ', 'الجوُّ جميلٌ'], correct: 1, points: 2, branch: 'نحو', explain: '«تشرقُ» فعل وفاعله ضمير، والجملة الفعلية في محل رفع <b>خبر</b>.' },
+    { text: 'علامة رفع المثنى:', options: ['الضمة', 'الواو', 'الألف', 'الياء'], correct: 2, points: 2, branch: 'إعراب', explain: 'المثنى يُرفع <b>بالألف</b>: «الطالبان مجتهدان».' },
+    { text: 'في «<mark>المعلمون</mark> مخلصون» علامة رفع المبتدأ:', options: ['الواو', 'الضمة', 'الألف', 'النون'], correct: 0, points: 2, branch: 'إعراب', explain: 'جمع المذكر السالم يُرفع <b>بالواو</b>.' },
+  ];
+  // ===============================
+
+  const L = ['أ', 'ب', 'ج', 'د', 'هـ', 'و'];
+  const ar = (n) => String(n).replace(/\d/g, (d) => '٠١٢٣٤٥٦٧٨٩'[d]);
+  const answers = {};
+  let submitted = false;
+  const post = (msg) => { try { parent.postMessage(msg, '*'); } catch (e) {} };
+
+  // المنصة بتبعت الثيم واسم الطالب
+  window.addEventListener('message', (e) => {
+    const d = e.data || {};
+    if (d.type !== 'nahhas:init') return;
+    document.documentElement.setAttribute('data-theme', d.theme === 'dark' ? 'dark' : 'light');
+    if (d.student && d.student.name) document.getElementById('who').textContent = d.student.name;
+  });
+  post({ type: 'nahhas:ready' });
+
+  const list = document.getElementById('list');
+  QUESTIONS.forEach((q, i) => {
+    const el = document.createElement('article');
+    el.className = 'q'; el.style.animationDelay = (i * 60) + 'ms';
+    el.innerHTML = `<div class="q-head"><span class="num">${ar(i + 1)}</span><span class="tag">${q.branch}</span><span class="pts">${ar(q.points)} درجة</span></div>
+      <h2>${q.text}</h2><div class="opts">${q.options.map((o, k) => `<button class="opt" data-q="${i}" data-k="${k}"><i>${L[k]}</i><span>${o}</span></button>`).join('')}</div>
+      <div class="explain">${q.explain || ''}</div>`;
+    list.appendChild(el);
+  });
+
+  const refresh = () => {
+    const done = Object.keys(answers).length;
+    document.getElementById('prog').style.width = (done / QUESTIONS.length * 100) + '%';
+    document.getElementById('count').textContent = `${ar(done)} / ${ar(QUESTIONS.length)}`;
+    document.getElementById('send').disabled = submitted || done < QUESTIONS.length;
+    post({ type: 'nahhas:progress', current: done, total: QUESTIONS.length });
+  };
+
+  list.addEventListener('click', (e) => {
+    const b = e.target.closest('.opt');
+    if (!b || submitted) return;
+    const qi = +b.dataset.q;
+    answers[qi] = +b.dataset.k;
+    b.parentElement.querySelectorAll('.opt').forEach((x) => x.classList.toggle('is-picked', x === b));
+    refresh();
+  });
+
+  document.getElementById('send').addEventListener('click', () => {
+    if (submitted) return;
+    submitted = true;
+    let score = 0, total = 0, correct = 0, wrong = 0;
+    const details = [];
+    document.querySelectorAll('.q').forEach((card, i) => {
+      const q = QUESTIONS[i]; const a = answers[i]; const ok = a === q.correct;
+      total += q.points; if (ok) { score += q.points; correct++; } else wrong++;
+      card.classList.add('done');
+      card.querySelectorAll('.opt').forEach((o, k) => { o.disabled = true; o.classList.remove('is-picked'); if (k === q.correct) o.classList.add('is-right'); else if (k === a) o.classList.add('is-wrong'); });
+      details.push({ n: i + 1, answer: a, correct: q.correct, ok, points: ok ? q.points : 0, max: q.points, branch: q.branch });
+    });
+    document.getElementById('hint').textContent = 'اتسلّم ✓ — راجع الشرح تحت كل سؤال';
+    refresh();
+    post({ type: 'nahhas:result', score, total, correct, wrong, skipped: 0, details });
+  });
+  refresh();
+</script>
+</body>
+</html>

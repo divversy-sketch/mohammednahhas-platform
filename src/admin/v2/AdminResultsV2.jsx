@@ -3,9 +3,14 @@
 // - ملخص لكل امتحان: سلّموا كام، المتوسط، أعلى وأقل درجة، نسبة النجاح، توزيع الدرجات، أضعف الفروع.
 // - فلترة بالحالة، بحث، ترتيب، وتصدير Excel.
 import { useMemo, useState } from 'react';
+import { rescoreResult } from '@shared/exam/examScoring.js';
+import { extractAllQuestions } from '@shared/core/platform/metrics.js';
 import { Icon } from '@v2/ui/Icon.jsx';
 import { formatNumber } from '@v2/ui/kit.jsx';
-import { getQuestionsForExam, generatePDF } from '@shared/core/platformShared.jsx';
+import { getQuestionsForExam, generatePDF, platformNotify } from '@shared/core/platformShared.jsx';
+import { addDoc, collection, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { db } from '@services/firebase';
+import { buildNotification } from '@shared/notifications/notify.js';
 import { downloadXlsx } from '@shared/utils/exportData.js';
 import { liveState, useExamEvents, useExamAttempts, Timeline } from './AdminExamLive.jsx';
 import { diagnoseAttempt, attemptStats, groupEvents, dur } from '@shared/exam/examDiagnosis.js';
@@ -109,12 +114,14 @@ export default function AdminResultsV2({ ctx }) {
     return [...ids];
   }, [examId, examsList]);
   const direct = useExamAttempts(relatedIds);
-  const allResults = useMemo(() => {
+  const mergedResults = useMemo(() => {
     if (!direct.length) return examResults;
     const byId = new Map(examResults.map((r) => [`${r.sourceCollection || ''}:${r.id}`, r]));
     direct.forEach((r) => byId.set(`${r.sourceCollection || ''}:${r.id}`, { ...byId.get(`${r.sourceCollection || ''}:${r.id}`), ...r }));
     return [...byId.values()];
   }, [examResults, direct]);
+  // الدرجة والنسبة بتتحسب تاني من الإجابات (النتايج القديمة كانت متخزنة بحساب غلط)
+  const allResults = useMemo(() => mergedResults.map((r) => rescoreResult(r, examsById.get(r.examId), extractAllQuestions)), [mergedResults, examsById]);
 
   // امتحانات ليها نتائج، الأحدث فوق (+ أي امتحان تاني من القايمة عشان تقدر تختاره حتى لو نتايجه قديمة)
   const examOptions = useMemo(() => {
@@ -329,6 +336,8 @@ export default function AdminResultsV2({ ctx }) {
                   <em className="ars-badge"><Icon name={st.icon} />{st.label}</em>
                   {x.state === 'submitted' && <small className="ars-lockline"><Icon name="lock" />متسلّم ومقفول</small>}
                   {x.needsEssay && <small className="ars-essay">مقالي محتاج تصحيح</small>}
+                  {x.r.kind === 'html' && x.r.studentNotes === 'retake_request' && x.r.status !== 'retake_allowed' && <small className="ars-essay"><Icon name="refresh" />طالب يعيد الامتحان</small>}
+                  {x.r.kind === 'html' && x.r.status === 'retake_allowed' && <small className="ars-lockline"><Icon name="key" />مسموح يعيد</small>}
                 </span>
                 <span className="ars-score">
                   {x.state === 'submitted' ? (
@@ -388,7 +397,18 @@ export function ResultDetailHeader({ result, exam, onBack, onApproveContinue, on
   const events = useMemo(() => groupEvents(batches).get(result.id) || [], [batches, result.id]);
   const diag = diagnoseAttempt(result, events, { totalQuestions: getQuestionsForExam(exam).length });
   const tstats = attemptStats(result, events);
-  const needsDecision = !done && ['security_hold', 'cheated', 'in_progress'].includes(result.status) && !['continue', 'restart'].includes(result.adminDecision);
+  const isHtml = result.kind === 'html';
+  const needsDecision = !isHtml && !done && ['security_hold', 'cheated', 'in_progress'].includes(result.status) && !['continue', 'restart'].includes(result.adminDecision);
+  const [retakeBusy, setRetakeBusy] = useState(false);
+  const allowRetake = async () => {
+    setRetakeBusy(true);
+    try {
+      await updateDoc(doc(db, result.sourceCollection || 'exam_results', result.id), { status: 'retake_allowed', adminDecision: 'restart', retakeGrantedAt: serverTimestamp(), retakeCount: (Number(result.retakeCount) || 0) + 1, studentNotes: '' });
+      if (result.studentId) await addDoc(collection(db, 'notifications'), buildNotification({ audienceKeys: [`user:${result.studentId}`], category: 'exam', title: `تقدر تعيد «${result.examTitle || 'الامتحان'}»`, body: 'المدرس وافق إنك تمتحن تاني. افتح الامتحان من الدروس التفاعلية.' })).catch(() => {});
+      platformNotify('اتسمح للطالب يعيد الامتحان، ووصله إشعار');
+    } catch (e) { platformNotify('ماتحفظش: ' + (e?.message || 'خطأ')); }
+    setRetakeBusy(false);
+  };
   return (
     <div className="ars ars-detail" dir="rtl">
       <div className="ars-detail__bar">
@@ -409,7 +429,16 @@ export function ResultDetailHeader({ result, exam, onBack, onApproveContinue, on
           </div>
         )}
       </div>
-      {done && <p className="ars-locked"><Icon name="lock" />الامتحان ده متسلّم ومقفول. الطالب مش هيقدر يكمّله أو يعدّل إجاباته.</p>}
+      {isHtml ? (
+        <div className="ars-decide">
+          <p><Icon name={result.status === 'retake_allowed' ? 'key' : 'lock'} />
+            <b>{result.status === 'retake_allowed' ? 'مسموح للطالب يعيد الامتحان' : done ? 'امتحان HTML — اتسلّم' : 'امتحان HTML — الطالب خرج قبل ما يسلّم'}</b>
+            {result.status === 'retake_allowed' ? ' — مستنيه يفتحه.' : ' — الامتحان محاولة واحدة ومقفول عليه.'}
+            {result.studentNotes === 'retake_request' && result.status !== 'retake_allowed' && <> <b>الطالب طالب يعيده.</b></>}
+          </p>
+          {result.status !== 'retake_allowed' && <div><button type="button" className="ars-btn" disabled={retakeBusy} onClick={allowRetake}><Icon name="refresh" />اسمح يمتحن تاني</button></div>}
+        </div>
+      ) : done && <p className="ars-locked"><Icon name="lock" />الامتحان ده متسلّم ومقفول. الطالب مش هيقدر يكمّله أو يعدّل إجاباته.</p>}
       {needsDecision && (
         <div className="ars-decide">
           <p><Icon name="shield" /><b>المحاولة دي محتاجة قرارك</b> — الطالب ما سلّمش.</p>

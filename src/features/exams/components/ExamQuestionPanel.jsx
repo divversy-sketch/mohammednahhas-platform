@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { correctIndexOf } from '@shared/exam/examScoring.js';
 import { createPortal } from 'react-dom';
 import { Check, ChevronRight, FileText, Flag, HelpCircle, Layers, Maximize2, PenTool, UploadCloud, X } from '../../../shared/icons/lucide-shim.jsx';
 import { LocalEssayReviewBox, LocalQuestionExplanation, renderBracketHighlightedText } from '../../../shared/core/platformShared.jsx';
@@ -87,7 +88,7 @@ function McqAnswerOptions({ question, answer, isSubmitted, onAnswer }) {
         const isSelected = answer === idx;
 
         if (isSubmitted) {
-          if (idx === question.correctIdx) optionClass = 'border-green-500 bg-green-50 text-green-900 shadow-md ring-2 ring-green-200';
+          if (idx === correctIndexOf(question)) optionClass = 'border-green-500 bg-green-50 text-green-900 shadow-md ring-2 ring-green-200';
           else if (isSelected) optionClass = 'border-red-500 bg-red-50 text-red-900 shadow-md';
           else optionClass = 'border-slate-200 bg-slate-50 opacity-50';
         } else if (isSelected) {
@@ -96,13 +97,13 @@ function McqAnswerOptions({ question, answer, isSubmitted, onAnswer }) {
 
         return (
           <div key={idx} onClick={() => !isSubmitted && onAnswer(question.id, idx)} role="radio" aria-checked={isSelected} tabIndex={isSubmitted ? -1 : 0} onKeyDown={(e) => { if (!isSubmitted && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onAnswer(question.id, idx); } }} className={`group p-3 md:p-5 rounded-2xl border cursor-pointer transition-all duration-200 flex items-center gap-4 ${optionClass}`}>
-            <div className={`w-10 h-10 rounded-full border-2 font-black text-base flex items-center justify-center shrink-0 transition-colors ${isSelected || (isSubmitted && idx === question.correctIdx) ? 'border-transparent bg-current' : 'border-slate-300'}`}>
+            <div className={`w-10 h-10 rounded-full border-2 font-black text-base flex items-center justify-center shrink-0 transition-colors ${isSelected || (isSubmitted && idx === correctIndexOf(question)) ? 'border-transparent bg-current' : 'border-slate-300'}`}>
               {!isSubmitted && <span>{['أ','ب','ج','د','هـ','و'][idx] || idx + 1}</span>}
-              {(isSubmitted && idx === question.correctIdx) && <Check size={16} className="text-white" />}
+              {(isSubmitted && idx === correctIndexOf(question)) && <Check size={16} className="text-white" />}
               {(isSubmitted && isSelected && idx !== question.correctIdx) && <X size={16} className="text-white" />}
             </div>
             <span className="font-['Cairo'] text-base md:text-xl font-bold leading-relaxed break-words min-w-0">{option}</span>
-            {isSubmitted && idx === question.correctIdx && <span className="mr-auto text-green-600 bg-green-100 px-3 py-1 rounded-lg text-xs font-bold">الإجابة الصحيحة</span>}
+            {isSubmitted && idx === correctIndexOf(question) && <span className="mr-auto text-green-600 bg-green-100 px-3 py-1 rounded-lg text-xs font-bold">الإجابة الصحيحة</span>}
             {isSubmitted && isSelected && idx !== question.correctIdx && <span className="mr-auto text-red-600 bg-red-100 px-3 py-1 rounded-lg text-xs font-bold">إجابتك (خطأ)</span>}
           </div>
         );

@@ -1,5 +1,5 @@
 import { buildNotification } from '@shared/notifications/notify.js';
-import { doc, setDoc, getDoc, getDocs, collection, addDoc, query, where, updateDoc, deleteDoc, serverTimestamp, writeBatch, increment } from 'firebase/firestore';
+import { deleteField, doc, setDoc, getDoc, getDocs, collection, addDoc, query, where, updateDoc, deleteDoc, serverTimestamp, writeBatch, increment } from 'firebase/firestore';
 
 import { db } from '@services/firebase';
 import { validateEgyptianPhones } from '@shared/utils/phone';
@@ -144,7 +144,8 @@ export const createContentManagementActions = (ctx) => {
       chaptersText: item.chaptersText || chaptersToText(item.chapters),
       branch: item.branch || '',
       thumbnailUrl: item.thumbnailUrl || item.posterUrl || item.image || '',
-      imagePlacement: normalizeImagePlacement(item.imagePlacement)
+      imagePlacement: normalizeImagePlacement(item.imagePlacement),
+      audience: item.audience || undefined
     });
   };
 
@@ -180,6 +181,13 @@ export const createContentManagementActions = (ctx) => {
       estimatedDurationMinutes: contentEditDraft.type === 'video' ? safeNumber(contentEditDraft.estimatedDurationMinutes, 0) : 0,
       chapters: contentEditDraft.type === 'video' ? parseChapters(contentEditDraft.chaptersText) : [],
       videoExamUnlockPercent: contentEditDraft.type === 'video' && contentEditDraft.linkedExamId ? VIDEO_EXAM_UNLOCK_PERCENT : 0,
+      ...(contentEditDraft.audienceFields ? (() => {
+        const af = contentEditDraft.audienceFields;
+        if (!af.audienceKeys?.length) return {};
+        // صف واحد = نفس صف المحتوى: يرجع للعرض بالصف العادي
+        const plain = af.audience?.mode === 'grades' && af.audience.grades?.length === 1 && af.audience.grades[0] === contentEditDraft.grade;
+        return plain ? { audience: deleteField(), audienceKeys: deleteField() } : { audience: af.audience, audienceKeys: af.audienceKeys };
+      })() : {}),
       updatedAt: serverTimestamp()
     };
 
@@ -187,8 +195,12 @@ export const createContentManagementActions = (ctx) => {
       await updateDoc(doc(db, 'content', editingFullContent.id), { ...payload, version: increment(1), lastEditMode: 'direct' });
       platformNotify('تم تعديل المحتوى مباشرة.');
     } else {
+      const clonePayload = { ...payload };
+      // deleteField ماينفعش في مستند جديد
+      ['audience', 'audienceKeys'].forEach((k) => { if (k in clonePayload && !(Array.isArray(clonePayload[k]) || clonePayload[k]?.mode)) delete clonePayload[k]; });
+      if (!('audience' in clonePayload) && editingFullContent.audience && !contentEditDraft.audienceFields) { clonePayload.audience = editingFullContent.audience; clonePayload.audienceKeys = editingFullContent.audienceKeys || []; }
       await addDoc(collection(db, 'content'), {
-        ...payload,
+        ...clonePayload,
         title: payload.title.includes('نسخة') ? payload.title : `${payload.title} - نسخة جديدة`,
         originalContentId: editingFullContent.id,
         clonedFrom: editingFullContent.id,
@@ -273,7 +285,7 @@ export const createContentManagementActions = (ctx) => {
               firebaseStoragePath: uploaded.storageProvider === 'firebase' ? uploaded.path : '',
               cloudinaryPublicId: uploaded.storageProvider === 'cloudinary' ? uploaded.path : '',
               storageProvider: uploaded.storageProvider || 'firebase',
-              type: autoType === 'html' ? 'html' : (newContent.type === 'video' && autoType !== 'video' ? autoType : (newContent.type || autoType))
+              type: autoType === 'html' ? (newContent.type === 'interactive_exam' ? 'interactive_exam' : 'html') : (newContent.type === 'video' && autoType !== 'video' ? autoType : (newContent.type || autoType))
           });
           setUploadProgress(100);
           setTimeout(() => setUploadProgress(0), 2000);
@@ -323,7 +335,7 @@ export const createContentManagementActions = (ctx) => {
           mimeType: newContent.mimeType || '',
           fileName: newContent.fileName || '',
           fileSize: newContent.fileSize || 0,
-          htmlContent: newContent.type === 'html' ? (newContent.htmlContent || '') : '',
+          htmlContent: ['html', 'interactive_exam'].includes(newContent.type) ? (newContent.htmlContent || '') : '',
           createdAt: new Date() 
       };
       

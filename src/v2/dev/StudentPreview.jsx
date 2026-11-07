@@ -2,6 +2,7 @@
 // Open: /?nxPreview=student&nxPlatform=ios|android|web&nxForm=phone|tablet|desktop&tab=exams:open
 import { useState } from 'react';
 import StudentAppV2 from '../student/StudentAppV2.jsx';
+import demoHtmlExam from '../../../docs/html-exam-template.html?raw';
 import { platformNotify, platformPromptAsync } from '@shared/core/platformShared.jsx';
 
 const day = 86400e3;
@@ -65,7 +66,7 @@ export default function StudentPreview() {
     unseenNotificationCount: 1, isPremium: premium, subscriptionDaysLeft: 5,
     startMistakesExam: () => platformNotify('بيبدأ امتحان الأخطاء'),
     videos, filesAndLinks: [{ id: 'f1', title: 'مذكرة النحو كاملة', url: '#', description: 'PDF · ٤٢ صفحة' }, { id: 'f2', title: 'ملخص البلاغة', url: '#' }, { id: 'f3', title: 'قناة المستر على يوتيوب', type: 'link', url: '#' }],
-    htmls: [{ id: 'h1', title: 'لعبة الإعراب التفاعلية' }], interactiveExams: [{ id: 'i1', title: 'تدريب: أنواع التشبيه' }],
+    htmls: [{ id: 'h1', title: 'لعبة الإعراب التفاعلية' }], interactiveExams: [{ id: 'i1', type: 'interactive_exam', title: 'تدريب: أنواع التشبيه', htmlContent: demoHtmlExam }],
     handlePremiumClick: (cb) => (premium ? cb() : (platformNotify('المحتوى ده للمشتركين'), setActiveTab('subscription'))),
     getVideoWatchPercent: (v) => watch[v.id] || 0,
     canOpenLinkedExam: (v) => (watch[v.id] || 0) >= 75, openLinkedExamFromVideo: () => platformNotify('بيفتح امتحان المحاضرة'),

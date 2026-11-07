@@ -1,3 +1,5 @@
+import { isAnswered, isCorrectAnswer } from '@shared/exam/examScoring.js';
+
 export const safeNumber = (value, fallback = 0) => {
     const num = Number(value);
     return Number.isFinite(num) ? num : fallback;
@@ -57,21 +59,19 @@ export const calculateDetailedExamMetrics = (exam, answers = {}, essayGrades = {
         branchStats[branch].possible += maxScore;
         branchStats[branch].total += 1;
         const answerValue = answers[q.id];
-        const answered = q.type === 'essay'
-            ? !!(answerValue && ((typeof answerValue === 'string' && answerValue.trim()) || answerValue.text || answerValue.image))
-            : answerValue !== undefined;
+        const answered = isAnswered(q, answerValue);
         if (answered) branchStats[branch].answered += 1;
 
         if (q.type === 'essay') {
             essayCount += 1;
             branchStats[branch].essay += 1;
-            const gradeInfo = essayGrades[q.id] || {};
-            const earned = safeNumber(gradeInfo.score, 0);
+            const gradeInfo = essayGrades[q.id];
+            const earned = safeNumber(typeof gradeInfo === 'object' && gradeInfo !== null ? gradeInfo.score : gradeInfo, 0);
             totalScore += earned;
             branchStats[branch].earned += earned;
         } else {
             mcqCount += 1;
-            const isCorrect = answerValue === q.correctIdx;
+            const isCorrect = isCorrectAnswer(q, answerValue);
             if (isCorrect) {
                 totalScore += maxScore;
                 branchStats[branch].earned += maxScore;

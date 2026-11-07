@@ -18,7 +18,7 @@ function ExamRunnerScreens({ ctx }) {
     lastLocalSaveAt, showAntiCheatChoice, showSubmitConfirm, handleSubmit, submissionError, submitting,
     setShowSubmitConfirm, activeBranchTab, uniqueBranches, displayQuestions,
     flagged, currentQIndex, setCurrentQIndex, currentQObj, handleAnswer,
-    setFlagged, handleEssayImageUpload, fileDialogBypassRef, isReviewMode, existingResult,
+    setFlagged, handleEssayImageUpload, fileDialogBypassRef, isReviewMode, existingResult, liveStats,
   } = ctx;
 
   // celebrate a good result once, right after submitting (not when reopening an old result)
@@ -38,10 +38,10 @@ function ExamRunnerScreens({ ctx }) {
   // After submitting (or when reopening a saved attempt): the score right away, the full review once the exam window closes.
   const submittedAt = useMemo(() => (isSubmitted ? new Date() : null), [isSubmitted]);
   const result = useMemo(() => (existingResult ? existingResult : {
-    answers, score, total: mcqQuestions?.length || 0, percentage, status: 'completed',
+    answers, score: liveStats?.earned ?? score, total: liveStats?.possible ?? (mcqQuestions?.length || 0), percentage, status: 'completed',
     timeTaken: Math.max(0, Number(exam.duration || 0) * 60 - Number(timeLeft || 0)),
     submittedAt: submittedAt || new Date(),
-  }), [existingResult, answers, score, mcqQuestions, percentage, exam.duration, timeLeft, submittedAt]);
+  }), [existingResult, answers, score, mcqQuestions, percentage, exam.duration, timeLeft, submittedAt, liveStats]);
   if (isSubmitted) {
     const reviewExam = isReviewMode ? { ...exam, allowReviewImmediately: true } : exam;
     return <Suspense fallback={null}><ExamReview exam={reviewExam} result={result} onClose={onClose} /></Suspense>;

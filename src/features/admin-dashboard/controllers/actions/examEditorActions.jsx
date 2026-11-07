@@ -1,5 +1,6 @@
 import { doc, setDoc, getDoc, getDocs, collection, addDoc, query, where, updateDoc, deleteDoc, serverTimestamp, writeBatch, increment } from 'firebase/firestore';
 
+import { isCorrectAnswer } from '@shared/exam/examScoring.js';
 import { db } from '@services/firebase';
 import { validateEgyptianPhones } from '@shared/utils/phone';
 import { FloatingArabicBackground } from '@features/home/HomeWidgets';
@@ -189,7 +190,7 @@ export const createExamEditorActions = (ctx) => {
       const weakBranches = branchRows.filter(b => b.percentage < 70);
       const mcqScore = metrics.questions
         .filter(q => q.type !== 'essay')
-        .reduce((sum, q) => sum + (answers[q.id] === q.correctIdx ? getQuestionMaxScore(q) : 0), 0);
+        .reduce((sum, q) => sum + (isCorrectAnswer(q, answers[q.id]) ? getQuestionMaxScore(q) : 0), 0);
 
       batch.update(resultDoc.ref, {
         score: metrics.totalScore,

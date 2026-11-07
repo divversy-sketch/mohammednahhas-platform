@@ -3,6 +3,7 @@
 // - جوه تطبيق الأندرويد: شاشة الطباعة بتاعة أندرويد ← «حفظ بتنسيق PDF» (ReportPrintPlugin).
 // - APK قديم من غير الإضافة: التقرير بيتعرض على الشاشة.
 import { Capacitor, registerPlugin } from '@capacitor/core';
+import { isCorrectAnswer, correctIndexOf } from '@shared/exam/examScoring.js';
 import logoUrl from '@assets/nahhas-brand-mark.png';
 
 const ReportPrint = registerPlugin('ReportPrint');
@@ -63,7 +64,7 @@ export function examReportModel(data = {}) {
     const a = answers[q.id];
     const b = branches.get(q.branch) || { name: q.branch, correct: 0, total: 0, wrong: 0, blank: 0 };
     b.total += 1;
-    if (!answered(a)) { blank += 1; b.blank += 1; } else if (a === q.correctIdx) { correct += 1; b.correct += 1; } else { wrong += 1; b.wrong += 1; }
+    if (!answered(a)) { blank += 1; b.blank += 1; } else if (isCorrectAnswer(q, a)) { correct += 1; b.correct += 1; } else { wrong += 1; b.wrong += 1; }
     branches.set(q.branch, b);
   });
   const essayAnswered = essays.filter((q) => answered(answers[q.id])).length;
@@ -124,11 +125,11 @@ export async function buildExamReportHtml(data = {}, { audience = 'student' } = 
         ${img ? `<img class="ans-img" src="${esc(img)}" alt="">` : ''}
         ${q.modelAnswer ? `<div class="ans model"><b>الإجابة النموذجية:</b> ${clean(q.modelAnswer)}</div>` : ''}</div>`;
     }
-    const isBlank = !answered(a); const ok = !isBlank && a === q.correctIdx;
+    const isBlank = !answered(a); const ok = !isBlank && isCorrectAnswer(q, a); const ci = correctIndexOf(q);
     const st = isBlank ? '<span class="st gray">' + ico('minus', 11) + ' متروك</span>' : ok ? '<span class="st green">' + ico('check', 11) + ' صح</span>' : '<span class="st red">' + ico('x', 11) + ' غلط</span>';
     const opts = (q.options || []).map((o, k) => {
-      const cls = k === q.correctIdx ? 'opt right' : k === a ? 'opt wrong' : 'opt';
-      const mark = k === q.correctIdx ? ico('check', 11) : k === a ? ico('x', 11) : '';
+      const cls = k === ci ? 'opt right' : k === Number(a) ? 'opt wrong' : 'opt';
+      const mark = k === ci ? ico('check', 11) : k === Number(a) ? ico('x', 11) : '';
       return `<span class="${cls}">${mark}${esc(o)}</span>`;
     }).join('');
     return `<div class="q ${ok ? 'ok' : isBlank ? 'blank' : 'bad'}"><div class="q-h"><em>${ar(i + 1)}</em><span class="chip">${esc(q.branch)}</span>${st}</div><p class="q-t">${clean(q.text)}</p><div class="opts">${opts}</div></div>`;

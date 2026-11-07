@@ -1,4 +1,5 @@
 import React from 'react';
+import { correctIndexOf } from '@shared/exam/examScoring.js';
 import { CheckCircle, Lock, X, AlertTriangle, Trash2, Eye, ShieldAlert, Phone, Edit, KeyRound, Send, MessageCircle, ClipboardList, Unlock, Layout, Bell, Download, Calendar, Clock, Upload, Users, RefreshCw, FileCheck, Crown, Key } from '@shared/icons/lucide-shim.jsx';
 import { AdminReviewQuizPanel } from '@features/review/ReviewQuizSystem.jsx';
 import { GradeOptions, getGradeLabel } from '@shared/constants/grades';
@@ -303,7 +304,7 @@ export default function AdminExamResultsTab({ ctx }) {
                                                    ) : (
                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                                                            {q.options.map((opt, oIdx) => {
-                                                               const isCorrect = oIdx === q.correctIdx;
+                                                               const isCorrect = oIdx === correctIndexOf(q);
                                                                const isSelected = viewingResult.answers[q.id] === oIdx;
                                                                let style = "bg-gray-50 text-gray-500";
                                                                if (isCorrect) style = "bg-green-100 text-green-800 border-green-500 border font-bold md:text-lg";

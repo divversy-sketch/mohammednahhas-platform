@@ -21,6 +21,9 @@ export function LessonCard({ item, ctx, kind = 'video', index = 0 }) {
   const percent = kind === 'video' && ctx.getVideoWatchPercent ? Math.round(ctx.getVideoWatchPercent(item) || 0) : null;
   const locked = ctx.isBannedContent || (!ctx.isPremium && item?.isPremium);
   const thumb = thumbOf(item);
+  // امتحان HTML: محاولة واحدة — نوضح حالته على الكارت
+  const htmlAttempt = item?.type === 'interactive_exam' ? (ctx.examResults || []).filter((r) => r.examId === item.id).sort((a, b) => (b.status === 'retake_allowed') - (a.status === 'retake_allowed') || (b.status === 'completed') - (a.status === 'completed'))[0] : null;
+  const htmlState = !htmlAttempt ? null : htmlAttempt.status === 'retake_allowed' ? 'retake' : htmlAttempt.status === 'completed' ? 'done' : 'closed';
   const open = () => {
     haptic('light');
     if (kind !== 'video') return ctx.handlePremiumClick ? ctx.handlePremiumClick(() => ctx.setPlayingHtml?.(item)) : ctx.setPlayingHtml?.(item);
@@ -34,14 +37,18 @@ export function LessonCard({ item, ctx, kind = 'video', index = 0 }) {
         <span className="nx-lesson__play"><Icon name={locked ? 'lock' : kind === 'video' ? 'play' : 'interactive'} /></span>
         <div className="nx-lesson__badges">
           {item?.isPremium ? <Chip tone="gold" icon="crown">VIP</Chip> : <span />}
-          {percent !== null && percent >= 95 ? <Chip tone="patina" icon="check">خلصته</Chip> : item?.linkedExamId ? <Chip className="nx-chip--night" icon="exam">عليه امتحان</Chip> : null}
+          {htmlState === 'done' ? <Chip tone="patina" icon="check">{formatNumber(Math.round(Number(htmlAttempt.percentage) || 0))}٪</Chip>
+            : htmlState === 'closed' ? <Chip className="nx-chip--night" icon="lock">مقفول</Chip>
+            : htmlState === 'retake' ? <Chip tone="gold" icon="refresh">مسموح تعيده</Chip>
+            : item?.type === 'interactive_exam' ? <Chip className="nx-chip--night" icon="exam">محاولة واحدة</Chip>
+            : percent !== null && percent >= 95 ? <Chip tone="patina" icon="check">خلصته</Chip> : item?.linkedExamId ? <Chip className="nx-chip--night" icon="exam">عليه امتحان</Chip> : null}
         </div>
       </div>
       <div className="nx-lesson__body">
         <div className="nx-lesson__title">{title}</div>
         {percent !== null && percent > 0 && percent < 95 && <Bar value={percent} />}
         <div className="nx-lesson__meta">
-          <span>{kind === 'video' ? (percent ? `اتفرجت ${formatNumber(percent)}٪` : 'لسه ما بدأتش') : 'نشاط تفاعلي'}</span>
+          <span>{kind === 'video' ? (percent ? `اتفرجت ${formatNumber(percent)}٪` : 'لسه ما بدأتش') : item?.type === 'interactive_exam' ? (htmlState === 'done' ? `امتحنته · درجتك ${formatNumber(htmlAttempt.score ?? 0)} من ${formatNumber(htmlAttempt.total ?? 0)}` : htmlState === 'closed' ? 'خرجت قبل التسليم' : htmlState === 'retake' ? 'المدرس سمحلك تعيده' : 'امتحان تفاعلي') : 'نشاط تفاعلي'}</span>
           {item?.duration ? <span>{item.duration}</span> : null}
         </div>
       </div>

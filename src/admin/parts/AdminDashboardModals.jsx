@@ -86,6 +86,7 @@ export default function AdminDashboardModals({ ctx }) {
         setContentEditDraft={setContentEditDraft}
         examsList={examsList}
         saveFullContentEdit={saveFullContentEdit}
+        users={ctx.activeUsersList || []}
       />
 
       <AdminStudentProfileModal

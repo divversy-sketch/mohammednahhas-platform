@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { rescoreResult } from '@shared/exam/examScoring.js';
+import { extractAllQuestions } from '@shared/core/platform/metrics.js';
 import { sendSystemNotification } from '@shared/core/platformShared.jsx';
 import { subscribeStudentDashboardData } from '@features/student-dashboard/services/studentDashboard.listeners.js';
 
@@ -74,10 +76,16 @@ export function useStudentDashboardData({ user, userData, setScanningHwId, setEd
     setEditFormData({ name: userData?.name, phone: userData.phone, parentPhone: userData.parentPhone, grade: userData?.grade });
   }, [userData?.name, userData?.phone, userData?.parentPhone, userData?.grade, setEditFormData]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // درجات الطالب بتتحسب من إجاباته نفسها بنفس حساب صفحة النتيجة (النتايج القديمة كانت متخزنة غلط)
+  const scoredResults = useMemo(() => {
+    const byId = new Map(exams.map((e) => [e.id, e]));
+    return examResults.map((r) => rescoreResult(r, byId.get(r.examId), extractAllQuestions));
+  }, [examResults, exams]);
+
   return {
     content,
     exams,
-    examResults,
+    examResults: scoredResults,
     hwResults,
     assignments,
     assignmentSubmissions,

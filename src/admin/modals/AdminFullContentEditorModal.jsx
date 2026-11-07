@@ -5,14 +5,17 @@ import { GradeOptions } from '../../shared/constants/grades';
 import { uploadToCloudinary } from '../../services/cloudinaryUpload';
 import { platformNotify } from '../../shared/core/platformShared.jsx';
 import ImageFitControls from '../../shared/ui/ImageFitControls.jsx';
+import AudiencePicker, { useStudentGroups } from '@admin/v2/AudiencePicker.jsx';
+import { defaultAudience, resolveAudience } from '@shared/audience/audience.js';
 
 export default function AdminFullContentEditorModal({
   editingFullContent, setEditingFullContent,
   contentEditMode, setContentEditMode,
   contentEditDraft, setContentEditDraft,
-  examsList, saveFullContentEdit
+  examsList, saveFullContentEdit, users = []
 }) {
   const [thumbBusy, setThumbBusy] = useState(false);
+  const groups = useStudentGroups();
   const uploadThumb = async (file) => {
     if (!file) return;
     try {
@@ -93,6 +96,7 @@ export default function AdminFullContentEditorModal({
         </div>
       )}
 
+      <AudiencePicker title="مين يشوف ده؟" value={contentEditDraft.audience || defaultAudience(contentEditDraft.grade)} onChange={(v) => setContentEditDraft({ ...contentEditDraft, audience: v, audienceFields: resolveAudience(v, users, groups), allowedEmailsText: '' })} users={users} groups={groups} />
       <textarea className="border p-3 rounded-xl min-h-[80px]" placeholder="إيميلات مسموحة مفصولة بفاصلة، أو اتركها فارغة للجميع" value={contentEditDraft.allowedEmailsText} onChange={e => setContentEditDraft({...contentEditDraft, allowedEmailsText: e.target.value})} />
       <label className="flex items-center gap-2 bg-slate-50 border rounded-xl p-3 font-bold"><input type="checkbox" checked={contentEditDraft.isPublic} onChange={e => setContentEditDraft({...contentEditDraft, isPublic: e.target.checked})}/> يظهر للزوار في الصفحة الرئيسية</label>
 
