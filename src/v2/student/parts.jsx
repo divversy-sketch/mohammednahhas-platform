@@ -48,7 +48,7 @@ export function LessonCard({ item, ctx, kind = 'video', index = 0 }) {
         <div className="nx-lesson__title">{title}</div>
         {percent !== null && percent > 0 && percent < 95 && <Bar value={percent} />}
         <div className="nx-lesson__meta">
-          <span>{kind === 'video' ? (percent ? `اتفرجت ${formatNumber(percent)}٪` : 'لسه ما بدأتش') : item?.type === 'interactive_exam' ? (htmlState === 'done' ? `امتحنته · درجتك ${formatNumber(htmlAttempt.score ?? 0)} من ${formatNumber(htmlAttempt.total ?? 0)}` : htmlState === 'closed' ? 'خرجت قبل التسليم' : htmlState === 'retake' ? 'المدرس سمحلك تعيده' : 'امتحان تفاعلي') : 'نشاط تفاعلي'}</span>
+          <span>{kind === 'video' ? (percent ? `اتفرجت ${formatNumber(percent)}٪` : 'لسه ما بدأتش') : item?.type === 'interactive_exam' ? (htmlState === 'done' ? `امتحنته · درجتك ${formatNumber(htmlAttempt.score ?? 0)} من ${formatNumber(htmlAttempt.total ?? 0)}` : htmlState === 'closed' ? (htmlAttempt.status === 'cheated' ? 'اتحظرت من الامتحان' : htmlAttempt.status === 'timed_out' ? 'الوقت خلص' : 'خرجت قبل التسليم') : htmlState === 'retake' ? 'المدرس سمحلك تعيده' : Number(item.examDurationMinutes) > 0 ? `امتحان · ${formatNumber(item.examDurationMinutes)} دقيقة` : 'امتحان تفاعلي') : 'نشاط تفاعلي'}</span>
           {item?.duration ? <span>{item.duration}</span> : null}
         </div>
       </div>

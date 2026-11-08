@@ -274,6 +274,22 @@ export default function AdminContentTab({ ctx }) {
                           <select className="border p-3 rounded flex-1" value={newContent.grade} onChange={e=>setContentGrade(e.target.value)}><GradeOptions/></select>
                       </div>
 
+                      {newContent.type === 'interactive_exam' && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
+                              <div>
+                                  <label className="block text-sm font-bold text-amber-800 mb-1">مدة الامتحان (بالدقايق)</label>
+                                  <input type="number" min="0" className="border p-3 rounded w-full bg-white" placeholder="مثال: 30 — سيبها فاضية لو من غير وقت" value={newContent.examDurationMinutes || ''} onChange={e=>setNewContent({...newContent, examDurationMinutes: e.target.value})} />
+                                  <p className="text-xs text-amber-700 mt-1">لما الوقت يخلص الامتحان بيتسلّم لوحده.</p>
+                              </div>
+                              <div>
+                                  <label className="block text-sm font-bold text-amber-800 mb-1">متاح لحد (اختياري)</label>
+                                  <input type="datetime-local" className="border p-3 rounded w-full bg-white" value={newContent.availableUntil || ''} onChange={e=>setNewContent({...newContent, availableUntil: e.target.value})} />
+                                  <p className="text-xs text-amber-700 mt-1">بعد الميعاد ده محدش يقدر يبدأ، واللي بيمتحن بيتسلّم وقتها.</p>
+                              </div>
+                              <p className="md:col-span-2 text-xs font-bold text-amber-900">الامتحان محاولة واحدة لكل طالب. لو غيّر التبويب أو خرج من الشاشة: أول مرة تحذير، والتانية حظر مايتفكش غير من «النتائج».</p>
+                          </div>
+                      )}
+
                       {newContent.type === 'video' && (
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-blue-50 border border-blue-200 rounded-xl p-4">
                               <div>

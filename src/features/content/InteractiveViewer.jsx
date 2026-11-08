@@ -1,18 +1,25 @@
 // نافذة المحتوى التفاعلي / امتحان HTML — شباك سينمائي بهوية المنصة.
 // بيتكلم مع صفحة الـHTML عن طريق postMessage (الشرح الكامل في HTML_EXAM_PROMPT_AR.md):
-//   المنصة ← الصفحة: { type:'nahhas:init', theme, student:{name}, kind, title, palette }
-//   الصفحة ← المنصة: { type:'nahhas:progress', current, total }
-//                    { type:'nahhas:result', score, total, correct, wrong, skipped, details? }
-//                    { type:'nahhas:close' }
+//   المنصة ← الصفحة: { type:'nahhas:init', theme, student:{name}, kind, title, palette, durationMinutes, endsAt }
+//                    { type:'nahhas:timeup' }   الوقت خلص: الصفحة تسلّم فورًا باللي اتجاوب
+//                    { type:'nahhas:locked' }   الطالب اتحظر: الصفحة توقف كل حاجة
+//   الصفحة ← المنصة: { type:'nahhas:ready' } | { type:'nahhas:progress', current, total }
+//                    { type:'nahhas:result', score, total, correct, wrong, skipped, details? } | { type:'nahhas:close' }
+// امتحان HTML للطالب: محاولة واحدة، وقت بيتسلّم لوحده، وخروج من الشاشة = تحذير ثم حظر (الفك من الأدمن بس).
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { collection, doc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
 import { auth, db } from '@services/firebase';
 import { platformNotify, platformConfirm } from '../../shared/core/platformShared.jsx';
+import { isExamLockSupported, requestExamLock, releaseExamLock, blockBackButton, useExamLockWatch, wasScreenTurnedOff } from '@features/native-app/examLock.js';
+import { markExamPage } from '@features/native-app/examLockGuard.js';
 import { Icon } from '@v2/ui/Icon.jsx';
 import '@v2/styles/html-window.css';
 
 const n = (x) => Number(x || 0).toLocaleString('ar-EG');
 const clock = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`.replace(/\d/g, (d) => '٠١٢٣٤٥٦٧٨٩'[d]);
+// معاينة التطوير بس: تجربة الامتحان من غير قاعدة بيانات
+const devTest = () => Boolean(import.meta.env.DEV && typeof window !== 'undefined' && window.__nxHtmlExamTest);
+const upd = (ref, data) => (devTest() ? Promise.resolve() : updateDoc(ref, data));
 const PALETTE = { copper: '#C0592A', gold: '#F2C063', patina: '#13806F', danger: '#C0303F', night: '#0C0907', paper: '#FAF6F1', ink: '#1A120D' };
 
 function ResultSheet({ result, onAgain, onClose }) {
@@ -49,30 +56,75 @@ function ResultSheet({ result, onAgain, onClose }) {
 
 // محاولة واحدة لكل طالب في امتحان الـHTML: فتحه = محاولة، والإعادة بموافقة الأدمن بس.
 export const htmlAttemptId = (contentId, uid) => `html_${contentId}_${uid}`;
+const toMs = (v) => (v?.seconds ? v.seconds * 1000 : v ? new Date(v).getTime() || 0 : 0);
+const fmtWhen = (ms) => new Date(ms).toLocaleString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' });
+const STRIKE_LABEL = { hidden: 'خرج من الشاشة / غيّر التبويب', blur: 'فتح شباك تاني', unpin: 'فك تثبيت الشاشة' };
 
-function GateScreen({ gate, onRequest, onClose }) {
+function GateScreen({ gate, rules, onStart, onRequest, onClose }) {
   const a = gate.attempt || {};
   const done = a.status === 'completed';
   const asked = a.studentNotes === 'retake_request';
   const pct = Math.round(Number(a.percentage) || 0);
+  const blockedView = done
+    ? { icon: 'checkCircle', tone: 'done', title: 'أنت امتحنت الامتحان ده قبل كده', body: `درجتك ${n(a.score)} من ${n(a.total)} (${n(pct)}٪). الامتحان محاولة واحدة، والإعادة بموافقة المدرس بس.` }
+    : a.status === 'cheated'
+      ? { icon: 'shield', tone: 'bad', title: 'اتحظرت من الامتحان ده', body: 'خرجت من شاشة الامتحان بعد التحذير. الحظر مايتفكش غير من المدرس.' }
+      : a.status === 'timed_out'
+        ? { icon: 'clock', tone: 'bad', title: 'وقت الامتحان خلص', body: 'الامتحان اتقفل لما الوقت خلص. الإعادة بموافقة المدرس بس.' }
+        : { icon: 'lock', tone: 'bad', title: 'الامتحان ده اتقفل', body: 'خرجت من الامتحان قبل ما تسلّم. مش هتقدر تدخله تاني إلا لو المدرس وافق.' };
   const view = {
     checking: { icon: 'shield', title: 'بنتأكد من الامتحان…', body: '' },
-    offline: { icon: 'wifiOff', title: 'محتاج نت عشان تبدأ', body: 'الامتحان ده محاولة واحدة، فلازم المنصة تسجّل إنك بدأت. اتأكد من النت وافتحه تاني.' },
-    error: { icon: 'alert', title: 'مقدرناش نفتح الامتحان', body: 'جرّب تاني بعد شوية، ولو المشكلة فضلت كلّم المدرس.' },
-    blocked: done
-      ? { icon: 'checkCircle', title: 'أنت امتحنت الامتحان ده قبل كده', body: `درجتك ${n(a.score)} من ${n(a.total)} (${n(pct)}٪). الامتحان محاولة واحدة، والإعادة بموافقة المدرس بس.` }
-      : { icon: 'lock', title: 'الامتحان ده اتقفل', body: 'خرجت من الامتحان قبل ما تسلّم. مش هتقدر تدخله تاني إلا لو المدرس وافق.' },
+    starting: { icon: 'shield', title: 'بنجهّز الامتحان…', body: '' },
+    offline: { icon: 'wifiOff', tone: 'wait', title: 'محتاج نت عشان تبدأ', body: 'الامتحان ده محاولة واحدة، فلازم المنصة تسجّل إنك بدأت. اتأكد من النت وافتحه تاني.' },
+    error: { icon: 'alert', tone: 'bad', title: 'مقدرناش نفتح الامتحان', body: 'جرّب تاني بعد شوية، ولو المشكلة فضلت كلّم المدرس.' },
+    expired: { icon: 'calendar', tone: 'bad', title: 'ميعاد الامتحان خلص', body: `الامتحان كان متاح لحد ${gate.until ? fmtWhen(gate.until) : ''}.` },
+    banned: { icon: 'shield', tone: 'bad', title: 'اتحظرت من الامتحان', body: 'خرجت من شاشة الامتحان تاني بعد التحذير، فالامتحان اتقفل واتسجّل غش. الحظر مايتفكش غير من المدرس.' },
+    timeup: { icon: 'clock', tone: 'bad', title: 'الوقت خلص', body: 'الامتحان اتقفل لما الوقت خلص، والصفحة دي ماسلّمتش إجاباتك لوحدها. كلّم المدرس.' },
+    blocked: blockedView,
   }[gate.state] || {};
+
+  if (gate.state === 'ready') {
+    return (
+      <div className="hw-gate">
+        <div className="hw-gate__card hw-rules">
+          <span className="hw-gate__ico is-gold"><Icon name="exam" /></span>
+          <h3>قبل ما تبدأ</h3>
+          <ul>
+            {rules.duration ? <li><Icon name="clock" /><span>وقت الامتحان <b>{n(rules.duration)} دقيقة</b>. لما يخلص، الامتحان بيتسلّم لوحده.</span></li> : null}
+            {rules.until ? <li><Icon name="calendar" /><span>متاح لحد <b>{fmtWhen(rules.until)}</b>.</span></li> : null}
+            <li><Icon name="lock" /><span><b>محاولة واحدة بس.</b> أول ما تدوس «ابدأ» تتحسب عليك، ولو خرجت قبل التسليم الامتحان بيتقفل.</span></li>
+            <li><Icon name="alert" /><span>لو غيّرت التبويب أو خرجت من الشاشة: <b>أول مرة تحذير</b>، والمرة التانية <b>حظر من الامتحان</b> مايتفكش غير من المدرس.</span></li>
+            {rules.native ? <li><Icon name="shield" /><span>التطبيق هيطلب يثبّت الشاشة، وافق عشان تقدر تمتحن.</span></li> : null}
+          </ul>
+          <button type="button" className="hw-btn hw-btn--pri" onClick={onStart}><Icon name="check" />موافق، ابدأ الامتحان</button>
+          <button type="button" className="hw-btn" onClick={onClose}><Icon name="arrowLeft" />مش دلوقتي</button>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="hw-gate">
-      <div className={`hw-gate__card is-${gate.state}${done ? ' is-done' : ''}`}>
-        <span className="hw-gate__ico">{gate.state === 'checking' ? <i className="hw-gate__spin" /> : <Icon name={view.icon} />}</span>
+      <div className={`hw-gate__card is-${view.tone || 'wait'}`}>
+        <span className="hw-gate__ico">{['checking', 'starting'].includes(gate.state) ? <i className="hw-gate__spin" /> : <Icon name={view.icon} />}</span>
         <h3>{view.title}</h3>
         {view.body && <p>{view.body}</p>}
-        {gate.state === 'blocked' && (asked
+        {['blocked', 'banned', 'timeup'].includes(gate.state) && a.id && (asked
           ? <small className="hw-gate__ok"><Icon name="check" />طلبك اتبعت للمدرس، أول ما يوافق هتقدر تدخل</small>
           : <button type="button" className="hw-btn" onClick={onRequest}><Icon name="message" />اطلب من المدرس يسمحلك تعيده</button>)}
-        {gate.state !== 'checking' && <button type="button" className="hw-btn hw-btn--pri" onClick={onClose}><Icon name="arrowLeft" />رجوع</button>}
+        {!['checking', 'starting'].includes(gate.state) && <button type="button" className="hw-btn hw-btn--pri" onClick={onClose}><Icon name="arrowLeft" />رجوع</button>}
+      </div>
+    </div>
+  );
+}
+
+function WarningSheet({ reason, onBack }) {
+  return (
+    <div className="hw-result hw-warn" role="alertdialog" aria-modal="true">
+      <div className="hw-gate__card is-bad">
+        <span className="hw-gate__ico"><Icon name="alert" /></span>
+        <h3>تحذير أول وأخير</h3>
+        <p>اتسجّل إنك {reason || 'خرجت من شاشة الامتحان'}. <b>لو حصلت تاني هتتحظر من الامتحان</b>، والحظر مايتفكش غير من المدرس.</p>
+        <button type="button" className="hw-btn hw-btn--pri" onClick={onBack}><Icon name="arrowLeft" />فاهم، رجّعني للامتحان</button>
       </div>
     </div>
   );
@@ -86,6 +138,9 @@ const InteractiveViewer = ({ content, user, onClose }) => {
   const [showResult, setShowResult] = useState(false);
   const [secs, setSecs] = useState(0);
   const [reloadKey, setReloadKey] = useState(0);
+  const [warning, setWarning] = useState(null);
+  const [timeUpPending, setTimeUpPending] = useState(false);
+  const [pinned, setPinned] = useState(false);
   const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine !== false);
   const winRef = useRef(null);
   const frameRef = useRef(null);
@@ -95,57 +150,92 @@ const InteractiveViewer = ({ content, user, onClose }) => {
   const uid = auth.currentUser?.uid || '';
   const isStaff = ['admin', 'teacher', 'assistant', 'owner', 'superadmin'].includes(String(user?.role || '').toLowerCase());
   // القفل للطالب المسجّل بس (الزائر في الصفحة الرئيسية والأدمن بيشوفوه عادي)
-  const locked = isExam && Boolean(uid) && Boolean(content?.id) && !isStaff;
+  const locked = isExam && (devTest() || (Boolean(uid) && Boolean(content?.id) && !isStaff));
+  const durationMin = Math.max(0, Number(content?.examDurationMinutes) || 0);
+  const untilMs = toMs(content?.availableUntil);
+  const native = isExamLockSupported();
   const [gate, setGate] = useState(() => (import.meta.env.DEV && typeof window !== 'undefined' && window.__nxHtmlGate) || { state: locked ? 'checking' : 'open' }); // معاينة التطوير بس
   const attemptRef = useRef(null);
+  const grantRef = useRef(null);
   const finishedRef = useRef(false);
   const latestSecs = useRef(0);
   const resultSent = useRef(false);
+  const deadlineRef = useRef(0);
+  const strikesRef = useRef([]);
+  const bypassRef = useRef(false);
+  const examRunning = locked && gate.state === 'open' && !result && !timeUpPending;
 
+  // ١) فحص: امتحنه قبل كده؟ الميعاد خلص؟
   useEffect(() => {
-    if (!locked) return undefined;
+    if (!locked || gate.state !== 'checking') return undefined;
     let alive = true;
     (async () => {
       try {
+        if (devTest()) { if (alive) setGate({ state: 'ready' }); return; }
         const snap = await getDocs(query(collection(db, 'exam_results'), where('studentId', '==', uid), where('examId', '==', content.id)));
         const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         const grant = rows.find((r) => r.adminDecision === 'restart' && r.status === 'retake_allowed');
-        const ref = doc(db, 'exam_results', grant?.id || htmlAttemptId(content.id, uid));
-        if (grant) {
-          await updateDoc(ref, { status: 'in_progress', adminDecision: 'restart_consumed', startedAtMillis: Date.now(), updatedAt: serverTimestamp() });
-        } else if (rows.length) {
-          if (alive) setGate({ state: 'blocked', attempt: rows.sort((a, b) => (b.status === 'completed') - (a.status === 'completed'))[0] });
-          return;
-        } else {
-          await setDoc(ref, {
-            examId: content.id, examTitle: content.title || 'امتحان تفاعلي', kind: 'html', grade: content.grade || user?.grade || '',
-            studentId: uid, studentName: studentName || 'طالب', status: 'in_progress', startedAtMillis: Date.now(), createdAt: serverTimestamp(),
-          });
-        }
-        attemptRef.current = ref;
-        if (alive) setGate({ state: 'open' });
+        if (!alive) return;
+        if (!grant && rows.length) return setGate({ state: 'blocked', attempt: rows.sort((a, b) => (b.status === 'completed') - (a.status === 'completed'))[0] });
+        if (!grant && untilMs && Date.now() > untilMs) return setGate({ state: 'expired', until: untilMs });
+        grantRef.current = grant || null;
+        setGate({ state: 'ready' });
       } catch (e) {
         console.warn('html exam gate', e?.code || e?.message);
         if (alive) setGate({ state: navigator.onLine === false || e?.code === 'unavailable' ? 'offline' : 'error' });
       }
     })();
     return () => { alive = false; };
-  }, [locked, uid, content?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [locked, uid, content?.id, gate.state, untilMs]);
+
+  // ٢) «ابدأ»: تتسجل المحاولة، تتثبت الشاشة على التطبيق، ويبدأ العدّاد
+  const start = async () => {
+    setGate({ state: 'starting' });
+    const startMs = Date.now();
+    const grant = grantRef.current;
+    const ref = devTest() ? { id: 'dev-test' } : doc(db, 'exam_results', grant?.id || htmlAttemptId(content.id, uid));
+    try {
+      if (devTest()) { /* من غير حفظ */ } else if (grant) {
+        await updateDoc(ref, { status: 'in_progress', adminDecision: 'restart_consumed', startedAtMillis: startMs, totalTime: durationMin * 60, antiCheatWarnings: 0, antiCheatLog: [], securityReason: '', updatedAt: serverTimestamp() });
+      } else {
+        await setDoc(ref, {
+          examId: content.id, examTitle: content.title || 'امتحان تفاعلي', kind: 'html', grade: content.grade || user?.grade || '',
+          studentId: uid, studentName: studentName || 'طالب', status: 'in_progress', startedAtMillis: startMs, totalTime: durationMin * 60,
+          antiCheatWarnings: 0, antiCheatLog: [], createdAt: serverTimestamp(),
+        });
+      }
+    } catch (e) {
+      console.warn('html exam start', e?.code || e?.message);
+      return setGate({ state: navigator.onLine === false || e?.code === 'unavailable' ? 'offline' : 'error' });
+    }
+    attemptRef.current = ref;
+    const ends = [durationMin ? startMs + durationMin * 60000 : 0, untilMs || 0].filter(Boolean);
+    deadlineRef.current = ends.length ? Math.min(...ends) : 0;
+    setSecs(0); latestSecs.current = 0;
+    if (native) {
+      markExamPage(true);
+      bypassRef.current = true; // رسالة أندرويد بتاخد الفوكس
+      setPinned(await requestExamLock());
+      setTimeout(() => { bypassRef.current = false; }, 1500);
+    }
+    setGate({ state: 'open' });
+  };
 
   // خرج من غير ما يسلّم (زرار خروج، رجوع، قفل التطبيق): المحاولة تتقفل
   const markExited = useCallback(() => {
     if (!attemptRef.current || finishedRef.current || resultSent.current) return;
     finishedRef.current = true;
-    updateDoc(attemptRef.current, { status: 'exited', timeTaken: latestSecs.current, updatedAt: serverTimestamp() }).catch(() => {});
+    upd(attemptRef.current, { status: 'exited', timeTaken: latestSecs.current, leftAt: serverTimestamp(), updatedAt: serverTimestamp() }).catch(() => {});
   }, []);
-  useEffect(() => () => markExited(), [markExited]);
+  useEffect(() => () => { markExited(); if (native) { releaseExamLock(); markExamPage(false); } }, [markExited, native]);
+  useEffect(() => { if (native && (result || ['banned', 'timeup'].includes(gate.state))) { releaseExamLock(); markExamPage(false); } }, [native, result, gate.state]);
 
   const requestRetake = async () => {
-    const a = gate.attempt;
-    if (!a?.id) return;
+    const id = gate.attempt?.id || attemptRef.current?.id;
+    if (!id) return;
     try {
-      await updateDoc(doc(db, 'exam_results', a.id), { studentNotes: 'retake_request', updatedAt: serverTimestamp() });
-      setGate((g) => ({ ...g, attempt: { ...g.attempt, studentNotes: 'retake_request' } }));
+      await updateDoc(doc(db, 'exam_results', id), { studentNotes: 'retake_request', updatedAt: serverTimestamp() });
+      setGate((g) => ({ ...g, attempt: { ...(g.attempt || { id }), studentNotes: 'retake_request' } }));
     } catch { platformNotify('الطلب ماتبعتش، جرّب تاني.'); }
   };
 
@@ -164,7 +254,7 @@ const InteractiveViewer = ({ content, user, onClose }) => {
     return () => blobUrl && URL.revokeObjectURL(blobUrl);
   }, [content.url, content.htmlContent, reloadKey, gate.state]);
 
-  // حماية + عدّاد الوقت + حالة النت
+  // حماية + العدّاد + حالة النت
   useEffect(() => {
     const block = (e) => e.preventDefault();
     const onKey = (e) => { if (e.key === 'PrintScreen') platformNotify('غير مسموح بأخذ لقطات شاشة! المحتوى محمي.', 'error'); };
@@ -185,15 +275,14 @@ const InteractiveViewer = ({ content, user, onClose }) => {
     };
   }, []);
 
+  const post = useCallback((msg) => { try { frameRef.current?.contentWindow?.postMessage(msg, '*'); } catch { /* الصفحة مش بتسمع */ } }, []);
   const sendInit = useCallback(() => {
     const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
-    try {
-      frameRef.current?.contentWindow?.postMessage({ type: 'nahhas:init', theme, kind: isExam ? 'exam' : 'lesson', title: content.title || '', student: { name: studentName }, palette: PALETTE }, '*');
-    } catch { /* الصفحة مش بتسمع */ }
-  }, [content.title, isExam, studentName]);
+    post({ type: 'nahhas:init', theme, kind: isExam ? 'exam' : 'lesson', title: content.title || '', student: { name: studentName }, palette: PALETTE, durationMinutes: durationMin || null, endsAt: deadlineRef.current || null });
+  }, [post, content.title, isExam, studentName, durationMin]);
 
   const latest = useRef({});
-  latest.current = { content, user, studentName, secs };
+  latest.current = { content, user };
   const saveResult = useCallback(async (r) => {
     const { content, user } = latest.current;
     if (!attemptRef.current || savedRef.current) return false;
@@ -201,14 +290,73 @@ const InteractiveViewer = ({ content, user, onClose }) => {
     finishedRef.current = true;
     try {
       // المفاتيح دي بس المسموح للطالب يكتبها في محاولته (قواعد Firestore)
-      await updateDoc(attemptRef.current, {
+      await upd(attemptRef.current, {
         status: 'completed', score: r.score, total: r.total, totalPossible: r.total, percentage: Math.round(r.percentage),
         timeTaken: latestSecs.current, submittedAt: serverTimestamp(), examTitle: content.title || 'امتحان تفاعلي', grade: content.grade || user?.grade || '',
-        performanceAnalysis: { correct: r.correct ?? null, wrong: r.wrong ?? null, skipped: r.skipped ?? 0, details: Array.isArray(r.details) ? r.details.slice(0, 200) : [] },
+        antiCheatWarnings: strikesRef.current.length, antiCheatLog: strikesRef.current,
+        performanceAnalysis: { correct: r.correct ?? null, wrong: r.wrong ?? null, skipped: r.skipped ?? 0, details: Array.isArray(r.details) ? r.details.slice(0, 200) : [], autoSubmitted: Boolean(r.auto) },
       });
       return true;
     } catch (e) { console.warn('html result not saved', e?.message); savedRef.current = false; finishedRef.current = false; return false; }
   }, []);
+
+  // ٣) الغش: أول مرة تحذير، التانية حظر
+  const strike = useCallback((kind) => {
+    if (!attemptRef.current || finishedRef.current || resultSent.current || bypassRef.current) return;
+    const last = strikesRef.current[strikesRef.current.length - 1];
+    if (last && Date.now() - last.at < 2500) return; // نفس الخروجة بتطلع أكتر من حدث
+    strikesRef.current = [...strikesRef.current, { type: kind, at: Date.now(), sec: latestSecs.current }];
+    const count = strikesRef.current.length;
+    if (count === 1) {
+      setWarning(STRIKE_LABEL[kind]);
+      upd(attemptRef.current, { antiCheatWarnings: 1, antiCheatLog: strikesRef.current, updatedAt: serverTimestamp() }).catch(() => {});
+      return;
+    }
+    finishedRef.current = true;
+    post({ type: 'nahhas:locked', reason: 'cheating' });
+    setWarning(null);
+    upd(attemptRef.current, { status: 'cheated', securityReason: STRIKE_LABEL[kind] || kind, securityHoldAt: serverTimestamp(), antiCheatWarnings: count, antiCheatLog: strikesRef.current, timeTaken: latestSecs.current, updatedAt: serverTimestamp() }).catch(() => {});
+    setGate({ state: 'banned', attempt: { id: attemptRef.current.id, status: 'cheated' } });
+  }, [post]);
+
+  useEffect(() => {
+    if (!examRunning) return undefined;
+    let hiddenAt = 0;
+    const onVis = async () => {
+      if (document.hidden) { hiddenAt = Date.now(); return; }
+      if (!hiddenAt) return;
+      const at = hiddenAt; hiddenAt = 0;
+      if (native && await wasScreenTurnedOff(at)) return; // قفل الشاشة مش غش
+      strike('hidden');
+    };
+    // شباك تاني على الكمبيوتر (الضغط جوه الامتحان نفسه بيعمل blur برضه، فبنتجاهله)
+    const onBlur = () => setTimeout(() => {
+      if (native || document.hidden || document.activeElement === frameRef.current) return;
+      strike('blur');
+    }, 60);
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('blur', onBlur);
+    const unBack = blockBackButton(() => platformNotify('مينفعش تخرج من الامتحان قبل ما تسلّم.'));
+    return () => { document.removeEventListener('visibilitychange', onVis); window.removeEventListener('blur', onBlur); unBack(); };
+  }, [examRunning, native, strike]);
+  const lockWatch = useExamLockWatch({ enabled: examRunning && native && pinned, onBroken: () => strike('unpin'), bypassRef });
+
+  // ٤) الوقت: لما يخلص المنصة بتطلب من الصفحة تسلّم، ولو ماسلّمتش في ٦ ثواني الامتحان بيتقفل
+  const remaining = deadlineRef.current ? Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000)) : null;
+  useEffect(() => {
+    if (!examRunning || remaining === null || remaining > 0) return undefined;
+    setTimeUpPending(true);
+    setWarning(null);
+    post({ type: 'nahhas:timeup' });
+    const id = setTimeout(() => {
+      if (resultSent.current) return;
+      finishedRef.current = true;
+      if (attemptRef.current) upd(attemptRef.current, { status: 'timed_out', timeTaken: latestSecs.current, antiCheatWarnings: strikesRef.current.length, antiCheatLog: strikesRef.current, updatedAt: serverTimestamp() }).catch(() => {});
+      setGate({ state: 'timeup', attempt: attemptRef.current ? { id: attemptRef.current.id, status: 'timed_out' } : undefined });
+      setTimeUpPending(false);
+    }, 6000);
+    return () => clearTimeout(id);
+  }, [examRunning, remaining, post]);
 
   // رسائل صفحة الـHTML
   useEffect(() => {
@@ -220,12 +368,15 @@ const InteractiveViewer = ({ content, user, onClose }) => {
       if (d.type === 'nahhas:progress') setProgress({ current: Number(d.current) || 0, total: Number(d.total) || 0 });
       if (d.type === 'nahhas:close') onClose?.();
       if (d.type === 'nahhas:result') {
+        if (isExam && resultSent.current) return; // نتيجة واحدة بس
+        if (locked && finishedRef.current && !savedRef.current) return; // اتحظر أو الوقت خلص قبلها
         const total = Math.max(0, Number(d.total) || 0);
         const score = Math.max(0, Math.min(total || Infinity, Number(d.score) || 0));
-        const r = { score, total, percentage: total ? (score / total) * 100 : Number(d.percentage) || 0, correct: d.correct ?? null, wrong: d.wrong ?? null, skipped: d.skipped ?? 0, details: d.details };
-        setResult({ ...r, saving: isExam && Boolean(attemptRef.current) }); setShowResult(true);
-        if (isExam && (savedRef.current || resultSent.current)) return; // نتيجة واحدة بس
+        const r = { score, total, percentage: total ? (score / total) * 100 : Number(d.percentage) || 0, correct: d.correct ?? null, wrong: d.wrong ?? null, skipped: d.skipped ?? 0, details: d.details, auto: timeUpPending };
         resultSent.current = true;
+        setTimeUpPending(false);
+        setWarning(null);
+        setResult({ ...r, saving: isExam && Boolean(attemptRef.current) }); setShowResult(true);
         if (!isExam || !attemptRef.current) return;
         // لو النت فاصل: نفضل نحاول لحد ما النتيجة تتسجل
         for (let i = 0; i < 40; i += 1) {
@@ -237,11 +388,13 @@ const InteractiveViewer = ({ content, user, onClose }) => {
     };
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
-  }, [sendInit, saveResult, isExam, onClose]);
+  }, [sendInit, saveResult, isExam, locked, onClose, timeUpPending]);
 
   const exit = async () => {
     if (locked && gate.state === 'open' && !result) {
+      bypassRef.current = true;
       const ok = await platformConfirm('لو خرجت دلوقتي الامتحان هيتقفل، ومش هتقدر تمتحنه تاني إلا بموافقة المدرس. تخرج؟');
+      bypassRef.current = false;
       if (!ok) return;
       markExited();
     }
@@ -249,10 +402,14 @@ const InteractiveViewer = ({ content, user, onClose }) => {
   };
   const fullscreen = () => {
     const el = winRef.current;
+    bypassRef.current = true;
+    setTimeout(() => { bypassRef.current = false; }, 1200);
     if (document.fullscreenElement) document.exitFullscreen?.();
     else (el?.requestFullscreen || el?.webkitRequestFullscreen)?.call(el);
   };
   const pct = progress?.total ? Math.round((progress.current / progress.total) * 100) : null;
+  const showTimer = gate.state === 'open' && !result;
+  const countdown = locked && remaining !== null;
 
   return (
     <div className="hw" dir="rtl" onContextMenu={(e) => e.preventDefault()}>
@@ -266,7 +423,9 @@ const InteractiveViewer = ({ content, user, onClose }) => {
           </div>
           <div className="hw-head__acts">
             {pct !== null && <span className="hw-chip is-prog" title="الأسئلة"><Icon name="checkCircle" /><bdi>{n(progress.current)} / {n(progress.total)}</bdi></span>}
-            {gate.state === 'open' && <span className="hw-chip" title="الوقت"><Icon name="clock" /><bdi dir="ltr">{clock(secs)}</bdi></span>}
+            {showTimer && (countdown
+              ? <span className={`hw-chip is-timer${remaining <= 60 ? ' is-danger' : remaining <= 300 ? ' is-warn' : ''}`} title="الوقت الفاضل"><Icon name="clock" /><bdi dir="ltr">{clock(remaining)}</bdi></span>
+              : <span className="hw-chip" title="الوقت"><Icon name="clock" /><bdi dir="ltr">{clock(secs)}</bdi></span>)}
             {result && <button type="button" className="hw-chip is-score" onClick={() => setShowResult(true)}><Icon name="trophy" />{n(Math.round(result.percentage))}٪</button>}
             {!isExam && <button type="button" className="hw-icon" title="إعادة تحميل" onClick={() => { savedRef.current = false; setResult(null); setProgress(null); setReloadKey((k) => k + 1); }}><Icon name="refresh" /></button>}
             <button type="button" className="hw-icon hw-hide-m" title="ملء الشاشة" onClick={fullscreen}><Icon name="external" /></button>
@@ -276,7 +435,7 @@ const InteractiveViewer = ({ content, user, onClose }) => {
         </header>
 
         <div className="hw-stage">
-          {gate.state !== 'open' && <GateScreen gate={gate} onRequest={requestRetake} onClose={onClose} />}
+          {gate.state !== 'open' && <GateScreen gate={gate} rules={{ duration: durationMin, until: untilMs, native }} onStart={start} onRequest={requestRetake} onClose={onClose} />}
           {gate.state === 'open' && loading && (
             <div className="hw-loading">
               <div className="hw-loading__orb"><Icon name={isExam ? 'exam' : 'interactive'} /></div>
@@ -292,14 +451,27 @@ const InteractiveViewer = ({ content, user, onClose }) => {
             onLoad={() => { setLoading(false); sendInit(); }}
             className="hw-frame"
             title={content.title || 'محتوى تفاعلي'}
-            sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals"
+            sandbox={locked ? 'allow-scripts allow-same-origin allow-forms' : 'allow-scripts allow-same-origin allow-popups allow-forms allow-modals'}
             allow="fullscreen; autoplay"
           />}
+          {warning && gate.state === 'open' && <WarningSheet reason={warning} onBack={() => setWarning(null)} />}
+          {lockWatch.broken && gate.state === 'open' && !warning && (
+            <div className="hw-result hw-warn"><div className="hw-gate__card is-bad">
+              <span className="hw-gate__ico"><Icon name="lock" /></span><h3>رجّع تثبيت الشاشة</h3>
+              <p>الامتحان مايكملش غير والشاشة متثبتة.</p>
+              <button type="button" className="hw-btn hw-btn--pri" onClick={() => lockWatch.repin()}><Icon name="shield" />ثبّت الشاشة</button>
+            </div></div>
+          )}
+          {timeUpPending && (
+            <div className="hw-result"><div className="hw-gate__card is-wait">
+              <span className="hw-gate__ico"><i className="hw-gate__spin" /></span><h3>الوقت خلص</h3><p>بنسلّم إجاباتك…</p>
+            </div></div>
+          )}
           {showResult && result && <ResultSheet result={result} onAgain={() => setShowResult(false)} onClose={onClose} />}
         </div>
 
         <footer className="hw-foot">
-          <span><Icon name="shield" />محتوى محمي</span>
+          <span><Icon name="shield" />{locked ? 'امتحان مراقَب' : 'محتوى محمي'}</span>
           {studentName && <span><Icon name="user" />{studentName}</span>}
           <span className={online ? '' : 'is-off'}><Icon name={online ? 'live' : 'wifiOff'} />{online ? 'متصل' : 'مفيش نت'}</span>
         </footer>

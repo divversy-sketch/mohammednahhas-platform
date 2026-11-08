@@ -135,3 +135,20 @@ html.hw-open, html.hw-open body { overflow: hidden !important; }
 .hw-gate__ok { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 12px; font-size: 13px; font-weight: 700; color: var(--hw-patina-2); background: rgba(76, 205, 180, .1); }
 .hw-gate__ok .nx-ico { width: 15px; height: 15px; }
 .hw-result__saved.is-wait { color: var(--hw-gold); }
+
+/* شاشة «قبل ما تبدأ» + العدّاد التنازلي + التحذير */
+.hw-gate__card.is-wait .hw-gate__ico, .hw-gate__ico.is-gold { color: var(--hw-gold); background: rgba(242, 192, 99, .12); border-color: rgba(242, 192, 99, .28); }
+.hw-gate__card.is-done .hw-gate__ico { color: var(--hw-patina-2); background: rgba(76, 205, 180, .14); border-color: rgba(76, 205, 180, .3); }
+.hw-rules { width: min(520px, 100%); }
+.hw-rules ul { list-style: none; margin: 4px 0 6px; padding: 0; display: grid; gap: 8px; width: 100%; text-align: start; }
+.hw-rules li { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 14px; background: rgba(255, 255, 255, .04); border: 1px solid var(--hw-line); font-size: 13.5px; line-height: 1.8; color: var(--hw-dim); }
+.hw-rules li b { color: var(--hw-ink); }
+.hw-rules li .nx-ico { width: 18px; height: 18px; flex: none; margin-top: 3px; color: var(--hw-gold); }
+.hw-chip.is-timer { min-width: 92px; font-size: 15px; }
+.hw-chip.is-warn { color: #1b1205; background: linear-gradient(135deg, #FFE2A3, var(--hw-gold)); border-color: transparent; }
+.hw-chip.is-danger { color: #fff; background: linear-gradient(135deg, #E5484D, var(--hw-danger)); border-color: transparent; animation: hw-pulse 1s ease-in-out infinite; }
+.hw-warn { z-index: 7; background: rgba(40, 6, 8, .72); }
+.hw-warn .hw-gate__card { border-color: rgba(255, 120, 120, .35); box-shadow: 0 0 0 1px rgba(255, 120, 120, .15), 0 40px 90px -30px rgba(0,0,0,.9), 0 0 70px -20px rgba(192, 48, 63, .6); }
+.hw-warn .hw-gate__card p b { color: #FFB4AC; }
+@keyframes hw-pulse { 50% { box-shadow: 0 0 0 6px rgba(229, 72, 77, .25); } }
+@media (max-width: 720px) { .hw-chip.is-timer { display: inline-flex !important; min-width: 0; padding: 0 10px; font-size: 14px; } }

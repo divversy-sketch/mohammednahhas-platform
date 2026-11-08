@@ -145,7 +145,9 @@ export const createContentManagementActions = (ctx) => {
       branch: item.branch || '',
       thumbnailUrl: item.thumbnailUrl || item.posterUrl || item.image || '',
       imagePlacement: normalizeImagePlacement(item.imagePlacement),
-      audience: item.audience || undefined
+      audience: item.audience || undefined,
+      examDurationMinutes: item.examDurationMinutes || '',
+      availableUntil: item.availableUntil || ''
     });
   };
 
@@ -181,6 +183,8 @@ export const createContentManagementActions = (ctx) => {
       estimatedDurationMinutes: contentEditDraft.type === 'video' ? safeNumber(contentEditDraft.estimatedDurationMinutes, 0) : 0,
       chapters: contentEditDraft.type === 'video' ? parseChapters(contentEditDraft.chaptersText) : [],
       videoExamUnlockPercent: contentEditDraft.type === 'video' && contentEditDraft.linkedExamId ? VIDEO_EXAM_UNLOCK_PERCENT : 0,
+      examDurationMinutes: contentEditDraft.type === 'interactive_exam' ? safeNumber(contentEditDraft.examDurationMinutes, 0) : 0,
+      availableUntil: contentEditDraft.type === 'interactive_exam' ? (contentEditDraft.availableUntil || '') : '',
       ...(contentEditDraft.audienceFields ? (() => {
         const af = contentEditDraft.audienceFields;
         if (!af.audienceKeys?.length) return {};
@@ -336,6 +340,8 @@ export const createContentManagementActions = (ctx) => {
           fileName: newContent.fileName || '',
           fileSize: newContent.fileSize || 0,
           htmlContent: ['html', 'interactive_exam'].includes(newContent.type) ? (newContent.htmlContent || '') : '',
+          examDurationMinutes: newContent.type === 'interactive_exam' ? safeNumber(newContent.examDurationMinutes, 0) : 0,
+          availableUntil: newContent.type === 'interactive_exam' ? (newContent.availableUntil || '') : '',
           createdAt: new Date() 
       };
       

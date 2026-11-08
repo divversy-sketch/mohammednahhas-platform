@@ -105,9 +105,14 @@
   // المنصة بتبعت الثيم واسم الطالب
   window.addEventListener('message', (e) => {
     const d = e.data || {};
-    if (d.type !== 'nahhas:init') return;
-    document.documentElement.setAttribute('data-theme', d.theme === 'dark' ? 'dark' : 'light');
-    if (d.student && d.student.name) document.getElementById('who').textContent = d.student.name;
+    if (d.type === 'nahhas:init') {
+      document.documentElement.setAttribute('data-theme', d.theme === 'dark' ? 'dark' : 'light');
+      if (d.student && d.student.name) document.getElementById('who').textContent = d.student.name;
+    }
+    // الوقت خلص: سلّم فورًا باللي اتجاوب (المتروك بيتحسب متروك)
+    if (d.type === 'nahhas:timeup') submit(true);
+    // الطالب اتحظر: وقف كل حاجة
+    if (d.type === 'nahhas:locked') { submitted = true; document.querySelectorAll('.opt, #send').forEach((b) => { b.disabled = true; }); }
   });
   post({ type: 'nahhas:ready' });
 
@@ -138,22 +143,24 @@
     refresh();
   });
 
-  document.getElementById('send').addEventListener('click', () => {
+  function submit(auto) {
     if (submitted) return;
     submitted = true;
-    let score = 0, total = 0, correct = 0, wrong = 0;
+    let score = 0, total = 0, correct = 0, wrong = 0, skipped = 0;
     const details = [];
     document.querySelectorAll('.q').forEach((card, i) => {
       const q = QUESTIONS[i]; const a = answers[i]; const ok = a === q.correct;
-      total += q.points; if (ok) { score += q.points; correct++; } else wrong++;
+      total += q.points;
+      if (ok) { score += q.points; correct++; } else if (a === undefined) skipped++; else wrong++;
       card.classList.add('done');
       card.querySelectorAll('.opt').forEach((o, k) => { o.disabled = true; o.classList.remove('is-picked'); if (k === q.correct) o.classList.add('is-right'); else if (k === a) o.classList.add('is-wrong'); });
       details.push({ n: i + 1, answer: a, correct: q.correct, ok, points: ok ? q.points : 0, max: q.points, branch: q.branch });
     });
-    document.getElementById('hint').textContent = 'اتسلّم ✓ — راجع الشرح تحت كل سؤال';
+    document.getElementById('hint').textContent = auto ? 'الوقت خلص واتسلّم لوحده — راجع الشرح تحت كل سؤال' : 'اتسلّم ✓ — راجع الشرح تحت كل سؤال';
     refresh();
-    post({ type: 'nahhas:result', score, total, correct, wrong, skipped: 0, details });
-  });
+    post({ type: 'nahhas:result', score, total, correct, wrong, skipped, details });
+  }
+  document.getElementById('send').addEventListener('click', () => submit(false));
   refresh();
 </script>
 </body>

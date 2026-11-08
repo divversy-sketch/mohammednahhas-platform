@@ -96,6 +96,16 @@ export default function AdminFullContentEditorModal({
         </div>
       )}
 
+      {contentEditDraft.type === 'interactive_exam' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <label className="text-sm font-bold text-amber-800">مدة الامتحان (بالدقايق)
+            <input type="number" min="0" className="border p-3 rounded w-full bg-white mt-1" placeholder="فاضية = من غير وقت" value={contentEditDraft.examDurationMinutes || ''} onChange={e => setContentEditDraft({ ...contentEditDraft, examDurationMinutes: e.target.value })} />
+          </label>
+          <label className="text-sm font-bold text-amber-800">متاح لحد (اختياري)
+            <input type="datetime-local" className="border p-3 rounded w-full bg-white mt-1" value={contentEditDraft.availableUntil || ''} onChange={e => setContentEditDraft({ ...contentEditDraft, availableUntil: e.target.value })} />
+          </label>
+        </div>
+      )}
       <AudiencePicker title="مين يشوف ده؟" value={contentEditDraft.audience || defaultAudience(contentEditDraft.grade)} onChange={(v) => setContentEditDraft({ ...contentEditDraft, audience: v, audienceFields: resolveAudience(v, users, groups), allowedEmailsText: '' })} users={users} groups={groups} />
       <textarea className="border p-3 rounded-xl min-h-[80px]" placeholder="إيميلات مسموحة مفصولة بفاصلة، أو اتركها فارغة للجميع" value={contentEditDraft.allowedEmailsText} onChange={e => setContentEditDraft({...contentEditDraft, allowedEmailsText: e.target.value})} />
       <label className="flex items-center gap-2 bg-slate-50 border rounded-xl p-3 font-bold"><input type="checkbox" checked={contentEditDraft.isPublic} onChange={e => setContentEditDraft({...contentEditDraft, isPublic: e.target.checked})}/> يظهر للزوار في الصفحة الرئيسية</label>

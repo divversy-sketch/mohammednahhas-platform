@@ -432,8 +432,13 @@ export function ResultDetailHeader({ result, exam, onBack, onApproveContinue, on
       {isHtml ? (
         <div className="ars-decide">
           <p><Icon name={result.status === 'retake_allowed' ? 'key' : 'lock'} />
-            <b>{result.status === 'retake_allowed' ? 'مسموح للطالب يعيد الامتحان' : done ? 'امتحان HTML — اتسلّم' : 'امتحان HTML — الطالب خرج قبل ما يسلّم'}</b>
-            {result.status === 'retake_allowed' ? ' — مستنيه يفتحه.' : ' — الامتحان محاولة واحدة ومقفول عليه.'}
+            <b>{result.status === 'retake_allowed' ? 'مسموح للطالب يعيد الامتحان'
+              : done ? `امتحان HTML — اتسلّم${result.performanceAnalysis?.autoSubmitted ? ' تلقائي لما الوقت خلص' : ''}`
+              : result.status === 'cheated' ? `امتحان HTML — الطالب اتحظر بسبب الغش${result.securityReason ? ` (${result.securityReason})` : ''}`
+              : result.status === 'timed_out' ? 'امتحان HTML — الوقت خلص والصفحة ماسلّمتش'
+              : 'امتحان HTML — الطالب خرج قبل ما يسلّم'}</b>
+            {result.status === 'retake_allowed' ? ' — مستنيه يفتحه.' : ' — الامتحان مقفول عليه لحد ما تسمحله.'}
+            {Number(result.antiCheatWarnings) > 0 && result.status !== 'retake_allowed' && <> اتحذّر {formatNumber(result.antiCheatWarnings)} مرة{(result.antiCheatLog || []).length ? `: ${(result.antiCheatLog || []).map((x) => ({ hidden: 'غيّر التبويب/خرج من الشاشة', blur: 'فتح شباك تاني', unpin: 'فك التثبيت' }[x.type] || x.type) + (x.sec ? ` بعد ${formatNumber(Math.round(x.sec / 60))} د` : '')).join('، ')}` : ''}.</>}
             {result.studentNotes === 'retake_request' && result.status !== 'retake_allowed' && <> <b>الطالب طالب يعيده.</b></>}
           </p>
           {result.status !== 'retake_allowed' && <div><button type="button" className="ars-btn" disabled={retakeBusy} onClick={allowRetake}><Icon name="refresh" />اسمح يمتحن تاني</button></div>}
