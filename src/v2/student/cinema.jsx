@@ -134,7 +134,7 @@ export function Poster({ item, ctx, index = 0, big, number }) {
   const percent = ctx.getVideoWatchPercent ? Math.round(ctx.getVideoWatchPercent(item) || 0) : 0;
   const locked = ctx.isBannedContent || (!ctx.isPremium && item?.isPremium);
   const thumb = thumbOf(item);
-  const open = () => { haptic('light'); ctx.handlePremiumClick ? ctx.handlePremiumClick(() => ctx.setPlayingVideo?.(item)) : ctx.setPlayingVideo?.(item); };
+  const open = () => { haptic('light'); ctx.handlePremiumClick ? ctx.handlePremiumClick(() => ctx.setPlayingVideo?.(item), item) : ctx.setPlayingVideo?.(item); };
   const card = (
     <button type="button" className={`cx-poster ${big ? 'cx-poster--tall' : ''} ${locked ? 'is-locked' : ''}`} style={{ animationDelay: `${0.12 + index * 0.07}s` }} onClick={open} aria-label={`${locked ? 'مقفول: ' : ''}${title}`}>
       <span className="cx-poster__art" style={{ background: ART[index % ART.length] }}>

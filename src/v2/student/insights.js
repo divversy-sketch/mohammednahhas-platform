@@ -161,7 +161,7 @@ export function searchIndex(ctx) {
   const rows = [];
   (ctx.videos || []).forEach((v) => rows.push({ id: `v-${v.id}`, group: 'محاضرات', title: titleOf(v, 'محاضرة'), icon: 'video', kind: 'video', item: v }));
   (ctx.htmls || []).forEach((v) => rows.push({ id: `h-${v.id}`, group: 'دروس تفاعلية', title: titleOf(v, 'درس'), icon: 'interactive', kind: 'html', item: v }));
-  (ctx.interactiveExams || []).forEach((v) => rows.push({ id: `i-${v.id}`, group: 'دروس تفاعلية', title: titleOf(v, 'نشاط'), icon: 'interactive', kind: 'html', item: v }));
+  (ctx.interactiveExams || []).forEach((v) => rows.push({ id: `i-${v.id}`, group: 'امتحانات الحصة', title: titleOf(v, 'نشاط'), icon: 'interactive', kind: 'html', item: v }));
   (ctx.filesAndLinks || []).forEach((v) => rows.push({ id: `f-${v.id}`, group: 'ملفات', title: titleOf(v, 'ملف'), icon: 'fileText', kind: 'file', item: v }));
   (ctx.exams || []).forEach((v) => rows.push({ id: `e-${v.id}`, group: 'امتحانات', title: v.title || 'امتحان', icon: 'exam', kind: 'exam', item: v }));
   (ctx.assignments || []).forEach((v) => rows.push({ id: `a-${v.id}`, group: 'واجبات', title: v.title || 'واجب', icon: 'qr', kind: 'homework', item: v }));

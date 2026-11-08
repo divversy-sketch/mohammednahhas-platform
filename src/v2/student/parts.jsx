@@ -26,8 +26,8 @@ export function LessonCard({ item, ctx, kind = 'video', index = 0 }) {
   const htmlState = !htmlAttempt ? null : htmlAttempt.status === 'retake_allowed' ? 'retake' : htmlAttempt.status === 'completed' ? 'done' : 'closed';
   const open = () => {
     haptic('light');
-    if (kind !== 'video') return ctx.handlePremiumClick ? ctx.handlePremiumClick(() => ctx.setPlayingHtml?.(item)) : ctx.setPlayingHtml?.(item);
-    return ctx.handlePremiumClick ? ctx.handlePremiumClick(() => ctx.setPlayingVideo?.(item)) : ctx.setPlayingVideo?.(item);
+    if (kind !== 'video') return ctx.handlePremiumClick ? ctx.handlePremiumClick(() => ctx.setPlayingHtml?.(item), item) : ctx.setPlayingHtml?.(item);
+    return ctx.handlePremiumClick ? ctx.handlePremiumClick(() => ctx.setPlayingVideo?.(item), item) : ctx.setPlayingVideo?.(item);
   };
   return (
     <button type="button" className="nx-lesson" onClick={open} aria-label={`${locked ? 'مقفول: ' : ''}${title}`}>
@@ -225,6 +225,23 @@ export function CommandPalette({ ctx, open, onClose, onOpenRow }) {
         }) : <Empty icon="search" title="مفيش نتايج" text={`مفيش حاجة باسم «${q}». جرّب كلمة تانية.`} />}
       </div>
     </Sheet>
+  );
+}
+
+/** ملف HTML تفاعلي في «الملفات»: بيفتح في نافذة المنصة */
+export function HtmlRow({ item, ctx }) {
+  const locked = ctx.isBannedContent || (!ctx.isPremium && item?.isPremium);
+  const open = () => { haptic('light'); ctx.handlePremiumClick ? ctx.handlePremiumClick(() => ctx.setPlayingHtml?.(item), item) : ctx.setPlayingHtml?.(item); };
+  return (
+    <button type="button" className="nx-row" onClick={open}>
+      <span className="nx-tile nx-tile--patina"><Icon name="interactive" /></span>
+      <span className="nx-row__main">
+        <span className="nx-row__title">{titleOf(item, 'درس تفاعلي')}</span>
+        <span className="nx-row__sub">{textOf(item) || 'ملف تفاعلي — بيفتح جوه المنصة'}</span>
+      </span>
+      {item?.isPremium ? <Chip tone="gold" icon="crown">VIP</Chip> : null}
+      <Icon name={locked ? 'lock' : 'chevronLeft'} />
+    </button>
   );
 }
 

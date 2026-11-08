@@ -196,3 +196,71 @@
 .shw-photo img { width: 140px; height: 140px; object-fit: cover; border-radius: 12px; border: 1px solid var(--nx-line); }
 .shw .smi-h { font-size: 18px; }
 .apl-note b { font-weight: 800; }
+
+/* صفحة المحتوى */
+.acn .apl-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.acn-form { display: grid; gap: 14px; }
+.acn-step { display: grid; gap: 10px; padding: 14px; border-radius: 16px; border: 1px solid var(--nx-line); background: var(--nx-sunk); }
+.acn-step > header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.acn-step > header > span { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 9px; font-size: 13px; font-weight: 900; color: #fff; background: linear-gradient(140deg, var(--nx-copper-2, #E68A4E), var(--nx-copper, #C0592A)); }
+.acn-step > header b { font-size: 15px; }
+.acn-step > header small { color: var(--nx-ink-3); font-size: 12px; }
+.acn-step__body { display: grid; gap: 10px; min-width: 0; }
+.acn-types { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.acn-type { display: grid; justify-items: center; gap: 4px; padding: 12px 8px; border-radius: 14px; border: 1.5px solid var(--nx-line); background: var(--nx-surface); color: var(--nx-ink); font: inherit; text-align: center; cursor: pointer; transition: border-color .15s, transform .15s; }
+.acn-type:hover { transform: translateY(-1px); border-color: var(--nx-copper-2, #E68A4E); }
+.acn-type__ico { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 12px; background: var(--nx-sunk); color: var(--nx-ink-2); }
+.acn-type__ico .nx-ico { width: 20px; height: 20px; }
+.acn-type b { font-size: 13px; }
+.acn-type small { font-size: 11px; color: var(--nx-ink-3); line-height: 1.5; }
+.acn-type.is-on { border-color: var(--nx-copper, #C0592A); background: color-mix(in srgb, var(--nx-copper, #C0592A) 8%, var(--nx-surface)); box-shadow: 0 8px 22px -14px rgba(192, 89, 42, .8); }
+.acn-type.is-on .acn-type__ico { background: var(--nx-copper, #C0592A); color: #fff; }
+.acn-where { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 13px; color: var(--nx-ink-2); }
+.acn-where .nx-ico { width: 15px; height: 15px; color: var(--nx-patina, #13806F); }
+.acn-where b { color: var(--nx-patina, #13806F); }
+.acn-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.acn-span2 { grid-column: 1 / -1; }
+.acn .apl-field input, .acn .apl-field select, .acn .apl-field textarea { width: 100%; min-width: 0; box-sizing: border-box; }
+.acn-drop { position: relative; display: grid; justify-items: center; gap: 4px; padding: 18px; border-radius: 14px; border: 2px dashed var(--nx-line); background: var(--nx-surface); cursor: pointer; overflow: hidden; text-align: center; }
+.acn-drop:hover { border-color: var(--nx-copper-2, #E68A4E); }
+.acn-drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.acn-drop > .nx-ico { width: 26px; height: 26px; color: var(--nx-copper, #C0592A); }
+.acn-drop b { font-size: 14px; }
+.acn-drop small { font-size: 12px; color: var(--nx-ink-3); }
+.acn-drop.is-done { border-color: var(--nx-patina, #13806F); border-style: solid; }
+.acn-drop.is-done > .nx-ico { color: var(--nx-patina, #13806F); }
+.acn-drop i { position: absolute; inset-inline-start: 0; bottom: 0; height: 4px; background: var(--nx-copper, #C0592A); transition: width .3s; }
+.acn-seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.acn-seg button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 12px; border-radius: 12px; border: 1.5px solid var(--nx-line); background: var(--nx-surface); color: var(--nx-ink-2); font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
+.acn-seg button .nx-ico { width: 16px; height: 16px; }
+.acn-seg button.is-on { border-color: var(--nx-patina, #13806F); color: var(--nx-patina, #13806F); background: color-mix(in srgb, var(--nx-patina, #13806F) 9%, var(--nx-surface)); }
+.acn-seg button.is-on.is-gold { border-color: #D97706; color: #A16207; background: color-mix(in srgb, #F59E0B 12%, var(--nx-surface)); }
+:root[data-theme="dark"] .acn-seg button.is-on.is-gold { color: #F3C46B; }
+.acn-more { justify-self: start; display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; color: var(--nx-ink-2); font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
+.acn-more .nx-ico { width: 15px; height: 15px; }
+.acn-cover { display: grid; gap: 10px; padding: 12px; border-radius: 14px; border: 1px dashed var(--nx-line); }
+.acn-cover .apl-btn { justify-self: start; }
+.acn-submit { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 4px; }
+.acn-summary { flex: 1; display: flex; flex-wrap: wrap; gap: 6px; }
+.acn-summary .apl-chip { padding: 5px 11px; font-size: 12px; }
+.acn-submit .apl-btn--pri { min-width: 160px; min-height: 48px; font-size: 15px; }
+.acn-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 11px 13px; border-radius: 14px; border: 1px solid var(--nx-line); background: var(--nx-surface); animation: apl-in .3s both; }
+.acn-row__ico { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; background: var(--nx-sunk); color: var(--nx-ink-2); }
+.acn-row__ico .nx-ico { width: 19px; height: 19px; }
+.acn-row__ico.t-video { background: color-mix(in srgb, #3B82F6 14%, transparent); color: #2563EB; }
+.acn-row__ico.t-interactive_exam { background: color-mix(in srgb, #F59E0B 16%, transparent); color: #B45309; }
+.acn-row__ico.t-html { background: color-mix(in srgb, #13806F 14%, transparent); color: #13806F; }
+.acn-row__main { display: grid; gap: 5px; min-width: 0; }
+.acn-row__main > b { font-size: 14.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acn-danger { display: flex; justify-content: flex-end; margin-top: 10px; }
+@media (max-width: 900px) { .acn-types { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 640px) {
+  .acn .apl-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .acn-types { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .acn-grid { grid-template-columns: 1fr; }
+  .acn-row { grid-template-columns: auto 1fr; }
+  .acn-row > .apl-acts { grid-column: 1 / -1; }
+  .acn-row > .apl-acts .apl-btn { flex: 1; }
+  .acn .aas-seg { width: 100%; overflow-x: auto; } .acn .aas-seg button { flex: none; }
+  .acn-submit .apl-btn--pri { width: 100%; }
+}

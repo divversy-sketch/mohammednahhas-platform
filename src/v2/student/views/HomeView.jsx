@@ -10,7 +10,7 @@ import { HeroCarousel, Poster, Rail, TaskPoster } from '../cinema.jsx';
 function useSlides(ctx, go, buckets, now) {
   const slides = [];
   const video = ctx.latestVideoActivity && !ctx.latestVideoActivity.isCompleted ? ctx.latestVideoActivity.video : null;
-  const playVideo = (v) => () => ctx.handlePremiumClick(() => ctx.setPlayingVideo(v));
+  const playVideo = (v) => () => ctx.handlePremiumClick(() => ctx.setPlayingVideo(v), v);
   if (video) {
     const pct = Math.round(ctx.getVideoWatchPercent(video) || 0);
     slides.push({ key: 'continue', kicker: 'كمّل المشاهدة', icon: 'play', glyph: '«', title: titleOf(video, 'محاضرة'), meta: `اتفرجت ${formatNumber(pct)}٪ من المحاضرة`, percent: pct, cta: 'كمّل', action: playVideo(video), image: thumbOf(video), secondary: { icon: 'focus', label: 'جلسة تركيز', action: () => ctx.setShowFocusMode(true) } });

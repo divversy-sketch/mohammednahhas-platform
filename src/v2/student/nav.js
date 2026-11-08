@@ -11,12 +11,12 @@ export const SUBS = {
   learn: [
     { key: 'lectures', label: 'المحاضرات', icon: 'video' },
     { key: 'courses', label: 'الكورسات', icon: 'layers' },
-    { key: 'interactive', label: 'دروس تفاعلية', icon: 'interactive' },
     { key: 'files', label: 'الملفات', icon: 'fileText' },
     { key: 'live', label: 'الحصص اللايف', icon: 'live' },
   ],
   exams: [
     { key: 'open', label: 'المتاحة', icon: 'exam' },
+    { key: 'lesson', label: 'امتحانات الحصة', icon: 'interactive' },
     { key: 'upcoming', label: 'الجاية', icon: 'calendar' },
     { key: 'done', label: 'اللي خلصتها', icon: 'checkCircle' },
     { key: 'homework', label: 'الواجبات', icon: 'qr' },
@@ -41,7 +41,7 @@ export const SUBS = {
 const ALIASES = {
   home: 'home',
   lectures: 'learn:lectures', videos: 'learn:lectures', learn: 'learn',
-  courses: 'learn:courses', htmls: 'learn:interactive', interactiveExams: 'learn:interactive', interactive: 'learn:interactive',
+  courses: 'learn:courses', htmls: 'learn:files', interactiveExams: 'exams:lesson', interactive: 'learn:files', 'learn:interactive': 'learn:files', lessonExams: 'exams:lesson',
   files: 'learn:files', library: 'learn:files', live: 'learn:live',
   exams: 'exams', assignments: 'exams:homework', homework: 'exams:homework', smartHomeworkResults: 'exams:homework',
   reviewQuiz: 'exams:quiz', review_quiz: 'exams:quiz',

@@ -5,7 +5,7 @@ import { VIDEO_EXAM_UNLOCK_PERCENT } from '@shared/core/platformShared.jsx';
 import { Icon } from '../../ui/Icon.jsx';
 import { Bar, Button, Chip, Empty, Skeleton, formatNumber } from '../../ui/kit.jsx';
 import { arabicDateTime, normalizeArabic, orderOf, titleOf, toDate } from '../insights.js';
-import { FileRow, LessonCard, SectionHead } from '../parts.jsx';
+import { FileRow, HtmlRow, LessonCard, SectionHead } from '../parts.jsx';
 import { Embed, StudentCoursesHub } from '../embeds.jsx';
 import { Poster } from '../cinema.jsx';
 
@@ -65,7 +65,7 @@ function Lectures({ ctx }) {
                     <span className="nx-row__title">{titleOf(v, 'محاضرة')}</span>
                     <Bar value={Math.min(100, (pct / VIDEO_EXAM_UNLOCK_PERCENT) * 100)} tone={open ? 'patina' : undefined} />
                   </span>
-                  <Button variant={open ? 'pri' : 'soft'} size="s" onClick={() => (open ? ctx.openLinkedExamFromVideo(v) : ctx.handlePremiumClick(() => ctx.setPlayingVideo(v)))}>
+                  <Button variant={open ? 'pri' : 'soft'} size="s" onClick={() => (open ? ctx.openLinkedExamFromVideo(v) : ctx.handlePremiumClick(() => ctx.setPlayingVideo(v), v))}>
                     {open ? 'ادخل الامتحان' : `كمّل (${formatNumber(pct)}٪)`}
                   </Button>
                 </div>
@@ -78,28 +78,18 @@ function Lectures({ ctx }) {
   );
 }
 
-function Interactive({ ctx }) {
-  const [q, setQ] = useState('');
-  const list = [...(ctx.htmls || []), ...(ctx.interactiveExams || [])].sort((a, b) => orderOf(a) - orderOf(b)).filter(match(q));
-  return (
-    <div className="nx-stack">
-      <FilterBar q={q} setQ={setQ} placeholder="دوّر في الدروس التفاعلية" />
-      {list.length
-        ? <div className="nx-grid nx-stagger">{list.map((v, i) => <LessonCard key={v.id} item={v} ctx={ctx} kind="html" index={i + 3} />)}</div>
-        : <Empty icon="interactive" title="مفيش دروس تفاعلية" text="الأنشطة والدروس التفاعلية هتظهر هنا أول ما تنزل." />}
-    </div>
-  );
-}
-
 function Files({ ctx }) {
   const [q, setQ] = useState('');
+  // كل الملفات هنا، حتى ملفات الـHTML (الدروس التفاعلية). امتحانات الـHTML بس في «الامتحانات ← امتحانات الحصة».
+  const htmls = [...(ctx.htmls || [])].sort((a, b) => orderOf(a) - orderOf(b)).filter(match(q));
   const all = (ctx.filesAndLinks || []).filter(match(q));
   const files = all.filter((f) => f.type !== 'link');
   const links = all.filter((f) => f.type === 'link');
   return (
     <div className="nx-stack">
       <FilterBar q={q} setQ={setQ} placeholder="دوّر في الملفات والمذكرات" />
-      {!all.length && <Empty icon="fileText" title={q ? 'مفيش ملف بالاسم ده' : 'مفيش ملفات لسه'} text={q ? 'جرّب كلمة تانية.' : 'المذكرات والملخصات هتنزل هنا.'} />}
+      {!all.length && !htmls.length && <Empty icon="fileText" title={q ? 'مفيش ملف بالاسم ده' : 'مفيش ملفات لسه'} text={q ? 'جرّب كلمة تانية.' : 'المذكرات والملخصات هتنزل هنا.'} />}
+      {htmls.length > 0 && <section className="nx-card nx-sec"><SectionHead title="دروس وملفات تفاعلية" icon="interactive" count={htmls.length} /><div className="nx-list nx-stagger">{htmls.map((h) => <HtmlRow key={h.id} item={h} ctx={ctx} />)}</div></section>}
       {files.length > 0 && <section className="nx-card nx-sec"><SectionHead title="ملفات ومذكرات" icon="fileText" count={files.length} /><div className="nx-list nx-stagger">{files.map((f) => <FileRow key={f.id} item={f} />)}</div></section>}
       {links.length > 0 && <section className="nx-card nx-sec"><SectionHead title="روابط مفيدة" icon="link" count={links.length} /><div className="nx-list nx-stagger">{links.map((f) => <FileRow key={f.id} item={f} />)}</div></section>}
     </div>
@@ -145,7 +135,7 @@ export default function LearnView({ ctx, route }) {
   switch (route.sub) {
     case 'courses':
       return <Embed><StudentCoursesHub user={ctx.user} userData={ctx.userData} exams={ctx.exams} onStartExam={(exam, opts = {}) => ctx.startExamWithCode(exam, { ...opts, skipCode: true, fromCourse: true })} /></Embed>;
-    case 'interactive': return <Interactive ctx={ctx} />;
+    case 'interactive':
     case 'files': return <Files ctx={ctx} />;
     case 'live': return <Live ctx={ctx} />;
     default: return <Lectures ctx={ctx} />;

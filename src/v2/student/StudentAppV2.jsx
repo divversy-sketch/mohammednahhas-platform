@@ -105,8 +105,10 @@ export default function StudentAppV2({ ctx }) {
   }, []);
 
   const buckets = useMemo(() => examBuckets(ctx), [ctx.exams, ctx.examResults]); // eslint-disable-line react-hooks/exhaustive-deps
+  // امتحانات الحصة (HTML) اللي لسه الطالب ما امتحنهاش
+  const lessonExamsPending = (ctx.interactiveExams || []).filter((x) => !(ctx.examResults || []).some((r) => r.examId === x.id && r.status !== 'retake_allowed')).length;
   const badges = {
-    exams: buckets.open.length + (ctx.pendingAssignmentsCount || 0),
+    exams: buckets.open.length + (ctx.pendingAssignmentsCount || 0) + lessonExamsPending,
     progress: 0,
     account: 0,
     learn: 0,
@@ -114,14 +116,15 @@ export default function StudentAppV2({ ctx }) {
   };
   const counts = {
     'exams:open': buckets.open.length,
+    'exams:lesson': lessonExamsPending,
     'exams:upcoming': buckets.upcoming.length,
     'exams:homework': ctx.pendingAssignmentsCount || 0,
     'progress:mistakes': (ctx.mistakes || []).length,
   };
 
   const openRow = (row) => {
-    if (row.kind === 'video') ctx.handlePremiumClick(() => ctx.setPlayingVideo(row.item));
-    else if (row.kind === 'html') ctx.handlePremiumClick(() => ctx.setPlayingHtml(row.item));
+    if (row.kind === 'video') ctx.handlePremiumClick(() => ctx.setPlayingVideo(row.item), row.item);
+    else if (row.kind === 'html') ctx.handlePremiumClick(() => ctx.setPlayingHtml(row.item), row.item);
     else if (row.kind === 'file') {
       const url = row.item.url || row.item.fileUrl || row.item.downloadUrl || row.item.link;
       if (url) window.open(url, '_blank', 'noopener'); else go('learn:files');

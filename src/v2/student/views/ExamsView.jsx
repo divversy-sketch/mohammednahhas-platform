@@ -1,8 +1,8 @@
 import { lazy, useState } from 'react';
 import { Icon } from '../../ui/Icon.jsx';
 import { Button, Empty, formatNumber, useNow } from '../../ui/kit.jsx';
-import { arabicDate, percentOf } from '../insights.js';
-import { ExamCard, SectionHead } from '../parts.jsx';
+import { arabicDate, orderOf, percentOf } from '../insights.js';
+import { ExamCard, LessonCard, SectionHead } from '../parts.jsx';
 import { Embed, StudentReviewQuiz } from '../embeds.jsx';
 
 const StudentAssignmentsPanel = lazy(() => import('@features/students/assignments/StudentAssignmentsPanel.jsx'));
@@ -27,6 +27,22 @@ function Open({ ctx, buckets, now }) {
           {showClosed && <div className="nx-grid nx-grid--exams nx-stagger">{buckets.closed.map((entry) => <ExamCard key={entry.exam.id} entry={entry} ctx={ctx} now={now} mode="closed" />)}</div>}
         </section>
       )}
+    </div>
+  );
+}
+
+// امتحانات الحصة: امتحانات الـHTML (محاولة واحدة، بوقت، ومراقبة)
+function Lesson({ ctx }) {
+  const list = [...(ctx.interactiveExams || [])].sort((a, b) => orderOf(a) - orderOf(b));
+  const doneIds = new Set((ctx.examResults || []).filter((r) => r.status !== 'retake_allowed').map((r) => r.examId));
+  const todo = list.filter((x) => !doneIds.has(x.id));
+  const done = list.filter((x) => doneIds.has(x.id));
+  if (!list.length) return <Empty icon="interactive" title="مفيش امتحانات حصة لسه" text="امتحانات الحصة اللي المستر بينزلها هتظهر هنا." />;
+  return (
+    <div className="nx-stack">
+      {ctx.isBannedExam && <BannedNote />}
+      {todo.length > 0 && <section className="nx-sec"><SectionHead title="مطلوب منك" icon="exam" count={todo.length} /><div className="nx-grid nx-stagger">{todo.map((v, i) => <LessonCard key={v.id} item={v} ctx={ctx} kind="html" index={i + 3} />)}</div></section>}
+      {done.length > 0 && <section className="nx-sec"><SectionHead title="امتحنتها" icon="checkCircle" count={done.length} /><div className="nx-grid nx-stagger">{done.map((v, i) => <LessonCard key={v.id} item={v} ctx={ctx} kind="html" index={i + 1} />)}</div></section>}
     </div>
   );
 }
@@ -108,6 +124,7 @@ function Quiz({ ctx }) {
 export default function ExamsView({ ctx, route, buckets }) {
   const now = useNow(1000);
   switch (route.sub) {
+    case 'lesson': return <Lesson ctx={ctx} />;
     case 'upcoming': return <Upcoming ctx={ctx} buckets={buckets} now={now} />;
     case 'done': return <Done ctx={ctx} buckets={buckets} now={now} />;
     case 'homework': return <Homework ctx={ctx} />;

@@ -93,8 +93,12 @@ export const StudentDashboard = ({ user, userData, installPrompt }) => {
 
   const { videos, filesAndLinks, htmls, interactiveExams } = getStudentContentBuckets(content);
 
-  const handlePremiumClick = (callback) => {
-      if(!isPremium) {
+  // VIP: المحتوى بيتقفل على الطالب المجاني بس لو الأدمن معلّمه «VIP».
+  // (قبل كده كان بيقفل أي حاجة على الطالب المجاني حتى لو المحتوى للكل)
+  // الشاشات القديمة اللي مش بتبعت المحتوى بتفضل على السلوك القديم.
+  const handlePremiumClick = (callback, item) => {
+      const needsVip = item === undefined ? true : Boolean(item?.isPremium);
+      if(needsVip && !isPremium) {
           platformNotify("عفواً يا بطل، هذا المحتوى مخصص للطلاب المشتركين في الباقة المدفوعة (VIP). يرجى شحن حسابك أو التواصل مع المستر لترقية حسابك!");
           setActiveTab('subscription');
       } else {

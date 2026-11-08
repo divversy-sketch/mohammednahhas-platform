@@ -67,7 +67,7 @@ export default function StudentPreview() {
     startMistakesExam: () => platformNotify('بيبدأ امتحان الأخطاء'),
     videos, filesAndLinks: [{ id: 'f1', title: 'مذكرة النحو كاملة', url: '#', description: 'PDF · ٤٢ صفحة' }, { id: 'f2', title: 'ملخص البلاغة', url: '#' }, { id: 'f3', title: 'قناة المستر على يوتيوب', type: 'link', url: '#' }],
     htmls: [{ id: 'h1', title: 'لعبة الإعراب التفاعلية' }], interactiveExams: [{ id: 'i1', type: 'interactive_exam', title: 'تدريب: أنواع التشبيه', htmlContent: demoHtmlExam, examDurationMinutes: 1 }],
-    handlePremiumClick: (cb) => (premium ? cb() : (platformNotify('المحتوى ده للمشتركين'), setActiveTab('subscription'))),
+    handlePremiumClick: (cb, item) => (premium || (item !== undefined && !item?.isPremium) ? cb() : (platformNotify('المحتوى ده للمشتركين'), setActiveTab('subscription'))),
     getVideoWatchPercent: (v) => watch[v.id] || 0,
     canOpenLinkedExam: (v) => (watch[v.id] || 0) >= 75, openLinkedExamFromVideo: () => platformNotify('بيفتح امتحان المحاضرة'),
     latestVideoActivity: { video: videos[2], isCompleted: false },
