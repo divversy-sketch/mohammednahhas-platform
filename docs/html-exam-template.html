@@ -154,7 +154,8 @@
       if (ok) { score += q.points; correct++; } else if (a === undefined) skipped++; else wrong++;
       card.classList.add('done');
       card.querySelectorAll('.opt').forEach((o, k) => { o.disabled = true; o.classList.remove('is-picked'); if (k === q.correct) o.classList.add('is-right'); else if (k === a) o.classList.add('is-wrong'); });
-      details.push({ n: i + 1, answer: a, correct: q.correct, ok, points: ok ? q.points : 0, max: q.points, branch: q.branch });
+      // النص والاختيارات والشرح بيتبعتوا عشان الطالب يراجع أخطاءه من المنصة بعدين
+      details.push({ n: i + 1, text: q.text, options: q.options, answer: a, correct: q.correct, ok, points: ok ? q.points : 0, max: q.points, branch: q.branch, explain: q.explain || '' });
     });
     document.getElementById('hint').textContent = auto ? 'الوقت خلص واتسلّم لوحده — راجع الشرح تحت كل سؤال' : 'اتسلّم ✓ — راجع الشرح تحت كل سؤال';
     refresh();

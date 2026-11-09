@@ -22,7 +22,7 @@ const devTest = () => Boolean(import.meta.env.DEV && typeof window !== 'undefine
 const upd = (ref, data) => (devTest() ? Promise.resolve() : updateDoc(ref, data));
 const PALETTE = { copper: '#C0592A', gold: '#F2C063', patina: '#13806F', danger: '#C0303F', night: '#0C0907', paper: '#FAF6F1', ink: '#1A120D' };
 
-function ResultSheet({ result, onAgain, onClose }) {
+function ResultSheet({ result, onAgain, onClose, onReview, onPractice, practice }) {
   const pct = Math.max(0, Math.min(100, Math.round(result.percentage)));
   const r = 54; const c = 2 * Math.PI * r;
   const tone = pct >= 75 ? 'is-good' : pct >= 50 ? 'is-mid' : 'is-low';
@@ -44,11 +44,15 @@ function ResultSheet({ result, onAgain, onClose }) {
           {result.wrong != null && <span className="is-wrong"><Icon name="mistake" />{n(result.wrong)} غلط</span>}
           {result.skipped ? <span><Icon name="help" />{n(result.skipped)} متروك</span> : null}
         </div>
+        {practice && <small className="hw-result__saved is-wait"><Icon name="info" />ده تدريب — الدرجة مابتتسجلش</small>}
         {result.saved ? <small className="hw-result__saved"><Icon name="check" />النتيجة اتسجلت وهتظهر للمدرس</small> : result.saving ? <small className="hw-result__saved is-wait"><Icon name="clock" />بنسجّل النتيجة…</small> : null}
         <div className="hw-result__acts">
-          <button type="button" className="hw-btn" onClick={onAgain}><Icon name="eye" />شوف إجاباتك</button>
+          {Array.isArray(result.details) && result.details.length > 0
+            ? <button type="button" className="hw-btn" onClick={onReview}><Icon name="mistake" />راجع أخطاءك</button>
+            : <button type="button" className="hw-btn" onClick={onAgain}><Icon name="eye" />شوف إجاباتك</button>}
           <button type="button" className="hw-btn hw-btn--pri" onClick={onClose}><Icon name="arrowLeft" />خروج</button>
         </div>
+        {onPractice && <button type="button" className="hw-link" onClick={onPractice}><Icon name="refresh" />حلّه تاني للتدريب{practice ? '' : ' (درجتك الرسمية مش هتتغير)'}</button>}
       </div>
     </div>
   );
@@ -60,7 +64,66 @@ const toMs = (v) => (v?.seconds ? v.seconds * 1000 : v ? new Date(v).getTime() |
 const fmtWhen = (ms) => new Date(ms).toLocaleString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' });
 const STRIKE_LABEL = { hidden: 'خرج من الشاشة / غيّر التبويب', blur: 'فتح شباك تاني', unpin: 'فك تثبيت الشاشة' };
 
-function GateScreen({ gate, rules, onStart, onRequest, onClose }) {
+// Firestore مابيقبلش undefined، ونقصّ النصوص الطويلة
+const cleanDetails = (list) => (Array.isArray(list) ? list.slice(0, 200) : []).map((d) => {
+  const o = JSON.parse(JSON.stringify(d || {}));
+  ['text', 'explain'].forEach((k) => { if (o[k]) o[k] = String(o[k]).slice(0, 1500); });
+  if (Array.isArray(o.options)) o.options = o.options.slice(0, 8).map((x) => String(typeof x === 'object' ? JSON.stringify(x) : x).slice(0, 400));
+  return o;
+});
+const strip = (h) => String(h ?? '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+const LETTERS = ['أ', 'ب', 'ج', 'د', 'هـ', 'و'];
+
+// مراجعة الأخطاء: من التفاصيل اللي الصفحة بعتتها مع النتيجة
+function ReviewSheet({ details = [], summary, onClose }) {
+  const [only, setOnly] = useState('wrong');
+  const items = details.map((d, i) => ({ ...d, n: d.n || i + 1, state: d.ok ? 'right' : d.answer === undefined || d.answer === null || d.answer === '' ? 'skipped' : 'wrong' }));
+  const wrong = items.filter((x) => x.state !== 'right');
+  const list = only === 'wrong' ? wrong : items;
+  const optText = (d, k) => (Array.isArray(d.options) && d.options[k] !== undefined ? strip(d.options[k]) : `الاختيار ${LETTERS[k] || Number(k) + 1}`);
+  return (
+    <div className="hw-review" role="dialog" aria-modal="true">
+      <header className="hw-review__head">
+        <div><small>مراجعة الامتحان</small><h3>{summary || 'إجاباتك'}</h3></div>
+        <div className="hw-review__tabs">
+          <button type="button" className={only === 'wrong' ? 'is-on' : ''} onClick={() => setOnly('wrong')}>الأخطاء والمتروك <i>{n(wrong.length)}</i></button>
+          <button type="button" className={only === 'all' ? 'is-on' : ''} onClick={() => setOnly('all')}>كل الأسئلة <i>{n(items.length)}</i></button>
+        </div>
+        <button type="button" className="hw-icon" title="إغلاق" onClick={onClose}><Icon name="close" /></button>
+      </header>
+      <div className="hw-review__list">
+        {!list.length && <div className="hw-review__empty"><Icon name="trophy" /><b>مفيش ولا غلطة!</b><span>جاوبت كل الأسئلة صح.</span></div>}
+        {list.map((d) => (
+          <article key={d.n} className={`hw-q is-${d.state}`}>
+            <header>
+              <span className="hw-q__n">{n(d.n)}</span>
+              {d.branch && <span className="hw-q__tag">{strip(d.branch)}</span>}
+              <span className="hw-q__pts">{n(d.points || 0)} / {n(d.max || 0)}</span>
+              <span className={`hw-q__state is-${d.state}`}><Icon name={d.state === 'right' ? 'checkCircle' : d.state === 'wrong' ? 'mistake' : 'help'} />{d.state === 'right' ? 'صح' : d.state === 'wrong' ? 'غلط' : 'متروك'}</span>
+            </header>
+            {d.text ? <p className="hw-q__text">{strip(d.text)}</p> : <p className="hw-q__text is-dim">سؤال رقم {n(d.n)}</p>}
+            {Array.isArray(d.options) && d.options.length > 0 ? (
+              <div className="hw-q__opts">
+                {d.options.map((o, k) => {
+                  const right = Number(d.correct) === k; const mine = d.answer !== undefined && d.answer !== null && Number(d.answer) === k;
+                  return <div key={k} className={`hw-q__opt${right ? ' is-right' : mine ? ' is-wrong' : ''}`}><i>{LETTERS[k] || k + 1}</i><span>{strip(o)}</span>{right ? <em>الإجابة الصح</em> : mine ? <em>إجابتك</em> : null}</div>;
+                })}
+              </div>
+            ) : (
+              <div className="hw-q__pair">
+                <span className="is-wrong">إجابتك: {d.answer === undefined || d.answer === null || d.answer === '' ? 'متروك' : optText(d, d.answer)}</span>
+                {d.correct !== undefined && <span className="is-right">الصح: {optText(d, d.correct)}</span>}
+              </div>
+            )}
+            {d.explain && <p className="hw-q__why"><Icon name="info" />{strip(d.explain)}</p>}
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function GateScreen({ gate, rules, onStart, onRequest, onClose, onReview, onPractice }) {
   const a = gate.attempt || {};
   const done = a.status === 'completed';
   const asked = a.studentNotes === 'retake_request';
@@ -108,10 +171,17 @@ function GateScreen({ gate, rules, onStart, onRequest, onClose }) {
         <span className="hw-gate__ico">{['checking', 'starting'].includes(gate.state) ? <i className="hw-gate__spin" /> : <Icon name={view.icon} />}</span>
         <h3>{view.title}</h3>
         {view.body && <p>{view.body}</p>}
-        {['blocked', 'banned', 'timeup'].includes(gate.state) && a.id && (asked
+        {gate.state === 'blocked' && done && (
+          <>
+            {(a.performanceAnalysis?.details || []).length > 0 && <button type="button" className="hw-btn hw-btn--pri" onClick={onReview}><Icon name="mistake" />راجع أخطاءك</button>}
+            <button type="button" className="hw-btn" onClick={onPractice}><Icon name="refresh" />حلّه تاني للتدريب</button>
+            <small className="hw-gate__note">التدريب مابيغيّرش درجتك الرسمية.</small>
+          </>
+        )}
+        {['blocked', 'banned', 'timeup'].includes(gate.state) && a.id && !done && (asked
           ? <small className="hw-gate__ok"><Icon name="check" />طلبك اتبعت للمدرس، أول ما يوافق هتقدر تدخل</small>
           : <button type="button" className="hw-btn" onClick={onRequest}><Icon name="message" />اطلب من المدرس يسمحلك تعيده</button>)}
-        {!['checking', 'starting'].includes(gate.state) && <button type="button" className="hw-btn hw-btn--pri" onClick={onClose}><Icon name="arrowLeft" />رجوع</button>}
+        {!['checking', 'starting'].includes(gate.state) && <button type="button" className={`hw-btn${gate.state === 'blocked' && done ? '' : ' hw-btn--pri'}`} onClick={onClose}><Icon name="arrowLeft" />رجوع</button>}
       </div>
     </div>
   );
@@ -141,6 +211,8 @@ const InteractiveViewer = ({ content, user, onClose }) => {
   const [warning, setWarning] = useState(null);
   const [timeUpPending, setTimeUpPending] = useState(false);
   const [pinned, setPinned] = useState(false);
+  const [practice, setPractice] = useState(false);
+  const [review, setReview] = useState(null);
   const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine !== false);
   const winRef = useRef(null);
   const frameRef = useRef(null);
@@ -163,7 +235,7 @@ const InteractiveViewer = ({ content, user, onClose }) => {
   const deadlineRef = useRef(0);
   const strikesRef = useRef([]);
   const bypassRef = useRef(false);
-  const examRunning = locked && gate.state === 'open' && !result && !timeUpPending;
+  const examRunning = locked && !practice && gate.state === 'open' && !result && !timeUpPending;
 
   // ١) فحص: امتحنه قبل كده؟ الميعاد خلص؟
   useEffect(() => {
@@ -230,6 +302,14 @@ const InteractiveViewer = ({ content, user, onClose }) => {
   useEffect(() => () => { markExited(); if (native) { releaseExamLock(); markExamPage(false); } }, [markExited, native]);
   useEffect(() => { if (native && (result || ['banned', 'timeup'].includes(gate.state))) { releaseExamLock(); markExamPage(false); } }, [native, result, gate.state]);
 
+  // تدريب بعد ما امتحن: نفس الصفحة، من غير وقت ولا مراقبة ولا تسجيل
+  const startPractice = () => {
+    setPractice(true); setResult(null); setShowResult(false); setProgress(null); setReview(null); setWarning(null);
+    resultSent.current = false; setSecs(0); latestSecs.current = 0;
+    setReloadKey((k) => k + 1);
+    setGate({ state: 'open' });
+  };
+
   const requestRetake = async () => {
     const id = gate.attempt?.id || attemptRef.current?.id;
     if (!id) return;
@@ -278,8 +358,8 @@ const InteractiveViewer = ({ content, user, onClose }) => {
   const post = useCallback((msg) => { try { frameRef.current?.contentWindow?.postMessage(msg, '*'); } catch { /* الصفحة مش بتسمع */ } }, []);
   const sendInit = useCallback(() => {
     const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
-    post({ type: 'nahhas:init', theme, kind: isExam ? 'exam' : 'lesson', title: content.title || '', student: { name: studentName }, palette: PALETTE, durationMinutes: durationMin || null, endsAt: deadlineRef.current || null });
-  }, [post, content.title, isExam, studentName, durationMin]);
+    post({ type: 'nahhas:init', theme, kind: isExam ? (practice ? 'practice' : 'exam') : 'lesson', practice, title: content.title || '', student: { name: studentName }, palette: PALETTE, durationMinutes: durationMin || null, endsAt: deadlineRef.current || null });
+  }, [post, content.title, isExam, studentName, durationMin, practice]);
 
   const latest = useRef({});
   latest.current = { content, user };
@@ -294,7 +374,7 @@ const InteractiveViewer = ({ content, user, onClose }) => {
         status: 'completed', score: r.score, total: r.total, totalPossible: r.total, percentage: Math.round(r.percentage),
         timeTaken: latestSecs.current, submittedAt: serverTimestamp(), examTitle: content.title || 'امتحان تفاعلي', grade: content.grade || user?.grade || '',
         antiCheatWarnings: strikesRef.current.length, antiCheatLog: strikesRef.current,
-        performanceAnalysis: { correct: r.correct ?? null, wrong: r.wrong ?? null, skipped: r.skipped ?? 0, details: Array.isArray(r.details) ? r.details.slice(0, 200) : [], autoSubmitted: Boolean(r.auto) },
+        performanceAnalysis: { correct: r.correct ?? null, wrong: r.wrong ?? null, skipped: r.skipped ?? 0, details: cleanDetails(r.details), autoSubmitted: Boolean(r.auto) },
       });
       return true;
     } catch (e) { console.warn('html result not saved', e?.message); savedRef.current = false; finishedRef.current = false; return false; }
@@ -369,15 +449,15 @@ const InteractiveViewer = ({ content, user, onClose }) => {
       if (d.type === 'nahhas:close') onClose?.();
       if (d.type === 'nahhas:result') {
         if (isExam && resultSent.current) return; // نتيجة واحدة بس
-        if (locked && finishedRef.current && !savedRef.current) return; // اتحظر أو الوقت خلص قبلها
+        if (locked && !practice && finishedRef.current && !savedRef.current) return; // اتحظر أو الوقت خلص قبلها
         const total = Math.max(0, Number(d.total) || 0);
         const score = Math.max(0, Math.min(total || Infinity, Number(d.score) || 0));
         const r = { score, total, percentage: total ? (score / total) * 100 : Number(d.percentage) || 0, correct: d.correct ?? null, wrong: d.wrong ?? null, skipped: d.skipped ?? 0, details: d.details, auto: timeUpPending };
         resultSent.current = true;
         setTimeUpPending(false);
         setWarning(null);
-        setResult({ ...r, saving: isExam && Boolean(attemptRef.current) }); setShowResult(true);
-        if (!isExam || !attemptRef.current) return;
+        setResult({ ...r, saving: isExam && !practice && Boolean(attemptRef.current) }); setShowResult(true);
+        if (!isExam || practice || !attemptRef.current) return;
         // لو النت فاصل: نفضل نحاول لحد ما النتيجة تتسجل
         for (let i = 0; i < 40; i += 1) {
           if (await saveResult(r)) { setResult((x) => (x ? { ...x, saved: true, saving: false } : x)); return; }
@@ -388,10 +468,10 @@ const InteractiveViewer = ({ content, user, onClose }) => {
     };
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
-  }, [sendInit, saveResult, isExam, locked, onClose, timeUpPending]);
+  }, [sendInit, saveResult, isExam, locked, onClose, timeUpPending, practice]);
 
   const exit = async () => {
-    if (locked && gate.state === 'open' && !result) {
+    if (locked && !practice && gate.state === 'open' && !result) {
       bypassRef.current = true;
       const ok = await platformConfirm('لو خرجت دلوقتي الامتحان هيتقفل، ومش هتقدر تمتحنه تاني إلا بموافقة المدرس. تخرج؟');
       bypassRef.current = false;
@@ -409,7 +489,7 @@ const InteractiveViewer = ({ content, user, onClose }) => {
   };
   const pct = progress?.total ? Math.round((progress.current / progress.total) * 100) : null;
   const showTimer = gate.state === 'open' && !result;
-  const countdown = locked && remaining !== null;
+  const countdown = locked && !practice && remaining !== null;
 
   return (
     <div className="hw" dir="rtl" onContextMenu={(e) => e.preventDefault()}>
@@ -422,6 +502,7 @@ const InteractiveViewer = ({ content, user, onClose }) => {
             <h2>{content.title || 'المحتوى التفاعلي'}</h2>
           </div>
           <div className="hw-head__acts">
+            {practice && <span className="hw-chip is-practice"><Icon name="refresh" />تدريب</span>}
             {pct !== null && <span className="hw-chip is-prog" title="الأسئلة"><Icon name="checkCircle" /><bdi>{n(progress.current)} / {n(progress.total)}</bdi></span>}
             {showTimer && (countdown
               ? <span className={`hw-chip is-timer${remaining <= 60 ? ' is-danger' : remaining <= 300 ? ' is-warn' : ''}`} title="الوقت الفاضل"><Icon name="clock" /><bdi dir="ltr">{clock(remaining)}</bdi></span>
@@ -435,7 +516,7 @@ const InteractiveViewer = ({ content, user, onClose }) => {
         </header>
 
         <div className="hw-stage">
-          {gate.state !== 'open' && <GateScreen gate={gate} rules={{ duration: durationMin, until: untilMs, native }} onStart={start} onRequest={requestRetake} onClose={onClose} />}
+          {gate.state !== 'open' && <GateScreen gate={gate} rules={{ duration: durationMin, until: untilMs, native }} onStart={start} onRequest={requestRetake} onClose={onClose} onPractice={startPractice} onReview={() => setReview({ details: gate.attempt?.performanceAnalysis?.details || [], summary: `درجتك ${n(gate.attempt?.score)} من ${n(gate.attempt?.total)}` })} />}
           {gate.state === 'open' && loading && (
             <div className="hw-loading">
               <div className="hw-loading__orb"><Icon name={isExam ? 'exam' : 'interactive'} /></div>
@@ -467,11 +548,12 @@ const InteractiveViewer = ({ content, user, onClose }) => {
               <span className="hw-gate__ico"><i className="hw-gate__spin" /></span><h3>الوقت خلص</h3><p>بنسلّم إجاباتك…</p>
             </div></div>
           )}
-          {showResult && result && <ResultSheet result={result} onAgain={() => setShowResult(false)} onClose={onClose} />}
+          {showResult && result && <ResultSheet result={result} practice={practice} onAgain={() => setShowResult(false)} onClose={onClose} onReview={() => setReview({ details: result.details, summary: `${practice ? 'تدريب — ' : ''}درجتك ${n(result.score)} من ${n(result.total)}` })} onPractice={locked && isExam ? startPractice : null} />}
+          {review && <ReviewSheet details={review.details} summary={review.summary} onClose={() => setReview(null)} />}
         </div>
 
         <footer className="hw-foot">
-          <span><Icon name="shield" />{locked ? 'امتحان مراقَب' : 'محتوى محمي'}</span>
+          <span><Icon name="shield" />{practice ? 'تدريب — مش بيتسجل' : locked ? 'امتحان مراقَب' : 'محتوى محمي'}</span>
           {studentName && <span><Icon name="user" />{studentName}</span>}
           <span className={online ? '' : 'is-off'}><Icon name={online ? 'live' : 'wifiOff'} />{online ? 'متصل' : 'مفيش نت'}</span>
         </footer>

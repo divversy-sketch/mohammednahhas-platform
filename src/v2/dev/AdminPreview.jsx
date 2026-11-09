@@ -46,7 +46,12 @@ export default function AdminPreview() {
     pendingUsers: [{ id: 'p1', name: 'سارة أحمد', grade: '3sec', phone: '01011112222', parentPhone: '01233334444', email: 'sara@mail.com', createdAt: new Date(now - 72e5).toISOString() }, { id: 'p2', name: 'عمر خالد', grade: '2sec', phone: '01155556666', createdAt: new Date(now - 2e7).toISOString() }, { id: 'p3', name: 'منة الله', grade: '3sec', phone: '01077778888', parentPhone: '01099990000', createdAt: new Date(now - 9e7).toISOString() }],
     passwordResetRequests: [{ id: 'r1', email: 'student1@mail.com', status: 'pending', createdAt: new Date(now - 36e5).toISOString() }, { id: 'r2', email: 'unknown@mail.com', status: 'pending', createdAt: new Date(now - 9e6).toISOString() }, { id: 'r3', email: 'old@mail.com', status: 'completed' }],
     messagesList: [{ id: 'm1', status: 'open' }, { id: 'm2', status: 'open' }],
-    contentList: Array.from({ length: 23 }, (_, i) => ({ id: `c${i}` })),
+    contentList: [
+      { id: 'hx1', type: 'interactive_exam', title: 'امتحان الحصة: المبتدأ والخبر', grade: '3sec', examDurationMinutes: 20 },
+      { id: 'v1', type: 'video', title: 'شرح التشبيه', grade: '3sec', videoSection: 'explanation', isPremium: true },
+      { id: 'f1', type: 'file', title: 'مذكرة النحو', grade: '3sec' },
+      { id: 'h1', type: 'html', title: 'لعبة الإعراب', grade: '3sec' },
+    ],
     examsList: [{ id: 'e1', title: 'امتحان البلاغة الشامل', startTime: new Date(now - 36e5).toISOString(), endTime: new Date(now + 36e5).toISOString() }, { id: 'e2', title: 'النحو' }, { id: 'e3', title: 'القصة' }],
     examResults: [
       ...Array.from({ length: 90 }, (_, i) => ({ id: `x${i}`, examId: i < 6 ? 'e1' : 'e2', studentId: `u${i}`, studentName: `طالب ${i + 1}`, status: 'completed', score: 12 + (i % 8), total: 20, percentage: 30 + ((i * 37) % 70), examLock: i % 3 ? 'pinned' : 'web', antiCheatWarnings: i % 11 === 0 ? 2 : 0, antiCheatLog: i % 11 === 0 ? [{ type: 'app_unpinned', at: new Date(now - 4e6).toISOString() }, { type: 'focus_or_visibility_lost', at: new Date(now - 3e6).toISOString() }] : [], branchStats: { 'البلاغة': { earned: 3 + (i % 5), possible: 8 }, 'النحو': { earned: 5 + (i % 3), possible: 7 }, 'النصوص': { earned: 2 + (i % 4), possible: 5 } }, timeTaken: 1500 + i * 13, submittedAt: new Date(now - ((i * 7919) % 13) * 864e5 - 36e5).toISOString() })),

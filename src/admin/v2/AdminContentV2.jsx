@@ -8,6 +8,7 @@ import { GradeOptions, getGradeLabel } from '@shared/constants/grades';
 import { VIDEO_EXAM_UNLOCK_PERCENT } from '@shared/core/platformShared.jsx';
 import AudiencePicker, { useStudentGroups } from '@admin/v2/AudiencePicker.jsx';
 import { defaultAudience, resolveAudience, audienceLabel } from '@shared/audience/audience.js';
+import AdminLessonExamGrades from '@admin/v2/AdminLessonExamGrades.jsx';
 import '@styles/pages/admin-people.css';
 
 const n = (x) => Number(x || 0).toLocaleString('ar-EG');
@@ -46,6 +47,7 @@ export default function AdminContentV2({ ctx }) {
   const [tab, setTab] = useState('all');
   const [q, setQ] = useState('');
   const [showCover, setShowCover] = useState(false);
+  const [gradesFor, setGradesFor] = useState(null);
   const set = (patch) => setNewContent({ ...newContent, ...patch });
   const t = typeOf(newContent.type);
   const isExam = newContent.type === 'interactive_exam';
@@ -205,6 +207,7 @@ export default function AdminContentV2({ ctx }) {
                   </div>
                 </div>
                 <div className="apl-acts">
+                  {c.type === 'interactive_exam' && <button type="button" className="apl-btn apl-btn--pri" onClick={() => setGradesFor(c)}><Icon name="chart" />الدرجات</button>}
                   <button type="button" className="apl-btn" onClick={() => openFullContentEditor(c)}><Icon name="edit" />تعديل</button>
                   <button type="button" className="apl-icon" title="حذف" onClick={() => handleDeleteContent(c.id)}><Icon name="close" /></button>
                 </div>
@@ -215,6 +218,7 @@ export default function AdminContentV2({ ctx }) {
         </div>
         {contentList.length > 0 && <div className="acn-danger"><button type="button" className="apl-btn apl-btn--danger" onClick={handleDeleteAllContent}><Icon name="alert" />حذف كل المحتوى</button></div>}
       </section>
+      {gradesFor && <AdminLessonExamGrades content={gradesFor} users={activeUsersList || []} groups={groups} onClose={() => setGradesFor(null)} />}
     </div>
   );
 }

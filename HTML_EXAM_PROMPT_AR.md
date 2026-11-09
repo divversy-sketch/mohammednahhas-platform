@@ -74,9 +74,11 @@
 - كل ما الطالب يجاوب سؤال ابعت:
   parent.postMessage({ type: 'nahhas:progress', current: عدد_المُجاب, total: عدد_الأسئلة }, '*')
 - عند التسليم ابعت مرة واحدة بس:
-  parent.postMessage({ type: 'nahhas:result', score, total, correct, wrong, skipped, details: [{ n, answer, correct, ok, points, max, branch }] }, '*')
+  parent.postMessage({ type: 'nahhas:result', score, total, correct, wrong, skipped, details: [{ n, text, options, answer, correct, ok, points, max, branch, explain }] }, '*')
   - score وtotal بالدرجات، مش بعدد الأسئلة.
   - المنصة هي اللي بتعرض شاشة النتيجة وبتسجلها، فما تعملش شاشة نتيجة كبيرة. اكتفي بتلوين الإجابات وإظهار الشرح.
+- details لازم يكون فيه لكل سؤال: n رقمه، وtext نص السؤال، وoptions مصفوفة الاختيارات، وanswer رقم اختيار الطالب (أو null لو متروك)، وcorrect رقم الإجابة الصح، وok صح ولا لأ، وpoints الدرجة اللي خدها، وmax درجة السؤال، وbranch الفرع، وexplain شرح الإجابة. المنصة بتستخدمهم في «راجع أخطاءك» عند الطالب.
+- لو nahhas:init جالها practice: true، يبقى الطالب بيحل تدريب. اعرض كلمة «تدريب» في الهيدر، والباقي زي ما هو.
 - لازم تكون فيه دالة submit(auto) واحدة بيستخدمها زرار التسليم، وكمان المنصة لما الوقت يخلص:
   - لو جات رسالة { type: 'nahhas:timeup' }: نادي submit(true) فورًا من غير ما تستنى إن كل الأسئلة تتجاوب، والسؤال المتروك يتحسب skipped.
   - لو جات رسالة { type: 'nahhas:locked' }: وقف كل الأزرار ومتبعتش نتيجة.
