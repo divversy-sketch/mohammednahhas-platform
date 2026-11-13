@@ -203,6 +203,11 @@ export const createContentManagementActions = (ctx) => {
       // deleteField ماينفعش في مستند جديد
       ['audience', 'audienceKeys'].forEach((k) => { if (k in clonePayload && !(Array.isArray(clonePayload[k]) || clonePayload[k]?.mode)) delete clonePayload[k]; });
       if (!('audience' in clonePayload) && editingFullContent.audience && !contentEditDraft.audienceFields) { clonePayload.audience = editingFullContent.audience; clonePayload.audienceKeys = editingFullContent.audienceKeys || []; }
+      if (editingFullContent.htmlStored === 'split') {
+        // النسخة محتاجة نسخة من ملف الـHTML كمان
+        const src = await getDoc(doc(db, 'content_html', editingFullContent.id)).catch(() => null);
+        if (src?.exists()) { clonePayload.htmlContent = src.data().html || ''; clonePayload.htmlStored = ''; }
+      }
       await addDoc(collection(db, 'content'), {
         ...clonePayload,
         title: payload.title.includes('نسخة') ? payload.title : `${payload.title} - نسخة جديدة`,
@@ -345,7 +350,18 @@ export const createContentManagementActions = (ctx) => {
           createdAt: new Date() 
       };
       
-      const addedContentRef = await addDoc(collection(db, 'content'), contentData);
+      // ملف الـHTML بيتخزن لوحده في content_html (عشان قايمة المحتوى عند الطلبة تفضل خفيفة وسريعة).
+      // لو القاعدة الجديدة لسه ما اترفعتش، بيرجع يتخزن جوه المحتوى زي الأول.
+      const addedContentRef = doc(collection(db, 'content'));
+      if (contentData.htmlContent) {
+        try {
+          await setDoc(doc(db, 'content_html', addedContentRef.id), { html: contentData.htmlContent, size: contentData.htmlContent.length, updatedAt: serverTimestamp() });
+          contentData.htmlSize = contentData.htmlContent.length;
+          contentData.htmlStored = 'split';
+          contentData.htmlContent = '';
+        } catch (err) { console.warn('content_html not available, storing inline', err?.code); }
+      }
+      await setDoc(addedContentRef, contentData);
       await audit('content_created', { title: 'إضافة محتوى جديد', targetCollection: 'content', targetDocId: addedContentRef.id, after: { title: newContent.title, type: contentData.type, grade: contentData.grade, isPremium: contentData.isPremium } });
       
       if (allowedEmailsArray.length === 0) {
@@ -364,6 +380,7 @@ export const createContentManagementActions = (ctx) => {
       const item = contentList.find((c) => c.id === id) || {};
       if(confirmSensitiveAction(`حذف المحتوى "${item.title || id}"؟`, { confirmText: 'حذف' })) {
         await deleteDoc(doc(db, 'content', id));
+        if (item.htmlStored === 'split') deleteDoc(doc(db, 'content_html', id)).catch(() => {});
         await audit('content_deleted', { title: 'حذف محتوى', severity: 'warning', targetCollection: 'content', targetDocId: id, before: { title: item.title || '', type: item.type || '', grade: item.grade || '' } });
       }
   };

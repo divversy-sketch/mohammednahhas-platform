@@ -1,7 +1,10 @@
 // صفحة المحتوى — إضافة محتوى خطوة بخطوة + قايمة منظمة حسب النوع.
 // كل نوع واضح هيظهر للطالب فين:
 //   فيديو → المحاضرات | ملف / رابط / HTML تفاعلي → الملفات | امتحان HTML → الامتحانات ← امتحانات الحصة
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { deleteField, doc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import { db } from '@services/firebase';
+import { speaksToPlatform } from '@features/content/htmlBridge.js';
 import { Icon } from '@v2/ui/Icon.jsx';
 import ImageFitControls from '@shared/ui/ImageFitControls.jsx';
 import { GradeOptions, getGradeLabel } from '@shared/constants/grades';
@@ -48,6 +51,25 @@ export default function AdminContentV2({ ctx }) {
   const [q, setQ] = useState('');
   const [showCover, setShowCover] = useState(false);
   const [gradesFor, setGradesFor] = useState(null);
+  const [rulesMissing, setRulesMissing] = useState(false);
+
+  // نقل ملفات الـHTML القديمة من جوه المحتوى لمكانها الخاص (مرة واحدة) — ده اللي كان مبطّأ المنصة عند الطلبة
+  useEffect(() => {
+    const heavy = contentList.filter((c) => typeof c.htmlContent === 'string' && c.htmlContent.length > 0 && c.htmlStored !== 'split');
+    if (!heavy.length || window.__nxHtmlMigrating) return;
+    window.__nxHtmlMigrating = true;
+    (async () => {
+      for (const c of heavy) {
+        try {
+          await setDoc(doc(db, 'content_html', c.id), { html: c.htmlContent, size: c.htmlContent.length, updatedAt: serverTimestamp() });
+          await updateDoc(doc(db, 'content', c.id), { htmlContent: deleteField(), htmlStored: 'split', htmlSize: c.htmlContent.length });
+        } catch (e) {
+          if (e?.code === 'permission-denied') { setRulesMissing(true); break; }
+        }
+      }
+      window.__nxHtmlMigrating = false;
+    })();
+  }, [contentList]);
   const set = (patch) => setNewContent({ ...newContent, ...patch });
   const t = typeOf(newContent.type);
   const isExam = newContent.type === 'interactive_exam';
@@ -80,6 +102,7 @@ export default function AdminContentV2({ ctx }) {
         <button type="button" className="apl-kpi tone-gold" onClick={() => setTab('vip')}><span><Icon name="crown" />محتوى VIP</span><b>{n(counts.vip)}</b></button>
       </div>
 
+      {rulesMissing && <p className="apl-note is-bad"><Icon name="alert" />ارفع قواعد Firebase الجديدة (firestore.rules) عشان ملفات الـHTML تتنقل لمكانها والمنصة تبقى أسرع عند الطلبة.</p>}
       <form className="apl-section acn-form" onSubmit={handleAddContent}>
         <h3><Icon name="plus" />إضافة محتوى</h3>
 
@@ -107,6 +130,9 @@ export default function AdminContentV2({ ctx }) {
               {isUploading && <i style={{ width: `${uploadProgress}%` }} />}
             </label>
           )}
+          {isExam && newContent.htmlContent && (speaksToPlatform(newContent.htmlContent)
+            ? <p className="apl-note"><Icon name="checkCircle" />الملف ده بيبعت الدرجة للمنصة. تمام.</p>
+            : <p className="apl-note is-bad"><Icon name="alert" />الملف ده مش معمول بالبرومت، ومابيبعتش الدرجة للمنصة. المنصة هتحاول تقرا الدرجة اللي بتظهر في الصفحة، ولو معرفتش هيتسجل «اتسلّم» وتحط الدرجة انت من «الدرجات». الأفضل تعمله بالبرومت أو بالنموذج.</p>)}
           <label className="apl-field"><span>{newContent.type === 'link' ? 'الرابط' : 'أو رابط (اختياري)'}</span><input dir="ltr" value={newContent.url} onChange={(e) => set({ url: e.target.value })} placeholder="https://" /></label>
         </Step>
 

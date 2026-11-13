@@ -248,6 +248,12 @@ service cloud.firestore {
       allow write: if canManageContent();
     }
 
+    // ملفات الـHTML (دروس تفاعلية وامتحانات الحصة) متخزنة لوحدها عشان قايمة المحتوى تفضل خفيفة
+    match /content_html/{docId} {
+      allow read: if true;
+      allow write: if canManageContent();
+    }
+
     match /settings/{docId} {
       allow read: if true;
       allow write: if canManageSettings();

@@ -298,3 +298,7 @@
   .alg-row { grid-template-columns: 30px 1fr auto; } .alg-row > .apl-acts { grid-column: 1 / -1; } .alg-row > .apl-acts .apl-btn { flex: 1; }
   .alg .aas-seg { width: 100%; overflow-x: auto; } .alg .aas-seg button { flex: none; }
 }
+.alg-mark { display: flex; align-items: center; gap: 4px; }
+.alg-mark input { width: 58px; min-height: 36px; padding: 0 6px; border-radius: 10px; border: 1px solid var(--nx-line); background: var(--nx-surface); color: var(--nx-ink); font: inherit; font-size: 13px; text-align: center; }
+.alg-mark span { font-size: 12px; color: var(--nx-ink-3); }
+.alg-mark .apl-btn { min-height: 36px; padding: 0 10px; }

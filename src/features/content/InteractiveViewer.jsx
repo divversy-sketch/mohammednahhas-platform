@@ -7,7 +7,8 @@
 //                    { type:'nahhas:result', score, total, correct, wrong, skipped, details? } | { type:'nahhas:close' }
 // امتحان HTML للطالب: محاولة واحدة، وقت بيتسلّم لوحده، وخروج من الشاشة = تحذير ثم حظر (الفك من الأدمن بس).
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { collection, doc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
+import { injectBridge } from './htmlBridge.js';
 import { auth, db } from '@services/firebase';
 import { platformNotify, platformConfirm } from '../../shared/core/platformShared.jsx';
 import { isExamLockSupported, requestExamLock, releaseExamLock, blockBackButton, useExamLockWatch, wasScreenTurnedOff } from '@features/native-app/examLock.js';
@@ -20,9 +21,27 @@ const clock = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s 
 // معاينة التطوير بس: تجربة الامتحان من غير قاعدة بيانات
 const devTest = () => Boolean(import.meta.env.DEV && typeof window !== 'undefined' && window.__nxHtmlExamTest);
 const upd = (ref, data) => (devTest() ? Promise.resolve() : updateDoc(ref, data));
+// مانستناش النت أكتر من كده قبل ما نفتح (الكتابة بتكمل في الخلفية)
+const within = (p, ms) => Promise.race([p, new Promise((res) => setTimeout(() => res('slow'), ms))]);
 const PALETTE = { copper: '#C0592A', gold: '#F2C063', patina: '#13806F', danger: '#C0303F', night: '#0C0907', paper: '#FAF6F1', ink: '#1A120D' };
 
 function ResultSheet({ result, onAgain, onClose, onReview, onPractice, practice }) {
+  if (result.ungraded) {
+    return (
+      <div className="hw-result" role="dialog" aria-modal="true">
+        <div className="hw-result__card is-good">
+          <span className="hw-gate__ico is-ok"><Icon name="checkCircle" /></span>
+          <h3>اتسلّم الامتحان</h3>
+          <p>{result.auto ? 'الوقت خلص واتسلّم لوحده. ' : ''}الصفحة دي مابتحسبش الدرجة للمنصة، فالمدرس هيحط درجتك وهيوصلك إشعار.</p>
+          {result.saved ? <small className="hw-result__saved"><Icon name="check" />التسليم اتسجل عند المدرس</small> : <small className="hw-result__saved is-wait"><Icon name="clock" />بنسجّل التسليم…</small>}
+          <div className="hw-result__acts">
+            <button type="button" className="hw-btn" onClick={onAgain}><Icon name="eye" />شوف الصفحة</button>
+            <button type="button" className="hw-btn hw-btn--pri" onClick={onClose}><Icon name="arrowLeft" />خروج</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
   const pct = Math.max(0, Math.min(100, Math.round(result.percentage)));
   const r = 54; const c = 2 * Math.PI * r;
   const tone = pct >= 75 ? 'is-good' : pct >= 50 ? 'is-mid' : 'is-low';
@@ -45,6 +64,7 @@ function ResultSheet({ result, onAgain, onClose, onReview, onPractice, practice 
           {result.skipped ? <span><Icon name="help" />{n(result.skipped)} متروك</span> : null}
         </div>
         {practice && <small className="hw-result__saved is-wait"><Icon name="info" />ده تدريب — الدرجة مابتتسجلش</small>}
+        {result.inferred && !practice && <small className="hw-result__saved is-wait"><Icon name="info" />الدرجة اتقرت من صفحة الامتحان</small>}
         {result.saved ? <small className="hw-result__saved"><Icon name="check" />النتيجة اتسجلت وهتظهر للمدرس</small> : result.saving ? <small className="hw-result__saved is-wait"><Icon name="clock" />بنسجّل النتيجة…</small> : null}
         <div className="hw-result__acts">
           {Array.isArray(result.details) && result.details.length > 0
@@ -128,7 +148,9 @@ function GateScreen({ gate, rules, onStart, onRequest, onClose, onReview, onPrac
   const done = a.status === 'completed';
   const asked = a.studentNotes === 'retake_request';
   const pct = Math.round(Number(a.percentage) || 0);
-  const blockedView = done
+  const blockedView = done && (a.score === undefined || a.score === null)
+    ? { icon: 'checkCircle', tone: 'done', title: 'أنت سلّمت الامتحان ده', body: 'المدرس هيحط درجتك وهيوصلك إشعار. الامتحان محاولة واحدة، والإعادة بموافقة المدرس بس.' }
+    : done
     ? { icon: 'checkCircle', tone: 'done', title: 'أنت امتحنت الامتحان ده قبل كده', body: `درجتك ${n(a.score)} من ${n(a.total)} (${n(pct)}٪). الامتحان محاولة واحدة، والإعادة بموافقة المدرس بس.` }
     : a.status === 'cheated'
       ? { icon: 'shield', tone: 'bad', title: 'اتحظرت من الامتحان ده', body: 'خرجت من شاشة الامتحان بعد التحذير. الحظر مايتفكش غير من المدرس.' }
@@ -213,6 +235,8 @@ const InteractiveViewer = ({ content, user, onClose }) => {
   const [pinned, setPinned] = useState(false);
   const [practice, setPractice] = useState(false);
   const [review, setReview] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [htmlError, setHtmlError] = useState('');
   const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine !== false);
   const winRef = useRef(null);
   const frameRef = useRef(null);
@@ -268,13 +292,13 @@ const InteractiveViewer = ({ content, user, onClose }) => {
     const ref = devTest() ? { id: 'dev-test' } : doc(db, 'exam_results', grant?.id || htmlAttemptId(content.id, uid));
     try {
       if (devTest()) { /* من غير حفظ */ } else if (grant) {
-        await updateDoc(ref, { status: 'in_progress', adminDecision: 'restart_consumed', startedAtMillis: startMs, totalTime: durationMin * 60, antiCheatWarnings: 0, antiCheatLog: [], securityReason: '', updatedAt: serverTimestamp() });
+        await within(updateDoc(ref, { status: 'in_progress', adminDecision: 'restart_consumed', startedAtMillis: startMs, totalTime: durationMin * 60, antiCheatWarnings: 0, antiCheatLog: [], securityReason: '', updatedAt: serverTimestamp() }), 3000);
       } else {
-        await setDoc(ref, {
+        await within(setDoc(ref, {
           examId: content.id, examTitle: content.title || 'امتحان تفاعلي', kind: 'html', grade: content.grade || user?.grade || '',
           studentId: uid, studentName: studentName || 'طالب', status: 'in_progress', startedAtMillis: startMs, totalTime: durationMin * 60,
           antiCheatWarnings: 0, antiCheatLog: [], createdAt: serverTimestamp(),
-        });
+        }), 3000);
       }
     } catch (e) {
       console.warn('html exam start', e?.code || e?.message);
@@ -323,16 +347,32 @@ const InteractiveViewer = ({ content, user, onClose }) => {
     if (gate.state !== 'open') return undefined;
     let blobUrl = null;
     setLoading(true);
-    if (content.htmlContent) {
-      blobUrl = URL.createObjectURL(new Blob([content.htmlContent], { type: 'text/html;charset=utf-8' }));
+    let alive = true;
+    setHtmlError('');
+    const show = (html) => {
+      if (!alive) return;
+      blobUrl = URL.createObjectURL(new Blob([isExam ? injectBridge(html) : html], { type: 'text/html;charset=utf-8' }));
       setIframeSrc(blobUrl);
+    };
+    const devHtml = import.meta.env.DEV && typeof window !== 'undefined' ? window.__nxHtmlOverride : null; // معاينة التطوير بس
+    if (devHtml) {
+      show(devHtml);
+    } else if (content.htmlContent) {
+      show(content.htmlContent);
+    } else if (content.htmlStored === 'split' || content.url === 'inline-html') {
+      // الملف متخزن لوحده (عشان قايمة المحتوى تبقى خفيفة) — بيتحمّل وقت الفتح بس
+      getDoc(doc(db, 'content_html', content.id))
+        .then((snap) => (snap.exists() && snap.data().html ? show(snap.data().html) : setHtmlError('ملف الامتحان مش موجود. كلّم المدرس.')))
+        .catch(() => setHtmlError('مقدرناش نحمّل الملف. اتأكد من النت وجرّب تاني.'));
+    } else if (isExam && content.url && !content.url.startsWith('data:')) {
+      fetch(content.url).then((r) => r.text()).then(show).catch(() => setIframeSrc(content.url));
     } else if (content.url?.startsWith('data:')) {
       fetch(content.url).then((res) => res.blob()).then((blob) => { blobUrl = URL.createObjectURL(blob); setIframeSrc(blobUrl); }).catch(() => setIframeSrc(content.url));
     } else {
       setIframeSrc(content.url);
     }
-    return () => blobUrl && URL.revokeObjectURL(blobUrl);
-  }, [content.url, content.htmlContent, reloadKey, gate.state]);
+    return () => { alive = false; if (blobUrl) URL.revokeObjectURL(blobUrl); };
+  }, [content.url, content.htmlContent, content.htmlStored, content.id, isExam, reloadKey, gate.state]);
 
   // حماية + العدّاد + حالة النت
   useEffect(() => {
@@ -368,17 +408,40 @@ const InteractiveViewer = ({ content, user, onClose }) => {
     if (!attemptRef.current || savedRef.current) return false;
     savedRef.current = true;
     finishedRef.current = true;
+    // المفاتيح دي بس المسموح للطالب يكتبها في محاولته (قواعد Firestore)
+    const fields = r.ungraded ? {
+      status: 'completed', timeTaken: latestSecs.current, submittedAt: serverTimestamp(), examTitle: content.title || 'امتحان تفاعلي', grade: content.grade || user?.grade || '',
+      antiCheatWarnings: strikesRef.current.length, antiCheatLog: strikesRef.current,
+      performanceAnalysis: { ungraded: true, autoSubmitted: Boolean(r.auto), details: [] },
+    } : {
+      status: 'completed', score: r.score, total: r.total, totalPossible: r.total, percentage: Math.round(r.percentage),
+      timeTaken: latestSecs.current, submittedAt: serverTimestamp(), examTitle: content.title || 'امتحان تفاعلي', grade: content.grade || user?.grade || '',
+      antiCheatWarnings: strikesRef.current.length, antiCheatLog: strikesRef.current,
+      performanceAnalysis: { correct: r.correct ?? null, wrong: r.wrong ?? null, skipped: r.skipped ?? 0, details: cleanDetails(r.details), autoSubmitted: Boolean(r.auto), inferred: Boolean(r.inferred) },
+    };
     try {
-      // المفاتيح دي بس المسموح للطالب يكتبها في محاولته (قواعد Firestore)
-      await upd(attemptRef.current, {
-        status: 'completed', score: r.score, total: r.total, totalPossible: r.total, percentage: Math.round(r.percentage),
-        timeTaken: latestSecs.current, submittedAt: serverTimestamp(), examTitle: content.title || 'امتحان تفاعلي', grade: content.grade || user?.grade || '',
-        antiCheatWarnings: strikesRef.current.length, antiCheatLog: strikesRef.current,
-        performanceAnalysis: { correct: r.correct ?? null, wrong: r.wrong ?? null, skipped: r.skipped ?? 0, details: cleanDetails(r.details), autoSubmitted: Boolean(r.auto) },
-      });
+      await upd(attemptRef.current, fields);
       return true;
-    } catch (e) { console.warn('html result not saved', e?.message); savedRef.current = false; finishedRef.current = false; return false; }
+    } catch (e) {
+      // لو تسجيل البداية ما وصلش (النت كان بطيء)، نسجّل المحاولة كاملة دلوقتي
+      if (e?.code === 'not-found' && auth.currentUser) {
+        try {
+          await setDoc(attemptRef.current, { ...fields, examId: content.id, kind: 'html', studentId: auth.currentUser.uid, studentName: user?.name || 'طالب', startedAtMillis: Date.now() - latestSecs.current * 1000, createdAt: serverTimestamp() });
+          return true;
+        } catch { /* نحاول تاني */ }
+      }
+      console.warn('html result not saved', e?.code || e?.message); savedRef.current = false; finishedRef.current = false; return false;
+    }
   }, []);
+
+  // بيسجّل النتيجة (ويعيد المحاولة لو النت فاصل)
+  const deliver = useCallback(async (r) => {
+    for (let i = 0; i < 40; i += 1) {
+      if (await saveResult(r)) { setResult((x) => (x ? { ...x, saved: true, saving: false } : x)); return; }
+      if (i === 0) platformNotify('النتيجة لسه ماتسجلتش، خليك في الصفحة لحد ما النت يرجع.');
+      await new Promise((res) => setTimeout(res, 5000));
+    }
+  }, [saveResult]);
 
   // ٣) الغش: أول مرة تحذير، التانية حظر
   const strike = useCallback((kind) => {
@@ -421,22 +484,28 @@ const InteractiveViewer = ({ content, user, onClose }) => {
   }, [examRunning, native, strike]);
   const lockWatch = useExamLockWatch({ enabled: examRunning && native && pinned, onBroken: () => strike('unpin'), bypassRef });
 
-  // ٤) الوقت: لما يخلص المنصة بتطلب من الصفحة تسلّم، ولو ماسلّمتش في ٦ ثواني الامتحان بيتقفل
+  // ٤) التسليم: زرار «سلّم» في المنصة، أو الوقت خلص، أو خروج بعد ما خلّص.
+  // المنصة بتطلب من الصفحة تسلّم (والجسر بيدوس زرار التسليم بتاعها). لو مفيش درجة رجعت في ٧ ثواني،
+  // بيتسجل «اتسلّم من غير درجة» والمدرس يحطها — الطالب عمره ما يتقفل عليه بسبب إن الصفحة ماردّتش.
+  const submitNow = useCallback(async (auto = false) => {
+    if (!attemptRef.current || resultSent.current || finishedRef.current) return;
+    setSubmitting(true); setWarning(null);
+    if (auto) setTimeUpPending(true);
+    post({ type: auto ? 'nahhas:timeup' : 'nahhas:submit' });
+    for (let i = 0; i < 28 && !resultSent.current; i += 1) await new Promise((res) => setTimeout(res, 250));
+    setSubmitting(false); setTimeUpPending(false);
+    if (resultSent.current || finishedRef.current) return;
+    resultSent.current = true;
+    const r = { ungraded: true, auto };
+    setResult({ ...r, saving: true }); setShowResult(true);
+    deliver(r);
+  }, [post, deliver]);
+
   const remaining = deadlineRef.current ? Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000)) : null;
   useEffect(() => {
-    if (!examRunning || remaining === null || remaining > 0) return undefined;
-    setTimeUpPending(true);
-    setWarning(null);
-    post({ type: 'nahhas:timeup' });
-    const id = setTimeout(() => {
-      if (resultSent.current) return;
-      finishedRef.current = true;
-      if (attemptRef.current) upd(attemptRef.current, { status: 'timed_out', timeTaken: latestSecs.current, antiCheatWarnings: strikesRef.current.length, antiCheatLog: strikesRef.current, updatedAt: serverTimestamp() }).catch(() => {});
-      setGate({ state: 'timeup', attempt: attemptRef.current ? { id: attemptRef.current.id, status: 'timed_out' } : undefined });
-      setTimeUpPending(false);
-    }, 6000);
-    return () => clearTimeout(id);
-  }, [examRunning, remaining, post]);
+    if (!examRunning || remaining === null || remaining > 0) return;
+    submitNow(true);
+  }, [examRunning, remaining, submitNow]);
 
   // رسائل صفحة الـHTML
   useEffect(() => {
@@ -447,33 +516,33 @@ const InteractiveViewer = ({ content, user, onClose }) => {
       if (d.type === 'nahhas:ready') sendInit();
       if (d.type === 'nahhas:progress') setProgress({ current: Number(d.current) || 0, total: Number(d.total) || 0 });
       if (d.type === 'nahhas:close') onClose?.();
+      if (d.type === 'nahhas:toast' && d.text) platformNotify(String(d.text).slice(0, 200));
       if (d.type === 'nahhas:result') {
         if (isExam && resultSent.current) return; // نتيجة واحدة بس
         if (locked && !practice && finishedRef.current && !savedRef.current) return; // اتحظر أو الوقت خلص قبلها
         const total = Math.max(0, Number(d.total) || 0);
         const score = Math.max(0, Math.min(total || Infinity, Number(d.score) || 0));
-        const r = { score, total, percentage: total ? (score / total) * 100 : Number(d.percentage) || 0, correct: d.correct ?? null, wrong: d.wrong ?? null, skipped: d.skipped ?? 0, details: d.details, auto: timeUpPending };
+        const r = { score, total, percentage: total ? (score / total) * 100 : Number(d.percentage) || 0, correct: d.correct ?? null, wrong: d.wrong ?? null, skipped: d.skipped ?? 0, details: d.details, auto: timeUpPending, inferred: Boolean(d.inferred) };
         resultSent.current = true;
+        post({ type: 'nahhas:got' });
+        setSubmitting(false);
         setTimeUpPending(false);
         setWarning(null);
         setResult({ ...r, saving: isExam && !practice && Boolean(attemptRef.current) }); setShowResult(true);
         if (!isExam || practice || !attemptRef.current) return;
-        // لو النت فاصل: نفضل نحاول لحد ما النتيجة تتسجل
-        for (let i = 0; i < 40; i += 1) {
-          if (await saveResult(r)) { setResult((x) => (x ? { ...x, saved: true, saving: false } : x)); return; }
-          if (i === 0) platformNotify('النتيجة لسه ماتسجلتش، خليك في الصفحة لحد ما النت يرجع.');
-          await new Promise((res) => setTimeout(res, 5000));
-        }
+        deliver(r);
       }
     };
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
-  }, [sendInit, saveResult, isExam, locked, onClose, timeUpPending, practice]);
+  }, [sendInit, deliver, post, isExam, locked, onClose, timeUpPending, practice]);
 
   const exit = async () => {
-    if (locked && !practice && gate.state === 'open' && !result) {
+    if (locked && !practice && gate.state === 'open' && !result && !submitting) {
       bypassRef.current = true;
-      const ok = await platformConfirm('لو خرجت دلوقتي الامتحان هيتقفل، ومش هتقدر تمتحنه تاني إلا بموافقة المدرس. تخرج؟');
+      const send = await platformConfirm('لسه ماسلّمتش الامتحان. تسلّم إجاباتك دلوقتي؟');
+      if (send) { bypassRef.current = false; submitNow(false); return; }
+      const ok = await platformConfirm('متأكد تخرج من غير تسليم؟ الامتحان هيتقفل، ومش هتقدر تدخله تاني إلا بموافقة المدرس.');
       bypassRef.current = false;
       if (!ok) return;
       markExited();
@@ -508,6 +577,11 @@ const InteractiveViewer = ({ content, user, onClose }) => {
               ? <span className={`hw-chip is-timer${remaining <= 60 ? ' is-danger' : remaining <= 300 ? ' is-warn' : ''}`} title="الوقت الفاضل"><Icon name="clock" /><bdi dir="ltr">{clock(remaining)}</bdi></span>
               : <span className="hw-chip" title="الوقت"><Icon name="clock" /><bdi dir="ltr">{clock(secs)}</bdi></span>)}
             {result && <button type="button" className="hw-chip is-score" onClick={() => setShowResult(true)}><Icon name="trophy" />{n(Math.round(result.percentage))}٪</button>}
+            {locked && !practice && gate.state === 'open' && !result && (
+              <button type="button" className="hw-submit" disabled={submitting} onClick={async () => { bypassRef.current = true; const ok = await platformConfirm('تسلّم الامتحان دلوقتي؟ مش هتقدر تعدّل بعد التسليم.'); bypassRef.current = false; if (ok) submitNow(false); }}>
+                <Icon name="check" /><span>{submitting ? 'بيسلّم…' : 'سلّم'}</span>
+              </button>
+            )}
             {!isExam && <button type="button" className="hw-icon" title="إعادة تحميل" onClick={() => { savedRef.current = false; setResult(null); setProgress(null); setReloadKey((k) => k + 1); }}><Icon name="refresh" /></button>}
             <button type="button" className="hw-icon hw-hide-m" title="ملء الشاشة" onClick={fullscreen}><Icon name="external" /></button>
             <button type="button" className="hw-exit" onClick={exit}><Icon name="close" /><span>خروج</span></button>
@@ -543,9 +617,15 @@ const InteractiveViewer = ({ content, user, onClose }) => {
               <button type="button" className="hw-btn hw-btn--pri" onClick={() => lockWatch.repin()}><Icon name="shield" />ثبّت الشاشة</button>
             </div></div>
           )}
-          {timeUpPending && (
+          {(timeUpPending || submitting) && !result && (
             <div className="hw-result"><div className="hw-gate__card is-wait">
-              <span className="hw-gate__ico"><i className="hw-gate__spin" /></span><h3>الوقت خلص</h3><p>بنسلّم إجاباتك…</p>
+              <span className="hw-gate__ico"><i className="hw-gate__spin" /></span><h3>{timeUpPending ? 'الوقت خلص' : 'بنسلّم الامتحان'}</h3><p>بنسلّم إجاباتك…</p>
+            </div></div>
+          )}
+          {htmlError && gate.state === 'open' && (
+            <div className="hw-result"><div className="hw-gate__card is-bad">
+              <span className="hw-gate__ico"><Icon name="alert" /></span><h3>الملف مافتحش</h3><p>{htmlError}</p>
+              <button type="button" className="hw-btn hw-btn--pri" onClick={() => setReloadKey((k) => k + 1)}><Icon name="refresh" />جرّب تاني</button>
             </div></div>
           )}
           {showResult && result && <ResultSheet result={result} practice={practice} onAgain={() => setShowResult(false)} onClose={onClose} onReview={() => setReview({ details: result.details, summary: `${practice ? 'تدريب — ' : ''}درجتك ${n(result.score)} من ${n(result.total)}` })} onPractice={locked && isExam ? startPractice : null} />}

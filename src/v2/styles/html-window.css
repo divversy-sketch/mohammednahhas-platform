@@ -201,3 +201,7 @@ html.hw-open, html.hw-open body { overflow: hidden !important; }
 .hw-q__pair .is-right { background: var(--nx-patina-soft, #D9F0EB); color: var(--hw-patina); }
 .hw-q__why { display: flex; gap: 8px; margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--nx-sunk, #F2ECE4); font-size: 13.5px; line-height: 1.9; color: var(--nx-ink-2, #5E5148); }
 .hw-q__why .nx-ico { width: 16px; height: 16px; flex: none; margin-top: 4px; color: var(--nx-gold, #B97F14); }
+.hw-submit { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 16px; border: 0; border-radius: 12px; color: #fff; font: inherit; font-size: 14px; font-weight: 800; cursor: pointer; background: linear-gradient(135deg, var(--hw-patina-2), var(--hw-patina)); box-shadow: 0 10px 24px -12px rgba(19, 128, 111, .9); }
+.hw-submit .nx-ico { width: 17px; height: 17px; }
+.hw-submit:disabled { opacity: .6; cursor: wait; }
+@media (max-width: 720px) { .hw-submit { height: 36px; padding: 0 12px; } }

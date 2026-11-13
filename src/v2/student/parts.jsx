@@ -37,7 +37,7 @@ export function LessonCard({ item, ctx, kind = 'video', index = 0 }) {
         <span className="nx-lesson__play"><Icon name={locked ? 'lock' : kind === 'video' ? 'play' : 'interactive'} /></span>
         <div className="nx-lesson__badges">
           {item?.isPremium ? <Chip tone="gold" icon="crown">VIP</Chip> : <span />}
-          {htmlState === 'done' ? <Chip tone="patina" icon="check">{formatNumber(Math.round(Number(htmlAttempt.percentage) || 0))}٪</Chip>
+          {htmlState === 'done' ? <Chip tone="patina" icon="check">{htmlAttempt.score == null ? 'اتسلّم' : `${formatNumber(Math.round(Number(htmlAttempt.percentage) || 0))}٪`}</Chip>
             : htmlState === 'closed' ? <Chip className="nx-chip--night" icon="lock">مقفول</Chip>
             : htmlState === 'retake' ? <Chip tone="gold" icon="refresh">مسموح تعيده</Chip>
             : item?.type === 'interactive_exam' ? <Chip className="nx-chip--night" icon="exam">محاولة واحدة</Chip>
@@ -48,7 +48,7 @@ export function LessonCard({ item, ctx, kind = 'video', index = 0 }) {
         <div className="nx-lesson__title">{title}</div>
         {percent !== null && percent > 0 && percent < 95 && <Bar value={percent} />}
         <div className="nx-lesson__meta">
-          <span>{kind === 'video' ? (percent ? `اتفرجت ${formatNumber(percent)}٪` : 'لسه ما بدأتش') : item?.type === 'interactive_exam' ? (htmlState === 'done' ? `امتحنته · درجتك ${formatNumber(htmlAttempt.score ?? 0)} من ${formatNumber(htmlAttempt.total ?? 0)}` : htmlState === 'closed' ? (htmlAttempt.status === 'cheated' ? 'اتحظرت من الامتحان' : htmlAttempt.status === 'timed_out' ? 'الوقت خلص' : 'خرجت قبل التسليم') : htmlState === 'retake' ? 'المدرس سمحلك تعيده' : Number(item.examDurationMinutes) > 0 ? `امتحان · ${formatNumber(item.examDurationMinutes)} دقيقة` : 'امتحان تفاعلي') : 'نشاط تفاعلي'}</span>
+          <span>{kind === 'video' ? (percent ? `اتفرجت ${formatNumber(percent)}٪` : 'لسه ما بدأتش') : item?.type === 'interactive_exam' ? (htmlState === 'done' ? (htmlAttempt.score == null ? 'سلّمته · الدرجة مع المدرس' : `امتحنته · درجتك ${formatNumber(htmlAttempt.score ?? 0)} من ${formatNumber(htmlAttempt.total ?? 0)}`) : htmlState === 'closed' ? (htmlAttempt.status === 'cheated' ? 'اتحظرت من الامتحان' : htmlAttempt.status === 'timed_out' ? 'الوقت خلص' : 'خرجت قبل التسليم') : htmlState === 'retake' ? 'المدرس سمحلك تعيده' : Number(item.examDurationMinutes) > 0 ? `امتحان · ${formatNumber(item.examDurationMinutes)} دقيقة` : 'امتحان تفاعلي') : 'نشاط تفاعلي'}</span>
           {item?.duration ? <span>{item.duration}</span> : null}
         </div>
       </div>

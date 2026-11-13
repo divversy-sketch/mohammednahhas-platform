@@ -27,6 +27,7 @@ const ago = (ms) => {
   return new Date(ms).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' });
 };
 
+const LESSON_WINDOW = 3 * 24 * 60 * 60 * 1000; // تنبيهات امتحانات الحصة لآخر ٣ أيام
 const KINDS = {
   join: { label: 'طلبات انضمام', icon: 'grade', tab: 'users', tone: 'gold' },
   grade: { label: 'طلبات تغيير الصف', icon: 'route', tab: 'all_users', tone: 'info' },
@@ -35,6 +36,8 @@ const KINDS = {
   message: { label: 'رسائل مستنية رد', icon: 'message', tab: 'messages_center', tone: 'info' },
   reset: { label: 'طلبات كلمة سر', icon: 'key', tab: 'password_resets', tone: 'warn' },
   held: { label: 'امتحانات متوقفة', icon: 'shield', tab: 'exam_live', tone: 'bad' },
+  retake: { label: 'طلبات إعادة امتحان الحصة', icon: 'refresh', tab: 'content', tone: 'gold' },
+  lesson: { label: 'امتحانات الحصة محتاجة نظرة', icon: 'exam', tab: 'content', tone: 'bad' },
 };
 const ORDER = ['held', 'join', 'grade', 'payment', 'message', 'reset', 'profile'];
 const DISMISS_KEY = 'nx-admin-inbox-dismissed';
@@ -61,20 +64,23 @@ function useInboxExtras() {
   const [gradeRequests, setGradeRequests] = useState([]);
   const [profileChanges, setProfileChanges] = useState([]);
   const [payments, setPayments] = useState([]);
+  const [lessonAttempts, setLessonAttempts] = useState([]);
   useEffect(() => {
     const map = (snap) => snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     const off = [
       onSnapshot(query(collection(db, 'users'), where('gradeUpdateStatus', '==', 'pending'), limit(100)), (s) => setGradeRequests(map(s)), () => setGradeRequests([])),
       onSnapshot(query(collection(db, 'users'), orderBy('profileUpdatedAt', 'desc'), limit(30)), (s) => setProfileChanges(map(s)), () => setProfileChanges([])),
       onSnapshot(query(collection(db, 'payment_requests'), where('status', '==', 'pending'), limit(100)), (s) => setPayments(map(s)), () => setPayments([])),
+      // امتحانات الحصة (HTML): طلبات الإعادة، الحظر، الخروج، والتسليم من غير درجة
+      onSnapshot(query(collection(db, 'exam_results'), where('kind', '==', 'html'), limit(300)), (s) => setLessonAttempts(map(s)), () => setLessonAttempts([])),
     ];
     return () => off.forEach((u) => u?.());
   }, []);
-  return { gradeRequests, profileChanges, payments };
+  return { gradeRequests, profileChanges, payments, lessonAttempts };
 }
 
 export function useAdminInbox(ctx = {}, adminProfile) {
-  const { gradeRequests, profileChanges, payments } = useInboxExtras();
+  const { gradeRequests, profileChanges, payments, lessonAttempts } = useInboxExtras();
   const [dismissed, setDismissed] = useState(readDismissed);
   const can = (tab) => !adminProfile || canAccessAdminTab(adminProfile, tab);
 
@@ -100,9 +106,26 @@ export function useAdminInbox(ctx = {}, adminProfile) {
       .forEach((r) => out.push({ id: `reset:${r.id}`, kind: 'reset', title: r.name || r.studentName || r.email || r.phone || 'طالب', sub: 'مش عارف يدخل حسابه', at: toMs(r.createdAt) }));
     (ctx.examResults || []).filter((r) => ['security_hold', 'cheated'].includes(r.status))
       .forEach((r) => out.push({ id: `held:${r.id}`, kind: 'held', title: r.studentName || 'طالب', sub: `${r.examTitle || 'امتحان'} · ${formatNumber(r.antiCheatWarnings || 0)} تنبيه أمان`, at: toMs(r.securityHoldAt || r.lastSavedAt) }));
+    lessonAttempts.forEach((r) => {
+      const title = r.studentName || 'طالب';
+      const exam = r.examTitle || 'امتحان الحصة';
+      if (r.studentNotes === 'retake_request' && r.status !== 'retake_allowed') {
+        out.push({ id: `retake:${r.id}`, kind: 'retake', title, sub: `عايز يعيد «${exam}»`, at: toMs(r.updatedAt || r.leftAt || r.securityHoldAt) });
+        return;
+      }
+      const at = toMs(r.updatedAt || r.submittedAt || r.leftAt || r.securityHoldAt);
+      if (!at || now - at > LESSON_WINDOW) return;
+      const why = r.status === 'cheated' ? `اتحظر في «${exam}» (${r.securityReason || 'خرج من الشاشة'})`
+        : r.status === 'exited' ? `خرج من «${exam}» قبل ما يسلّم`
+        : r.status === 'timed_out' ? `وقته خلص في «${exam}» من غير تسليم`
+        : r.status === 'completed' && r.performanceAnalysis?.ungraded && r.score == null ? `سلّم «${exam}» والصفحة مابعتتش درجة — حط درجته`
+        : '';
+      const key = `lesson:${r.id}:${r.status}`;
+      if (why && !dismissed[key]) out.push({ id: key, kind: 'lesson', title, sub: why, at, dismissable: true });
+    });
     return out.filter((x) => can(KINDS[x.kind].tab)).sort((a, b) => b.at - a.at);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ctx.pendingUsers, ctx.messagesList, ctx.passwordResetRequests, ctx.examResults, gradeRequests, profileChanges, payments, dismissed, adminProfile]);
+  }, [ctx.pendingUsers, ctx.messagesList, ctx.passwordResetRequests, ctx.examResults, gradeRequests, profileChanges, payments, lessonAttempts, dismissed, adminProfile]);
 
   const dismiss = (id) => {
     const next = { ...readDismissed(), [id]: Date.now() };

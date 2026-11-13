@@ -30,6 +30,7 @@ export default function AdminLessonExamGrades({ content, users = [], groups = []
   const [q, setQ] = useState('');
   const [openId, setOpenId] = useState('');
   const [busy, setBusy] = useState('');
+  const [marks, setMarks] = useState({});
 
   useEffect(() => {
     if (import.meta.env.DEV && typeof window !== 'undefined' && window.__nxDemoLessonGrades) { setRows(window.__nxDemoLessonGrades); setReady(true); return undefined; } // معاينة التطوير بس
@@ -50,7 +51,7 @@ export default function AdminLessonExamGrades({ content, users = [], groups = []
   const done = attempts.filter((a) => a.status === 'completed');
   const closed = attempts.filter((a) => ['cheated', 'timed_out', 'exited', 'in_progress'].includes(a.status));
   const asks = attempts.filter((a) => a.studentNotes === 'retake_request' && a.status !== 'retake_allowed');
-  const pcts = done.map((a) => Number(a.percentage) || 0);
+  const pcts = done.filter((a) => a.score !== undefined && a.score !== null).map((a) => Number(a.percentage) || 0);
   const avg = pcts.length ? Math.round(pcts.reduce((s, x) => s + x, 0) / pcts.length) : 0;
   const top = pcts.length ? Math.max(...pcts) : 0;
 
@@ -65,6 +66,20 @@ export default function AdminLessonExamGrades({ content, users = [], groups = []
       await updateDoc(doc(db, 'exam_results', r.id), { status: 'retake_allowed', adminDecision: 'restart', retakeGrantedAt: serverTimestamp(), retakeCount: (Number(r.retakeCount) || 0) + 1, studentNotes: '' });
       if (r.studentId) await addDoc(collection(db, 'notifications'), buildNotification({ audienceKeys: [`user:${r.studentId}`], category: 'exam', title: `تقدر تعيد «${content.title || 'امتحان الحصة'}»`, body: 'المدرس وافق إنك تمتحن تاني. افتحه من الامتحانات ← امتحانات الحصة.' })).catch(() => {});
       platformNotify(`اتسمح لـ ${r.studentName || 'الطالب'} يعيد، ووصله إشعار`);
+    } catch (e) { platformNotify('ماتحفظش: ' + (e?.message || 'خطأ')); }
+    setBusy('');
+  };
+
+  // تسليم من غير درجة (الصفحة مابعتتهاش): المدرس يحطها
+  const saveMark = async (r) => {
+    const m = marks[r.id] || {};
+    const score = Number(m.score); const total = Number(m.total || r.total || 0);
+    if (!Number.isFinite(score) || !total || score < 0 || score > total) return platformNotify('اكتب الدرجة صح (الدرجة ≤ النهاية)');
+    setBusy(r.id);
+    try {
+      await updateDoc(doc(db, 'exam_results', r.id), { score, total, totalPossible: total, percentage: Math.round((score / total) * 100), gradedByAdminAt: serverTimestamp(), 'performanceAnalysis.ungraded': false });
+      if (r.studentId) await addDoc(collection(db, 'notifications'), buildNotification({ audienceKeys: [`user:${r.studentId}`], category: 'result', title: `درجتك في «${content.title || 'امتحان الحصة'}»`, body: `${score} من ${total}` })).catch(() => {});
+      platformNotify('اتحفظت الدرجة ووصلت للطالب');
     } catch (e) { platformNotify('ماتحفظش: ' + (e?.message || 'خطأ')); }
     setBusy('');
   };
@@ -127,6 +142,8 @@ export default function AdminLessonExamGrades({ content, users = [], groups = []
                     {a.timeTaken ? <span className="apl-chip"><Icon name="clock" />{dur(a.timeTaken)}</span> : null}
                     {Number(a.antiCheatWarnings) > 0 && <span className="apl-chip is-gold"><Icon name="alert" />{n(a.antiCheatWarnings)} تحذير</span>}
                     {a.performanceAnalysis?.autoSubmitted && <span className="apl-chip">اتسلّم لوحده</span>}
+                    {a.status === 'completed' && (a.score === undefined || a.score === null) && <span className="apl-chip is-bad"><Icon name="edit" />من غير درجة — حطها</span>}
+                    {a.performanceAnalysis?.inferred && <span className="apl-chip">الدرجة اتقرت من الصفحة</span>}
                     {a.studentNotes === 'retake_request' && a.status !== 'retake_allowed' && <span className="apl-chip is-gold"><Icon name="refresh" />طالب يعيد</span>}
                     <span className="apl-chip is-mute">{when(a.submittedAt || a.updatedAt || a.createdAt)}</span>
                   </div>
@@ -137,7 +154,14 @@ export default function AdminLessonExamGrades({ content, users = [], groups = []
                   )}
                 </div>
                 <div className="alg-score">
-                  {a.status === 'completed' ? <><b>{n(a.score)}<small>/{n(a.total)}</small></b><em className={Number(a.percentage) >= 75 ? 'is-ok' : Number(a.percentage) >= 50 ? 'is-mid' : 'is-bad'}>{n(a.percentage)}٪</em></> : <b className="is-dim">—</b>}
+                  {a.status === 'completed' && (a.score === undefined || a.score === null) ? (
+                    <div className="alg-mark">
+                      <input type="number" min="0" placeholder="الدرجة" value={marks[a.id]?.score ?? ''} onChange={(e) => setMarks((x) => ({ ...x, [a.id]: { ...x[a.id], score: e.target.value } }))} />
+                      <span>من</span>
+                      <input type="number" min="1" placeholder="١٠" value={marks[a.id]?.total ?? ''} onChange={(e) => setMarks((x) => ({ ...x, [a.id]: { ...x[a.id], total: e.target.value } }))} />
+                      <button type="button" className="apl-btn apl-btn--ok" disabled={busy === a.id} onClick={() => saveMark(a)}><Icon name="check" /></button>
+                    </div>
+                  ) : a.status === 'completed' ? <><b>{n(a.score)}<small>/{n(a.total)}</small></b><em className={Number(a.percentage) >= 75 ? 'is-ok' : Number(a.percentage) >= 50 ? 'is-mid' : 'is-bad'}>{n(a.percentage)}٪</em></> : <b className="is-dim">—</b>}
                 </div>
                 <div className="apl-acts">
                   {det.length > 0 && <button type="button" className="apl-btn" onClick={() => setOpenId(open ? '' : a.id)}><Icon name={open ? 'chevronDown' : 'eye'} />الأسئلة</button>}
